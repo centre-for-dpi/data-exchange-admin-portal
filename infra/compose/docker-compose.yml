@@ -41,6 +41,11 @@ services:
       # Tokens always carry the browser-facing issuer; containers (APISIX) reach Keycloak by service name.
       KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'true'
+      # Placeholders resolved by --import-realm in infra/keycloak/*-realm.json (M0-03).
+      RID_PORTAL_WEB_CLIENT_SECRET: ${RID_PORTAL_WEB_CLIENT_SECRET:?set RID_PORTAL_WEB_CLIENT_SECRET in .env}
+      RID_GATEWAY_PROVISIONER_SECRET: ${RID_GATEWAY_PROVISIONER_SECRET:?set RID_GATEWAY_PROVISIONER_SECRET in .env}
+      RID_WEB_URL: ${RID_WEB_URL:-http://localhost:3000}
+      RID_DEMO_USER_PASSWORD: ${RID_DEMO_USER_PASSWORD:-demo}
     volumes:
       - ../keycloak:/opt/keycloak/data/import:ro
     ports:

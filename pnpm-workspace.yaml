@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - infra/mock-providers
+  - tests/*
 
 # pnpm 11 blocks dependency install scripts unless explicitly allowed here.
 allowBuilds:

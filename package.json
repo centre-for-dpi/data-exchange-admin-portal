@@ -23,7 +23,8 @@
     "infra:down": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability down",
     "infra:reset": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability down --volumes",
     "infra:ps": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability ps",
-    "infra:logs": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability logs -f --tail=100"
+    "infra:logs": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability logs -f --tail=100",
+    "test:integration": "pnpm --filter @rid/infra-tests test:integration"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

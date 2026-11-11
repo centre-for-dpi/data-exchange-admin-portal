@@ -105,6 +105,7 @@ pnpm dev                 # web (3000) + api (4000)
 pnpm test                # unit + integración
 pnpm test:e2e            # Playwright contra el stack completo
 pnpm test:policy         # opa test packages/policy
+pnpm test:integration    # pruebas contra el stack local (requiere pnpm infra:up)
 pnpm lint && pnpm typecheck
 pnpm license:check       # falla si hay una licencia no permitida
 pnpm demo                # ejecuta el guion de docs/DEMO.md de forma automatizada

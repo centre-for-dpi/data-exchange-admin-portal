@@ -1,0 +1,191 @@
+{
+  "realm": "rid-portal",
+  "enabled": true,
+  "displayName": "Portal RID",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": false,
+  "bruteForceProtected": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["es", "en"],
+  "defaultLocale": "es",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "no-reply@rid.example",
+    "fromDisplayName": "Portal RID"
+  },
+  "clients": [
+    {
+      "clientId": "rid-portal-web",
+      "name": "Portal RID (web)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${RID_PORTAL_WEB_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true,
+      "rootUrl": "${RID_WEB_URL:http://localhost:3000}",
+      "redirectUris": ["${RID_WEB_URL:http://localhost:3000}/*"],
+      "webOrigins": ["${RID_WEB_URL:http://localhost:3000}"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${RID_WEB_URL:http://localhost:3000}/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-rid-portal-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "rid-portal-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000001",
+      "username": "ana.operadora",
+      "firstName": "Ana",
+      "lastName": "Operadora",
+      "email": "ana.operadora@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000002",
+      "username": "pedro.publicador",
+      "firstName": "Pedro",
+      "lastName": "Publicador",
+      "email": "pedro.publicador@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000003",
+      "username": "lucia.datos",
+      "firstName": "Lucía",
+      "lastName": "Datos",
+      "email": "lucia.datos@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000004",
+      "username": "carlos.dev",
+      "firstName": "Carlos",
+      "lastName": "Desarrollador",
+      "email": "carlos.dev@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000005",
+      "username": "marta.regulador",
+      "firstName": "Marta",
+      "lastName": "Reguladora",
+      "email": "marta.regulador@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000006",
+      "username": "pablo.plataforma",
+      "firstName": "Pablo",
+      "lastName": "Plataforma",
+      "email": "pablo.plataforma@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000007",
+      "username": "sofia.auditora",
+      "firstName": "Sofía",
+      "lastName": "Auditora",
+      "email": "sofia.auditora@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a6c0-0000-7000-8000-000000000008",
+      "username": "elena.admin",
+      "firstName": "Elena",
+      "lastName": "Administradora",
+      "email": "elena.admin@demo.rid.example",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
