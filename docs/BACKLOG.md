@@ -98,10 +98,20 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Web:** la entidad activa va en una cookie validada contra `/me`; el selector tiene botón explícito, sin cambio al seleccionar (WCAG 3.2.2). La navegación usa los roles de plataforma más los de la entidad activa.
     - **Renovación del token:** el access token (5 min) se renueva con el refresh token 60 s antes de vencer, en el proxy. Se verificó con Keycloak real forzando el umbral.
     - **Pruebas:** 17 de autorización con tokens firmados en la prueba (corren en la CI) y 3 e2e con Keycloak real (roles en la navegación, operadora y cambio de entidad).
-- [ ] **M1-03 — Registrar API y versión**
+- [x] **M1-03 — Registrar API y versión**
   - `api_publisher` crea API y versión: subir OpenAPI 3.x (JSON/YAML), upstream `direct` o `node` (en M1, el nodo es el mock), campos expuestos, finalidades permitidas, clasificación.
   - Lint con Spectral (reglas mínimas: `operationId`, respuestas definidas); errores visibles por línea.
   - Estados `draft → in_review`.
+  - _Notas de implementación:_
+    - **Ruleset RID con Spectral** (Apache-2.0): parte de OAS con todas las reglas apagadas y activa solo `oas3-schema`, `operationId` (obligatorio y único), respuesta exitosa, parámetros válidos y `rid-no-id-in-query` (si `lint.noIdInQuery`). Esta última compara palabras del nombre (camelCase, guiones) para no marcar `valid` o `unidad`. Cada problema trae la línea (1-based) y la web la muestra.
+    - **La revisión de "descripciones en español" queda para M4-06**, porque necesita detectar el idioma.
+    - **Una versión con errores de lint queda en borrador:** se puede reemplazar el documento (`PUT .../openapi`) y el envío a revisión devuelve 400 con `openapi:<línea>`.
+    - **Upstream:** `direct` exige HTTPS. `node` lleva `servicePath`, y `nodeId` es opcional hasta M4 (en M1 el nodo es el mock). X-Road llega en M4-05.
+    - **El OpenAPI se guarda como `json` (no `jsonb`)** para conservar el orden del documento.
+    - **El predicado del índice parcial de suscripciones** se escribió tal como lo normaliza PostgreSQL, porque si no Prisma veía una diferencia en cada migración.
+    - **Máquina de estados** en `domain/api-version/state-machine.ts`: una transición inválida devuelve 409.
+    - **Permisos:** `api.write` es solo para `api_publisher`; `api.read` es para todos los miembros, el operador y el regulador.
+    - **Imports de Spectral:** sus paquetes son CommonJS y deben importarse por defecto. Vitest ocultaba el error y la prueba `pnpm --filter @rid/api test:dist` (también en la CI) lo detecta ejecutando el código compilado con Node.
 - [ ] **M1-04 — Revisión y publicación**
   - `platform_reviewer` aprueba o pide cambios con comentario; al aprobar → `published` (el paso del regulador llega en M2).
   - Publicar encola la reconciliación del gateway.

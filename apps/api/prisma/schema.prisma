@@ -326,8 +326,9 @@ model ApiVersion {
   major            Int
   minor            Int
   status           ApiVersionStatus @default(draft)
-  /// OpenAPI 3.x document as uploaded (stored as JSON) and its SHA-256.
-  openapiSpec      Json             @map("openapi_spec")
+  /// OpenAPI 3.x document as uploaded and its SHA-256. `json` (not jsonb) keeps the key order of
+  /// the document, so paths and operations are shown in the order the provider wrote them.
+  openapiSpec      Json             @map("openapi_spec") @db.Json
   openapiSha256    String           @map("openapi_sha256")
   lintReport       Json?            @map("lint_report")
   upstreamType     UpstreamType     @map("upstream_type")
@@ -500,7 +501,8 @@ model Subscription {
   decisions SubscriptionDecision[]
 
   /// At most one live subscription per application, API version and purpose (SPEC.md §4.4).
-  @@unique([applicationId, apiVersionId, purposeCode], map: "subscription_one_live_per_purpose", where: raw("status IN ('pending_provider', 'pending_regulator', 'approved', 'active', 'suspended')"))
+  /// The predicate is written exactly as PostgreSQL normalizes it, so Prisma sees no drift.
+  @@unique([applicationId, apiVersionId, purposeCode], map: "subscription_one_live_per_purpose", where: raw("(status = ANY (ARRAY['pending_provider'::subscription_status, 'pending_regulator'::subscription_status, 'approved'::subscription_status, 'active'::subscription_status, 'suspended'::subscription_status]))"))
   @@index([apiVersionId, status])
   @@index([status, validUntil])
   @@map("subscription")

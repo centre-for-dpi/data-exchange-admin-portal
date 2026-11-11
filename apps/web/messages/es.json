@@ -48,5 +48,112 @@
     "label": "Entidad activa",
     "change": "Cambiar",
     "current": "Entidad: {name}"
+  },
+  "forms": {
+    "required": "Obligatorio",
+    "errorSummary": "Revisa los campos marcados.",
+    "unexpected": "No pudimos completar la operación. Intenta de nuevo."
+  },
+  "classification": {
+    "public": "Pública",
+    "internal": "Interna",
+    "personal": "Datos personales",
+    "sensitive": "Datos sensibles"
+  },
+  "versionStatus": {
+    "draft": "Borrador",
+    "in_review": "En revisión",
+    "changes_requested": "Cambios solicitados",
+    "approved_operator": "Aprobada por el operador",
+    "approved_regulator": "Aprobada por el regulador",
+    "published": "Publicada",
+    "deprecated": "Obsoleta",
+    "retired": "Retirada"
+  },
+  "apiStatus": {
+    "draft": "Borrador",
+    "published": "Publicada",
+    "deprecated": "Obsoleta",
+    "retired": "Retirada"
+  },
+  "myApis": {
+    "noEntity": "Necesitas pertenecer a una entidad para ver sus APIs.",
+    "empty": "Tu entidad aún no ha registrado APIs.",
+    "newApi": "Registrar API",
+    "name": "Nombre",
+    "status": "Estado",
+    "classification": "Clasificación",
+    "sector": "Sector",
+    "readOnly": "Puedes ver las APIs de tu entidad. Solo quien tiene el rol de publicador puede registrarlas.",
+    "create": {
+      "title": "Registrar API",
+      "slug": "Identificador en la URL",
+      "slugHint": "Letras minúsculas, números y guiones. Forma parte de la ruta pública: /entidad/identificador/v1",
+      "name": "Nombre",
+      "summary": "Resumen",
+      "description": "Descripción (Markdown)",
+      "sector": "Sector",
+      "tags": "Etiquetas",
+      "tagsHint": "Separadas por comas",
+      "classification": "Clasificación",
+      "ownerContact": "Correo del responsable",
+      "submit": "Registrar API"
+    },
+    "detail": {
+      "versions": "Versiones",
+      "noVersions": "Esta API aún no tiene versiones.",
+      "newVersion": "Nueva versión",
+      "version": "Versión",
+      "basePath": "Ruta pública",
+      "owner": "Responsable"
+    }
+  },
+  "version": {
+    "create": {
+      "title": "Nueva versión de {api}",
+      "version": "Versión",
+      "versionHint": "Mayor.menor, por ejemplo 1.0",
+      "openapiFile": "Archivo OpenAPI (YAML o JSON)",
+      "openapiText": "O pega el documento OpenAPI",
+      "upstreamType": "¿Dónde vive el servicio?",
+      "upstreamNode": "Nodo del kit de APIs instantáneas",
+      "upstreamDirect": "API existente de la entidad (HTTPS)",
+      "servicePath": "Ruta del servicio en el nodo",
+      "url": "URL de la API",
+      "mtls": "La API exige mTLS",
+      "purposes": "Finalidades permitidas",
+      "exposedFields": "Datos que expone",
+      "fieldName": "Nombre del dato",
+      "personal": "Personal",
+      "sensitive": "Sensible",
+      "addField": "Agregar dato",
+      "removeField": "Quitar {name}",
+      "legalBasis": "Base legal",
+      "legalReferences": "Referencias normativas",
+      "legalReferencesHint": "Una por línea",
+      "submit": "Crear versión"
+    },
+    "detail": {
+      "title": "{api} · versión {version}",
+      "status": "Estado",
+      "basePath": "Ruta pública",
+      "upstream": "Servicio",
+      "purposes": "Finalidades permitidas",
+      "exposedFields": "Datos que expone",
+      "operations": "Operaciones",
+      "lint": "Validación del OpenAPI",
+      "lintOk": "El documento cumple las reglas de la red.",
+      "lintErrors": "El documento tiene {count, plural, one {# error} other {# errores}}. Corrígelos para poder enviarlo a revisión.",
+      "line": "Línea {line}",
+      "replace": "Reemplazar el documento OpenAPI",
+      "replaceSubmit": "Subir y validar",
+      "submit": "Enviar a revisión",
+      "inReview": "La versión está en revisión del operador.",
+      "yes": "Sí",
+      "no": "No",
+      "method": "Método",
+      "path": "Ruta",
+      "none": "Ninguno"
+    }
   }
 }

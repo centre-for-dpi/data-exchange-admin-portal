@@ -49,6 +49,8 @@ jobs:
       - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres
       - run: pnpm exec turbo run build --filter=@rid/api^...
       - run: pnpm --filter @rid/api test:integration
+      # Compiled code under plain Node: catches CommonJS interop issues Vitest hides.
+      - run: pnpm exec turbo run build --filter=@rid/api && pnpm --filter @rid/api test:dist
 
   policy:
     name: OPA policy tests

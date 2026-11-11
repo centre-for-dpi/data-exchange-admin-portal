@@ -24,6 +24,16 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['entity_admin', 'entity_viewer'],
     platformRoles: ['platform_admin', 'regulator'],
   },
+  /** See the entity's APIs and versions, including drafts. */
+  'api.read': {
+    entityRoles: ENTITY_ROLES,
+    platformRoles: ['platform_admin', 'platform_reviewer', 'regulator'],
+  },
+  /** Register APIs and versions, edit drafts and submit them for review (SPEC.md §2.2). */
+  'api.write': {
+    entityRoles: ['api_publisher'],
+    platformRoles: [],
+  },
 } as const satisfies Record<string, EntityPermission>;
 
 export type EntityAction = keyof typeof ENTITY_PERMISSIONS;

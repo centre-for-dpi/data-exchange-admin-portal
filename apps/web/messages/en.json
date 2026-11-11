@@ -48,5 +48,112 @@
     "label": "Active entity",
     "change": "Change",
     "current": "Entity: {name}"
+  },
+  "forms": {
+    "required": "Required",
+    "errorSummary": "Please review the highlighted fields.",
+    "unexpected": "We could not complete the operation. Please try again."
+  },
+  "classification": {
+    "public": "Public",
+    "internal": "Internal",
+    "personal": "Personal data",
+    "sensitive": "Sensitive data"
+  },
+  "versionStatus": {
+    "draft": "Draft",
+    "in_review": "In review",
+    "changes_requested": "Changes requested",
+    "approved_operator": "Approved by the operator",
+    "approved_regulator": "Approved by the regulator",
+    "published": "Published",
+    "deprecated": "Deprecated",
+    "retired": "Retired"
+  },
+  "apiStatus": {
+    "draft": "Draft",
+    "published": "Published",
+    "deprecated": "Deprecated",
+    "retired": "Retired"
+  },
+  "myApis": {
+    "noEntity": "You need to belong to an entity to see its APIs.",
+    "empty": "Your entity has not registered any API yet.",
+    "newApi": "Register API",
+    "name": "Name",
+    "status": "Status",
+    "classification": "Classification",
+    "sector": "Sector",
+    "readOnly": "You can see the APIs of your entity. Only users with the publisher role can register them.",
+    "create": {
+      "title": "Register API",
+      "slug": "URL identifier",
+      "slugHint": "Lower-case letters, digits and hyphens. Part of the public path: /entity/identifier/v1",
+      "name": "Name",
+      "summary": "Summary",
+      "description": "Description (Markdown)",
+      "sector": "Sector",
+      "tags": "Tags",
+      "tagsHint": "Comma separated",
+      "classification": "Classification",
+      "ownerContact": "Owner e-mail",
+      "submit": "Register API"
+    },
+    "detail": {
+      "versions": "Versions",
+      "noVersions": "This API has no versions yet.",
+      "newVersion": "New version",
+      "version": "Version",
+      "basePath": "Public path",
+      "owner": "Owner"
+    }
+  },
+  "version": {
+    "create": {
+      "title": "New version of {api}",
+      "version": "Version",
+      "versionHint": "Major.minor, for example 1.0",
+      "openapiFile": "OpenAPI file (YAML or JSON)",
+      "openapiText": "Or paste the OpenAPI document",
+      "upstreamType": "Where does the service live?",
+      "upstreamNode": "Node of the instant-APIs kit",
+      "upstreamDirect": "Existing API of the entity (HTTPS)",
+      "servicePath": "Service path on the node",
+      "url": "API URL",
+      "mtls": "The API requires mTLS",
+      "purposes": "Allowed purposes",
+      "exposedFields": "Data it exposes",
+      "fieldName": "Data name",
+      "personal": "Personal",
+      "sensitive": "Sensitive",
+      "addField": "Add data",
+      "removeField": "Remove {name}",
+      "legalBasis": "Legal basis",
+      "legalReferences": "Legal references",
+      "legalReferencesHint": "One per line",
+      "submit": "Create version"
+    },
+    "detail": {
+      "title": "{api} · version {version}",
+      "status": "Status",
+      "basePath": "Public path",
+      "upstream": "Service",
+      "purposes": "Allowed purposes",
+      "exposedFields": "Data it exposes",
+      "operations": "Operations",
+      "lint": "OpenAPI validation",
+      "lintOk": "The document meets the network rules.",
+      "lintErrors": "The document has {count, plural, one {# error} other {# errors}}. Fix them to send it for review.",
+      "line": "Line {line}",
+      "replace": "Replace the OpenAPI document",
+      "replaceSubmit": "Upload and validate",
+      "submit": "Send for review",
+      "inReview": "The version is being reviewed by the operator.",
+      "yes": "Yes",
+      "no": "No",
+      "method": "Method",
+      "path": "Path",
+      "none": "None"
+    }
   }
 }

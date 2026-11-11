@@ -16,7 +16,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:pgboss-migration": "node scripts/pgboss-migration.mjs",
-    "db:seed": "tsx src/seed/main.ts"
+    "db:seed": "tsx src/seed/main.ts",
+    "test:dist": "node scripts/smoke-dist.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.4.2",
@@ -27,6 +28,10 @@
     "@rid/config": "workspace:*",
     "@rid/contracts": "workspace:*",
     "@scalar/nestjs-api-reference": "^1.2.36",
+    "@stoplight/spectral-core": "^1.24.1",
+    "@stoplight/spectral-functions": "^1.11.1",
+    "@stoplight/spectral-parsers": "^1.0.5",
+    "@stoplight/spectral-rulesets": "^1.23.1",
     "fastify": "5.12.8",
     "jose": "^6.2.17",
     "pg": "^8.23.1",
