@@ -65,6 +65,36 @@ paths:
     expect(result.report.issues.filter((i) => i.severity === 'error')).toEqual([]);
   });
 
+  const aliasBomb = () => {
+    const levels = ['a: &a ["lol","lol","lol","lol","lol","lol","lol","lol","lol"]'];
+    for (let i = 1; i < 10; i += 1) {
+      const prev = String.fromCharCode(96 + i);
+      const name = String.fromCharCode(97 + i);
+      levels.push(
+        `${name}: &${name} [${Array(9)
+          .fill('*' + prev)
+          .join(',')}]`,
+      );
+    }
+    return levels.join('\n');
+  };
+
+  it('fails closed: an alias bomb combined with an unrelated YAML error is still rejected', async () => {
+    // A duplicate key makes a strict parser throw before it counts aliases; the document must
+    // still never reach Spectral's (unbounded) parser.
+    const source = `openapi: 3.1.0
+info: { title: T, version: '1' }
+paths: {}
+paths: {}
+${aliasBomb()}
+`;
+    const started = Date.now();
+    const result = await lintOpenApi(source, { noIdInQuery: true });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(result.report.valid).toBe(false);
+    expect(result.spec).toEqual({});
+  });
+
   it('rejects YAML alias bombs quickly instead of expanding them', async () => {
     const levels = ['a: &a ["lol","lol","lol","lol","lol","lol","lol","lol","lol"]'];
     for (let i = 1; i < 10; i += 1) {

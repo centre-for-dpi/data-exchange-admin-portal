@@ -5,7 +5,7 @@ import spectralCore from '@stoplight/spectral-core';
 import spectralParsers from '@stoplight/spectral-parsers';
 import spectralRefResolver from '@stoplight/spectral-ref-resolver';
 import spectralRulesets from '@stoplight/spectral-rulesets';
-import { parse as parseYaml } from 'yaml';
+import { parseDocument } from 'yaml';
 import type { LintIssue, LintReport } from '@rid/contracts';
 
 const { Spectral, Document, createRulesetFunction } = spectralCore;
@@ -135,47 +135,60 @@ export function listOperations(spec: Record<string, unknown>): ParsedOpenApi['op
 }
 
 /**
- * Parses an OpenAPI 3.x document given as YAML or JSON text and lints it with the RID ruleset.
- * Issues carry 1-based line numbers so the UI can point at them (M1-03).
+ * Gatekeeper in front of Spectral, whose YAML parser expands aliases without limit. Fails closed:
+ * the document reaches Spectral only if the bounded parser read it without any error, with at
+ * most MAX_YAML_ALIASES alias expansions and within MAX_PARSED_JSON_BYTES. Any other outcome
+ * (syntax error, duplicate key, alias bomb, oversize) rejects it here, with the error's line.
  */
-/**
- * Pre-parse with a bounded YAML parser before handing the text to Spectral, whose parser expands
- * aliases without limit. Returns an issue when the document must not be processed further.
- */
-function preflight(source: string): LintIssue | undefined {
+function preflight(source: string): LintIssue[] {
+  const document = parseDocument(source, { prettyErrors: false, uniqueKeys: true });
+  if (document.errors.length > 0) {
+    return document.errors.map((error) => ({
+      code: 'parser',
+      message: error.message,
+      severity: 'error' as const,
+      path: [],
+      line: error.linePos?.[0]?.line ?? 1,
+    }));
+  }
   let data: unknown;
   try {
-    data = parseYaml(source, { maxAliasCount: MAX_YAML_ALIASES, prettyErrors: false });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/alias/i.test(message)) {
-      return {
+    data = document.toJS({ maxAliasCount: MAX_YAML_ALIASES });
+  } catch {
+    return [
+      {
         code: 'rid-yaml-too-complex',
         message: `The YAML uses too many aliases (limit ${MAX_YAML_ALIASES})`,
         severity: 'error',
         path: [],
         line: 1,
-      };
-    }
-    return undefined; // Syntax errors are reported with their line by Spectral's parser below.
+      },
+    ];
   }
   if (JSON.stringify(data ?? null).length > MAX_PARSED_JSON_BYTES) {
-    return {
-      code: 'rid-openapi-too-large',
-      message: 'The document is too large once parsed',
-      severity: 'error',
-      path: [],
-      line: 1,
-    };
+    return [
+      {
+        code: 'rid-openapi-too-large',
+        message: 'The document is too large once parsed',
+        severity: 'error',
+        path: [],
+        line: 1,
+      },
+    ];
   }
-  return undefined;
+  return [];
 }
+
+/**
+ * Parses an OpenAPI 3.x document given as YAML or JSON text and lints it with the RID ruleset.
+ * Issues carry 1-based line numbers so the UI can point at them (M1-03).
+ */
 
 export async function lintOpenApi(source: string, options: LintOptions): Promise<ParsedOpenApi> {
   const sha256 = createHash('sha256').update(source).digest('hex');
   const rejected = preflight(source);
-  if (rejected) {
-    return { spec: {}, sha256, report: { valid: false, issues: [rejected] }, operations: [] };
+  if (rejected.length > 0) {
+    return { spec: {}, sha256, report: { valid: false, issues: rejected }, operations: [] };
   }
 
   const document = new Document(source, Yaml, 'openapi.yaml');
