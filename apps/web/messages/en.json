@@ -187,5 +187,36 @@
       "requestChanges": "Request changes",
       "decided": "This version is no longer in review."
     }
+  },
+  "catalog": {
+    "lead": "APIs published by the network entities. Each one shows the personal data it exposes and the purposes for which access can be requested.",
+    "search": "Search",
+    "searchLabel": "Search by name, summary or tag",
+    "sector": "Sector",
+    "entity": "Entity",
+    "classification": "Classification",
+    "all": "All",
+    "apply": "Filter",
+    "results": "{count, plural, =0 {No API matches the search.} one {# API found} other {# APIs found}}",
+    "personalData": "Personal data: {fields}",
+    "noPersonalData": "Exposes no personal data",
+    "sensitiveData": "Sensitive data: {fields}",
+    "providedBy": "Published by {entity}",
+    "more": "See more results",
+    "detail": {
+      "provider": "Provider entity",
+      "owner": "Owner",
+      "versions": "Versions",
+      "version": "Version {version}",
+      "gatewayUrl": "Gateway URL",
+      "purposes": "Purposes for which access can be requested",
+      "exposedFields": "Data it exposes",
+      "legalBasis": "Legal basis",
+      "rateLimit": "Default limit: {limit} requests per minute",
+      "documentation": "Interactive documentation",
+      "documentationNote": "Read-only documentation. To call the API you need an application and an approved access request.",
+      "deprecated": "Deprecated"
+    },
+    "signInRequired": "Sign in to see the catalogue of the network APIs."
   }
 }

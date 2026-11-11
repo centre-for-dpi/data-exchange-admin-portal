@@ -6,6 +6,7 @@ import type { Principal } from './principal.service.js';
 export const IS_PUBLIC = 'rid:public';
 export const ENTITY_ACTION = 'rid:entity-action';
 export const PLATFORM_ACTION = 'rid:platform-action';
+export const OPTIONAL_AUTH = 'rid:optional-auth';
 
 /** Endpoint that does not require authentication (health checks). Everything else does. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
@@ -16,6 +17,12 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
  * 403 to members whose roles do not allow it (CLAUDE.md, definition of done).
  */
 export const EntityAccess = (action: EntityAction) => SetMetadata(ENTITY_ACTION, action);
+
+/**
+ * Endpoint that also answers anonymous callers (no Authorization header): the handler decides what
+ * they may see (public catalogue, SPEC.md §2.3). A present but invalid token is still a 401.
+ */
+export const OptionalAuth = () => SetMetadata(OPTIONAL_AUTH, true);
 
 /** Endpoint on a platform-wide resource: callers without an allowed platform role get 403. */
 export const PlatformAccess = (action: PlatformAction) => SetMetadata(PLATFORM_ACTION, action);

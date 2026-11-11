@@ -28,11 +28,23 @@ async function accessToken(): Promise<string> {
   return token.accessToken;
 }
 
-export async function apiGet<S extends z.ZodType>(path: string, schema: S): Promise<z.output<S>> {
-  const res = await fetch(`${apiUrl()}/api/v1${path}`, {
-    headers: { authorization: `Bearer ${await accessToken()}`, accept: 'application/json' },
-    cache: 'no-store',
-  });
+export async function apiGet<S extends z.ZodType>(
+  path: string,
+  schema: S,
+  options: { anonymous?: boolean } = {},
+): Promise<z.output<S>> {
+  // anonymous: call without a token (public catalogue); otherwise the user's token is required.
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (!options.anonymous) headers.authorization = `Bearer ${await accessToken()}`;
+  const url = `${apiUrl()}/api/v1${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers, cache: 'no-store' });
+  } catch {
+    // GETs are idempotent: retry once on a network error (e.g. ECONNRESET when a keep-alive
+    // connection is closed by the API at the moment it is reused).
+    res = await fetch(url, { headers, cache: 'no-store' });
+  }
   if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => undefined));
   return schema.parse(await res.json());
 }

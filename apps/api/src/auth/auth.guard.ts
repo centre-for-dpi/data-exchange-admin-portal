@@ -13,6 +13,7 @@ import {
   ENTITY_ACTION,
   type EntityContext,
   IS_PUBLIC,
+  OPTIONAL_AUTH,
   PLATFORM_ACTION,
 } from './decorators.js';
 import {
@@ -45,6 +46,12 @@ export class AuthGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
     const request = context.switchToHttp().getRequest<FastifyRequest & AuthenticatedRequest>();
+    if (
+      this.reflector.getAllAndOverride<boolean>(OPTIONAL_AUTH, targets) &&
+      request.headers.authorization === undefined
+    ) {
+      return true;
+    }
     const principal = await this.authenticate(request);
     request.principal = principal;
 

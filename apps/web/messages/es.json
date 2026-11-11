@@ -187,5 +187,36 @@
       "requestChanges": "Pedir cambios",
       "decided": "Esta versión ya no está en revisión."
     }
+  },
+  "catalog": {
+    "lead": "APIs publicadas por las entidades de la red. Cada una indica qué datos personales expone y con qué finalidades se puede solicitar acceso.",
+    "search": "Buscar",
+    "searchLabel": "Buscar por nombre, resumen o etiqueta",
+    "sector": "Sector",
+    "entity": "Entidad",
+    "classification": "Clasificación",
+    "all": "Todas",
+    "apply": "Filtrar",
+    "results": "{count, plural, =0 {No hay APIs que coincidan con la búsqueda.} one {# API encontrada} other {# APIs encontradas}}",
+    "personalData": "Datos personales: {fields}",
+    "noPersonalData": "No expone datos personales",
+    "sensitiveData": "Datos sensibles: {fields}",
+    "providedBy": "Publicada por {entity}",
+    "more": "Ver más resultados",
+    "detail": {
+      "provider": "Entidad proveedora",
+      "owner": "Responsable",
+      "versions": "Versiones",
+      "version": "Versión {version}",
+      "gatewayUrl": "URL en el gateway",
+      "purposes": "Finalidades con las que se puede solicitar acceso",
+      "exposedFields": "Datos que expone",
+      "legalBasis": "Base legal",
+      "rateLimit": "Límite por defecto: {limit} peticiones por minuto",
+      "documentation": "Documentación interactiva",
+      "documentationNote": "Documentación de solo lectura. Para llamar a la API necesitas una aplicación y una solicitud de acceso aprobada.",
+      "deprecated": "Obsoleta"
+    },
+    "signInRequired": "Inicia sesión para ver el catálogo de APIs de la red."
   }
 }

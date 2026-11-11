@@ -123,8 +123,19 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Pedir cambios** exige un comentario de al menos 10 caracteres. Las decisiones quedan en `api_version_review`, solo de inserción para `rid_app`, y el publicador las ve en su versión.
     - **Separación de funciones y conflicto de interés** (reforzados tras la revisión automática de seguridad): el revisor no puede pertenecer a la entidad proveedora (con ningún rol), ni haber creado la API o la versión, ni haberla enviado. Esto se verifica aunque haya dejado la entidad, y la condición sobre quien envió se repite dentro del `UPDATE` para cubrir carreras. El paso del regulador también se exige cuando algún dato expuesto es `sensitive`, aunque la API no esté clasificada así.
     - **Web:** consola del operador con la cola y la ficha de revisión (aviso de minimización, datos expuestos, finalidades, operaciones y lint), formularios de decisión accesibles y vista de solo lectura para el regulador.
-- [ ] **M1-05 — Catálogo y detalle**
+- [x] **M1-05 — Catálogo y detalle**
   - Lista con búsqueda y filtros (sector, entidad, clasificación); detalle con ficha del servicio y documentación interactiva (Scalar) en modo solo lectura.
+  - _Notas de implementación:_
+    - **Endpoints `/catalog/*`:** búsqueda por texto en nombre, resumen y etiquetas, filtros por sector, entidad y clasificación, paginación por cursor, entidades con APIs publicadas, ficha y OpenAPI. Solo aparecen versiones `published` y `deprecated`.
+    - **Datos personales en las tarjetas:** cada tarjeta lista los datos personales y sensibles que expone la API.
+    - **OpenAPI del catálogo:** se sirve con `servers` reemplazado por la URL pública del gateway (`RID_GATEWAY_PUBLIC_URL`), para no publicar las direcciones internas del proveedor.
+    - **`@OptionalAuth`:** sin token, el catálogo responde 401, salvo con `features.publicCatalog`, que deja ver solo APIs `public` (SPEC §2.3). Un token inválido siempre da 401. En la web, un anónimo ve la invitación a iniciar sesión.
+    - **Scalar (MIT) empaquetado en la web, no desde CDN:** solo lectura (sin "Test Request" ni cliente), sin telemetría ni fuentes externas; el e2e verifica que no haya peticiones a otros hosts.
+    - **Contraste de Scalar:** su paleta por defecto no cumplía WCAG AA según axe; se corrigió con `customCss`.
+    - **Descripción en Markdown** con `react-markdown` (MIT), sin HTML crudo.
+    - **Pendiente:** el botón "Solicitar acceso" llega con M1-07 y "probar en sandbox" con M4-08.
+    - **Pendiente:** el modo `publicCatalog: true` no tiene prueba automatizada, porque `co.yaml` lo tiene apagado.
+    - **Pendiente, por investigar:** en dos corridas e2e la web recibió `ECONNRESET` del API; no se pudo reproducir con el log del API a la vista. Mitigación: un reintento único en las lecturas (GET).
 - [ ] **M1-06 — Aplicaciones y credenciales OAuth2**
   - `app_developer` crea una aplicación; el reconciliador crea el cliente en `rid-gateway`; el secreto se muestra una sola vez.
   - Guía de integración con `curl` para obtener token.

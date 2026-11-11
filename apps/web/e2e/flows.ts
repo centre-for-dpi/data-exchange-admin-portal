@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { expect, type Page } from '@playwright/test';
+import { type Browser, expect, type Page } from '@playwright/test';
 import { keycloakLogin } from './helpers';
 
 /** Shared UI flows of the API lifecycle (M1-03, M1-04). */
@@ -17,9 +17,9 @@ export async function signIn(page: Page, username: string, path = '/') {
 }
 
 export const signInAsPublisher = (page: Page) => signIn(page, 'pedro.publicador', '/my-apis');
-export async function registerApi(page: Page, slug: string) {
+export async function registerApi(page: Page, slug: string, name = 'Consulta de afiliación') {
   await page.getByRole('link', { name: 'Registrar API' }).click();
-  await page.getByLabel(/^Nombre/).fill('Consulta de afiliación');
+  await page.getByLabel(/^Nombre/).fill(name);
   await page.getByLabel('Identificador en la URL').fill(slug);
   await page.getByLabel('Resumen').fill('Consulta el estado de afiliación de una persona.');
   await page.getByLabel('Descripción (Markdown)').fill('API de prueba con datos sintéticos.');
@@ -27,9 +27,7 @@ export async function registerApi(page: Page, slug: string) {
   await page.getByLabel('Clasificación').selectOption({ label: 'Datos personales' });
   await page.getByLabel('Correo del responsable').fill('apis@salud.demo.rid.example');
   await page.getByRole('button', { name: 'Registrar API' }).click();
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Consulta de afiliación' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
 export async function newVersion(
@@ -48,11 +46,33 @@ export async function newVersion(
 }
 
 /** pedro registers an API and a version from the salud mock and sends it to review. */
-export async function submitNewApi(page: Page): Promise<{ name: string; versionUrl: string }> {
+export async function submitNewApi(
+  page: Page,
+  options: { name?: string; slug?: string } = {},
+): Promise<{ name: string; slug: string; versionUrl: string }> {
+  const slug = options.slug ?? `afiliacion-${Date.now().toString(36)}`;
+  const name = options.name ?? 'Consulta de afiliación';
   await signInAsPublisher(page);
-  await registerApi(page, `afiliacion-${Date.now().toString(36)}`);
+  await registerApi(page, slug, name);
   await newVersion(page, { version: '1.0', file: openapiFile });
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
   await expect(page.getByTestId('version-status')).toHaveText('En revisión');
-  return { name: 'Consulta de afiliación', versionUrl: page.url() };
+  return { name, slug, versionUrl: page.url() };
+}
+
+/** pedro submits a new API and ana approves it, in separate browser sessions. */
+export async function publishNewApi(
+  browser: Browser,
+  options: { name?: string; slug?: string } = {},
+): Promise<{ name: string; slug: string }> {
+  const publisher = await (await browser.newContext()).newPage();
+  const submitted = await submitNewApi(publisher, options);
+  const versionId = submitted.versionUrl.split('/versions/')[1]?.split(/[?#]/)[0] ?? '';
+  const operator = await (await browser.newContext()).newPage();
+  await signIn(operator, 'ana.operadora', `/operator/reviews/${versionId}`);
+  await operator.getByRole('button', { name: 'Aprobar' }).click();
+  await expect(operator.getByTestId('version-status')).toHaveText('Publicada');
+  await publisher.context().close();
+  await operator.context().close();
+  return { name: submitted.name, slug: submitted.slug };
 }

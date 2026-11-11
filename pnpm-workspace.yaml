@@ -16,3 +16,5 @@ allowBuilds:
   # Verifies the platform binary (used by tsx for the database seed).
   esbuild: true
   prisma: true
+  # Local file-copy script that selects the Vue 3 build (Scalar API reference).
+  vue-demi: true
