@@ -75,9 +75,17 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
 - [x] **SPIKE S-1 — Cabeceras de OPA visibles para otros plugins** (máx. 1 día)
   - Confirmar si las cabeceras de `send_headers_upstream` están disponibles para `limit-count` y `http-logger`, y cómo retirar `X-RID-End-User` en claro antes del upstream. Conclusión en `docs/spikes/S-1.md`. Si no, proponer alternativa (p. ej. `serverless-post-function` o plugin propio en Lua).
   - _Conclusión:_ sí, ambos plugins las ven, comprobado con tráfico real en APISIX 3.19. `X-RID-End-User` se retira listándolo en `send_headers_upstream` sin que la política lo devuelva, sin código propio. OPA ve la ruta pública completa: `pathRegex` se ancla a ella. Se usa `request-id` para generar `X-Request-Id`, la razón de negación va en `X-RID-Deny-Reason` y el 429 sale en problem+json con `response-rewrite`. `ARCHITECTURE.md` §4.1, §4.2 y §8 actualizados.
-- [ ] **M1-01 — Modelo de datos base**
+- [x] **M1-01 — Modelo de datos base**
   - Prisma: Entity, User, Membership, Api, ApiVersion, Application, Credential, Subscription, Purpose, AuditEvent, Outbox, SyncState.
   - Seed: 3 entidades (proveedora de salud ficticia, proveedora socioeconómica ficticia, consumidora), usuarios por rol, catálogo de finalidades de `co.yaml`.
+  - _Notas de implementación:_
+    - **Roles de plataforma** en `user_platform_role`, una fila por asignación para que quede auditable. El operador y el regulador no son `Entity`.
+    - **Suscripciones:** `decisions[]` es la tabla `subscription_decision`. La regla "una suscripción viva por aplicación, versión y finalidad" la impone un índice único parcial (función `partialIndexes` de Prisma, en preview).
+    - **"Nada se borra"** también lo impone la base: `rid_app` no tiene `DELETE` sobre las tablas de dominio. Solo lo conserva en `user_platform_role` y `api_version_purpose`, cuyas filas se revocan o editan, siempre con auditoría.
+    - **`Api.status`** se guarda (desnormalizado) para filtrar el catálogo y se actualiza en la misma transacción que las versiones.
+    - **Finalidades:** la tabla `purpose` es el catálogo. El seed la carga desde `co.yaml` (`source = config`) y el operador podrá agregar más (M2-10).
+    - **Seed idempotente** (`pnpm db:seed`): lee los usuarios del realm de Keycloak (misma fuente de IDs) y los sectores y el tipo de identificador desde la configuración del país. Todo lo que crea queda auditado como `system:seed`. `pedro.publicador` pertenece a dos entidades para probar el selector de M1-02.
+    - Quedan para sus historias: `Document` (M2-07), `Node` (M4), `Notification` (M2-08) y el estado de "pedir información" (M2-06).
 - [ ] **M1-02 — Sesión y contexto de entidad**
   - Login con Keycloak; el API resuelve usuario, roles de plataforma y membresías.
   - Selector de entidad activa en la UI; todo endpoint de entidad exige pertenencia (403/404 según `CLAUDE.md`).

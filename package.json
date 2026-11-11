@@ -27,7 +27,8 @@
     "test:integration": "turbo run test:integration --concurrency=1",
     "test:e2e": "pnpm --filter @rid/web test:e2e",
     "db:migrate": "pnpm --filter @rid/api db:migrate",
-    "db:deploy": "pnpm --filter @rid/api db:deploy"
+    "db:deploy": "pnpm --filter @rid/api db:deploy",
+    "db:seed": "pnpm --filter @rid/api db:seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

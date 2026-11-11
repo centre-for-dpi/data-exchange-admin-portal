@@ -103,7 +103,7 @@ pnpm install
 pnpm infra:up            # levanta Postgres, Keycloak, APISIX, etcd, OPA, step-ca, OpenSearch, Fluent Bit, Mailpit, mock-providers
 pnpm db:migrate          # prisma migrate dev (como dueño del esquema; el API corre como rid_app)
 pnpm db:deploy           # prisma migrate deploy (CI, producción)
-pnpm db:seed             # entidades, usuarios y APIs de ejemplo
+pnpm db:seed             # entidades, usuarios (del realm de Keycloak), roles y finalidades de ejemplo; idempotente
 pnpm dev                 # web (3000) + api (4000)
 pnpm test                # unit + integración
 pnpm test:e2e            # Playwright contra el stack completo

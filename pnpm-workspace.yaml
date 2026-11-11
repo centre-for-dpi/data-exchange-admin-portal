@@ -13,4 +13,6 @@ allowBuilds:
   # Install-time telemetry pulled in by swagger-ui-dist: never allowed.
   '@scarf/scarf': false
   '@swc/core': true
+  # Verifies the platform binary (used by tsx for the database seed).
+  esbuild: true
   prisma: true
