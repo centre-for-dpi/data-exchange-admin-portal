@@ -259,7 +259,7 @@ subscription_id, purpose, end_user_hash, bytes_sent, gateway_node
 | `POST /api/v1/nodes/{id}/renew` | Renovación de certificado |
 | `GET /api/v1/nodes/{id}/config` | Configuración deseada (versiones mínimas, avisos) |
 
-El kit se especifica en otro repositorio; este contrato es la frontera. En desarrollo, `infra/mock-providers` simula un nodo (PostgREST sobre datos ficticios) y un contenedor WireGuard.
+El kit se especifica en otro repositorio; este contrato es la frontera. En desarrollo, `infra/mock-providers` simula un nodo (servicios Fastify con datos sintéticos, ADR-0009) y un contenedor WireGuard.
 
 **Camino X-Road:** el gateway usa un Security Server del operador como cliente X-Road. El upstream apunta al Security Server y el reconciliador agrega `X-Road-Client` (subsistema del operador) y el identificador del servicio en la ruta REST. La identidad del consumidor real se propaga en `X-Road-UserId` y en las cabeceras `X-RID-*` (verificar soporte exacto del protocolo REST de X-Road en SPIKE S-5).
 

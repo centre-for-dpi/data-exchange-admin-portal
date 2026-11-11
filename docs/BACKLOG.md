@@ -32,10 +32,10 @@ Formato: `ID — título`. Criterios de aceptación (CA) debajo. **SPIKE** = inv
 - [ ] **M0-04 — Gateway, OPA y proveedores de prueba**
   - APISIX con etcd, Admin API solo en la red interna de Compose.
   - OPA configurado para descargar el bundle desde `apps/api` (puede fallar hasta M1-09).
-  - `mock-providers`: PostgREST sobre dos bases ficticias ("afiliación en salud" y "registro socioeconómico") con 1.000 personas sintéticas. **Ningún dato real.**
+  - `mock-providers`: dos servicios Fastify ("afiliación en salud" y "registro socioeconómico") con 1.000 personas sintéticas generadas de forma determinista, recursos por ruta y registro de cabeceras `X-RID-*` (ADR-0009). **Ningún dato real.**
 - [ ] **M0-05 — Verificación de licencias**
   - `pnpm license:check` lista licencias de todas las dependencias y falla ante cualquiera fuera de la lista permitida de `CLAUDE.md`.
-  - Lista de excepciones explícita y comentada (vacía al inicio).
+  - Lista de excepciones explícita y comentada, por paquete y solo para paquetes de datos (ADR-0008).
 - [ ] **M0-06 — Configuración por país**
   - `packages/config` carga `config/country/<código>.yaml` según `RID_COUNTRY`, la valida con zod y falla al arrancar si es inválida.
   - `co.yaml` y `example.yaml` completos según `SPEC.md §10`.

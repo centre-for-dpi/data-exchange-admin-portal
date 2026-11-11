@@ -27,7 +27,7 @@ Documentos que mandan (léelos antes de tocar un área):
 
 ## Reglas de oro (no negociables)
 
-1. **Solo open source con licencia aprobada por la OSI.** Antes de agregar cualquier dependencia, verifica su licencia. Permitidas: MIT, Apache-2.0, BSD-2/3, ISC, MPL-2.0, LGPL. GPL/AGPL solo para servicios separados que corren en su propio contenedor (Grafana, k6), nunca enlazados en nuestro código. Prohibidas: BSL, SSPL, Elastic License, "source-available", "fair source", Commons Clause. Ejecuta `pnpm license:check` antes de cada commit que toque dependencias.
+1. **Solo open source con licencia aprobada por la OSI.** Antes de agregar cualquier dependencia, verifica su licencia. Permitidas: MIT, Apache-2.0, BSD-2/3, ISC, MPL-2.0, LGPL, y las permisivas OSI de ADR-0008 (0BSD, BlueOak-1.0.0, Python-2.0, Zlib, Unlicense, MIT-0). Paquetes de datos con CC-BY/CC0 solo como excepción por paquete en `scripts/license-exceptions.json`. GPL/AGPL solo para servicios separados que corren en su propio contenedor (Grafana, k6), nunca enlazados en nuestro código. Prohibidas: BSL, SSPL, Elastic License, "source-available", "fair source", Commons Clause. Ejecuta `pnpm license:check` antes de cada commit que toque dependencias.
 2. **No se guarda el contenido de las respuestas.** Ni el portal, ni APISIX, ni los logs guardan cuerpos de petición o respuesta. Solo metadatos. Rutas y query strings se registran **enmascarados** (ver `ARCHITECTURE.md §8`), porque pueden contener números de identificación.
 3. **La autorización vive en el backend**, nunca solo en la UI. Cada endpoint del API verifica rol y pertenencia a la entidad. Hay tests de autorización para cada endpoint.
 4. **Todo cambio de estado de dominio emite un evento de auditoría** en la misma transacción (`AuditService.record(...)`). Sin excepción.
@@ -82,7 +82,7 @@ rid-portal/
 │   ├── opa/                 # config de OPA (apunta al bundle del portal)
 │   ├── step-ca/             # init de la CA de dev
 │   ├── fluent-bit/          # pipeline de logs con enmascarado
-│   └── mock-providers/      # servicios de ejemplo (PostgREST + datos ficticios)
+│   └── mock-providers/      # servicios de ejemplo (Fastify + datos sintéticos, ADR-0009)
 ├── scripts/                 # seed, license-check, demo
 └── docs/
     ├── SPEC.md
