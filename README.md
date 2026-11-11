@@ -22,6 +22,8 @@ pnpm dev
 
 Abre http://localhost:3000. Usuarios de prueba en `docs/DEMO.md`.
 
+Para las pruebas e2e (`pnpm test:e2e`, con el stack arriba) instala una vez el navegador: `pnpm --filter @rid/web exec playwright install chromium`.
+
 ### Infraestructura local
 
 | Comando | Qué hace |

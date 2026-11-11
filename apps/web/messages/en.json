@@ -1,0 +1,46 @@
+{
+  "metadata": {
+    "description": "Developer portal and governance console for the data exchange network between public entities."
+  },
+  "a11y": {
+    "skipToContent": "Skip to main content",
+    "mainNavigation": "Main navigation",
+    "language": "Language",
+    "homeLink": "{productName}: go to home page"
+  },
+  "locale": {
+    "es": "Español",
+    "en": "English"
+  },
+  "nav": {
+    "home": "Home",
+    "catalog": "Catalogue",
+    "myEntity": "My entity",
+    "myApis": "My APIs",
+    "myApps": "My applications",
+    "requests": "Requests",
+    "operator": "Operator console",
+    "regulator": "Regulator view",
+    "audit": "Audit"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signedInAs": "Signed in as {name}"
+  },
+  "home": {
+    "lead": "Publish, discover and consume public-sector APIs with a declared purpose, approval by the data owner and a trace of every request.",
+    "anonymousCta": "Sign in to see the catalogue, your applications and your pending tasks.",
+    "welcome": "Hello, {name}",
+    "quickAccess": "Quick access",
+    "noRoles": "You have no roles in any entity yet. Ask your entity administrator to invite you."
+  },
+  "footer": {
+    "operatedBy": "Operated by {operator}",
+    "supervisedBy": "Supervised by {regulator}",
+    "privacy": "The gateway does not store the content of requests: only who asked, which operation and for what purpose."
+  },
+  "comingSoon": {
+    "body": "This section will be available in a future version of the portal."
+  }
+}

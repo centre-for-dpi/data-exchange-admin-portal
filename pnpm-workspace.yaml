@@ -6,4 +6,6 @@ packages:
 
 # pnpm 11 blocks dependency install scripts unless explicitly allowed here.
 allowBuilds:
+  # Ships prebuilt binaries per platform; its script only builds from source as a fallback.
+  '@parcel/watcher': false
   '@swc/core': true

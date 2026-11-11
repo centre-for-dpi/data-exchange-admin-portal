@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+/* Design tokens. --primary and --primary-foreground are overridden per country from
+   config/country/<code>.yaml (branding.primaryColor) in the root layout. */
+:root {
+  --primary: #6564db;
+  --primary-foreground: #ffffff;
+  --background: #ffffff;
+  --foreground: #111827;
+  --muted: #f3f4f6;
+  --muted-foreground: #4b5563;
+  --border: #d1d5db;
+  /* Fixed dark focus ring: guaranteed 3:1 against the light background whatever the brand color. */
+  --ring: #111827;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}

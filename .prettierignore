@@ -7,3 +7,7 @@ pnpm-lock.yaml
 
 # Authored documentation keeps its own formatting
 *.md
+
+# Playwright
+**/test-results/
+**/playwright-report/

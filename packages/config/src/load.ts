@@ -49,7 +49,8 @@ export function resolveConfigDir(
   const fromEnv = env[CONFIG_DIR_ENV_VAR]?.trim();
   if (fromEnv) return resolve(fromEnv);
 
-  let dir = resolve(startDir);
+  // turbopackIgnore: runtime path, so the Next.js file tracer does not walk the whole repository.
+  let dir = resolve(/* turbopackIgnore: true */ startDir);
   for (;;) {
     const candidate = join(dir, 'config', 'country');
     if (existsSync(candidate)) return candidate;

@@ -1,0 +1,46 @@
+{
+  "metadata": {
+    "description": "Portal de desarrolladores y consola de gobierno de la red de intercambio de datos entre entidades públicas."
+  },
+  "a11y": {
+    "skipToContent": "Saltar al contenido principal",
+    "mainNavigation": "Navegación principal",
+    "language": "Idioma",
+    "homeLink": "{productName}: ir al inicio"
+  },
+  "locale": {
+    "es": "Español",
+    "en": "English"
+  },
+  "nav": {
+    "home": "Inicio",
+    "catalog": "Catálogo",
+    "myEntity": "Mi entidad",
+    "myApis": "Mis APIs",
+    "myApps": "Mis aplicaciones",
+    "requests": "Solicitudes",
+    "operator": "Consola del operador",
+    "regulator": "Vista del regulador",
+    "audit": "Auditoría"
+  },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signOut": "Cerrar sesión",
+    "signedInAs": "Sesión iniciada como {name}"
+  },
+  "home": {
+    "lead": "Publica, descubre y consume APIs de entidades públicas con finalidad declarada, aprobación del responsable de los datos y trazabilidad de cada consulta.",
+    "anonymousCta": "Inicia sesión para ver el catálogo, tus aplicaciones y tus pendientes.",
+    "welcome": "Hola, {name}",
+    "quickAccess": "Accesos rápidos",
+    "noRoles": "Aún no tienes roles asignados en una entidad. Pide al administrador de tu entidad que te invite."
+  },
+  "footer": {
+    "operatedBy": "Operado por {operator}",
+    "supervisedBy": "Supervisado por {regulator}",
+    "privacy": "El gateway no almacena el contenido de las consultas: solo quién consultó, qué operación y con qué finalidad."
+  },
+  "comingSoon": {
+    "body": "Esta sección estará disponible en una próxima versión del portal."
+  }
+}
