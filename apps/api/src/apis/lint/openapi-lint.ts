@@ -3,12 +3,32 @@ import spectralCore from '@stoplight/spectral-core';
 // Spectral packages are CommonJS: use their default export. Named/namespace imports work under
 // Vitest's interop but are undefined in plain Node ESM (caught by scripts/smoke-dist.mjs).
 import spectralParsers from '@stoplight/spectral-parsers';
+import spectralRefResolver from '@stoplight/spectral-ref-resolver';
 import spectralRulesets from '@stoplight/spectral-rulesets';
+import { parse as parseYaml } from 'yaml';
 import type { LintIssue, LintReport } from '@rid/contracts';
 
 const { Spectral, Document, createRulesetFunction } = spectralCore;
 const { oas } = spectralRulesets;
 const { Yaml } = spectralParsers;
+const { Resolver } = spectralRefResolver;
+
+/**
+ * The document is untrusted input. Spectral's default resolver follows $refs over HTTP and the
+ * file system (SSRF, local file read): this one has no readers at all, so only local `#/...`
+ * references resolve. External references are also reported by the rid-no-external-ref rule.
+ */
+const localOnlyResolver = () => new Resolver({ resolvers: {} });
+
+/** Limits against YAML alias bombs ("billion laughs") and oversized documents. */
+const MAX_YAML_ALIASES = 100;
+const MAX_PARSED_JSON_BYTES = 2 * 1024 * 1024;
+
+const onlyLocalRefs = createRulesetFunction<unknown, null>({ input: null, options: null }, (ref) =>
+  typeof ref === 'string' && ref.startsWith('#')
+    ? undefined
+    : [{ message: 'Only local references (#/...) are allowed; external $ref are not resolved' }],
+);
 
 /**
  * Words that mark a parameter as an identifier. Identifiers in the query string end up in URLs,
@@ -60,6 +80,13 @@ function ruleset(options: LintOptions) {
       'operation-parameters': 'error',
       'path-params': 'error',
       'no-$ref-siblings': 'error',
+      'rid-no-external-ref': {
+        description: 'Every $ref must point inside the document',
+        severity: 'error',
+        resolved: false,
+        given: "$..[?(@property === '$ref')]",
+        then: { function: onlyLocalRefs },
+      },
       ...(options.noIdInQuery
         ? {
             'rid-no-id-in-query': {
@@ -111,7 +138,46 @@ export function listOperations(spec: Record<string, unknown>): ParsedOpenApi['op
  * Parses an OpenAPI 3.x document given as YAML or JSON text and lints it with the RID ruleset.
  * Issues carry 1-based line numbers so the UI can point at them (M1-03).
  */
+/**
+ * Pre-parse with a bounded YAML parser before handing the text to Spectral, whose parser expands
+ * aliases without limit. Returns an issue when the document must not be processed further.
+ */
+function preflight(source: string): LintIssue | undefined {
+  let data: unknown;
+  try {
+    data = parseYaml(source, { maxAliasCount: MAX_YAML_ALIASES, prettyErrors: false });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/alias/i.test(message)) {
+      return {
+        code: 'rid-yaml-too-complex',
+        message: `The YAML uses too many aliases (limit ${MAX_YAML_ALIASES})`,
+        severity: 'error',
+        path: [],
+        line: 1,
+      };
+    }
+    return undefined; // Syntax errors are reported with their line by Spectral's parser below.
+  }
+  if (JSON.stringify(data ?? null).length > MAX_PARSED_JSON_BYTES) {
+    return {
+      code: 'rid-openapi-too-large',
+      message: 'The document is too large once parsed',
+      severity: 'error',
+      path: [],
+      line: 1,
+    };
+  }
+  return undefined;
+}
+
 export async function lintOpenApi(source: string, options: LintOptions): Promise<ParsedOpenApi> {
+  const sha256 = createHash('sha256').update(source).digest('hex');
+  const rejected = preflight(source);
+  if (rejected) {
+    return { spec: {}, sha256, report: { valid: false, issues: [rejected] }, operations: [] };
+  }
+
   const document = new Document(source, Yaml, 'openapi.yaml');
   const spec = (document.data ?? {}) as Record<string, unknown>;
   const issues: LintIssue[] = [];
@@ -136,7 +202,7 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
       line: 1,
     });
   } else {
-    const spectral = new Spectral();
+    const spectral = new Spectral({ resolver: localOnlyResolver() });
     spectral.setRuleset(ruleset(options) as unknown as Parameters<typeof spectral.setRuleset>[0]);
     for (const result of await spectral.run(document)) {
       issues.push({
@@ -152,7 +218,7 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
   issues.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
   return {
     spec,
-    sha256: createHash('sha256').update(source).digest('hex'),
+    sha256,
     report: { valid: !issues.some((i) => i.severity === 'error'), issues },
     operations: listOperations(spec),
   };

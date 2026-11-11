@@ -19,7 +19,15 @@ const ok = await lintOpenApi(spec, { noIdInQuery: true });
 const broken = await lintOpenApi(spec.replace('operationId: getAfiliado', ''), {
   noIdInQuery: true,
 });
-if (!ok.report.valid || ok.operations.length !== 2 || broken.report.valid) {
+// External $ref must be reported, never fetched (ref resolver wiring under plain Node).
+const external = await lintOpenApi(
+  spec.replace("$ref: '#/components/schemas/Afiliado'", "$ref: 'http://127.0.0.1:1/x.json'"),
+  {
+    noIdInQuery: true,
+  },
+);
+const externalFlagged = external.report.issues.some((i) => i.code === 'rid-no-external-ref');
+if (!ok.report.valid || ok.operations.length !== 2 || broken.report.valid || !externalFlagged) {
   console.error(
     'Smoke test failed',
     JSON.stringify({ ok: ok.report, broken: broken.report.valid }),

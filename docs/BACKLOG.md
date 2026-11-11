@@ -111,6 +111,7 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **El predicado del índice parcial de suscripciones** se escribió tal como lo normaliza PostgreSQL, porque si no Prisma veía una diferencia en cada migración.
     - **Máquina de estados** en `domain/api-version/state-machine.ts`: una transición inválida devuelve 409.
     - **Permisos:** `api.write` es solo para `api_publisher`; `api.read` es para todos los miembros, el operador y el regulador.
+    - **Seguridad del lint** (hallazgos de la revisión automática, corregidos con pruebas): el documento es entrada no confiable. Spectral corre con un resolver sin lectores HTTP ni de archivos, así que solo se resuelven `$ref` locales (`#/...`); la regla `rid-no-external-ref` marca los externos. Antes se comprobó que el resolver por defecto hacía la petición, es decir, que el SSRF era real. Un pre-parseo con `yaml` (`maxAliasCount: 100`) y un límite de 2 MiB del documento parseado evitan las bombas de alias YAML; sin esa defensa, una sola subida tumbaba el proceso por falta de memoria.
     - **Imports de Spectral:** sus paquetes son CommonJS y deben importarse por defecto. Vitest ocultaba el error y la prueba `pnpm --filter @rid/api test:dist` (también en la CI) lo detecta ejecutando el código compilado con Node.
 - [ ] **M1-04 — Revisión y publicación**
   - `platform_reviewer` aprueba o pide cambios con comentario; al aprobar → `published` (el paso del regulador llega en M2).
