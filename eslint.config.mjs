@@ -15,6 +15,7 @@ export default defineConfig(
     '**/.turbo/',
     '**/coverage/',
     '**/next-env.d.ts',
+    '**/src/generated/',
   ]),
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
@@ -68,7 +69,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['**/scripts/**/*.mjs'],
     rules: { 'no-console': 'off' },
   },
   prettier,

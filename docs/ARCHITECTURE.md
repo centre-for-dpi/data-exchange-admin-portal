@@ -227,7 +227,8 @@ El proveedor sabe quién consulta, para qué y bajo qué autorización: resuelve
 - **Prisma** con migraciones versionadas. Tablas principales = entidades de `SPEC.md §3` + `outbox`, `sync_state`, `audit_event`, `opa_bundle_revision`.
 - **Outbox** para que estado de dominio y trabajo de sincronización se confirmen en la misma transacción.
 - **Auditoría encadenada:** `hash = SHA-256(prevHash ‖ JSON canónico del evento)`. `seq` asignado por secuencia de PostgreSQL bajo bloqueo para evitar huecos. Endpoint de verificación de la cadena. Anclaje diario: el hash del último evento del día se envía por correo al regulador y se guarda en `audit_anchor` (en el futuro, sello de tiempo RFC 3161).
-- La tabla `audit_event` tiene permisos solo de `INSERT`/`SELECT` para el rol de la aplicación (sin `UPDATE`/`DELETE`).
+- La tabla `audit_event` tiene permisos solo de `INSERT`/`SELECT` para el rol de la aplicación (sin `UPDATE`/`DELETE`), y un trigger rechaza `UPDATE`/`DELETE`/`TRUNCATE` incluso para el dueño del esquema.
+- **Roles de base de datos:** el dueño del esquema (`rid`) solo se usa para migraciones; el API corre como `rid_app`, sin DDL. El esquema de pg-boss se crea con una migración de Prisma, así que pg-boss corre sin permisos de DDL.
 - **Documentos:** almacenamiento en volumen local detrás de la interfaz `StorageService` (adaptador S3 compatible a futuro, con un backend OSS como SeaweedFS o Garage). Solo PDF, antivirus opcional (ClamAV) en M6.
 
 ## 8. Logs de acceso y privacidad

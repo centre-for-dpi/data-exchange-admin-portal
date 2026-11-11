@@ -21,6 +21,7 @@ export const ALLOWED_LICENSES = new Set([
   'LGPL-2.1-or-later',
   'LGPL-3.0-only',
   'LGPL-3.0-or-later',
+  'EPL-2.0', // ADR-0012
 ]);
 
 /**

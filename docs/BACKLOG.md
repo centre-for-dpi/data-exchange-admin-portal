@@ -49,8 +49,20 @@ Formato: `ID — título`. Criterios de aceptación (CA) debajo. **SPIKE** = inv
   - Layout, navegación por rol, i18n es/en con `next-intl`, tokens de diseño leídos de `branding` de la config, componentes base shadcn/ui.
   - Verificación de accesibilidad con axe en un test de Playwright de la página de inicio.
   - _Notas de implementación:_ Auth.js v5 sigue en beta; se fijó la versión exacta `next-auth@5.0.0-beta.32`. Si se vuelve un problema, la alternativa es `openid-client` (MIT). El login usa Authorization Code + PKCE + state + nonce. Los tokens viven solo en la cookie cifrada HttpOnly; la sesión que ve el navegador no los incluye (lo verifica el e2e). Cerrar sesión también cierra la sesión de Keycloak (logout iniciado por el cliente), así que en la demo se puede cambiar de usuario. Rutas con next-intl: español sin prefijo y `/en` para inglés, sin redirigir según el idioma del navegador (`localeDetection: false`). El branding (nombre, color y logo en `/branding/logo`) y las autoridades vienen de `co.yaml`; el color del texto sobre el primario se elige para cumplir AA. La navegación por rol está en `src/lib/navigation.ts` con pruebas, pero los roles llegan vacíos hasta M1-02 (vendrán del API). Las secciones de historias futuras muestran "Próximamente". E2E (`pnpm test:e2e`, con el stack arriba): axe WCAG 2.1 AA en inicio, en inglés y con sesión iniciada; enlace para saltar al contenido; cambio de idioma; login y logout reales con Keycloak.
-- [ ] **M0-08 — Base del API**
+- [x] **M0-08 — Base del API**
   - Errores RFC 9457, `scopedRepo`, `AuditService` (aún sin cadena), tabla `outbox` y worker pg-boss vacío, OpenAPI del portal publicado en `/api/docs`.
+  - _Notas de implementación:_
+    - **Prisma 7.10** con adaptador `pg`. Hay dos roles de base de datos: `rid` es dueño del esquema y corre las migraciones (`DATABASE_MIGRATION_URL`); `rid_app` es el rol del API en ejecución (`DATABASE_URL`), sin DDL. Los crea `infra/postgres/init/02-app-role.sh`, que también crea la base `rid_test`.
+    - **Auditoría solo de inserción:** `rid_app` no tiene `UPDATE`, `DELETE` ni `TRUNCATE` sobre `audit_event`, y un trigger lo impide incluso al dueño del esquema. La purga por retención (5 años) necesitará un procedimiento explícito y auditado.
+    - **UUIDv7** con `uuidv7()` de PostgreSQL 18.
+    - **Esquema de pg-boss 12** generado como migración de Prisma (`pnpm --filter @rid/api db:pgboss-migration`); el API corre pg-boss sin permisos de DDL. Al actualizar pg-boss hay que generar su migración de upgrade.
+    - **Outbox:** un relay (cada 1 s) pasa los mensajes a colas con política `stately` por agregado, así que varios cambios seguidos se reconcilian una vez. La entrega es al menos una vez. `RID_WORKER=off` desactiva el worker.
+    - **`AuditService.record(tx, …)` y `OutboxService.enqueue(tx, …)` exigen el cliente de transacción**, para que el evento y el trabajo de sincronización queden en la misma transacción que el cambio. Los campos con nombre de secreto se redactan.
+    - **`scopedRepo`** combina el filtro del llamador con `entityId` (no lo reemplaza), no expone operaciones por clave primaria e impide mover filas a otra entidad. La prueba con tablas reales llega en M1-01.
+    - **Errores RFC 9457** en todo: también los que Fastify genera antes del handler (JSON mal formado → 400, cuerpo de más de 1 MiB → 413, tipo de contenido distinto de JSON → 415). Solo los errores de dominio llevan `detail`, porque los mensajes del framework pueden repetir la URL o parte del cuerpo.
+    - **OpenAPI desde zod (ADR-0013)** en `/api/docs/openapi.json` con Scalar en `/api/docs`; una prueba exige que toda ruta esté documentada.
+    - **Licencias:** se permitió EPL-2.0 (ADR-0012), que llega con el CLI de Prisma. Se descartó `@nestjs/swagger` porque arrastra `argparse` con PSF-2.0, que no está aprobada por la OSI.
+    - **CI:** nuevo job con PostgreSQL (mismo Compose) que corre `pnpm --filter @rid/api test:integration`.
 
 **Cierre M0:** `pnpm infra:up && pnpm dev` muestra la web con login funcionando contra Keycloak.
 

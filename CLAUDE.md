@@ -29,7 +29,7 @@ Documentos que mandan (léelos antes de tocar un área):
 
 ## Reglas de oro (no negociables)
 
-1. **Solo open source con licencia aprobada por la OSI.** Antes de agregar cualquier dependencia, verifica su licencia. Permitidas: MIT, Apache-2.0, BSD-2/3, ISC, MPL-2.0, LGPL, y las permisivas OSI de ADR-0008 (0BSD, BlueOak-1.0.0, Python-2.0, Zlib, Unlicense, MIT-0). Paquetes de datos con CC-BY/CC0 solo como excepción por paquete en `scripts/license-exceptions.json`. GPL/AGPL solo para servicios separados que corren en su propio contenedor (Grafana, k6), nunca enlazados en nuestro código. Prohibidas: BSL, SSPL, Elastic License, "source-available", "fair source", Commons Clause. Ejecuta `pnpm license:check` antes de cada commit que toque dependencias.
+1. **Solo open source con licencia aprobada por la OSI.** Antes de agregar cualquier dependencia, verifica su licencia. Permitidas: MIT, Apache-2.0, BSD-2/3, ISC, MPL-2.0, LGPL, y las permisivas OSI de ADR-0008 (0BSD, BlueOak-1.0.0, Python-2.0, Zlib, Unlicense, MIT-0), más EPL-2.0 como copyleft débil (ADR-0012). Paquetes de datos con CC-BY/CC0 solo como excepción por paquete en `scripts/license-exceptions.json`. GPL/AGPL solo para servicios separados que corren en su propio contenedor (Grafana, k6), nunca enlazados en nuestro código. Prohibidas: BSL, SSPL, Elastic License, "source-available", "fair source", Commons Clause. Ejecuta `pnpm license:check` antes de cada commit que toque dependencias.
 2. **No se guarda el contenido de las respuestas.** Ni el portal, ni APISIX, ni los logs guardan cuerpos de petición o respuesta. Solo metadatos. Rutas y query strings se registran **enmascarados** (ver `ARCHITECTURE.md §8`), porque pueden contener números de identificación.
 3. **La autorización vive en el backend**, nunca solo en la UI. Cada endpoint del API verifica rol y pertenencia a la entidad. Hay tests de autorización para cada endpoint.
 4. **Todo cambio de estado de dominio emite un evento de auditoría** en la misma transacción (`AuditService.record(...)`). Sin excepción.
@@ -46,7 +46,7 @@ Documentos que mandan (léelos antes de tocar un área):
 | :-- | :-- |
 | Monorepo | pnpm workspaces + Turborepo |
 | Web | Next.js (App Router) + React + TypeScript, Tailwind CSS + shadcn/ui, next-intl, Auth.js (proveedor Keycloak) |
-| API | NestJS con adaptador Fastify, TypeScript, OpenAPI generado (`@nestjs/swagger`) |
+| API | NestJS con adaptador Fastify, TypeScript, OpenAPI generado desde los esquemas zod y publicado con Scalar (ADR-0013) |
 | Base de datos | PostgreSQL + Prisma (migraciones versionadas) |
 | Trabajos en segundo plano | pg-boss (cola sobre PostgreSQL; no agregamos Redis) |
 | Validación compartida | zod en `packages/contracts` (mismos esquemas en web y API) |
@@ -101,7 +101,8 @@ Dentro de `apps/api/src`, un módulo NestJS por contexto de dominio: `entities`,
 ```bash
 pnpm install
 pnpm infra:up            # levanta Postgres, Keycloak, APISIX, etcd, OPA, step-ca, OpenSearch, Fluent Bit, Mailpit, mock-providers
-pnpm db:migrate          # prisma migrate dev
+pnpm db:migrate          # prisma migrate dev (como dueño del esquema; el API corre como rid_app)
+pnpm db:deploy           # prisma migrate deploy (CI, producción)
 pnpm db:seed             # entidades, usuarios y APIs de ejemplo
 pnpm dev                 # web (3000) + api (4000)
 pnpm test                # unit + integración

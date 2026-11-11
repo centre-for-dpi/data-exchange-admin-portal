@@ -8,4 +8,9 @@ packages:
 allowBuilds:
   # Ships prebuilt binaries per platform; its script only builds from source as a fallback.
   '@parcel/watcher': false
+  # Downloads the Prisma schema/migration engine binaries.
+  '@prisma/engines': true
+  # Install-time telemetry pulled in by swagger-ui-dist: never allowed.
+  '@scarf/scarf': false
   '@swc/core': true
+  prisma: true

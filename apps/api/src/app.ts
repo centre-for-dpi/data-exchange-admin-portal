@@ -1,14 +1,39 @@
+import type { Type } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module.js';
+import { ProblemDetailsFilter } from './common/problem.filter.js';
+import { registerApiDocs } from './openapi/docs.js';
 
 export const API_PREFIX = 'api/v1';
+/** Maximum JSON body (CLAUDE.md, ARCHITECTURE.md §12). Document uploads get their own limit. */
+export const BODY_LIMIT_BYTES = 1024 * 1024;
 
-/** Builds the Nest application without listening, so tests and main share the same setup. */
-export async function createApp(): Promise<NestFastifyApplication> {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
+export function createAdapter(): FastifyAdapter {
+  const adapter = new FastifyAdapter({ bodyLimit: BODY_LIMIT_BYTES });
+  // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
+  adapter.getInstance().removeContentTypeParser('text/plain');
+  return adapter;
+}
+
+/**
+ * Shared setup for the real app and for tests: prefix, RFC 9457 errors everywhere and docs.
+ * The global filter must be set before init(): Nest installs Fastify's error and not-found
+ * handlers during init and routes them through global filters, so errors raised before a
+ * handler runs (malformed JSON, oversized body, wrong content type) become problems too.
+ */
+export async function configureApp(app: NestFastifyApplication): Promise<NestFastifyApplication> {
+  app.setGlobalPrefix(API_PREFIX);
+  app.useGlobalFilters(new ProblemDetailsFilter());
+  await app.init();
+  registerApiDocs(app, API_PREFIX);
+  return app;
+}
+
+/** Builds and initialises the application without listening. */
+export async function createApp(module: Type = AppModule): Promise<NestFastifyApplication> {
+  const app = await NestFactory.create<NestFastifyApplication>(module, createAdapter(), {
     logger: ['error', 'warn', 'log'],
   });
-  app.setGlobalPrefix(API_PREFIX);
-  return app;
+  return configureApp(app);
 }

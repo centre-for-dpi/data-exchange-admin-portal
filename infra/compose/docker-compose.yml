@@ -18,6 +18,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
       KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:?set KEYCLOAK_DB_USER in .env}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
+      RID_APP_DB_PASSWORD: ${RID_APP_DB_PASSWORD:?set RID_APP_DB_PASSWORD in .env}
     volumes:
       - pg-data:/var/lib/postgresql
       - ../postgres/init:/docker-entrypoint-initdb.d:ro

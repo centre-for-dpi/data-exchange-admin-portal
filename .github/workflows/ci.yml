@@ -32,6 +32,24 @@ jobs:
       - run: pnpm test
       - run: pnpm license:check
 
+  api-integration:
+    name: API integration tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Same PostgreSQL image and init scripts (roles rid/rid_app, database rid_test) as local dev.
+      - run: cp .env.example .env
+      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres
+      - run: pnpm exec turbo run build --filter=@rid/api^...
+      - run: pnpm --filter @rid/api test:integration
+
   policy:
     name: OPA policy tests
     runs-on: ubuntu-latest

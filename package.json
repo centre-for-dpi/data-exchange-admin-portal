@@ -24,8 +24,10 @@
     "infra:reset": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability down --volumes",
     "infra:ps": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability ps",
     "infra:logs": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability logs -f --tail=100",
-    "test:integration": "pnpm --filter @rid/infra-tests test:integration",
-    "test:e2e": "pnpm --filter @rid/web test:e2e"
+    "test:integration": "turbo run test:integration --concurrency=1",
+    "test:e2e": "pnpm --filter @rid/web test:e2e",
+    "db:migrate": "pnpm --filter @rid/api db:migrate",
+    "db:deploy": "pnpm --filter @rid/api db:deploy"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

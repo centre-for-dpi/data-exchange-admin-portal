@@ -9,11 +9,14 @@ export const PROBLEM_TYPE_BASE = 'https://rid.example/errors/';
  */
 export const ErrorCode = {
   ValidationFailed: 'validation_failed',
+  BadRequest: 'bad_request',
   Unauthenticated: 'unauthenticated',
   Forbidden: 'forbidden',
   NotFound: 'not_found',
   Conflict: 'conflict',
   InvalidTransition: 'invalid_transition',
+  PayloadTooLarge: 'payload_too_large',
+  UnsupportedMediaType: 'unsupported_media_type',
   RateLimited: 'rate_limited',
   Internal: 'internal',
 } as const;
@@ -22,11 +25,14 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   validation_failed: 400,
+  bad_request: 400,
   unauthenticated: 401,
   forbidden: 403,
   not_found: 404,
   conflict: 409,
   invalid_transition: 409,
+  payload_too_large: 413,
+  unsupported_media_type: 415,
   rate_limited: 429,
   internal: 500,
 };

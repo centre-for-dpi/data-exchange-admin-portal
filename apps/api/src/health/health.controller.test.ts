@@ -7,7 +7,6 @@ describe('GET /api/v1/health', () => {
 
   beforeAll(async () => {
     app = await createApp();
-    await app.init();
     await app.getHttpAdapter().getInstance().ready();
   });
 
@@ -15,7 +14,7 @@ describe('GET /api/v1/health', () => {
     await app.close();
   });
 
-  it('returns ok', async () => {
+  it('returns ok without a database', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/v1/health' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: 'ok' });

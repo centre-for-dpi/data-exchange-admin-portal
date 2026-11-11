@@ -10,6 +10,7 @@ describe('isLicenseAllowed', () => {
     'Python-2.0',
     'MPL-2.0',
     'LGPL-3.0-or-later',
+    'EPL-2.0',
   ])('allows %s', (license) => {
     expect(isLicenseAllowed(license)).toBe(true);
   });
@@ -22,6 +23,8 @@ describe('isLicenseAllowed', () => {
     'Elastic-2.0',
     'CC-BY-4.0',
     'CC0-1.0',
+    'PSF-2.0',
+    'EPL-1.0',
     'UNLICENSED',
     'Unknown',
     '',
