@@ -15,6 +15,8 @@ El portal NO es el gateway. El gateway es **Apache APISIX**. El portal es la cap
 - El portal traduce ese estado a configuración de **APISIX**, datos de política para **OPA** y clientes en **Keycloak**.
 - Todo cambio de estado queda en una **bitácora de auditoría** encadenada por hash.
 
+**Dos entregables separados (ADR-0011).** Este repositorio es solo el **portal + gateway**. El **kit de APIs instantáneas** que se instala en las entidades es otro producto, con su propio repositorio; la frontera es el contrato de `ARCHITECTURE.md §10`. `infra/mock-providers` y el nodo simulado de M4 son utilería de pruebas, no el kit: no implementes aquí instalador, conectores a bases de datos de entidades, generación de APIs ni agente del nodo.
+
 Documentos que mandan (léelos antes de tocar un área):
 
 | Documento | Para qué |

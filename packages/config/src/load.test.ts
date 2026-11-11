@@ -69,7 +69,7 @@ describe('versioned country files', () => {
     );
     expect(config.features).toEqual({
       publicCatalog: false,
-      mtls: { required: true },
+      mtls: { required: false }, // ADR-0010: back to true in M3-10
       sandbox: { autoApprove: true },
       approval: { regulatorForSensitive: true },
       lint: { noIdInQuery: true },

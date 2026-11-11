@@ -72,7 +72,9 @@ purposes:
 features:
   publicCatalog: false
   mtls:
-    required: true
+    # REQUIREMENT: true (SPEC.md §4.3). Disabled until mTLS is implemented in M3; M3-10 turns it
+    # back on. See docs/adr/0010-mtls-diferido-hasta-m3.md.
+    required: false
   sandbox:
     autoApprove: true
   approval:
