@@ -1,0 +1,83 @@
+# Template for a new country. Copy it to config/country/<code>.yaml (ISO 3166-1 alpha-2 in lower
+# case, e.g. pe.yaml), fill every field and start the stack with RID_COUNTRY=<code>.
+# Schema and validation rules: packages/config/src/schema.ts. Unknown keys are rejected.
+#
+# Texts marked "localized" accept a plain string or { es: ..., en: ... } (the portal's UI languages).
+
+country:
+  code: XX # ISO 3166-1 alpha-2, upper case. Must match the file name (xx.yaml).
+  name: Example Country
+  locale: es # BCP 47 locale for dates and numbers, e.g. es-PE, en-KE.
+  timezone: UTC # IANA time zone used to display dates (stored in UTC).
+
+authorities:
+  operator: # Runs the gateway and reviews publications.
+    name: National Digital Operator (example)
+    shortName: NDO
+  regulator: # Oversees the network; approves sensitive publications and subscriptions.
+    name: Ministry of Digital Affairs (example)
+    shortName: MDA
+
+legal:
+  dataProtectionLaw: Data Protection Act (example)
+  dataProtectionAuthority: Data Protection Authority (example)
+
+identifiers:
+  person: [NATIONAL_ID, PASSPORT] # Person document types accepted in the country.
+  organization: [TAX_ID] # Organization identifier types.
+
+sectors: # code: lower snake_case, stable. name: localized.
+  - code: identity
+    name: { es: Identidad, en: Identity }
+  - code: health
+    name: { es: Salud, en: Health }
+  - code: social_protection
+    name: { es: Protección social, en: Social protection }
+
+purposes: # Purpose catalogue offered to consumers. code: lower snake_case, stable.
+  - code: eligibility_check
+    name: { es: Verificación de requisitos, en: Eligibility check }
+    description:
+      es: Verificar que una persona cumple los requisitos de un trámite.
+      en: Verify that a person meets the requirements of a procedure.
+    # legalReference: optional reference to the norm that enables this purpose.
+  - code: identity_validation
+    name: { es: Validación de identidad, en: Identity validation }
+    description:
+      es: Confirmar la identidad de una persona en un trámite.
+      en: Confirm a person's identity during a procedure.
+
+features:
+  publicCatalog: false # Anonymous users can browse public APIs.
+  mtls:
+    required: true # Consumer applications must present a client certificate.
+  sandbox:
+    autoApprove: true # Sandbox subscriptions are approved automatically.
+  approval:
+    regulatorForSensitive: true # Sensitive APIs/subscriptions also need the regulator.
+  lint:
+    noIdInQuery: true # OpenAPI lint rejects identifiers in query strings.
+
+subscriptionMaxValidityMonths: # Per API classification.
+  public: 24
+  internal: 24
+  personal: 12
+  sensitive: 6
+
+# lifecycle and retention are optional; omitted values take the SPEC.md defaults.
+lifecycle:
+  apiRetirementNoticeDays: 90
+  subscriptionRenewalNoticeDays: 30
+  certificateValidityDays: 90
+  certificateExpiryWarningDays: 15
+  enrollmentTokenValidityHours: 72
+  nodeOfflineAfterMinutes: 5
+
+retention:
+  auditYears: 5
+  accessLogMonths: 12
+
+branding:
+  productName: Data Exchange Network
+  logo: ./branding/example/logo.svg # Relative to this file.
+  primaryColor: '#2F6F8F'

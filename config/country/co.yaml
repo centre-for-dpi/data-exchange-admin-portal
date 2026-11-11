@@ -1,0 +1,106 @@
+# Country configuration: Colombia (first deployment). Schema: packages/config/src/schema.ts.
+# Everything country-specific lives here or in i18n files, never in code (CLAUDE.md, rule 6).
+
+country:
+  code: CO
+  name: Colombia
+  locale: es-CO
+  timezone: America/Bogota
+
+authorities:
+  operator:
+    name: Agencia Nacional Digital
+    shortName: AND
+  regulator:
+    name: Ministerio de Tecnologías de la Información y las Comunicaciones
+    shortName: MinTIC
+
+legal:
+  dataProtectionLaw: Ley 1581 de 2012
+  dataProtectionAuthority: Superintendencia de Industria y Comercio
+
+identifiers:
+  # Person document types: cédula de ciudadanía, cédula de extranjería, tarjeta de identidad,
+  # permiso especial de permanencia, permiso por protección temporal, pasaporte.
+  person: [CC, CE, TI, PEP, PPT, PA]
+  organization: [NIT]
+
+sectors:
+  - code: identidad
+    name: { es: Identidad, en: Identity }
+  - code: vulnerabilidad
+    name: { es: Vulnerabilidad, en: Vulnerability }
+  - code: vivienda
+    name: { es: Vivienda, en: Housing }
+  - code: salud
+    name: { es: Salud, en: Health }
+  - code: trabajo
+    name: { es: Trabajo, en: Labour }
+  - code: educacion
+    name: { es: Educación, en: Education }
+  - code: movilidad
+    name: { es: Movilidad, en: Mobility }
+
+# Purpose catalogue (SPEC.md §3). The operator can extend it from the portal (M2-10).
+purposes:
+  - code: eligibility_check
+    name: { es: Verificación de requisitos de un trámite, en: Eligibility check for a procedure }
+    description:
+      es: Verificar que una persona cumple los requisitos de un trámite o servicio.
+      en: Verify that a person meets the requirements of a procedure or service.
+  - code: benefit_targeting
+    name: { es: Focalización de programas sociales, en: Social programme targeting }
+    description:
+      es: Identificar a los beneficiarios de un programa social.
+      en: Identify the beneficiaries of a social programme.
+  - code: identity_validation
+    name: { es: Validación de identidad, en: Identity validation }
+    description:
+      es: Confirmar la identidad de una persona en un trámite.
+      en: Confirm a person's identity during a procedure.
+  - code: statistics_anonymized
+    name: { es: Estadística anonimizada, en: Anonymised statistics }
+    description:
+      es: Producir estadísticas sin identificar a las personas.
+      en: Produce statistics without identifying individuals.
+  - code: oversight
+    name: { es: Control y auditoría, en: Oversight and audit }
+    description:
+      es: Ejercer funciones de control, vigilancia o auditoría.
+      en: Carry out oversight, supervision or audit functions.
+
+features:
+  publicCatalog: false
+  mtls:
+    required: true
+  sandbox:
+    autoApprove: true
+  approval:
+    regulatorForSensitive: true
+  lint:
+    noIdInQuery: true
+
+subscriptionMaxValidityMonths:
+  public: 24
+  internal: 24
+  personal: 12
+  sensitive: 6
+
+# Optional; these are the SPEC.md defaults, written out for visibility.
+lifecycle:
+  apiRetirementNoticeDays: 90
+  subscriptionRenewalNoticeDays: 30
+  certificateValidityDays: 90
+  certificateExpiryWarningDays: 15
+  enrollmentTokenValidityHours: 72
+  nodeOfflineAfterMinutes: 5
+
+retention:
+  auditYears: 5
+  accessLogMonths: 12
+
+branding:
+  productName: Red de Intercambio de Datos
+  # Placeholder mark; replace with the official logo provided by the operator.
+  logo: ./branding/co/logo.svg
+  primaryColor: '#6564DB'
