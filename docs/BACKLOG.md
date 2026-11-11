@@ -121,7 +121,7 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Aprobar** registra `approved_operator` y, en la misma transacción, publica: `published`, `publishedAt`, `Api.status = published` y un mensaje `gateway.sync` / `apiVersion:<id>` en el outbox (M1-08 lo consume). Ambas transiciones quedan auditadas.
     - **Versiones `sensitive`**, con `approval.regulatorForSensitive` activo, quedan en `approved_operator` esperando al regulador (M2-04).
     - **Pedir cambios** exige un comentario de al menos 10 caracteres. Las decisiones quedan en `api_version_review`, solo de inserción para `rid_app`, y el publicador las ve en su versión.
-    - **Separación de funciones:** se guarda `submittedBy`, y quien envió la versión no puede aprobarla (403).
+    - **Separación de funciones y conflicto de interés** (reforzados tras la revisión automática de seguridad): el revisor no puede pertenecer a la entidad proveedora (con ningún rol), ni haber creado la API o la versión, ni haberla enviado. Esto se verifica aunque haya dejado la entidad, y la condición sobre quien envió se repite dentro del `UPDATE` para cubrir carreras. El paso del regulador también se exige cuando algún dato expuesto es `sensitive`, aunque la API no esté clasificada así.
     - **Web:** consola del operador con la cola y la ficha de revisión (aviso de minimización, datos expuestos, finalidades, operaciones y lint), formularios de decisión accesibles y vista de solo lectura para el regulador.
 - [ ] **M1-05 — Catálogo y detalle**
   - Lista con búsqueda y filtros (sector, entidad, clasificación); detalle con ficha del servicio y documentación interactiva (Scalar) en modo solo lectura.

@@ -57,10 +57,39 @@ export class ReviewsService {
     return version;
   }
 
-  private requiresRegulator(classification: string): boolean {
-    return (
-      classification === 'sensitive' && getCountryConfig().features.approval.regulatorForSensitive
-    );
+  /**
+   * The regulator must also approve (M2-04) when the country requires it for sensitive data and the
+   * API is classified sensitive OR declares any sensitive exposed field: the field-level flag cannot
+   * be bypassed by a lower API classification.
+   */
+  private requiresRegulator(classification: string, exposedFields: unknown): boolean {
+    if (!getCountryConfig().features.approval.regulatorForSensitive) return false;
+    const fields = Array.isArray(exposedFields)
+      ? (exposedFields as Array<{ sensitive?: unknown }>)
+      : [];
+    return classification === 'sensitive' || fields.some((f) => f.sensitive === true);
+  }
+
+  /**
+   * Separation of duties / conflict of interest (SPEC.md §2.2): a reviewer cannot decide on a
+   * version of an entity they belong to (any role), nor on a version or API they created or
+   * submitted, even if their membership was revoked afterwards.
+   */
+  private assertImpartial(
+    principal: Principal,
+    version: {
+      createdBy: string;
+      submittedBy: string | null;
+      api: { entityId: string; createdBy: string };
+    },
+  ): void {
+    const authors = [version.createdBy, version.submittedBy, version.api.createdBy];
+    if (authors.includes(principal.userId)) {
+      throw new ForbiddenError('You cannot review a version you created or submitted');
+    }
+    if (principal.memberships.some((m) => m.entityId === version.api.entityId)) {
+      throw new ForbiddenError('You cannot review an API of an entity you belong to');
+    }
   }
 
   async detail(versionId: string): Promise<ReviewDetail> {
@@ -83,7 +112,7 @@ export class ReviewsService {
         ownerContact: api.ownerContact,
       },
       version: this.apis.toVersionDetail(v),
-      requiresRegulator: this.requiresRegulator(api.classification),
+      requiresRegulator: this.requiresRegulator(api.classification, v.exposedFields),
     };
   }
 
@@ -97,10 +126,24 @@ export class ReviewsService {
   }
 
   /** Moves the version from `from` to `to` only if nobody changed it meanwhile. */
-  private async move(tx: Tx, id: string, from: ApiVersionStatus, to: ApiVersionStatus, data = {}) {
+  private async move(
+    tx: Tx,
+    id: string,
+    from: ApiVersionStatus,
+    to: ApiVersionStatus,
+    data = {},
+    reviewerId?: string,
+  ) {
     assertTransition(from, to);
     const changed = await tx.apiVersion.updateMany({
-      where: { id, status: from },
+      // The submitter check is repeated here so a concurrent resubmission cannot slip through.
+      where: {
+        id,
+        status: from,
+        ...(reviewerId
+          ? { OR: [{ submittedBy: null }, { submittedBy: { not: reviewerId } }] }
+          : {}),
+      },
       data: { status: to, ...data },
     });
     if (changed.count === 0) throw new ConflictError('The version changed meanwhile; reload it');
@@ -110,15 +153,12 @@ export class ReviewsService {
     const before = await this.load(versionId);
     const role = this.reviewerRole(principal);
     assertTransition(before.status, 'approved_operator');
-    // Separation of duties (SPEC.md §2.2): nobody approves what they submitted.
-    if (before.submittedBy === principal.userId) {
-      throw new ForbiddenError('You cannot approve a version you submitted');
-    }
+    this.assertImpartial(principal, before);
     const actor = { type: 'user' as const, id: principal.keycloakSub };
-    const publish = !this.requiresRegulator(before.api.classification);
+    const publish = !this.requiresRegulator(before.api.classification, before.exposedFields);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.move(tx, versionId, 'in_review', 'approved_operator');
+      await this.move(tx, versionId, 'in_review', 'approved_operator', {}, principal.userId);
       await tx.apiVersionReview.create({
         data: {
           apiVersionId: versionId,
@@ -171,9 +211,10 @@ export class ReviewsService {
     const before = await this.load(versionId);
     const role = this.reviewerRole(principal);
     assertTransition(before.status, 'changes_requested');
+    this.assertImpartial(principal, before);
 
     await this.prisma.$transaction(async (tx) => {
-      await this.move(tx, versionId, 'in_review', 'changes_requested');
+      await this.move(tx, versionId, 'in_review', 'changes_requested', {}, principal.userId);
       await tx.apiVersionReview.create({
         data: {
           apiVersionId: versionId,

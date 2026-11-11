@@ -57,6 +57,7 @@ describe('operator review and publication (M1-04)', () => {
   async function submitted(
     classification = 'personal',
     publisher: string | { sub: string } = 'pedro.publicador',
+    exposedFields: Array<{ name: string; personal: boolean; sensitive: boolean }> = [],
   ) {
     const slug = `rev-${randomUUID().slice(0, 8)}`;
     const api = await call('POST', `/api/v1/entities/${salud}/apis`, publisher, {
@@ -79,6 +80,7 @@ describe('operator review and publication (M1-04)', () => {
         openapi,
         upstream: { type: 'node', servicePath: '/salud' },
         allowedPurposes: ['eligibility_check'],
+        exposedFields,
       },
     );
     const versionId = version.json<{ id: string }>().id;
@@ -213,6 +215,80 @@ describe('operator review and publication (M1-04)', () => {
     expect(res.statusCode).toBe(409);
     expect(res.json()).toMatchObject({ code: 'invalid_transition' });
     expect((await call('GET', review(randomUUID()), 'ana.operadora')).statusCode).toBe(404);
+  });
+
+  it('requires the regulator when a non-sensitive API declares a sensitive exposed field', async () => {
+    const { versionId } = await submitted('personal', 'pedro.publicador', [
+      { name: 'diagnostico', personal: true, sensitive: true },
+    ]);
+    const res = await call('POST', review(versionId, '/approve'), 'ana.operadora', {});
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      requiresRegulator: true,
+      version: { status: 'approved_operator', publishedAt: null },
+    });
+    expect(
+      await prisma.outboxMessage.count({ where: { aggregate: `apiVersion:${versionId}` } }),
+    ).toBe(0);
+  });
+
+  describe('conflict of interest (security review follow-up)', () => {
+    /** A user with an operator role and, optionally, a membership in the provider entity. */
+    async function operatorUser(membershipRoles?: Array<'api_publisher' | 'entity_viewer'>) {
+      const sub = randomUUID();
+      const user = await prisma.user.create({
+        data: {
+          keycloakSub: sub,
+          email: `coi.${sub.slice(0, 8)}@example.org`,
+          fullName: 'Conflicted reviewer',
+          createdBy: 'system:test',
+        },
+      });
+      await prisma.userPlatformRole.create({
+        data: { userId: user.id, role: 'platform_reviewer', grantedBy: 'system:test' },
+      });
+      const membership = membershipRoles
+        ? await prisma.membership.create({
+            data: {
+              userId: user.id,
+              entityId: salud,
+              roles: membershipRoles,
+              status: 'active',
+              createdBy: 'system:test',
+            },
+          })
+        : undefined;
+      return { sub, membershipId: membership?.id };
+    }
+
+    it('a reviewer who belongs to the provider entity cannot decide, even without submitting', async () => {
+      const { sub } = await operatorUser(['entity_viewer']);
+      const { versionId } = await submitted();
+      const approve = await call('POST', review(versionId, '/approve'), { sub }, {});
+      expect(approve.statusCode).toBe(403);
+      expect(approve.json<{ detail: string }>().detail).toMatch(/entity you belong to/);
+      const changes = await call(
+        'POST',
+        review(versionId, '/request-changes'),
+        { sub },
+        {
+          comment: 'Comentario suficientemente largo.',
+        },
+      );
+      expect(changes.statusCode).toBe(403);
+    });
+
+    it('the author cannot approve even after leaving the entity', async () => {
+      const { sub, membershipId } = await operatorUser(['api_publisher']);
+      const { versionId } = await submitted('personal', { sub });
+      await prisma.membership.update({
+        where: { id: membershipId ?? '' },
+        data: { status: 'revoked' },
+      });
+      const res = await call('POST', review(versionId, '/approve'), { sub }, {});
+      expect(res.statusCode).toBe(403);
+      expect(res.json<{ detail: string }>().detail).toMatch(/created or submitted/);
+    });
   });
 
   describe('authorization', () => {
