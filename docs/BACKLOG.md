@@ -86,9 +86,18 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Finalidades:** la tabla `purpose` es el catálogo. El seed la carga desde `co.yaml` (`source = config`) y el operador podrá agregar más (M2-10).
     - **Seed idempotente** (`pnpm db:seed`): lee los usuarios del realm de Keycloak (misma fuente de IDs) y los sectores y el tipo de identificador desde la configuración del país. Todo lo que crea queda auditado como `system:seed`. `pedro.publicador` pertenece a dos entidades para probar el selector de M1-02.
     - Quedan para sus historias: `Document` (M2-07), `Node` (M4), `Notification` (M2-08) y el estado de "pedir información" (M2-06).
-- [ ] **M1-02 — Sesión y contexto de entidad**
+- [x] **M1-02 — Sesión y contexto de entidad**
   - Login con Keycloak; el API resuelve usuario, roles de plataforma y membresías.
   - Selector de entidad activa en la UI; todo endpoint de entidad exige pertenencia (403/404 según `CLAUDE.md`).
+  - _Notas de implementación:_
+    - **Validación del token en el API** con `jose`: firma RS256 contra el JWKS del realm, emisor, audiencia `rid-portal-api` y expiración.
+    - **Roles desde PostgreSQL en cada petición:** una membresía revocada pierde el acceso en la siguiente llamada, aunque el token siga vigente (está probado).
+    - **Primer login:** el usuario se registra sin roles, con auditoría `user.registered`.
+    - **Rutas por entidad (ADR-0014):** los recursos de una entidad van bajo `/entities/{entityId}/...`. Un guard global aplica la tabla `auth/policy.ts`: otra entidad → 404, miembro sin rol → 403.
+    - **Endpoints nuevos:** `GET /me`, `GET /entities/{id}` y `GET /entities/{id}/members` (paginado por cursor).
+    - **Web:** la entidad activa va en una cookie validada contra `/me`; el selector tiene botón explícito, sin cambio al seleccionar (WCAG 3.2.2). La navegación usa los roles de plataforma más los de la entidad activa.
+    - **Renovación del token:** el access token (5 min) se renueva con el refresh token 60 s antes de vencer, en el proxy. Se verificó con Keycloak real forzando el umbral.
+    - **Pruebas:** 17 de autorización con tokens firmados en la prueba (corren en la CI) y 3 e2e con Keycloak real (roles en la navegación, operadora y cambio de entidad).
 - [ ] **M1-03 — Registrar API y versión**
   - `api_publisher` crea API y versión: subir OpenAPI 3.x (JSON/YAML), upstream `direct` o `node` (en M1, el nodo es el mock), campos expuestos, finalidades permitidas, clasificación.
   - Lint con Spectral (reglas mínimas: `operationId`, respuestas definidas); errores visibles por línea.

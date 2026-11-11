@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { z } from 'zod';
+import { Public } from '../auth/decorators.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
 
 export const healthSchema = z.object({ status: z.literal('ok') });
@@ -8,6 +9,7 @@ export type HealthStatus = z.infer<typeof healthSchema>;
 @Controller('health')
 export class HealthController {
   @Get()
+  @Public()
   @ApiOperation({
     operationId: 'getHealth',
     summary: 'Liveness check',

@@ -5,6 +5,7 @@ import { Link } from '../../i18n/navigation';
 import { signInAction } from '../../lib/auth-actions';
 import { visibleNavItems } from '../../lib/navigation';
 import { getSite } from '../../lib/site';
+import { getViewer } from '../../lib/viewer';
 
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -13,12 +14,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const site = getSite();
   const t = await getTranslations();
 
-  // Roles come from the portal API starting with M1-02 (ADR-0004).
-  const roles = [] as const;
-  const quickLinks = visibleNavItems(
-    { authenticated: Boolean(session?.user), roles },
-    { publicCatalog: site.publicCatalog },
-  ).filter((item) => item.key !== 'home');
+  const viewer = await getViewer();
+  const quickLinks = visibleNavItems(viewer, { publicCatalog: site.publicCatalog }).filter(
+    (item) => item.key !== 'home',
+  );
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10">
@@ -28,7 +27,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       {session?.user ? (
         <div className="mt-10 space-y-4">
           <h2 className="text-xl font-semibold">
-            {t('home.welcome', { name: session.user.name ?? session.user.email ?? '' })}
+            {t('home.welcome', { name: viewer.name ?? session.user.name ?? '' })}
           </h2>
           <h3 className="font-medium">{t('home.quickAccess')}</h3>
           <ul className="flex flex-wrap gap-2">
@@ -40,7 +39,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               </li>
             ))}
           </ul>
-          {roles.length === 0 && <p className="text-muted-foreground">{t('home.noRoles')}</p>}
+          {viewer.apiUnavailable ? (
+            <p role="status" className="text-muted-foreground">
+              {t('home.apiUnavailable')}
+            </p>
+          ) : (
+            viewer.roles.length === 0 && (
+              <p className="text-muted-foreground">{t('home.noRoles')}</p>
+            )
+          )}
         </div>
       ) : (
         <div className="mt-10 space-y-4">

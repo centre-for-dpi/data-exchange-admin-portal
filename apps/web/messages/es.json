@@ -33,7 +33,8 @@
     "anonymousCta": "Inicia sesión para ver el catálogo, tus aplicaciones y tus pendientes.",
     "welcome": "Hola, {name}",
     "quickAccess": "Accesos rápidos",
-    "noRoles": "Aún no tienes roles asignados en una entidad. Pide al administrador de tu entidad que te invite."
+    "noRoles": "Aún no tienes roles asignados en una entidad. Pide al administrador de tu entidad que te invite.",
+    "apiUnavailable": "No pudimos cargar tus permisos en este momento. Intenta de nuevo en unos minutos."
   },
   "footer": {
     "operatedBy": "Operado por {operator}",
@@ -42,5 +43,10 @@
   },
   "comingSoon": {
     "body": "Esta sección estará disponible en una próxima versión del portal."
+  },
+  "entity": {
+    "label": "Entidad activa",
+    "change": "Cambiar",
+    "current": "Entidad: {name}"
   }
 }

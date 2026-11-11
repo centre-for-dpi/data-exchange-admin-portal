@@ -73,6 +73,8 @@ Dos planos separados:
 
 - Login OIDC (Authorization Code + PKCE) desde `apps/web` vía Auth.js.
 - `apps/api` valida el access token (JWKS de Keycloak, `aud = rid-portal-api`).
+- Los recursos de una entidad se exponen bajo `/api/v1/entities/{entityId}/...` y un guard global aplica la tabla de permisos (`apps/api/src/auth/policy.ts`): otra entidad → 404, miembro sin rol → 403 (ADR-0014).
+- La web guarda los tokens solo en la cookie cifrada de Auth.js y renueva el access token (5 min) con el refresh token antes de que venza.
 - **Los roles NO viven en Keycloak.** Keycloak solo autentica; roles de plataforma y membresías por entidad viven en PostgreSQL. Así el portal tiene roles personalizados por entidad sin depender de grupos de Keycloak.
 - Excepción: MFA obligatorio se configura en Keycloak para usuarios marcados (el portal sincroniza un atributo `requires_mfa` y una política de flujo de autenticación lo exige).
 

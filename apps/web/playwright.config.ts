@@ -10,7 +10,7 @@ const baseURL = process.env.RID_WEB_URL ?? 'http://localhost:3000';
 
 /**
  * End-to-end tests against the full local stack: `pnpm infra:up` first.
- * The web app is built and started automatically unless one is already running on baseURL.
+ * The API and the web app are built and started automatically unless already running.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -24,10 +24,20 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: 'pnpm -w exec turbo run build --filter=@rid/web... && pnpm start',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 240_000,
-  },
+  // Migrations and the (idempotent) seed run once before the suite.
+  globalSetup: './e2e/global-setup.ts',
+  webServer: [
+    {
+      command: 'pnpm -w exec turbo run build --filter=@rid/api && pnpm --filter @rid/api start',
+      url: `${process.env.RID_API_URL ?? 'http://localhost:4000'}/api/v1/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 240_000,
+    },
+    {
+      command: 'pnpm -w exec turbo run build --filter=@rid/web... && pnpm start',
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 240_000,
+    },
+  ],
 });

@@ -33,7 +33,8 @@
     "anonymousCta": "Sign in to see the catalogue, your applications and your pending tasks.",
     "welcome": "Hello, {name}",
     "quickAccess": "Quick access",
-    "noRoles": "You have no roles in any entity yet. Ask your entity administrator to invite you."
+    "noRoles": "You have no roles in any entity yet. Ask your entity administrator to invite you.",
+    "apiUnavailable": "We could not load your permissions right now. Please try again in a few minutes."
   },
   "footer": {
     "operatedBy": "Operated by {operator}",
@@ -42,5 +43,10 @@
   },
   "comingSoon": {
     "body": "This section will be available in a future version of the portal."
+  },
+  "entity": {
+    "label": "Active entity",
+    "change": "Change",
+    "current": "Entity: {name}"
   }
 }
