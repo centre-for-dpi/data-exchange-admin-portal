@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+**/dist/
+**/.next/
+**/.turbo/
+**/coverage/
+**/next-env.d.ts
+
+# Authored documentation keeps its own formatting
+*.md

@@ -1,0 +1,11 @@
+{
+  "$comment": "Per-package license exceptions (ADR-0008). Only data packages, never code. Each entry needs a reason and is reviewed in the PR. Unused entries make `pnpm license:check` fail.",
+  "exceptions": [
+    {
+      "package": "caniuse-lite",
+      "license": "CC-BY-4.0",
+      "reason": "Browser compatibility data tables used by browserslist at build time (via Next.js). Data, not code; not shipped to the gateway.",
+      "addedAt": "2026-11-11"
+    }
+  ]
+}

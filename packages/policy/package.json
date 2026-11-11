@@ -1,0 +1,7 @@
+{
+  "name": "@rid/policy",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OPA Rego policies for gateway traffic authorization (run with `pnpm test:policy`)",
+  "license": "Apache-2.0"
+}

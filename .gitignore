@@ -39,3 +39,4 @@ Thumbs.db
 # Local infra data
 infra/**/data/
 infra/**/.volumes/
+next-env.d.ts

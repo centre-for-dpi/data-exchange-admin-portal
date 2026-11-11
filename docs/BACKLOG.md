@@ -18,10 +18,11 @@ Formato: `ID — título`. Criterios de aceptación (CA) debajo. **SPIKE** = inv
 
 ## M0 — Fundaciones
 
-- [ ] **M0-01 — Monorepo y calidad**
+- [x] **M0-01 — Monorepo y calidad**
   - pnpm workspaces + Turborepo con `apps/web`, `apps/api`, `packages/contracts`, `packages/policy`, `packages/config`.
   - ESLint, Prettier, TypeScript estricto, Vitest configurado en todos los paquetes.
   - CI (GitHub Actions): lint, typecheck, test, `opa test`, license check.
+  - _Notas de implementación:_ TypeScript fijado en `~6.0` porque typescript-eslint aún no soporta 7.x. NestJS 12 es solo ESM, así que todos los paquetes son ESM (`"type": "module"`). `packages/policy` no usa Vitest: sus pruebas son `opa test` (`pnpm test:policy`, con OPA local o en contenedor). Prettier no formatea Markdown para no reescribir la documentación.
 - [ ] **M0-02 — Infraestructura local**
   - `infra/compose/docker-compose.yml` con PostgreSQL, Keycloak, APISIX, etcd, OPA, step-ca, OpenSearch, Fluent Bit, Mailpit y mock-providers, todos con healthcheck.
   - `pnpm infra:up` deja todo sano en < 3 min en una laptop de 16 GB.
@@ -33,9 +34,10 @@ Formato: `ID — título`. Criterios de aceptación (CA) debajo. **SPIKE** = inv
   - APISIX con etcd, Admin API solo en la red interna de Compose.
   - OPA configurado para descargar el bundle desde `apps/api` (puede fallar hasta M1-09).
   - `mock-providers`: dos servicios Fastify ("afiliación en salud" y "registro socioeconómico") con 1.000 personas sintéticas generadas de forma determinista, recursos por ruta y registro de cabeceras `X-RID-*` (ADR-0009). **Ningún dato real.**
-- [ ] **M0-05 — Verificación de licencias**
+- [x] **M0-05 — Verificación de licencias**
   - `pnpm license:check` lista licencias de todas las dependencias y falla ante cualquiera fuera de la lista permitida de `CLAUDE.md`.
   - Lista de excepciones explícita y comentada, por paquete y solo para paquetes de datos (ADR-0008).
+  - _Notas de implementación:_ usa `pnpm licenses list` (sin dependencias nuevas), evalúa expresiones SPDX (`OR`/`AND`/`WITH`) y también falla si una excepción ya no se usa. Excepción inicial: `caniuse-lite` (CC-BY-4.0). `--verbose` lista cada paquete. `pnpm licenses` solo ve los binarios opcionales de la plataforma actual; la CI en Linux cubre los de Linux.
 - [ ] **M0-06 — Configuración por país**
   - `packages/config` carga `config/country/<código>.yaml` según `RID_COUNTRY`, la valida con zod y falla al arrancar si es inválida.
   - `co.yaml` y `example.yaml` completos según `SPEC.md §10`.
