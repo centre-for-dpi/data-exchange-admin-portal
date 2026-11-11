@@ -1,48 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { newVersion, openapiFile, registerApi, signInAsPublisher } from './flows';
 import { expectNoAccessibilityViolations, keycloakLogin } from './helpers';
 
 // M1-03: the API publisher registers an API and a version, sees the lint and submits it.
-const openapiFile = resolve(
-  import.meta.dirname,
-  '../../../infra/mock-providers/salud/openapi.yaml',
-);
-
-async function signInAsPublisher(page: Page) {
-  await page.goto('/my-apis');
-  await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
-  await keycloakLogin(page, 'pedro.publicador');
-  await page.goto('/my-apis');
-}
-
-async function registerApi(page: Page, slug: string) {
-  await page.getByRole('link', { name: 'Registrar API' }).click();
-  await page.getByLabel(/^Nombre/).fill('Consulta de afiliación');
-  await page.getByLabel('Identificador en la URL').fill(slug);
-  await page.getByLabel('Resumen').fill('Consulta el estado de afiliación de una persona.');
-  await page.getByLabel('Descripción (Markdown)').fill('API de prueba con datos sintéticos.');
-  await page.getByLabel('Sector').selectOption({ label: 'Salud' });
-  await page.getByLabel('Clasificación').selectOption({ label: 'Datos personales' });
-  await page.getByLabel('Correo del responsable').fill('apis@salud.demo.rid.example');
-  await page.getByRole('button', { name: 'Registrar API' }).click();
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Consulta de afiliación' }),
-  ).toBeVisible();
-}
-
-async function newVersion(page: Page, options: { version: string; file?: string; text?: string }) {
-  await page.getByRole('link', { name: 'Nueva versión' }).click();
-  await page.getByLabel(/^Versión/).fill(options.version);
-  if (options.file)
-    await page.getByLabel('Archivo OpenAPI (YAML o JSON)').setInputFiles(options.file);
-  if (options.text) await page.getByLabel('O pega el documento OpenAPI').fill(options.text);
-  await page.getByLabel('Ruta del servicio en el nodo').fill('/salud');
-  await page.getByLabel('Verificación de requisitos de un trámite').check();
-  await page.getByLabel('Nombre del dato').fill('regimen');
-  await page.getByRole('button', { name: 'Crear versión' }).click();
-}
-
 test.describe('API registration (M1-03)', () => {
   test('a publisher registers an API, uploads its OpenAPI and sends it to review', async ({
     page,

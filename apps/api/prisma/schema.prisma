@@ -344,6 +344,9 @@ model ApiVersion {
   sla              Json?
   /// Requests per minute per subscription unless the subscription says otherwise.
   defaultRateLimit Int              @default(600) @map("default_rate_limit")
+  /// User who last sent the version to review (separation of duties: cannot approve it).
+  submittedBy      String?          @map("submitted_by") @db.Uuid
+  submittedAt      DateTime?        @map("submitted_at") @db.Timestamptz(3)
   publishedAt      DateTime?        @map("published_at") @db.Timestamptz(3)
   deprecatedAt     DateTime?        @map("deprecated_at") @db.Timestamptz(3)
   sunsetAt         DateTime?        @map("sunset_at") @db.Timestamptz(3)
@@ -352,6 +355,7 @@ model ApiVersion {
   createdBy        String           @map("created_by")
 
   allowedPurposes ApiVersionPurpose[]
+  reviews         ApiVersionReview[]
   subscriptions   Subscription[]
 
   @@unique([apiId, major, minor])
@@ -564,4 +568,27 @@ model SyncState {
 
   @@index([status])
   @@map("sync_state")
+}
+
+enum ReviewDecision {
+  approved
+  changes_requested
+
+  @@map("review_decision")
+}
+
+/// Operator (and later regulator) decisions on an API version (SPEC.md §4.2). Append-only.
+model ApiVersionReview {
+  id           String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  apiVersionId String         @map("api_version_id") @db.Uuid
+  apiVersion   ApiVersion     @relation(fields: [apiVersionId], references: [id])
+  decision     ReviewDecision
+  /// Platform role the reviewer acted with (platform_reviewer, platform_admin, regulator).
+  reviewerRole PlatformRole   @map("reviewer_role")
+  reviewerId   String         @map("reviewer_id") @db.Uuid
+  comment      String?
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([apiVersionId, createdAt])
+  @@map("api_version_review")
 }

@@ -153,7 +153,39 @@
       "no": "No",
       "method": "Method",
       "path": "Path",
-      "none": "None"
+      "none": "None",
+      "reviews": "Reviews",
+      "published": "The version is published."
+    }
+  },
+  "reviewDecision": {
+    "approved": "Approved",
+    "changes_requested": "Changes requested"
+  },
+  "operator": {
+    "queueTitle": "Versions in review",
+    "empty": "No version is waiting for review.",
+    "entity": "Entity",
+    "api": "API",
+    "version": "Version",
+    "classification": "Classification",
+    "submittedAt": "Submitted",
+    "review": {
+      "title": "Review: {api} {version}",
+      "entity": "Provider entity",
+      "summary": "Summary",
+      "description": "Description",
+      "sector": "Sector",
+      "owner": "Owner",
+      "minimization": "Check that the exposed data matches the allowed purposes (minimization).",
+      "requiresRegulator": "This API exposes sensitive data: after your approval the regulator must approve it too.",
+      "readOnly": "You can read the review, but only the operator decides.",
+      "decision": "Decision",
+      "approveComment": "Comment (optional)",
+      "approve": "Approve",
+      "changesComment": "What must change",
+      "requestChanges": "Request changes",
+      "decided": "This version is no longer in review."
     }
   }
 }

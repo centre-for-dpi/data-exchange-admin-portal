@@ -113,9 +113,16 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Permisos:** `api.write` es solo para `api_publisher`; `api.read` es para todos los miembros, el operador y el regulador.
     - **Seguridad del lint** (hallazgos de la revisión automática, corregidos con pruebas): el documento es entrada no confiable. Spectral corre con un resolver sin lectores HTTP ni de archivos, así que solo se resuelven `$ref` locales (`#/...`); la regla `rid-no-external-ref` marca los externos. Antes se comprobó que el resolver por defecto hacía la petición, es decir, que el SSRF era real. Un pre-parseo con `yaml` (`maxAliasCount: 100`) y un límite de 2 MiB del documento parseado evitan las bombas de alias YAML; sin esa defensa, una sola subida tumbaba el proceso por falta de memoria.
     - **Imports de Spectral:** sus paquetes son CommonJS y deben importarse por defecto. Vitest ocultaba el error y la prueba `pnpm --filter @rid/api test:dist` (también en la CI) lo detecta ejecutando el código compilado con Node.
-- [ ] **M1-04 — Revisión y publicación**
+- [x] **M1-04 — Revisión y publicación**
   - `platform_reviewer` aprueba o pide cambios con comentario; al aprobar → `published` (el paso del regulador llega en M2).
   - Publicar encola la reconciliación del gateway.
+  - _Notas de implementación:_
+    - **Endpoints de plataforma** `/review/api-versions` (cola, ficha, `approve`, `request-changes`), protegidos con `@PlatformAccess`: deciden `platform_admin` y `platform_reviewer`, el regulador solo lee y cualquier otro rol recibe 403.
+    - **Aprobar** registra `approved_operator` y, en la misma transacción, publica: `published`, `publishedAt`, `Api.status = published` y un mensaje `gateway.sync` / `apiVersion:<id>` en el outbox (M1-08 lo consume). Ambas transiciones quedan auditadas.
+    - **Versiones `sensitive`**, con `approval.regulatorForSensitive` activo, quedan en `approved_operator` esperando al regulador (M2-04).
+    - **Pedir cambios** exige un comentario de al menos 10 caracteres. Las decisiones quedan en `api_version_review`, solo de inserción para `rid_app`, y el publicador las ve en su versión.
+    - **Separación de funciones:** se guarda `submittedBy`, y quien envió la versión no puede aprobarla (403).
+    - **Web:** consola del operador con la cola y la ficha de revisión (aviso de minimización, datos expuestos, finalidades, operaciones y lint), formularios de decisión accesibles y vista de solo lectura para el regulador.
 - [ ] **M1-05 — Catálogo y detalle**
   - Lista con búsqueda y filtros (sector, entidad, clasificación); detalle con ficha del servicio y documentación interactiva (Scalar) en modo solo lectura.
 - [ ] **M1-06 — Aplicaciones y credenciales OAuth2**

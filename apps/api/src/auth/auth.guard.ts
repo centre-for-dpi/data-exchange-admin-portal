@@ -13,8 +13,14 @@ import {
   ENTITY_ACTION,
   type EntityContext,
   IS_PUBLIC,
+  PLATFORM_ACTION,
 } from './decorators.js';
-import { ENTITY_PERMISSIONS, type EntityAction } from './policy.js';
+import {
+  ENTITY_PERMISSIONS,
+  type EntityAction,
+  PLATFORM_PERMISSIONS,
+  type PlatformAction,
+} from './policy.js';
 import { type Principal, PrincipalService } from './principal.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,6 +52,16 @@ export class AuthGuard implements CanActivate {
       ENTITY_ACTION,
       targets,
     );
+    const platformAction = this.reflector.getAllAndOverride<PlatformAction | undefined>(
+      PLATFORM_ACTION,
+      targets,
+    );
+    if (platformAction) {
+      const allowed: readonly string[] = PLATFORM_PERMISSIONS[platformAction];
+      if (!principal.platformRoles.some((role) => allowed.includes(role)))
+        throw new ForbiddenError();
+    }
+
     if (action) {
       const entityId = (request.params as Record<string, string | undefined>).entityId;
       request.entityContext = await this.authorizeEntity(principal, action, entityId);

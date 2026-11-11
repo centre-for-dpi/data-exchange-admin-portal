@@ -7,6 +7,8 @@ import { EntitiesController } from './entities/entities.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { MeController } from './me/me.controller.js';
 import { PurposesController } from './purposes/purposes.controller.js';
+import { ReviewsController } from './reviews/reviews.controller.js';
+import { ReviewsService } from './reviews/reviews.service.js';
 
 @Module({
   imports: [CoreModule, AuthModule],
@@ -16,7 +18,8 @@ import { PurposesController } from './purposes/purposes.controller.js';
     EntitiesController,
     PurposesController,
     ApisController,
+    ReviewsController,
   ],
-  providers: [ApisService],
+  providers: [ApisService, ReviewsService],
 })
 export class AppModule {}

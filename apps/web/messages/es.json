@@ -153,7 +153,39 @@
       "no": "No",
       "method": "Método",
       "path": "Ruta",
-      "none": "Ninguno"
+      "none": "Ninguno",
+      "reviews": "Revisiones",
+      "published": "La versión está publicada."
+    }
+  },
+  "reviewDecision": {
+    "approved": "Aprobada",
+    "changes_requested": "Cambios solicitados"
+  },
+  "operator": {
+    "queueTitle": "Versiones en revisión",
+    "empty": "No hay versiones esperando revisión.",
+    "entity": "Entidad",
+    "api": "API",
+    "version": "Versión",
+    "classification": "Clasificación",
+    "submittedAt": "Enviada",
+    "review": {
+      "title": "Revisión: {api} {version}",
+      "entity": "Entidad proveedora",
+      "summary": "Resumen",
+      "description": "Descripción",
+      "sector": "Sector",
+      "owner": "Responsable",
+      "minimization": "Revisa que los datos expuestos correspondan a las finalidades permitidas (minimización).",
+      "requiresRegulator": "Esta API expone datos sensibles: después de tu aprobación también debe aprobarla el regulador.",
+      "readOnly": "Puedes consultar la revisión, pero solo el operador decide.",
+      "decision": "Decisión",
+      "approveComment": "Comentario (opcional)",
+      "approve": "Aprobar",
+      "changesComment": "Qué debe cambiar",
+      "requestChanges": "Pedir cambios",
+      "decided": "Esta versión ya no está en revisión."
     }
   }
 }

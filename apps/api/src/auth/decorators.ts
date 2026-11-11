@@ -1,10 +1,11 @@
 import { createParamDecorator, type ExecutionContext, SetMetadata } from '@nestjs/common';
 import type { EntityRole } from '@rid/contracts';
-import type { EntityAction } from './policy.js';
+import type { EntityAction, PlatformAction } from './policy.js';
 import type { Principal } from './principal.service.js';
 
 export const IS_PUBLIC = 'rid:public';
 export const ENTITY_ACTION = 'rid:entity-action';
+export const PLATFORM_ACTION = 'rid:platform-action';
 
 /** Endpoint that does not require authentication (health checks). Everything else does. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
@@ -15,6 +16,9 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
  * 403 to members whose roles do not allow it (CLAUDE.md, definition of done).
  */
 export const EntityAccess = (action: EntityAction) => SetMetadata(ENTITY_ACTION, action);
+
+/** Endpoint on a platform-wide resource: callers without an allowed platform role get 403. */
+export const PlatformAccess = (action: PlatformAction) => SetMetadata(PLATFORM_ACTION, action);
 
 /** How the caller reached the entity of this request, set by the guard. */
 export interface EntityContext {

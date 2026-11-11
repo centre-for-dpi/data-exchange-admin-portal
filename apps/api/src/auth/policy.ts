@@ -37,3 +37,16 @@ export const ENTITY_PERMISSIONS = {
 } as const satisfies Record<string, EntityPermission>;
 
 export type EntityAction = keyof typeof ENTITY_PERMISSIONS;
+
+/**
+ * Actions on platform-wide resources (not owned by one entity). Users without one of the roles get
+ * 403. Grows into the full matrix in M2-03.
+ */
+export const PLATFORM_PERMISSIONS = {
+  /** See the review queue and versions under review, from any entity. */
+  'review.read': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** Approve or request changes on a version (operator). The regulator step is M2-04. */
+  'review.decide': ['platform_admin', 'platform_reviewer'],
+} as const satisfies Record<string, readonly PlatformRole[]>;
+
+export type PlatformAction = keyof typeof PLATFORM_PERMISSIONS;

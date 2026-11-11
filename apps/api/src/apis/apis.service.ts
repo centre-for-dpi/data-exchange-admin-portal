@@ -21,7 +21,11 @@ import { scopedRepo } from '../prisma/scoped-repo.js';
 import { lintOpenApi, listOperations } from './lint/openapi-lint.js';
 
 type ApiRow = Prisma.ApiGetPayload<object>;
-type VersionRow = Prisma.ApiVersionGetPayload<{ include: { allowedPurposes: true } }>;
+export const VERSION_INCLUDE = {
+  allowedPurposes: true,
+  reviews: { orderBy: { createdAt: 'asc' } },
+} as const satisfies Prisma.ApiVersionInclude;
+export type VersionRow = Prisma.ApiVersionGetPayload<{ include: typeof VERSION_INCLUDE }>;
 
 const isUniqueViolation = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002';
@@ -39,7 +43,7 @@ const toSummary = (api: ApiRow): ApiSummary => ({
 });
 
 /** Audit snapshot of a version: domain fields only, not the (large) OpenAPI document. */
-const versionSnapshot = (v: VersionRow) => ({
+export const versionSnapshot = (v: VersionRow) => ({
   id: v.id,
   apiId: v.apiId,
   version: v.version,
@@ -151,13 +155,13 @@ export class ApisService {
     const api = await this.findApi(entityId, apiId);
     const version = await this.prisma.apiVersion.findFirst({
       where: { id: versionId, apiId: api.id },
-      include: { allowedPurposes: true },
+      include: VERSION_INCLUDE,
     });
     if (!version) throw new NotFoundError('API version');
     return version;
   }
 
-  private toVersionDetail(v: VersionRow): ApiVersionDetail {
+  toVersionDetail(v: VersionRow): ApiVersionDetail {
     return {
       id: v.id,
       apiId: v.apiId,
@@ -174,6 +178,14 @@ export class ApisService {
       openapiSha256: v.openapiSha256,
       lintReport: (v.lintReport as LintReport | null) ?? { valid: false, issues: [] },
       operations: listOperations(v.openapiSpec as Record<string, unknown>),
+      submittedAt: v.submittedAt?.toISOString() ?? null,
+      publishedAt: v.publishedAt?.toISOString() ?? null,
+      reviews: v.reviews.map((r) => ({
+        decision: r.decision,
+        reviewerRole: r.reviewerRole,
+        comment: r.comment,
+        createdAt: r.createdAt.toISOString(),
+      })),
     };
   }
 
@@ -239,7 +251,7 @@ export class ApisService {
               create: [...new Set(data.allowedPurposes)].map((purposeCode) => ({ purposeCode })),
             },
           },
-          include: { allowedPurposes: true },
+          include: VERSION_INCLUDE,
         });
         await this.audit.record(tx, {
           actor: this.actor(principal, entityId),
@@ -285,7 +297,7 @@ export class ApisService {
       if (changed.count === 0) throw new ConflictError('The version changed meanwhile; reload it');
       const after = await tx.apiVersion.findUniqueOrThrow({
         where: { id: versionId },
-        include: { allowedPurposes: true },
+        include: VERSION_INCLUDE,
       });
       await this.audit.record(tx, {
         actor: this.actor(principal, entityId),
@@ -328,12 +340,12 @@ export class ApisService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const changed = await tx.apiVersion.updateMany({
         where: { id: versionId, status: before.status },
-        data: { status: target },
+        data: { status: target, submittedBy: principal.userId, submittedAt: new Date() },
       });
       if (changed.count === 0) throw new ConflictError('The version changed meanwhile; reload it');
       const after = await tx.apiVersion.findUniqueOrThrow({
         where: { id: versionId },
-        include: { allowedPurposes: true },
+        include: VERSION_INCLUDE,
       });
       await this.audit.record(tx, {
         actor: this.actor(principal, entityId),

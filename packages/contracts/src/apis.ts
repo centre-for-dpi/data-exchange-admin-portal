@@ -125,6 +125,15 @@ export const apiDetailSchema = apiSummarySchema.extend({
 });
 export type ApiDetail = z.infer<typeof apiDetailSchema>;
 
+/** A decision of the operator (or regulator) on a version, visible to the provider. */
+export const versionReviewSchema = z.object({
+  decision: z.enum(['approved', 'changes_requested']),
+  reviewerRole: z.enum(['platform_admin', 'platform_reviewer', 'regulator', 'auditor']),
+  comment: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type VersionReview = z.infer<typeof versionReviewSchema>;
+
 export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
   apiId: z.uuid(),
   upstream: upstreamSchema,
@@ -136,6 +145,9 @@ export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
   openapiSha256: z.string(),
   lintReport: lintReportSchema,
   operations: z.array(z.object({ operationId: z.string(), method: z.string(), path: z.string() })),
+  submittedAt: z.iso.datetime().nullable(),
+  publishedAt: z.iso.datetime().nullable(),
+  reviews: z.array(versionReviewSchema),
 });
 export type ApiVersionDetail = z.infer<typeof apiVersionDetailSchema>;
 
@@ -158,3 +170,50 @@ export const purposeSchema = z.object({
   legalReference: z.string().nullable(),
 });
 export const purposeListSchema = z.object({ items: z.array(purposeSchema) });
+
+// ---------------------------------------------------------------------------------------------
+// Operator review (SPEC.md §4.2, M1-04)
+// ---------------------------------------------------------------------------------------------
+
+export const reviewQueueItemSchema = z.object({
+  versionId: z.uuid(),
+  version: z.string(),
+  status: apiVersionStatusSchema,
+  submittedAt: z.iso.datetime().nullable(),
+  api: z.object({ id: z.uuid(), name: z.string(), classification: classificationSchema }),
+  entity: z.object({ id: z.uuid(), slug: z.string(), shortName: z.string() }),
+});
+export const reviewQueueSchema = z.object({ items: z.array(reviewQueueItemSchema) });
+export const reviewQueueQuerySchema = z.strictObject({
+  status: apiVersionStatusSchema.default('in_review'),
+});
+
+export const reviewDetailSchema = z.object({
+  entity: z.object({
+    id: z.uuid(),
+    slug: z.string(),
+    shortName: z.string(),
+    legalName: z.string(),
+  }),
+  api: z.object({
+    id: z.uuid(),
+    name: z.string(),
+    summary: z.string(),
+    description: z.string(),
+    sector: z.string(),
+    classification: classificationSchema,
+    ownerContact: z.string(),
+  }),
+  version: apiVersionDetailSchema,
+  /** True when this decision must also go through the regulator (SPEC.md §4.2, M2-04). */
+  requiresRegulator: z.boolean(),
+});
+export type ReviewDetail = z.infer<typeof reviewDetailSchema>;
+
+export const approveVersionSchema = z.strictObject({
+  comment: z.string().trim().max(2_000).optional(),
+});
+export const requestChangesSchema = z.strictObject({
+  comment: z.string().trim().min(10, 'explain what has to change (10+ characters)').max(2_000),
+});
+export const versionIdParamsSchema = z.strictObject({ versionId: z.uuid() });
