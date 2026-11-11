@@ -69,7 +69,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['**/scripts/**/*.mjs'],
+    files: ['**/scripts/**/*.mjs', 'docs/spikes/**/*.mjs'],
     rules: { 'no-console': 'off' },
   },
   prettier,

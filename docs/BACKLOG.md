@@ -72,8 +72,9 @@ Formato: `ID — título`. Criterios de aceptación (CA) debajo. **SPIKE** = inv
 
 Meta: en la demo, una entidad publica una API, otra solicita acceso con finalidad, el proveedor aprueba y una llamada real pasa por APISIX; luego se revoca y la llamada falla en menos de 60 s.
 
-- [ ] **SPIKE S-1 — Cabeceras de OPA visibles para otros plugins** (máx. 1 día)
+- [x] **SPIKE S-1 — Cabeceras de OPA visibles para otros plugins** (máx. 1 día)
   - Confirmar si las cabeceras de `send_headers_upstream` están disponibles para `limit-count` y `http-logger`, y cómo retirar `X-RID-End-User` en claro antes del upstream. Conclusión en `docs/spikes/S-1.md`. Si no, proponer alternativa (p. ej. `serverless-post-function` o plugin propio en Lua).
+  - _Conclusión:_ sí, ambos plugins las ven, comprobado con tráfico real en APISIX 3.19. `X-RID-End-User` se retira listándolo en `send_headers_upstream` sin que la política lo devuelva, sin código propio. OPA ve la ruta pública completa: `pathRegex` se ancla a ella. Se usa `request-id` para generar `X-Request-Id`, la razón de negación va en `X-RID-Deny-Reason` y el 429 sale en problem+json con `response-rewrite`. `ARCHITECTURE.md` §4.1, §4.2 y §8 actualizados.
 - [ ] **M1-01 — Modelo de datos base**
   - Prisma: Entity, User, Membership, Api, ApiVersion, Application, Credential, Subscription, Purpose, AuditEvent, Outbox, SyncState.
   - Seed: 3 entidades (proveedora de salud ficticia, proveedora socioeconómica ficticia, consumidora), usuarios por rol, catálogo de finalidades de `co.yaml`.

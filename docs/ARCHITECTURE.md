@@ -118,13 +118,15 @@ Reconciliador
 
 **Route** `rid-route-<apiVersionId>`
 - `uri = /{entitySlug}/{apiSlug}/v{major}/*`, métodos declarados en el OpenAPI.
-- Plugins, en orden de ejecución:
-  1. `proxy-rewrite`: elimina las cabeceras que solo el gateway puede poner (`X-RID-Consumer-Entity`, `X-RID-Consumer-App`, `X-RID-Subscription`, `X-RID-Operation`, `X-RID-End-User-Hash`) si vienen del cliente, para evitar suplantación; conserva `X-RID-Purpose` y `X-RID-End-User`, que OPA necesita leer. Reescribe la ruta quitando el prefijo.
-  2. `openid-connect`: `bearer_only: true`, `use_jwks: true`, `discovery` del realm `rid-gateway`, `set_userinfo_header: false`.
-  3. `opa`: `host` del OPA local, `policy: rid/authz`, `with_route: true`, `send_headers_upstream: [X-RID-Consumer-Entity, X-RID-Consumer-App, X-RID-Subscription, X-RID-Purpose, X-RID-Operation, X-RID-End-User-Hash, X-Request-Id]`.
-  4. `limit-count`: límite por suscripción (clave = cabecera `X-RID-Subscription` puesta por OPA). Ver SPIKE S-2.
-  5. `http-logger`: hacia Fluent Bit con `log_format` de §8.
-  6. `prometheus`.
+- Plugins. APISIX los ejecuta por fase y, dentro de cada fase, por prioridad (no en el orden en que se listan). Verificado en SPIKE S-1 (`docs/spikes/S-1.md`):
+  1. `request-id` (rewrite, 12015): genera `X-Request-Id` si el cliente no lo envía.
+  2. `openid-connect` (rewrite, 2599): `bearer_only: true`, `use_jwks: true`, `discovery` del realm `rid-gateway`, `set_userinfo_header: false`.
+  3. `proxy-rewrite` (rewrite, 1008): elimina las cabeceras que solo el gateway puede poner (`X-RID-Consumer-Entity`, `X-RID-Consumer-App`, `X-RID-Subscription`, `X-RID-Operation`, `X-RID-End-User-Hash`) si vienen del cliente, antes de que OPA arme su entrada; conserva `X-RID-Purpose` y `X-RID-End-User`, que OPA necesita leer. Reescribe la ruta quitando el prefijo (solo cambia `upstream_uri`; OPA sigue viendo la ruta pública completa).
+  4. `opa` (access, 2001): `host` del OPA local, `policy: rid/authz`, `with_route: true`, `send_headers_upstream: [X-RID-Consumer-Entity, X-RID-Consumer-App, X-RID-Subscription, X-RID-Purpose, X-RID-Operation, X-RID-End-User-Hash, X-RID-End-User, X-Request-Id]`. Para cada nombre de esa lista el plugin pone el valor que devuelve la política y, **si la política no lo devuelve, borra la cabecera del cliente**. Por eso la política devuelve siempre `X-RID-Purpose` y `X-Request-Id`, y **nunca** `X-RID-End-User` (así el valor en claro no llega al proveedor). Si OPA no responde, niega con 403 (falla cerrado).
+  5. `limit-count` (access, 1002): límite por suscripción con `key_type: var`, `key: http_x_rid_subscription` (la cabecera que puso OPA). Ver SPIKE S-2.
+  6. `response-rewrite` (899): convierte el 429 de `limit-count` en problem+json (`vars: [["status","==",429]]`; S-2 define cómo no tocar un 429 del proveedor).
+  7. `prometheus` (log, 500).
+  8. `http-logger` (log, 410): hacia Fluent Bit con `log_format` de §8.
 
 Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega todo.
 
@@ -140,7 +142,7 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
       "apiVersionId": "...",
       "classification": "personal",
       "operations": [
-        { "id": "getAfiliacion", "method": "GET", "pathRegex": "^/afiliados/[^/]+$" }
+        { "id": "getAfiliacion", "method": "GET", "pathRegex": "^/salud/afiliacion/v1/afiliados/[^/]+$" }
       ]
     }
   },
@@ -170,10 +172,10 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
 - Política `rid.authz` (resumen):
   1. Extrae el JWT de `Authorization` (ya validado por `openid-connect`; OPA solo lo decodifica) y toma `azp`/`client_id`.
   2. `clients[client_id].status == "active"`.
-  3. Encuentra la operación: método + `pathRegex` de la ruta (`input.route.id`).
+  3. Encuentra la operación: método + `pathRegex` de la ruta (`input.route.id`). `input.request.path` es la ruta pública completa, con el prefijo `/{entitySlug}/{apiSlug}/v{major}` (S-1), y `pathRegex` se ancla a ella.
   4. Existe una suscripción para esa ruta con la operación, la finalidad de `X-RID-Purpose`, vigente.
   5. Si `endUserRequired`, exige `X-RID-End-User` y calcula `X-RID-End-User-Hash` con la sal del despliegue (incluida en el bundle, que solo se sirve por red interna).
-  6. Devuelve `allow`, cabeceras para el upstream y, al negar, `status_code` + cuerpo problem+json con un `reason` estable (`no_subscription`, `purpose_not_allowed`, `operation_not_allowed`, `subscription_expired`, `end_user_required`, `app_suspended`).
+  6. Devuelve `allow`, cabeceras para el upstream y, al negar, `status_code` + cuerpo problem+json en `reason` con una razón estable (`no_subscription`, `purpose_not_allowed`, `operation_not_allowed`, `subscription_expired`, `end_user_required`, `app_suspended`). Al negar, `headers` son cabeceras de **respuesta**: `Content-Type: application/problem+json` y `X-RID-Deny-Reason: <razón>`, que el log de acceso registra con `$sent_http_x_rid_deny_reason`.
 - Las políticas tienen tests con `opa test` y cobertura ≥ 90 %.
 
 ### 4.3 Keycloak
@@ -238,8 +240,11 @@ El proveedor sabe quién consulta, para qué y bajo qué autorización: resuelve
 ```
 ts, request_id, route_id, operation (X-RID-Operation), method, status,
 latency_ms, upstream_latency_ms, consumer_entity, consumer_app,
-subscription_id, purpose, end_user_hash, bytes_sent, gateway_node
+subscription_id, purpose, end_user_hash, bytes_sent, gateway_node,
+deny_reason
 ```
+
+- Variables de APISIX para cada campo: `$http_x_rid_operation`, `$http_x_rid_subscription`, `$http_x_rid_consumer_entity`, `$http_x_rid_consumer_app`, `$http_x_rid_purpose`, `$http_x_rid_end_user_hash` (las cabeceras que puso OPA, visibles en la fase de log según S-1) y `$sent_http_x_rid_deny_reason`. **Nunca** `$uri`, `$request_uri` ni `$upstream_uri`: incluyen la ruta real y la query.
 
 - **No se registran**: `uri` real, query string, cuerpos, `Authorization`, IP del ciudadano (no hay; los consumidores son sistemas).
 - Fluent Bit aplica un filtro Lua que descarta cualquier campo fuera de la lista permitida (defensa en profundidad).
