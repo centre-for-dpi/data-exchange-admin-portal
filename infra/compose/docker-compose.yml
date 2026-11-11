@@ -113,6 +113,12 @@ services:
       - --server
       - --addr=0.0.0.0:8181
       - --log-format=json
+      - --config-file=/config/config.yaml
+    environment:
+      OPA_PORTAL_URL: ${OPA_PORTAL_URL:-http://host.docker.internal:4000/api/v1/opa}
+      OPA_BUNDLE_TOKEN: ${OPA_BUNDLE_TOKEN:?set OPA_BUNDLE_TOKEN in .env}
+    volumes:
+      - ../opa/config.yaml:/config/config.yaml:ro
     extra_hosts:
       # Lets OPA reach the portal API running on the host (bundle download, M0-04).
       - host.docker.internal:host-gateway

@@ -1,0 +1,140 @@
+openapi: 3.1.0
+info:
+  title: Consulta de afiliación en salud
+  version: 1.0.0
+  description: >-
+    Servicio de prueba con datos sintéticos (ningún dato real). Permite consultar y verificar la
+    afiliación de una persona al sistema de salud a partir de su número de identificación.
+  contact:
+    name: Entidad de Salud (ficticia)
+    email: soporte@salud.demo.rid.example
+tags:
+  - name: Afiliación
+    description: Consultas sobre la afiliación de una persona.
+paths:
+  /afiliados/{numeroIdentificacion}:
+    get:
+      operationId: getAfiliado
+      tags: [Afiliación]
+      summary: Consultar afiliación
+      description: Devuelve el régimen, el estado y la aseguradora de la persona afiliada.
+      parameters:
+        - $ref: '#/components/parameters/NumeroIdentificacion'
+      responses:
+        '200':
+          description: Afiliación encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Afiliado'
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /afiliados/verificaciones:
+    post:
+      operationId: verificarAfiliacion
+      tags: [Afiliación]
+      summary: Verificar afiliación
+      description: >-
+        Indica si la persona está afiliada y activa, sin devolver el detalle de la afiliación.
+        El número de identificación viaja en el cuerpo de la petición.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudVerificacion'
+      responses:
+        '200':
+          description: Resultado de la verificación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoVerificacion'
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+components:
+  parameters:
+    NumeroIdentificacion:
+      name: numeroIdentificacion
+      in: path
+      required: true
+      description: Número de identificación de la persona (solo dígitos).
+      schema:
+        type: string
+        pattern: '^[0-9]{6,12}$'
+  schemas:
+    Afiliado:
+      type: object
+      description: Afiliación de una persona al sistema de salud.
+      additionalProperties: false
+      required: [numeroIdentificacion, regimen, estado, aseguradora, fechaAfiliacion]
+      properties:
+        numeroIdentificacion:
+          type: string
+          description: Número de identificación de la persona.
+        regimen:
+          type: string
+          description: Régimen de afiliación.
+          enum: [contributivo, subsidiado, especial]
+        estado:
+          type: string
+          description: Estado de la afiliación.
+          enum: [activo, suspendido, retirado]
+        aseguradora:
+          type: string
+          description: Nombre de la aseguradora.
+        fechaAfiliacion:
+          type: string
+          format: date
+          description: Fecha de afiliación.
+    SolicitudVerificacion:
+      type: object
+      description: Datos para verificar una afiliación.
+      additionalProperties: false
+      required: [numeroIdentificacion]
+      properties:
+        numeroIdentificacion:
+          type: string
+          description: Número de identificación de la persona (solo dígitos).
+          pattern: '^[0-9]{6,12}$'
+    ResultadoVerificacion:
+      type: object
+      description: Resultado de la verificación de afiliación.
+      additionalProperties: false
+      required: [afiliadoActivo]
+      properties:
+        afiliadoActivo:
+          type: boolean
+          description: Verdadero si la persona tiene una afiliación en estado activo.
+    Problema:
+      type: object
+      description: Error en formato RFC 9457.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          description: Identificador del tipo de error.
+        title:
+          type: string
+          description: Resumen del error.
+        status:
+          type: integer
+          description: Código HTTP.
+        detail:
+          type: string
+          description: Detalle del error.
+  responses:
+    SolicitudInvalida:
+      description: La petición no cumple el formato esperado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    NoEncontrado:
+      description: No existe un registro para el número de identificación.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'

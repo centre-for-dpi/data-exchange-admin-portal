@@ -1,0 +1,97 @@
+openapi: 3.1.0
+info:
+  title: Registro socioeconómico
+  version: 1.0.0
+  description: >-
+    Servicio de prueba con datos sintéticos (ningún dato real). Permite consultar la clasificación
+    socioeconómica del hogar de una persona a partir de su número de identificación.
+  contact:
+    name: Entidad de Programas Sociales (ficticia)
+    email: soporte@socioeconomico.demo.rid.example
+tags:
+  - name: Hogares
+    description: Consultas sobre la clasificación socioeconómica de los hogares.
+paths:
+  /hogares/{numeroIdentificacion}:
+    get:
+      operationId: getHogar
+      tags: [Hogares]
+      summary: Consultar clasificación del hogar
+      description: Devuelve el grupo, el puntaje y el número de integrantes del hogar de la persona.
+      parameters:
+        - name: numeroIdentificacion
+          in: path
+          required: true
+          description: Número de identificación de una persona del hogar (solo dígitos).
+          schema:
+            type: string
+            pattern: '^[0-9]{6,12}$'
+      responses:
+        '200':
+          description: Hogar encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hogar'
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+components:
+  schemas:
+    Hogar:
+      type: object
+      description: Clasificación socioeconómica de un hogar.
+      additionalProperties: false
+      required: [numeroIdentificacion, grupo, puntaje, integrantes, fechaEncuesta]
+      properties:
+        numeroIdentificacion:
+          type: string
+          description: Número de identificación consultado.
+        grupo:
+          type: string
+          description: Grupo de clasificación, de A (mayor vulnerabilidad) a D.
+          enum: [A, B, C, D]
+        puntaje:
+          type: number
+          description: Puntaje entre 0 y 100.
+          minimum: 0
+          maximum: 100
+        integrantes:
+          type: integer
+          description: Número de integrantes del hogar.
+          minimum: 1
+        fechaEncuesta:
+          type: string
+          format: date
+          description: Fecha de la última encuesta.
+    Problema:
+      type: object
+      description: Error en formato RFC 9457.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          description: Identificador del tipo de error.
+        title:
+          type: string
+          description: Resumen del error.
+        status:
+          type: integer
+          description: Código HTTP.
+        detail:
+          type: string
+          description: Detalle del error.
+  responses:
+    SolicitudInvalida:
+      description: La petición no cumple el formato esperado.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    NoEncontrado:
+      description: No existe un registro para el número de identificación.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'

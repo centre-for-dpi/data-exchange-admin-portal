@@ -1,0 +1,21 @@
+# OPA runtime configuration (ARCHITECTURE.md §4.2). ${VAR} values come from the container env.
+services:
+  portal:
+    # The portal API runs on the host during development (`pnpm dev`).
+    url: ${OPA_PORTAL_URL}
+    credentials:
+      bearer:
+        token: ${OPA_BUNDLE_TOKEN}
+
+bundles:
+  rid:
+    service: portal
+    # GET {url}/bundle.tar.gz, served by apps/api from M1-09; until then downloads fail and OPA
+    # keeps denying everything (no policy loaded).
+    resource: bundle.tar.gz
+    polling:
+      min_delay_seconds: 10
+      max_delay_seconds: 20
+
+# Decision logs are intentionally NOT configured: each decision input carries request headers
+# (Authorization, X-RID-End-User in clear). Access metadata goes through APISIX -> Fluent Bit.
