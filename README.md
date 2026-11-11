@@ -10,7 +10,7 @@ Primer despliegue: **Colombia** (operador: AND · gobierno: MinTIC). Diseñado p
 
 ## Empezar
 
-Requisitos: Node.js LTS, pnpm, Docker Engine (o Podman) con Compose.
+Requisitos: Node.js 24, pnpm 11, Docker Engine (o Podman) con Compose v2.
 
 ```bash
 cp .env.example .env
@@ -21,6 +21,18 @@ pnpm dev
 ```
 
 Abre http://localhost:3000. Usuarios de prueba en `docs/DEMO.md`.
+
+### Infraestructura local
+
+| Comando | Qué hace |
+| :-- | :-- |
+| `pnpm infra:up` | Levanta todo y espera a que cada servicio esté sano |
+| `pnpm infra:up:core` | Igual, sin OpenSearch ni Fluent Bit (más liviano) |
+| `pnpm infra:ps` / `pnpm infra:logs` | Estado y logs |
+| `pnpm infra:down` | Detiene los servicios (conserva datos) |
+| `pnpm infra:reset` | Detiene y **borra** volúmenes (base de datos, CA, índices) |
+
+Todos los puertos se publican solo en `127.0.0.1`. Si alguno ya está ocupado en tu máquina, cámbialo en `.env` con la variable `*_PORT` correspondiente (ver `.env.example`).
 
 ## Arrancar con Claude Code
 

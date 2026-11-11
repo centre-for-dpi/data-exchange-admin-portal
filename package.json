@@ -17,7 +17,13 @@
     "test:policy": "node scripts/opa-test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "license:check": "node scripts/license-check.mjs"
+    "license:check": "node scripts/license-check.mjs",
+    "infra:up": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability up -d --build --wait --wait-timeout 180",
+    "infra:up:core": "docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --build --wait --wait-timeout 180",
+    "infra:down": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability down",
+    "infra:reset": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability down --volumes",
+    "infra:ps": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability ps",
+    "infra:logs": "docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability logs -f --tail=100"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

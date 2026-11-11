@@ -1,0 +1,44 @@
+# APISIX static configuration for local development.
+# Routes, upstreams and plugins are never written by hand: the portal reconciler owns them (ADR-0007).
+apisix:
+  node_listen: 9080
+  enable_ipv6: false
+  ssl:
+    enable: true
+    listen:
+      - port: 9443
+  # Readiness endpoint for the container healthcheck (internal only, not published).
+  status:
+    ip: 0.0.0.0
+    port: 7085
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+  admin:
+    admin_key_required: true
+    admin_key:
+      - name: admin
+        key: ${{APISIX_ADMIN_KEY}}
+        role: admin
+    # Admin API is published only on the host loopback (127.0.0.1:9180) and the Compose network.
+    allow_admin:
+      - 127.0.0.0/24
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+    admin_listen:
+      ip: 0.0.0.0
+      port: 9180
+  etcd:
+    host:
+      - http://etcd:2379
+    prefix: /apisix
+    timeout: 30
+
+plugin_attr:
+  prometheus:
+    export_addr:
+      ip: 0.0.0.0
+      port: 9091

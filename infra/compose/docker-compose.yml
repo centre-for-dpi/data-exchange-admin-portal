@@ -1,0 +1,232 @@
+# Local development and pilot stack for the RID portal.
+# Start with `pnpm infra:up` (all services) or `pnpm infra:up:core` (without OpenSearch/Fluent Bit).
+# Every published port binds to 127.0.0.1 only and can be moved with *_PORT variables in .env.
+# Secrets come from the repo-root .env (see .env.example).
+name: rid
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 5s
+  timeout: 5s
+  retries: 30
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:?set KEYCLOAK_DB_USER in .env}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
+    volumes:
+      - pg-data:/var/lib/postgresql
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ['start-dev', '--import-realm']
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?set KEYCLOAK_ADMIN_USER in .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_HEALTH_ENABLED: 'true'
+      # Tokens always carry the browser-facing issuer; containers (APISIX) reach Keycloak by service name.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'true'
+    volumes:
+      - ../keycloak:/opt/keycloak/data/import:ro
+    ports:
+      - 127.0.0.1:${KEYCLOAK_PORT:-8080}:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      # The image has no curl/wget: plain HTTP over bash's /dev/tcp against the management port.
+      test:
+        [
+          'CMD-SHELL',
+          "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '",
+        ]
+      start_period: 30s
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.6.16
+    command:
+      - etcd
+      - --name=etcd0
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --initial-cluster=etcd0=http://etcd:2380
+    volumes:
+      - etcd-data:/etcd-data
+    # Not published: only APISIX talks to etcd.
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'etcdctl', '--endpoints=http://127.0.0.1:2379', 'endpoint', 'health']
+
+  apisix:
+    image: apache/apisix:3.19.0-debian
+    environment:
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?set APISIX_ADMIN_KEY in .env}
+    volumes:
+      - ../apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - 127.0.0.1:${APISIX_HTTP_PORT:-9080}:9080
+      - 127.0.0.1:${APISIX_HTTPS_PORT:-9443}:9443
+      # Admin API: host loopback only, for the portal reconciler running with `pnpm dev`.
+      - 127.0.0.1:${APISIX_ADMIN_PORT:-9180}:9180
+    depends_on:
+      etcd:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      # The image has bash but no curl/wget: plain HTTP over /dev/tcp against the status port.
+      test:
+        [
+          'CMD',
+          'bash',
+          '-c',
+          "exec 3<>/dev/tcp/127.0.0.1/7085 && printf 'GET /status/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '",
+        ]
+
+  opa:
+    image: openpolicyagent/opa:1.21.4-static
+    command:
+      - run
+      - --server
+      - --addr=0.0.0.0:8181
+      - --log-format=json
+    extra_hosts:
+      # Lets OPA reach the portal API running on the host (bundle download, M0-04).
+      - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:${OPA_PORT:-8181}:8181
+    healthcheck:
+      <<: *healthcheck-defaults
+      # No HTTP client in the image: OPA checks itself with http.send. Two statements on purpose:
+      # a lone comparison would return `false` (defined) and --fail would pass on a 404.
+      test:
+        [
+          'CMD',
+          '/opa',
+          'eval',
+          '--fail',
+          'r := http.send({"method": "get", "url": "http://127.0.0.1:8181/health"}); r.status_code == 200',
+        ]
+
+  step-ca:
+    image: smallstep/step-ca:0.30.2
+    environment:
+      DOCKER_STEPCA_INIT_NAME: RID Dev CA
+      DOCKER_STEPCA_INIT_DNS_NAMES: localhost,step-ca
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: rid-portal
+      DOCKER_STEPCA_INIT_PASSWORD: ${STEP_CA_PASSWORD:?set STEP_CA_PASSWORD in .env}
+    volumes:
+      - step-ca-data:/home/step
+    ports:
+      - 127.0.0.1:${STEP_CA_PORT:-9000}:9000
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        [
+          'CMD',
+          'step',
+          'ca',
+          'health',
+          '--ca-url=https://localhost:9000',
+          '--root=/home/step/certs/root_ca.crt',
+        ]
+
+  opensearch:
+    image: opensearchproject/opensearch:3.9.0
+    profiles: [observability]
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: 'false'
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      # Dev only: no TLS/auth inside the private Compose network. Production uses the security plugin.
+      DISABLE_SECURITY_PLUGIN: 'true'
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - 127.0.0.1:${OPENSEARCH_PORT:-9200}:9200
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        [
+          'CMD-SHELL',
+          'curl -fsS "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=4s"',
+        ]
+      start_period: 30s
+
+  fluent-bit:
+    image: fluent/fluent-bit:5.1.5-debug
+    profiles: [observability]
+    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/fluent-bit.yaml']
+    volumes:
+      - ../fluent-bit:/fluent-bit/etc/rid:ro
+    # Not published: APISIX ships logs over the Compose network (http://fluent-bit:9880).
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      # The -debug image ships curl; the plain image has no tools at all.
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:2020/api/v1/health']
+
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - 127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025
+      - 127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', '/mailpit', 'readyz']
+
+  mock-salud:
+    build: &mock-build
+      context: ../..
+      dockerfile: infra/mock-providers/Dockerfile
+    image: rid/mock-providers:dev
+    environment:
+      PROVIDER: salud
+      PORT: '8000'
+    ports:
+      - 127.0.0.1:${MOCK_SALUD_PORT:-8101}:8000
+    healthcheck: &mock-healthcheck
+      <<: *healthcheck-defaults
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8000/health']
+
+  mock-socioeconomico:
+    # Same image as mock-salud (the build is cached); the provider is chosen by PROVIDER.
+    build: *mock-build
+    image: rid/mock-providers:dev
+    environment:
+      PROVIDER: socioeconomico
+      PORT: '8000'
+    ports:
+      - 127.0.0.1:${MOCK_SOCIOECONOMICO_PORT:-8102}:8000
+    healthcheck: *mock-healthcheck
+
+volumes:
+  pg-data:
+  etcd-data:
+  step-ca-data:
+  opensearch-data:
