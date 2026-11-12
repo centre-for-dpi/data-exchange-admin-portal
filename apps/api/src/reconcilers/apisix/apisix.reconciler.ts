@@ -175,7 +175,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    */
   private async assertPublicUpstream(upstream: Upstream): Promise<void> {
     if (upstream.type !== 'direct') return;
-    const host = new URL(upstream.url).hostname.replace(/^[|]$/g, '');
+    const host = new URL(upstream.url).hostname.replace(/^\[|\]$/g, '');
     if (isIP(host)) return; // literal IPs are fully judged by isPublicHostname
     const addresses = await this.settings.resolveHost(host);
     const internal = addresses.filter((address) => !isPublicAddress(address));

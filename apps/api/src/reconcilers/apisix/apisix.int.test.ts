@@ -227,6 +227,21 @@ describe('APISIX reconciler (M1-08)', () => {
       expect(state?.status).toBe('error');
     });
 
+    it('a public IPv6 literal is served without a DNS lookup', async () => {
+      const versionId = await publish('salud', `gw-ipv6-${run}`);
+      await setUpstream(versionId, {
+        type: 'direct',
+        url: 'https://[2001:4860:4860::8888]/v1',
+        mtls: false,
+      });
+      try {
+        dns = new Error('a literal address must not be looked up');
+        expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+      } finally {
+        dns = ['93.184.215.14'];
+      }
+    });
+
     it('a public name that resolves to a private address is not served', async () => {
       const versionId = await publish('salud', `gw-dns-${run}`);
       await setUpstream(versionId, {
