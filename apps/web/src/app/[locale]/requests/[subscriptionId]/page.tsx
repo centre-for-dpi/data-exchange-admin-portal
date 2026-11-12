@@ -2,7 +2,10 @@ import { subscriptionDetailSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { RequestDecisionForms } from '../../../../components/subscriptions/subscription-forms';
+import {
+  RequestDecisionForms,
+  RevokeForm,
+} from '../../../../components/subscriptions/subscription-forms';
 import { SubscriptionFacts } from '../../../../components/subscriptions/subscription-view';
 import { AutoRefresh } from '../../../../components/auto-refresh';
 import { ApiError, apiGet } from '../../../../lib/api';
@@ -43,7 +46,9 @@ export default async function AccessRequestPage({ params }: PageProps) {
   // The API enforces separation of duties; the UI only avoids offering a doomed action. A user who
   // also develops for the requesting entity may be the requester, so the forms stay and the API
   // answers 403 with the reason.
-  const canDecide = pending && entity.roles.includes('data_steward');
+  const steward = entity.roles.includes('data_steward');
+  const canDecide = pending && steward;
+  const canRevoke = steward && ['approved', 'active', 'suspended'].includes(detail.status);
 
   return (
     <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
@@ -68,6 +73,12 @@ export default async function AccessRequestPage({ params }: PageProps) {
           <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>
           <AutoRefresh />
         </>
+      ) : null}
+      {canRevoke ? (
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold">{t('decide.revoke')}</h2>
+          <RevokeForm subscriptionId={detail.id} />
+        </div>
       ) : null}
     </section>
   );

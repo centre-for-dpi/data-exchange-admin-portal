@@ -56,7 +56,7 @@ export async function requestAccessAction(
 
 async function decide(
   subscriptionId: string,
-  action: 'approve' | 'reject',
+  action: 'approve' | 'reject' | 'revoke',
   body: Record<string, unknown>,
 ): Promise<FormState> {
   const t = await getTranslations('forms');
@@ -69,8 +69,8 @@ async function decide(
     subscriptionDetailSchema,
   );
   if (!result.ok) {
-    // 403 here is separation of duties: say so in the user's language.
-    if (result.status === 403) {
+    // On approve/reject a 403 is separation of duties: say so in the user's language.
+    if (result.status === 403 && action !== 'revoke') {
       return { formError: (await getTranslations('subscriptions.decide'))('ownRequest') };
     }
     return problemToFormState(result.problem, t('unexpected'));
@@ -101,4 +101,13 @@ export async function rejectRequestAction(
   formData: FormData,
 ): Promise<FormState> {
   return decide(subscriptionId, 'reject', { comment: text(formData, 'comment') });
+}
+
+/** Provider data steward: revoke an approved or active subscription (M1-10). */
+export async function revokeSubscriptionAction(
+  subscriptionId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  return decide(subscriptionId, 'revoke', { comment: text(formData, 'comment') });
 }

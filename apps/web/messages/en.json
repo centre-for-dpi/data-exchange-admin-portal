@@ -372,7 +372,10 @@
       "approveComment": "Comment (optional)",
       "reject": "Reject",
       "rejectComment": "Reason for rejecting",
-      "ownRequest": "You cannot decide on this request: you or your application made it (separation of duties)."
+      "ownRequest": "You cannot decide on this request: you or your application made it (separation of duties).",
+      "revoke": "Revoke access",
+      "revokeHint": "The consumer entity can no longer call the API within a minute. This cannot be undone: access again needs a new request.",
+      "revokeComment": "Reason for revoking"
     }
   }
 }

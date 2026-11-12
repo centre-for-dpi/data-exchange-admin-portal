@@ -7,6 +7,8 @@ import {
   entityIdParamsSchema,
   type RejectSubscriptionInput,
   rejectSubscriptionSchema,
+  type RevokeSubscriptionInput,
+  revokeSubscriptionSchema,
   subscriptionDetailSchema,
   type SubscriptionListQuery,
   subscriptionListQuerySchema,
@@ -172,5 +174,32 @@ export class AccessRequestsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.subscriptions.reject(entity.entityId, id, principal, body, request.id);
+  }
+
+  @Post(':subscriptionId/revoke')
+  @HttpCode(200)
+  @EntityAccess('access_request.decide')
+  @ApiOperation({
+    operationId: 'revokeSubscription',
+    summary: 'Revoke a subscription to one of the entity’s APIs, with a reason',
+    description:
+      'Final. The gateway starts denying calls (403 no_subscription) as soon as OPA downloads ' +
+      'the next bundle, within 60 seconds.',
+    tags: ['access-requests'],
+    params: subscriptionParamsSchema,
+    body: revokeSubscriptionSchema,
+    responses: {
+      200: { description: 'The revoked subscription', schema: subscriptionDetailSchema },
+    },
+    errors: [400, 401, 403, 404, 409],
+  })
+  revoke(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Body(new ZodValidationPipe(revokeSubscriptionSchema)) body: RevokeSubscriptionInput,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.subscriptions.revoke(entity.entityId, id, principal, body, request.id);
   }
 }

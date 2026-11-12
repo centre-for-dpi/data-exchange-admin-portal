@@ -61,6 +61,12 @@ export const rejectSubscriptionSchema = z.strictObject({
 });
 export type RejectSubscriptionInput = z.input<typeof rejectSubscriptionSchema>;
 
+/** Revocation by the provider's data steward: final, with a reason the consumer reads. */
+export const revokeSubscriptionSchema = z.strictObject({
+  comment: z.string().trim().min(10, 'explain why access is revoked (10+ characters)').max(2_000),
+});
+export type RevokeSubscriptionInput = z.input<typeof revokeSubscriptionSchema>;
+
 const entityRef = z.object({ id: z.uuid(), slug: z.string(), shortName: z.string() });
 
 export const subscriptionSummarySchema = z.object({

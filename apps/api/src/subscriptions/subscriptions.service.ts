@@ -5,6 +5,7 @@ import type {
   Classification,
   CreateSubscriptionInput,
   RejectSubscriptionInput,
+  RevokeSubscriptionInput,
   SubscriptionDetail,
   SubscriptionListQuery,
   SubscriptionStatus,
@@ -14,6 +15,7 @@ import {
   approveSubscriptionSchema,
   createSubscriptionSchema,
   rejectSubscriptionSchema,
+  revokeSubscriptionSchema,
 } from '@rid/contracts';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -481,6 +483,56 @@ export class SubscriptionsService {
         before: snapshot(before),
         after: { status: 'rejected', comment },
         requestId,
+      });
+    });
+    return this.getForProvider(entityId, subscriptionId);
+  }
+
+  /**
+   * Revocation by the provider's data steward (SPEC.md §4.4, M1-10). Final. Unlike approving, it
+   * is not subject to separation of duties: it only takes access away, and a steward must be able
+   * to cut access that their own application has. The next OPA bundle no longer carries the
+   * subscription, so the gateway denies with no_subscription within one polling cycle (< 60 s).
+   */
+  async revoke(
+    entityId: string,
+    subscriptionId: string,
+    principal: Principal,
+    input: RevokeSubscriptionInput,
+    requestId?: string,
+  ): Promise<SubscriptionDetail> {
+    const { comment } = revokeSubscriptionSchema.parse(input);
+    const before = await this.loadForProvider(entityId, subscriptionId);
+    assertTransition(before.status, 'revoked');
+
+    await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.subscription.updateMany({
+        where: { id: subscriptionId, status: before.status },
+        data: { status: 'revoked' },
+      });
+      if (changed.count === 0)
+        throw new ConflictError('The subscription changed meanwhile; reload it');
+      await tx.subscriptionDecision.create({
+        data: {
+          subscriptionId,
+          decision: 'revoked',
+          decidedBy: principal.userId,
+          decidedByEntityId: entityId,
+          comment,
+        },
+      });
+      await this.audit.record(tx, {
+        actor: { type: 'user', id: principal.keycloakSub, entityId },
+        action: 'subscription.revoked',
+        target: { type: 'subscription', id: subscriptionId },
+        before: snapshot(before),
+        after: { status: 'revoked', comment },
+        requestId,
+      });
+      await this.outbox.enqueue(tx, {
+        topic: POLICY_SYNC_TOPIC,
+        aggregate: `subscription:${subscriptionId}`,
+        payload: { reason: 'revoked' },
       });
     });
     return this.getForProvider(entityId, subscriptionId);

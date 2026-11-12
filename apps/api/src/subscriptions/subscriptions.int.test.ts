@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { OpaService } from '../opa/opa.service.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
 import { addMonths, POLICY_SYNC_TOPIC } from './subscriptions.service.js';
@@ -459,6 +460,95 @@ describe('access requests and approval (M1-07)', () => {
       const both = await userWith({ [programas]: ['app_developer'], [salud]: ['data_steward'] });
       const s = await requestAccess({ applicationId: await createApplication(both) }, 'carlos.dev');
       expect((await call('POST', `${inbox(s.id)}/approve`, both, {})).statusCode).toBe(403);
+    });
+  });
+
+  describe('revocation (M1-10)', () => {
+    const revoke = (
+      id: string,
+      who: Who,
+      entityId = salud,
+      comment = 'El convenio de intercambio terminó.',
+    ) => call('POST', `/entities/${entityId}/access-requests/${id}/revoke`, who, { comment });
+
+    /** An approved request, optionally already active (as OPA's status report would leave it). */
+    async function granted(active: boolean) {
+      const s = await requestAccess({ applicationId: await createApplication() });
+      const approved = await call('POST', `${inbox(s.id)}/approve`, 'lucia.datos', {});
+      expect(approved.statusCode, approved.body).toBe(200);
+      if (active)
+        await prisma.subscription.update({ where: { id: s.id }, data: { status: 'active' } });
+      return s.id;
+    }
+
+    it('the data steward revokes an active subscription; the next bundle no longer grants it', async () => {
+      const id = await granted(true);
+      const opa = app.get(OpaService);
+      const grantedIds = async () =>
+        Object.values((await opa.data()).data.clients).flatMap((c) =>
+          c.subscriptions.map((x) => x.id),
+        );
+      expect(await grantedIds()).toContain(id);
+
+      expect((await revoke(id, 'lucia.datos', salud, 'corto')).statusCode).toBe(400);
+      const res = await revoke(id, 'lucia.datos');
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toMatchObject({
+        status: 'revoked',
+        decisions: [
+          { decision: 'approved', by: 'provider' },
+          { decision: 'revoked', by: 'provider', comment: 'El convenio de intercambio terminó.' },
+        ],
+      });
+      expect(await grantedIds()).not.toContain(id);
+
+      const actions = await prisma.auditEvent.findMany({
+        where: { targetType: 'subscription', targetId: id },
+        orderBy: { seq: 'asc' },
+      });
+      expect(actions.map((e) => e.action)).toEqual([
+        'subscription.requested',
+        'subscription.approved',
+        'subscription.revoked',
+      ]);
+      expect(
+        await prisma.outboxMessage.count({
+          where: { topic: POLICY_SYNC_TOPIC, aggregate: `subscription:${id}` },
+        }),
+      ).toBe(2);
+
+      // Final: nothing moves a revoked subscription, and the consumer reads the reason.
+      const again = await revoke(id, 'lucia.datos');
+      expect(again.statusCode).toBe(409);
+      expect(again.json()).toMatchObject({ code: 'invalid_transition' });
+      const seen = await call('GET', `/entities/${programas}/subscriptions/${id}`, 'carlos.dev');
+      expect(seen.json()).toMatchObject({ status: 'revoked' });
+    });
+
+    it('an approved subscription can be revoked before it activates; a pending request cannot', async () => {
+      expect((await revoke(await granted(false), 'lucia.datos')).statusCode).toBe(200);
+      const pending = await requestAccess({ applicationId: await createApplication() });
+      expect((await revoke(pending.id, 'lucia.datos')).statusCode).toBe(409);
+    });
+
+    it('only the provider’s data steward revokes: others 403, other entities 404', async () => {
+      const id = await granted(true);
+      expect((await revoke(id, 'pedro.publicador')).statusCode).toBe(403);
+      expect((await revoke(id, 'carlos.dev')).statusCode).toBe(404);
+      expect((await revoke(id, 'carlos.dev', programas)).statusCode).toBe(403);
+      expect((await revoke(id, 'ana.operadora')).statusCode).toBe(404);
+      expect((await prisma.subscription.findUniqueOrThrow({ where: { id } })).status).toBe(
+        'active',
+      );
+    });
+
+    it('a steward may revoke access their own application requested (no separation of duties)', async () => {
+      const both = await userWith({ [programas]: ['app_developer'], [salud]: ['data_steward'] });
+      const s = await requestAccess({ applicationId: await createApplication(both) }, both);
+      expect((await call('POST', `${inbox(s.id)}/approve`, 'lucia.datos', {})).statusCode).toBe(
+        200,
+      );
+      expect((await revoke(s.id, both)).statusCode).toBe(200);
     });
   });
 

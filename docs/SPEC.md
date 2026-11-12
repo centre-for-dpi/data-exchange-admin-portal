@@ -167,7 +167,7 @@ pending_* → withdrawn (el solicitante desiste)
 **Reglas**
 - Una aplicación tiene como máximo una suscripción activa por versión de API y finalidad.
 - Sandbox: las suscripciones de aplicaciones sandbox se aprueban automáticamente si `features.sandbox.autoApprove` y solo apuntan al upstream de pruebas.
-- Separación de funciones: quien solicita no puede aprobar, aunque tenga ambos roles en entidades distintas.
+- Separación de funciones: quien solicita no puede aprobar, aunque tenga ambos roles en entidades distintas. No aplica a revocar ni a suspender: esas acciones solo quitan acceso, y un responsable de datos debe poder cortar el acceso de una aplicación propia comprometida.
 
 ### 4.5 Llamada a una API (lo que el portal hace posible)
 

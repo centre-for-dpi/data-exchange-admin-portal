@@ -372,7 +372,10 @@
       "approveComment": "Comentario (opcional)",
       "reject": "Rechazar",
       "rejectComment": "Motivo del rechazo",
-      "ownRequest": "No puedes decidir esta solicitud: la hiciste tú o tu aplicación (separación de funciones)."
+      "ownRequest": "No puedes decidir esta solicitud: la hiciste tú o tu aplicación (separación de funciones).",
+      "revoke": "Revocar acceso",
+      "revokeHint": "La entidad consumidora deja de poder llamar a la API en menos de un minuto. No se puede deshacer: para volver a dar acceso hace falta una nueva solicitud.",
+      "revokeComment": "Motivo de la revocación"
     }
   }
 }

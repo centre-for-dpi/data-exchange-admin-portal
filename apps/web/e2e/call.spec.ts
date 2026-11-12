@@ -130,5 +130,33 @@ test.describe('a call through the gateway (M1-09)', () => {
       },
       'operation_not_allowed',
     );
+
+    // M1-10 (DEMO.md step 9): lucia revokes; within 60 s the same call is denied.
+    const revoker = await (await browser.newContext()).newPage();
+    await signIn(revoker, 'lucia.datos', `/requests/${subscriptionId}`);
+    const revoke = revoker.getByRole('form', { name: 'Revocar acceso' });
+    await revoke.getByLabel(/^Motivo de la revocación/).fill('El convenio de intercambio terminó.');
+    await revoke.getByRole('button', { name: 'Revocar acceso' }).click();
+    await expect(revoker.getByTestId('subscription-status')).toHaveText('Revocada');
+    const revokedAt = Date.now();
+    await revoker.context().close();
+
+    await expect
+      .poll(
+        async () => {
+          const res = await fetch(`${base}/1000000001`, { headers: headers() });
+          return res.status === 403 ? res.headers.get('x-rid-deny-reason') : String(res.status);
+        },
+        { timeout: 60_000, intervals: [1_000] },
+      )
+      .toBe('no_subscription');
+    const seconds = (Date.now() - revokedAt) / 1000;
+    expect(seconds).toBeLessThan(60);
+    test.info().annotations.push({ type: 'revocation', description: `denied after ${seconds} s` });
+
+    // The consumer reads why.
+    await page.goto(`/my-apps/requests/${subscriptionId}`);
+    await expect(page.getByTestId('subscription-status')).toHaveText('Revocada');
+    await expect(page.getByText('El convenio de intercambio terminó.')).toBeVisible();
   });
 });

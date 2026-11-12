@@ -7,6 +7,7 @@ import {
   approveRequestAction,
   rejectRequestAction,
   requestAccessAction,
+  revokeSubscriptionAction,
 } from '../../lib/subscription-actions';
 import { ErrorSummary, Field, inputClass } from '../form/field';
 import { Button } from '../ui/button';
@@ -253,5 +254,26 @@ export function RequestDecisionForms({
         </Button>
       </form>
     </div>
+  );
+}
+
+/** Data steward: revoke an approved or active subscription, with a reason (M1-10). */
+export function RevokeForm({ subscriptionId }: { subscriptionId: string }) {
+  const t = useTranslations('subscriptions.decide');
+  const [state, action, pending] = useActionState(
+    revokeSubscriptionAction.bind(null, subscriptionId),
+    initialFormState,
+  );
+  return (
+    <form action={action} className="max-w-2xl space-y-4" aria-label={t('revoke')} noValidate>
+      <ErrorSummary state={state} />
+      <p className="text-sm text-muted-foreground">{t('revokeHint')}</p>
+      <Field name="comment" label={t('revokeComment')} required state={state}>
+        {(p) => <textarea {...p} rows={3} className={inputClass} />}
+      </Field>
+      <Button type="submit" variant="outline" disabled={pending}>
+        {t('revoke')}
+      </Button>
+    </form>
   );
 }

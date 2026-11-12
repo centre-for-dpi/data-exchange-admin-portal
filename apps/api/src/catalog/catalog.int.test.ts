@@ -124,8 +124,16 @@ describe('catalogue (M1-05)', () => {
   });
 
   it('filters by text, sector, entity and classification', async () => {
-    const has = async (query: string) =>
-      (await search(`${query}&limit=100`)).items.some((i) => i.api.id === published.apiId);
+    // Walks every page: the test database keeps the APIs of earlier runs.
+    const has = async (query: string) => {
+      let cursor = '';
+      for (;;) {
+        const page = await search(`${query}&limit=100${cursor ? `&cursor=${cursor}` : ''}`);
+        if (page.items.some((i) => i.api.id === published.apiId)) return true;
+        if (!page.nextCursor) return false;
+        cursor = page.nextCursor;
+      }
+    };
     expect(await has(`q=${encodeURIComponent(published.name.toUpperCase())}`)).toBe(true);
     expect(await has('q=afiliacion')).toBe(true); // tag
     expect(await has('sector=salud')).toBe(true);

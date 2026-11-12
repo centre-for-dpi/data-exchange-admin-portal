@@ -178,8 +178,14 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Activación:** OPA no expone un "GET status", así que se usa su plugin `status`, que avisa al portal (`POST /api/v1/opa/status`) qué revisión activó. `policy_bundle` guarda qué suscripciones trae cada revisión, y las `approved` pasan a `active` con auditoría. `policy.sync` actualiza el `sync_state` `opa:bundle` para la consola del operador. La UI de la solicitud se refresca sola mientras está "Aprobada (activándose)".
     - **e2e (`call.spec.ts`, DEMO pasos 5–8):** llamada real con 200 y datos del mock. El proveedor recibe la suscripción, la operación, la entidad y la aplicación que puso OPA, aunque el cliente envíe valores falsos, y solo el hash del funcionario. Se prueban además las negaciones `purpose_not_allowed`, `end_user_required` y `operation_not_allowed` (el POST no solicitado). `gateway.spec.ts` ahora espera `403 no_subscription`.
     - **Además:** `pathRegex` acepta parámetros dentro de un segmento (`/{id}.json`). El refresco automático de la web pasó a un componente genérico.
-- [ ] **M1-10 — Revocación**
+- [x] **M1-10 — Revocación**
   - `data_steward` revoca; la llamada empieza a fallar con `403 no_subscription` en < 60 s (test automatizado).
+  - _Notas de implementación:_
+    - **API:** `POST /entities/:id/access-requests/:sid/revoke`, solo para el `data_steward` de la proveedora y con motivo obligatorio (10 caracteres o más). Vale para suscripciones `approved`, `active` y `suspended`; la revocación es final (409 en cualquier otro estado). Registra la decisión, `subscription.revoked` en auditoría y `policy.sync`.
+    - **Gateway:** la siguiente revisión del bundle ya no lleva la suscripción, y OPA la descarga en 10–20 s.
+    - **Interpretación (SPEC §4.4):** revocar no está sujeto a separación de funciones, porque solo quita acceso.
+    - **Web:** formulario "Revocar acceso" en la ficha de la solicitud. El consumidor ve la suscripción "Revocada" con el motivo.
+    - **e2e (`call.spec.ts`, DEMO paso 9):** tras la llamada exitosa, lucia revoca desde la UI y la misma llamada se repite cada segundo hasta recibir `403 no_subscription`. En local tardó 10,5 s; la prueba exige menos de 60 s.
 - [ ] **M1-11 — Auditoría encadenada mínima**
   - Cadena de hash funcionando; línea de tiempo por objeto (API, suscripción) en la UI.
   - Endpoint de verificación de integridad.
