@@ -93,46 +93,52 @@ export function buildServer(provider: Provider, options: ServerOptions = {}): Fa
     properties: { numeroIdentificacion: { type: 'string', pattern: ID_PATTERN } },
   } as const;
 
-  if (provider === 'salud') {
-    const afiliados = generateAfiliados();
+  const afiliados = provider === 'salud' ? generateAfiliados() : undefined;
+  const hogares = provider === 'salud' ? undefined : generateHogares();
 
-    app.get<{ Params: { numeroIdentificacion: string } }>(
-      '/afiliados/:numeroIdentificacion',
-      { schema: { params: idParams } },
-      (request, reply) => {
-        const afiliado = afiliados.get(request.params.numeroIdentificacion);
-        return afiliado ? afiliado : problem(reply, 404, 'No encontrado');
-      },
-    );
+  /** The provider's service. Served at the root and under /<provider>, like a node of the kit that
+   * exposes each service under its own path (upstream servicePath, ARCHITECTURE.md §10). */
+  const service = (scope: FastifyInstance, _options: unknown, done: () => void) => {
+    if (afiliados) {
+      scope.get<{ Params: { numeroIdentificacion: string } }>(
+        '/afiliados/:numeroIdentificacion',
+        { schema: { params: idParams } },
+        (request, reply) => {
+          const afiliado = afiliados.get(request.params.numeroIdentificacion);
+          return afiliado ? afiliado : problem(reply, 404, 'No encontrado');
+        },
+      );
 
-    app.post<{ Body: { numeroIdentificacion: string } }>(
-      '/afiliados/verificaciones',
-      {
-        schema: {
-          body: {
-            type: 'object',
-            required: ['numeroIdentificacion'],
-            additionalProperties: false,
-            properties: { numeroIdentificacion: { type: 'string', pattern: ID_PATTERN } },
+      scope.post<{ Body: { numeroIdentificacion: string } }>(
+        '/afiliados/verificaciones',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['numeroIdentificacion'],
+              additionalProperties: false,
+              properties: { numeroIdentificacion: { type: 'string', pattern: ID_PATTERN } },
+            },
           },
         },
-      },
-      (request) => ({
-        afiliadoActivo: afiliados.get(request.body.numeroIdentificacion)?.estado === 'activo',
-      }),
-    );
-  } else {
-    const hogares = generateHogares();
-
-    app.get<{ Params: { numeroIdentificacion: string } }>(
-      '/hogares/:numeroIdentificacion',
-      { schema: { params: idParams } },
-      (request, reply) => {
-        const hogar = hogares.get(request.params.numeroIdentificacion);
-        return hogar ? hogar : problem(reply, 404, 'No encontrado');
-      },
-    );
-  }
+        (request) => ({
+          afiliadoActivo: afiliados.get(request.body.numeroIdentificacion)?.estado === 'activo',
+        }),
+      );
+    } else if (hogares) {
+      scope.get<{ Params: { numeroIdentificacion: string } }>(
+        '/hogares/:numeroIdentificacion',
+        { schema: { params: idParams } },
+        (request, reply) => {
+          const hogar = hogares.get(request.params.numeroIdentificacion);
+          return hogar ? hogar : problem(reply, 404, 'No encontrado');
+        },
+      );
+    }
+    done();
+  };
+  void app.register(service);
+  void app.register(service, { prefix: `/${provider}` });
 
   return app;
 }

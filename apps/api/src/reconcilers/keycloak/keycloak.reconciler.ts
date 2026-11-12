@@ -52,6 +52,8 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
   async onApplicationBootstrap(): Promise<void> {
     if (!QueueService.enabled()) return;
     await this.queue.work(KEYCLOAK_SYNC_TOPIC, (data) => this.handle(data));
+    // Converge right after a restart instead of waiting for the first periodic pass.
+    void this.reconcileAll();
     this.timer = setInterval(() => void this.reconcileAll(), FULL_RECONCILE_MS);
   }
 

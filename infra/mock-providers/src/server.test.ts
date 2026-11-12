@@ -101,6 +101,13 @@ describe('mock provider: salud', () => {
     expect(validate(res.json()), JSON.stringify(validate.errors)).toBe(true);
   });
 
+  it('also serves under its service path, like a node of the kit', async () => {
+    const prefixed = await app.inject({ method: 'GET', url: `/salud/afiliados/${SAMPLE_ID}` });
+    const root = await app.inject({ method: 'GET', url: `/afiliados/${SAMPLE_ID}` });
+    expect(prefixed.statusCode).toBe(200);
+    expect(prefixed.json()).toEqual(root.json());
+  });
+
   it('answers 404 problem+json for an unknown identifier', async () => {
     const res = await app.inject({ method: 'GET', url: `/afiliados/${UNKNOWN_ID}` });
     expect(res.statusCode).toBe(404);

@@ -51,8 +51,20 @@ describe('APISIX (M0-04)', () => {
   });
 
   it('has no route for unknown paths (nothing is published by hand)', async () => {
-    const res = await fetch(`${gatewayUrl()}/salud/afiliacion/v1/afiliados/1000000001`);
+    const res = await fetch(`${gatewayUrl()}/unknown-${randomUUID()}/v1/afiliados/1000000001`);
     expect(res.status).toBe(404);
+  });
+
+  it('never writes the request path to its own logs (rule 2, ARCHITECTURE.md §8)', async () => {
+    // Paths carry identification numbers: nginx's access log is off and only http-logger, with
+    // the allow-listed fields, records requests.
+    const since = new Date(Date.now() - 1_000).toISOString();
+    const identifier = String(Date.now()).slice(-10);
+    await fetch(
+      `${gatewayUrl()}/unknown-${randomUUID()}/v1/afiliados/${identifier}?doc=${identifier}`,
+    );
+    await new Promise((r) => setTimeout(r, 1_000));
+    expect(containerLogsSince('rid-apisix-1', since)).not.toContain(identifier);
   });
 });
 

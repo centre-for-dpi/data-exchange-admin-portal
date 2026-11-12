@@ -8,10 +8,8 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../common/errors.j
 import { assertTransition } from '../domain/api-version/state-machine.js';
 import { requiresRegulator } from '../domain/approval.js';
 import { OutboxService } from '../outbox/outbox.service.js';
+import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
-
-/** Outbox topic consumed by the APISIX reconciler (M1-08). */
-export const GATEWAY_SYNC_TOPIC = 'gateway.sync';
 
 const REVIEWER_ROLE_PREFERENCE: readonly PlatformRole[] = ['platform_reviewer', 'platform_admin'];
 

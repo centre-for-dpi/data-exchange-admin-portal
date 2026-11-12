@@ -91,9 +91,24 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
   ): Promise<void> {
     await this.start();
     await this.ensureQueue(topic);
-    await this.instance.work<Record<string, unknown>>(topic, async (jobs) => {
-      for (const job of jobs) await handler(job.data);
-    });
+    // Batches drain a backlog (e.g. after downtime) without waiting a polling interval per job;
+    // a one-second poll keeps a single change well inside the 60 s target (SPEC.md §4.4).
+    await this.instance.work<Record<string, unknown>>(
+      topic,
+      { batchSize: 10, pollingIntervalSeconds: 1, burstWhenBatchFull: true },
+      async (jobs) => {
+        for (const job of jobs) {
+          try {
+            await handler(job.data);
+          } catch (error) {
+            // Fail only this job (pg-boss retries it); the rest of the batch completes normally.
+            await this.instance.fail(topic, job.id, {
+              message: error instanceof Error ? error.message.slice(0, 1000) : String(error),
+            });
+          }
+        }
+      },
+    );
   }
 
   /** Moves pending outbox rows to their queues. Returns how many rows were processed. */

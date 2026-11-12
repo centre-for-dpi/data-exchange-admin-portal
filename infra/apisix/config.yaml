@@ -37,6 +37,15 @@ deployment:
     prefix: /apisix
     timeout: 30
 
+nginx_config:
+  # Rule 2 (CLAUDE.md, ARCHITECTURE.md §8): nginx's access log writes the request line and the
+  # upstream URI, which carry identification numbers. Access logs leave only through http-logger
+  # with the allow-listed fields.
+  http:
+    enable_access_log: false
+  # Warnings (e.g. every request a plugin denies) also print the request line; keep errors only.
+  error_log_level: error
+
 plugin_attr:
   prometheus:
     export_addr:

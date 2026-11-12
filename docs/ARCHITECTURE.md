@@ -114,15 +114,15 @@ Reconciliador
 ### 4.1 Objetos en APISIX por versión de API publicada
 
 **Upstream** `rid-upstream-<apiVersionId>`
-- `node`: `nodes = { "<tunnelIp>:<port>": 1 }`, `scheme = https`, `tls.client_cert/client_key` = certificado del gateway emitido por step-ca (mTLS hacia el nodo).
-- `direct`: host de la API existente, `scheme = https`, mTLS opcional.
+- `node`: `nodes = { "<tunnelIp>:<port>": 1 }`, `scheme = https`, `tls.client_cert/client_key` = certificado del gateway emitido por step-ca (mTLS hacia el nodo). El servicio vive en el `servicePath` del nodo (la ruta pública se reescribe a `servicePath/...`). **Hasta M4** no hay nodos enrolados: el reconciliador resuelve el nodo con `RID_DEV_NODES` (`slug-entidad=host:puerto` del mock de esa entidad, `scheme = http`), y una versión cuyo upstream tiene `nodeId` o cuya entidad no figura ahí queda en error de sincronización, sin escribir nada en APISIX.
+- `direct`: host de la API existente, `scheme = https`, `pass_host = node`, y la ruta del URL como prefijo. mTLS opcional; mientras no exista (M3, ADR-0010), una versión que lo pide queda en error de sincronización en lugar de publicarse sin él.
 - `xroad`: Security Server del operador (ver §10).
 
 **Route** `rid-route-<apiVersionId>`
 - `uri = /{entitySlug}/{apiSlug}/v{major}/*`, métodos declarados en el OpenAPI.
 - Plugins. APISIX los ejecuta por fase y, dentro de cada fase, por prioridad (no en el orden en que se listan). Verificado en SPIKE S-1 (`docs/spikes/S-1.md`):
   1. `request-id` (rewrite, 12015): genera `X-Request-Id` si el cliente no lo envía.
-  2. `openid-connect` (rewrite, 2599): `bearer_only: true`, `use_jwks: true`, `discovery` del realm `rid-gateway`, `set_userinfo_header: false`.
+  2. `openid-connect` (rewrite, 2599): `client_id: rid-gateway`, `bearer_only: true`, `use_jwks: true`, `discovery` del realm `rid-gateway` (como lo alcanza APISIX: `RID_GATEWAY_KEYCLOAK_URL`), `set_userinfo_header`, `set_access_token_header` y `set_id_token_header` en `false` (el token no viaja al proveedor en otra cabecera), y `claim_validator.audience` con `required` y `match_with_client_id`: solo pasan tokens con `aud = rid-gateway`. El emisor se valida contra el de la discovery.
   3. `proxy-rewrite` (rewrite, 1008): elimina las cabeceras que solo el gateway puede poner (`X-RID-Consumer-Entity`, `X-RID-Consumer-App`, `X-RID-Subscription`, `X-RID-Operation`, `X-RID-End-User-Hash`) si vienen del cliente, antes de que OPA arme su entrada; conserva `X-RID-Purpose` y `X-RID-End-User`, que OPA necesita leer. Reescribe la ruta quitando el prefijo (solo cambia `upstream_uri`; OPA sigue viendo la ruta pública completa).
   4. `opa` (access, 2001): `host` del OPA local, `policy: rid/authz`, `with_route: true`, `send_headers_upstream: [X-RID-Consumer-Entity, X-RID-Consumer-App, X-RID-Subscription, X-RID-Purpose, X-RID-Operation, X-RID-End-User-Hash, X-RID-End-User, X-Request-Id]`. Para cada nombre de esa lista el plugin pone el valor que devuelve la política y, **si la política no lo devuelve, borra la cabecera del cliente**. Por eso la política devuelve siempre `X-RID-Purpose` y `X-Request-Id`, y **nunca** `X-RID-End-User` (así el valor en claro no llega al proveedor). Si OPA no responde, niega con 403 (falla cerrado).
   5. `limit-count` (access, 1002): límite por suscripción con `key_type: var`, `key: http_x_rid_subscription` (la cabecera que puso OPA). Ver SPIKE S-2.
@@ -131,6 +131,8 @@ Reconciliador
   8. `http-logger` (log, 410): hacia Fluent Bit con `log_format` de §8.
 
 Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega todo.
+
+**Reconciliador (M1-08):** consume `gateway.sync` (aggregate `apiVersion:<id>`) y sirve las versiones `published` y `deprecated`. Compara el estado deseado con lo que guarda APISIX campo por campo (APISIX agrega valores por defecto, que no cuentan como deriva) y solo escribe si algo cambió: upstream antes que ruta, y al borrar, ruta antes que upstream. Hace una pasada completa al arrancar y cada 5 minutos, que también borra los objetos `rid-` que ninguna versión pide. Los objetos sin ese prefijo no se tocan. El resultado queda en `sync_state` (`apisix:route:rid-route-<id>`).
 
 ### 4.2 Bundle de OPA
 
@@ -249,6 +251,7 @@ deny_reason
 - Variables de APISIX para cada campo: `$http_x_rid_operation`, `$http_x_rid_subscription`, `$http_x_rid_consumer_entity`, `$http_x_rid_consumer_app`, `$http_x_rid_purpose`, `$http_x_rid_end_user_hash` (las cabeceras que puso OPA, visibles en la fase de log según S-1) y `$sent_http_x_rid_deny_reason`. **Nunca** `$uri`, `$request_uri` ni `$upstream_uri`: incluyen la ruta real y la query.
 
 - **No se registran**: `uri` real, query string, cuerpos, `Authorization`, IP del ciudadano (no hay; los consumidores son sistemas).
+- El access log propio de nginx en APISIX está **desactivado** (`nginx_config.http.enable_access_log: false`), porque escribe la línea de la petición y la URI del upstream. El error log queda en nivel `error`, porque los avisos (p. ej. cada denegación de un plugin) también incluyen la línea de la petición. Hay una prueba de regresión en `tests/infra`. Pendiente para M5-01: los errores reales todavía pueden llevar la línea de la petición en el log de nginx.
 - Fluent Bit aplica un filtro Lua que descarta cualquier campo fuera de la lista permitida (defensa en profundidad).
 - OpenSearch: índice `rid-access-YYYY.MM`, política de retención por configuración.
 - La analítica del portal consulta OpenSearch desde `apps/api` filtrando por la entidad del usuario; los roles de plataforma ven todo.

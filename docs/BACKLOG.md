@@ -154,10 +154,19 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Gateway:** aprobar encola `policy.sync` (aggregate `subscription:<id>`). M1-09 lo consume y pasa la suscripción a `active` cuando OPA descarga el bundle; mientras tanto la UI muestra "Aprobada (activándose)".
     - **Pendientes:** la autoaprobación de sandbox (`features.sandbox.autoApprove`) queda para M4-08, porque exige el upstream de pruebas. Pedir información y desistir quedan para M2-06, y el adjunto del acuerdo para M2-07.
     - **Web:** botón "Solicitar acceso" en la ficha del catálogo (solo para `app_developer`), formulario accesible, solicitudes en "Mis aplicaciones" con su ficha, y bandeja "Solicitudes" (pendientes y todas) con los formularios de aprobar y rechazar.
-- [ ] **M1-08 — Reconciliador de APISIX**
+- [x] **M1-08 — Reconciliador de APISIX**
   - Outbox → pg-boss → reconciliador idempotente que crea upstream y ruta con los plugins de `ARCHITECTURE.md §4.1` (sin `limit-count` ni mTLS todavía).
   - Reconciliación completa periódica; `sync_state` actualizado.
   - Test de integración: borrar una ruta a mano en APISIX y verificar que el reconcile la recrea.
+  - _Notas de implementación:_
+    - **Plugins:** `request-id`, `openid-connect` (con validación de `aud = rid-gateway`), `proxy-rewrite` (reescribe al `servicePath` y quita las cabeceras que solo pone el gateway), `opa`, `prometheus` y `http-logger` con los campos de §8.
+    - **Diseño:** el estado deseado es una función pura (`desired-state.ts`). La comparación con APISIX acepta los valores por defecto que este agrega, así que dos pasadas seguidas no escriben nada. La pasada completa corre al arrancar y cada 5 minutos, y borra objetos `rid-` huérfanos sin tocar los demás.
+    - **Pruebas:** contra APISIX real. Crear, idempotencia, ruta borrada a mano y recreada, plugin `opa` quitado a mano y repuesto, huérfanos, upstream no servible y versión retirada. El CI levanta ahora `etcd` y `apisix` en el job de integración del API.
+    - **Nodos (hasta M4):** `RID_DEV_NODES` mapea cada entidad a su mock, y el mock atiende también bajo su `servicePath` (`/salud/...`), como lo haría un nodo. Un upstream con `nodeId`, sin nodo de desarrollo o `direct` con mTLS queda en error de `sync_state`, sin escribir nada (falla cerrado).
+    - **e2e:** al publicar desde la UI la ruta aparece sola. Responde 401 sin token o con un token falso. Con un token válido de aplicación llega a OPA, que hoy responde 503 porque `rid/authz` aún no existe; M1-09 lo convierte en `403 no_subscription`.
+    - **Cola:** el worker procesa en lotes de 10, consulta cada segundo y hace que falle solo el trabajo con error. Había un atraso de trabajos `gateway.sync` acumulado desde M1-04, que retrasaba las rutas nuevas.
+    - **Privacidad, regla 2:** el access log de nginx en APISIX escribía la ruta con el número de identificación. Queda desactivado y el error log en nivel `error`, con una prueba de regresión en `tests/infra`. Pendiente para M5-01: un error real de nginx todavía puede incluir la línea de la petición.
+    - **Limpieza:** la prueba de integración borra al terminar las rutas que crea, porque localmente APISIX se comparte entre la base de desarrollo y la de pruebas.
 - [ ] **M1-09 — Bundle y política OPA**
   - `GET /api/v1/opa/bundle.tar.gz` con `ETag`; `data.json` según `ARCHITECTURE.md §4.2`.
   - `rid.authz` con las reglas 1–6 y razones de negación estables; `opa test` con casos positivos y negativos de cada regla.
