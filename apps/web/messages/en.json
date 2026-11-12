@@ -281,5 +281,98 @@
       "guideCall": "2. Call an API with the token and the purpose of your approved request:",
       "guideNote": "Replace YOUR_SECRET with the secret you saved when you created the application. You need an approved access request for the gateway to accept the call."
     }
+  },
+  "subscriptionStatus": {
+    "pending_provider": "Waiting for the provider",
+    "pending_regulator": "Waiting for the regulator",
+    "approved": "Approved (activating)",
+    "active": "Active",
+    "suspended": "Suspended",
+    "revoked": "Revoked",
+    "expired": "Expired",
+    "rejected": "Rejected",
+    "withdrawn": "Withdrawn"
+  },
+  "subscriptions": {
+    "requestAccess": "Request access",
+    "requestAccessNote": "You need a request approved by the provider entity to call this API.",
+    "myRequests": "Access requests",
+    "noRequests": "Your entity has not requested access to any API yet.",
+    "api": "API",
+    "provider": "Provider entity",
+    "consumer": "Requesting entity",
+    "application": "Application",
+    "purpose": "Purpose",
+    "status": "Status",
+    "requestedAt": "Requested",
+    "validUntil": "Valid until",
+    "detailTitle": "Access request to {api}",
+    "purposeDetail": "Purpose details",
+    "legalBasis": "Legal basis",
+    "legalReference": "Legal reference",
+    "requestedOperations": "Requested operations",
+    "approvedOperations": "Approved operations",
+    "allReadOnly": "Every read-only operation",
+    "requestedValidity": "Requested validity",
+    "months": "{count, plural, one {# month} other {# months}}",
+    "validity": "Validity",
+    "rateLimit": "Rate limit",
+    "perMinute": "{limit} per minute",
+    "defaultRateLimit": "The API default ({limit} per minute)",
+    "endUser": "Official identification",
+    "endUserRequired": "Required: every call must send X-RID-End-User.",
+    "endUserNotRequired": "Not required.",
+    "regulatorNote": "This API handles sensitive data: after your approval the request goes to the regulator.",
+    "activatingNote": "Approved. The gateway will apply it in a few seconds.",
+    "decisions": "Decisions",
+    "noDecisions": "No decisions yet.",
+    "decision": {
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "info_requested": "Asked for information",
+      "suspended": "Suspended",
+      "reactivated": "Reactivated",
+      "revoked": "Revoked"
+    },
+    "by": {
+      "provider": "by the provider entity",
+      "platform": "by the operator or the regulator"
+    },
+    "form": {
+      "title": "Request access to {api}",
+      "version": "Version {version} by {provider}",
+      "application": "Application that will make the calls",
+      "noApplications": "Your entity has no active applications. Create one before requesting access.",
+      "purpose": "Purpose",
+      "purposeDetail": "What you will use the data for",
+      "purposeDetailHint": "Describe the specific procedure or programme. The provider entity reviews it.",
+      "legalBasis": "Legal basis",
+      "legalBasisHint": "The law or agreement that entitles you to process this data.",
+      "legalReference": "Legal reference (optional)",
+      "operations": "Operations you need",
+      "operationsHint": "If you tick none, every read-only (GET) operation is requested.",
+      "validityMonths": "Validity in months",
+      "validityHint": "At most {max} months for this classification.",
+      "rateLimit": "Requests per minute you need (optional)",
+      "submit": "Send request"
+    },
+    "inbox": {
+      "title": "Received requests",
+      "pending": "Pending",
+      "all": "All",
+      "empty": "There are no requests in this view.",
+      "readOnly": "Only your entity’s data steward can decide."
+    },
+    "decide": {
+      "approve": "Approve",
+      "approveHint": "You may reduce operations, validity or rate limit; never widen them.",
+      "operations": "Operations you approve",
+      "validityMonths": "Approved validity in months",
+      "rateLimit": "Approved limit (requests per minute, optional)",
+      "approveComment": "Comment (optional)",
+      "reject": "Reject",
+      "rejectComment": "Reason for rejecting",
+      "ownRequest": "You cannot decide on this request: you or your application made it (separation of duties)."
+    }
   }
 }

@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import Markdown from 'react-markdown';
 import { z } from 'zod';
 import { ApiDocs } from '../../../../components/catalog/api-docs';
+import { Button } from '../../../../components/ui/button';
 import { Link } from '../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { localize } from '../../../../lib/localize';
@@ -51,6 +52,10 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
     anonymous,
   });
   const sector = getCountryConfig().sectors.find((s) => s.code === detail.api.sector);
+  // Only app developers request access; the API checks it again (SPEC.md §2.2).
+  const canRequest =
+    version.status === 'published' &&
+    Boolean((await getViewer()).activeEntity?.roles.includes('app_developer'));
 
   return (
     <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
@@ -113,6 +118,16 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
         <p className="text-sm">
           {t('catalog.detail.rateLimit', { limit: version.defaultRateLimit })}
         </p>
+        {canRequest ? (
+          <div className="flex flex-wrap items-center gap-4">
+            <Button asChild>
+              <Link href={`/my-apps/request?api=${apiId}&version=${version.id}`}>
+                {t('subscriptions.requestAccess')}
+              </Link>
+            </Button>
+            <p className="text-sm text-muted-foreground">{t('subscriptions.requestAccessNote')}</p>
+          </div>
+        ) : null}
 
         <h3 className="font-semibold">{t('catalog.detail.exposedFields')}</h3>
         {version.exposedFields.length === 0 ? (

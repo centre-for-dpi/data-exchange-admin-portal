@@ -1,6 +1,7 @@
-import { applicationPageSchema } from '@rid/contracts';
+import { applicationPageSchema, subscriptionPageSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { SubscriptionTable } from '../../../components/subscriptions/subscription-view';
 import { Button } from '../../../components/ui/button';
 import { Link } from '../../../i18n/navigation';
 import { apiGet } from '../../../lib/api';
@@ -31,10 +32,10 @@ export default async function MyAppsPage({ params }: PageProps) {
     );
   }
   const canWrite = entity.roles.includes('app_developer');
-  const page = await apiGet(
-    `/entities/${entity.entity.id}/applications?limit=100`,
-    applicationPageSchema,
-  );
+  const [page, requests] = await Promise.all([
+    apiGet(`/entities/${entity.entity.id}/applications?limit=100`, applicationPageSchema),
+    apiGet(`/entities/${entity.entity.id}/subscriptions?limit=100`, subscriptionPageSchema),
+  ]);
 
   return (
     <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
@@ -82,6 +83,13 @@ export default async function MyAppsPage({ params }: PageProps) {
             ))}
           </tbody>
         </table>
+      )}
+
+      <h2 className="pt-4 text-xl font-semibold">{t('subscriptions.myRequests')}</h2>
+      {requests.items.length === 0 ? (
+        <p>{t('subscriptions.noRequests')}</p>
+      ) : (
+        <SubscriptionTable items={requests.items} side="consumer" hrefBase="/my-apps/requests" />
       )}
     </section>
   );

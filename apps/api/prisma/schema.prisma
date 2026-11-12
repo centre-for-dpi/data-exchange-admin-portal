@@ -494,6 +494,8 @@ model Subscription {
   requestedOperations           String[]           @map("requested_operations")
   /// operationIds granted by the data steward (may be fewer than requested).
   approvedOperations            String[]           @map("approved_operations")
+  /// Validity the consumer asked for; the approval may only shorten it (SPEC.md §4.4).
+  requestedValidityMonths       Int                @map("requested_validity_months")
   requestedRateLimit            Int?               @map("requested_rate_limit")
   /// Granted requests per minute; null = the version's defaultRateLimit.
   rateLimitPerMinute            Int?               @map("rate_limit_per_minute")

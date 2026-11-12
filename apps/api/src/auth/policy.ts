@@ -44,6 +44,26 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['app_developer'],
     platformRoles: [],
   },
+  /** See the access requests the entity made as a consumer, and their status. */
+  'subscription.read': {
+    entityRoles: ENTITY_ROLES,
+    platformRoles: ['platform_admin', 'regulator'],
+  },
+  /** Ask for access to an API on behalf of one of the entity's applications (SPEC.md §2.2). */
+  'subscription.write': {
+    entityRoles: ['app_developer'],
+    platformRoles: [],
+  },
+  /** See the access requests other entities made to this entity's APIs (provider inbox). */
+  'access_request.read': {
+    entityRoles: ['data_steward', 'entity_admin', 'entity_viewer', 'api_publisher'],
+    platformRoles: ['platform_admin', 'regulator'],
+  },
+  /** Approve or reject access requests to the entity's APIs (SPEC.md §2.2). */
+  'access_request.decide': {
+    entityRoles: ['data_steward'],
+    platformRoles: [],
+  },
 } as const satisfies Record<string, EntityPermission>;
 
 export type EntityAction = keyof typeof ENTITY_PERMISSIONS;

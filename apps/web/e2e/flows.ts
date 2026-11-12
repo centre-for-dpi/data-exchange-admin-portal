@@ -76,3 +76,23 @@ export async function publishNewApi(
   await operator.context().close();
   return { name: submitted.name, slug: submitted.slug };
 }
+
+/** carlos (signed in) creates an application in the UI and returns its client id (M1-06). */
+export async function createApplication(page: Page, name: string): Promise<string> {
+  await page.goto('/my-apps/new');
+  await page.getByLabel(/^Nombre de la aplicación/).fill(name);
+  await page.getByLabel(/^Para qué la usará/).fill('Verifica requisitos de subsidios.');
+  await page.getByLabel(/^Entorno/).selectOption('production');
+  await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.rid.example');
+  await page.getByRole('button', { name: 'Crear aplicación' }).click();
+  return (await page.getByTestId('client-id').textContent()) ?? '';
+}
+
+/** Opens the catalogue sheet of a published API by its (unique) name. */
+export async function openCatalogApi(page: Page, name: string) {
+  await page.goto('/catalog');
+  await page.getByLabel('Buscar por nombre, resumen o etiqueta').fill(name);
+  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await page.getByRole('link', { name }).click();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+}

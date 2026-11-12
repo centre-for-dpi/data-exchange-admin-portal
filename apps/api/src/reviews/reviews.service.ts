@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
 import type { ApiVersionStatus, PlatformRole, ReviewDetail } from '@rid/contracts';
 import { ApisService, VERSION_INCLUDE, versionSnapshot } from '../apis/apis.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -7,6 +6,7 @@ import { PLATFORM_PERMISSIONS } from '../auth/policy.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../common/errors.js';
 import { assertTransition } from '../domain/api-version/state-machine.js';
+import { requiresRegulator } from '../domain/approval.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 
@@ -58,19 +58,6 @@ export class ReviewsService {
   }
 
   /**
-   * The regulator must also approve (M2-04) when the country requires it for sensitive data and the
-   * API is classified sensitive OR declares any sensitive exposed field: the field-level flag cannot
-   * be bypassed by a lower API classification.
-   */
-  private requiresRegulator(classification: string, exposedFields: unknown): boolean {
-    if (!getCountryConfig().features.approval.regulatorForSensitive) return false;
-    const fields = Array.isArray(exposedFields)
-      ? (exposedFields as Array<{ sensitive?: unknown }>)
-      : [];
-    return classification === 'sensitive' || fields.some((f) => f.sensitive === true);
-  }
-
-  /**
    * Separation of duties / conflict of interest (SPEC.md §2.2): a reviewer cannot decide on a
    * version of an entity they belong to (any role), nor on a version or API they created or
    * submitted, even if their membership was revoked afterwards.
@@ -112,7 +99,7 @@ export class ReviewsService {
         ownerContact: api.ownerContact,
       },
       version: this.apis.toVersionDetail(v),
-      requiresRegulator: this.requiresRegulator(api.classification, v.exposedFields),
+      requiresRegulator: requiresRegulator(api.classification, v.exposedFields),
     };
   }
 
@@ -155,7 +142,7 @@ export class ReviewsService {
     assertTransition(before.status, 'approved_operator');
     this.assertImpartial(principal, before);
     const actor = { type: 'user' as const, id: principal.keycloakSub };
-    const publish = !this.requiresRegulator(before.api.classification, before.exposedFields);
+    const publish = !requiresRegulator(before.api.classification, before.exposedFields);
 
     await this.prisma.$transaction(async (tx) => {
       await this.move(tx, versionId, 'in_review', 'approved_operator', {}, principal.userId);

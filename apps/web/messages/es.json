@@ -281,5 +281,98 @@
       "guideCall": "2. Llama a una API con el token y la finalidad de tu solicitud aprobada:",
       "guideNote": "Reemplaza TU_SECRETO por el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada."
     }
+  },
+  "subscriptionStatus": {
+    "pending_provider": "Pendiente del proveedor",
+    "pending_regulator": "Pendiente del regulador",
+    "approved": "Aprobada (activándose)",
+    "active": "Activa",
+    "suspended": "Suspendida",
+    "revoked": "Revocada",
+    "expired": "Vencida",
+    "rejected": "Rechazada",
+    "withdrawn": "Retirada"
+  },
+  "subscriptions": {
+    "requestAccess": "Solicitar acceso",
+    "requestAccessNote": "Necesitas una solicitud aprobada por la entidad proveedora para llamar a esta API.",
+    "myRequests": "Solicitudes de acceso",
+    "noRequests": "Tu entidad aún no ha solicitado acceso a ninguna API.",
+    "api": "API",
+    "provider": "Entidad proveedora",
+    "consumer": "Entidad solicitante",
+    "application": "Aplicación",
+    "purpose": "Finalidad",
+    "status": "Estado",
+    "requestedAt": "Solicitada",
+    "validUntil": "Vigente hasta",
+    "detailTitle": "Solicitud de acceso a {api}",
+    "purposeDetail": "Detalle de la finalidad",
+    "legalBasis": "Base legal",
+    "legalReference": "Referencia normativa",
+    "requestedOperations": "Operaciones solicitadas",
+    "approvedOperations": "Operaciones aprobadas",
+    "allReadOnly": "Todas las de solo lectura",
+    "requestedValidity": "Vigencia solicitada",
+    "months": "{count, plural, one {# mes} other {# meses}}",
+    "validity": "Vigencia",
+    "rateLimit": "Límite de peticiones",
+    "perMinute": "{limit} por minuto",
+    "defaultRateLimit": "El de la API ({limit} por minuto)",
+    "endUser": "Identificación del funcionario",
+    "endUserRequired": "Obligatoria: cada llamada debe enviar X-RID-End-User.",
+    "endUserNotRequired": "No se exige.",
+    "regulatorNote": "Esta API maneja datos sensibles: después de tu aprobación, la solicitud pasa al regulador.",
+    "activatingNote": "Aprobada. El gateway la aplicará en unos segundos.",
+    "decisions": "Decisiones",
+    "noDecisions": "Aún no hay decisiones.",
+    "decision": {
+      "approved": "Aprobada",
+      "rejected": "Rechazada",
+      "info_requested": "Pidió información",
+      "suspended": "Suspendida",
+      "reactivated": "Reactivada",
+      "revoked": "Revocada"
+    },
+    "by": {
+      "provider": "por la entidad proveedora",
+      "platform": "por el operador o el regulador"
+    },
+    "form": {
+      "title": "Solicitar acceso a {api}",
+      "version": "Versión {version} de {provider}",
+      "application": "Aplicación que hará las llamadas",
+      "noApplications": "Tu entidad no tiene aplicaciones activas. Crea una antes de solicitar acceso.",
+      "purpose": "Finalidad",
+      "purposeDetail": "Para qué usarás los datos",
+      "purposeDetailHint": "Describe el trámite o programa concreto. La entidad proveedora lo revisa.",
+      "legalBasis": "Base legal",
+      "legalBasisHint": "La norma o el convenio que te habilita a tratar estos datos.",
+      "legalReference": "Referencia normativa (opcional)",
+      "operations": "Operaciones que necesitas",
+      "operationsHint": "Si no marcas ninguna, se solicitan todas las de solo lectura (GET).",
+      "validityMonths": "Vigencia en meses",
+      "validityHint": "Máximo {max} meses para esta clasificación.",
+      "rateLimit": "Peticiones por minuto que necesitas (opcional)",
+      "submit": "Enviar solicitud"
+    },
+    "inbox": {
+      "title": "Solicitudes recibidas",
+      "pending": "Pendientes",
+      "all": "Todas",
+      "empty": "No hay solicitudes en esta vista.",
+      "readOnly": "Solo el responsable de datos de tu entidad puede decidir."
+    },
+    "decide": {
+      "approve": "Aprobar",
+      "approveHint": "Puedes reducir las operaciones, la vigencia o el límite; nunca ampliarlos.",
+      "operations": "Operaciones que apruebas",
+      "validityMonths": "Vigencia aprobada en meses",
+      "rateLimit": "Límite aprobado (peticiones por minuto, opcional)",
+      "approveComment": "Comentario (opcional)",
+      "reject": "Rechazar",
+      "rejectComment": "Motivo del rechazo",
+      "ownRequest": "No puedes decidir esta solicitud: la hiciste tú o tu aplicación (separación de funciones)."
+    }
   }
 }

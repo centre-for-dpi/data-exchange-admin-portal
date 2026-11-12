@@ -105,6 +105,7 @@ describe('domain model constraints (M1-01)', () => {
         purposeCode,
         purposeDetail: 'test',
         legalBasisText: 'test',
+        requestedValidityMonths: 1,
         validFrom: new Date(),
         validUntil: new Date(Date.now() + 86_400_000),
         status,

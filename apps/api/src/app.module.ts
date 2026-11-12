@@ -2,6 +2,11 @@ import { Module } from '@nestjs/common';
 import { ApisController } from './apis/apis.controller.js';
 import { ApplicationsController } from './applications/applications.controller.js';
 import { ApplicationsService } from './applications/applications.service.js';
+import {
+  AccessRequestsController,
+  SubscriptionsController,
+} from './subscriptions/subscriptions.controller.js';
+import { SubscriptionsService } from './subscriptions/subscriptions.service.js';
 import { ApisService } from './apis/apis.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CatalogController } from './catalog/catalog.controller.js';
@@ -26,7 +31,15 @@ import { ReviewsService } from './reviews/reviews.service.js';
     ReviewsController,
     CatalogController,
     ApplicationsController,
+    SubscriptionsController,
+    AccessRequestsController,
   ],
-  providers: [ApisService, ReviewsService, CatalogService, ApplicationsService],
+  providers: [
+    ApisService,
+    ReviewsService,
+    CatalogService,
+    ApplicationsService,
+    SubscriptionsService,
+  ],
 })
 export class AppModule {}
