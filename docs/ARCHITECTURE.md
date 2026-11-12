@@ -136,7 +136,9 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
 
 ### 4.2 Bundle de OPA
 
-- `apps/api` expone `GET /api/v1/opa/bundle.tar.gz` (autenticado con token de servicio, soporta `ETag`). OPA lo consulta cada 10–20 s (`polling.min_delay_seconds`).
+- `apps/api` expone `GET /api/v1/opa/bundle.tar.gz` (autenticado con el token de servicio `OPA_BUNDLE_TOKEN`; sin token configurado rechaza todo; soporta `ETag`). OPA lo consulta cada 10–20 s (`polling.min_delay_seconds`).
+- El bundle se arma desde PostgreSQL en cada consulta y es reproducible. Incluye un `.manifest` con `revision` (SHA-256 de políticas + datos) y `roots: [rid, routes, clients, config]`. El ETag es la revisión, y una revisión igual responde 304.
+- **Activación (`approved → active`):** OPA tiene configurado el plugin `status`, que envía `POST /api/v1/opa/status` (mismo token) en cuanto activa un bundle. El portal guarda qué suscripciones contiene cada revisión (`policy_bundle`, se poda a las 24 h). Cuando OPA informa una revisión activa, pasa a `active` las suscripciones `approved` que contiene, con el evento `subscription.activated` (actor `system:opa`) en la misma transacción, y actualiza `sync_state` `opa:bundle`. Con varios gateways basta el primer OPA que informa; distinguir por nodo queda para M4. Objetivo: menos de 60 s (encuesta de 10–20 s y aviso inmediato).
 - Contenido: políticas Rego de `packages/policy` + `data.json`:
 
 ```json
@@ -162,6 +164,7 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
           "route": "rid-route-<apiVersionId>",
           "operations": ["getAfiliacion"],
           "purposes": ["eligibility_check"],
+          "validFrom": "2026-11-30T00:00:00Z",
           "validUntil": "2027-11-30T23:59:59Z",
           "endUserRequired": true,
           "rateLimitPerMinute": 600
@@ -169,7 +172,8 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
       ],
       "revokedCertFingerprints": []
     }
-  }
+  },
+  "config": { "endUserHashSalt": "<RID_END_USER_HASH_SALT>" }
 }
 ```
 
@@ -178,9 +182,11 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
   2. `clients[client_id].status == "active"`.
   3. Encuentra la operación: método + `pathRegex` de la ruta (`input.route.id`). `input.request.path` es la ruta pública completa, con el prefijo `/{entitySlug}/{apiSlug}/v{major}` (S-1), y `pathRegex` se ancla a ella.
   4. Existe una suscripción para esa ruta con la operación, la finalidad de `X-RID-Purpose`, vigente.
-  5. Si `endUserRequired`, exige `X-RID-End-User` y calcula `X-RID-End-User-Hash` con la sal del despliegue (incluida en el bundle, que solo se sirve por red interna).
+  5. Si `endUserRequired` (clasificaciones `personal` y `sensitive`), exige `X-RID-End-User` y calcula `X-RID-End-User-Hash = HMAC-SHA-256(valor, sal)` con la sal del despliegue (`RID_END_USER_HASH_SALT`, mínimo 16 caracteres; sin ella el bundle no se sirve). La sal va en el bundle, que solo se sirve por red interna.
   6. Devuelve `allow`, cabeceras para el upstream y, al negar, `status_code` + cuerpo problem+json en `reason` con una razón estable (`no_subscription`, `purpose_not_allowed`, `operation_not_allowed`, `subscription_expired`, `end_user_required`, `app_suspended`). Al negar, `headers` son cabeceras de **respuesta**: `Content-Type: application/problem+json` y `X-RID-Deny-Reason: <razón>`, que el log de acceso registra con `$sent_http_x_rid_deny_reason`.
-- Las políticas tienen tests con `opa test` y cobertura ≥ 90 %.
+- `data.json` incluye las rutas de las versiones `published`/`deprecated` y los clientes no eliminados (las aplicaciones suspendidas aparecen con `status: suspended`). Solo lleva las suscripciones `approved` o `active` de versiones servidas. `pathRegex` se ancla a la ruta pública completa, y un parámetro `{x}` equivale a un segmento o a parte de uno (`[^/]+`).
+- Una cabecera repetida cuenta como ausente. Cuando hay más de una suscripción válida, se elige siempre la misma (orden por id). Las razones se evalúan en este orden: cliente, aplicación suspendida, ruta, operación, suscripción a la ruta, operación concedida, finalidad, vigencia y funcionario.
+- Las políticas tienen tests con `opa test` y cobertura ≥ 90 %, exigida en CI (`--threshold 90`).
 
 ### 4.3 Keycloak
 

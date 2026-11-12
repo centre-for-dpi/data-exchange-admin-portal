@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { SubscriptionFacts } from '../../../../../components/subscriptions/subscription-view';
+import { AutoRefresh } from '../../../../../components/auto-refresh';
 import { ApiError, apiGet } from '../../../../../lib/api';
 import { getViewer } from '../../../../../lib/viewer';
 
@@ -40,7 +41,10 @@ export default async function ConsumerSubscriptionPage({ params }: PageProps) {
     <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
       <h1 className="text-2xl font-bold">{t('detailTitle', { api: detail.api.name })}</h1>
       {detail.status === 'approved' ? (
-        <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>
+        <>
+          <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>
+          <AutoRefresh />
+        </>
       ) : null}
       <SubscriptionFacts detail={detail} side="consumer" />
     </section>

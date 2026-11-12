@@ -1,7 +1,6 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { Link } from '../../i18n/navigation';
 import {
@@ -101,19 +100,4 @@ export function CreateApplicationForm() {
       </Button>
     </form>
   );
-}
-
-/** Refreshes the page every 2 s while the Keycloak client is being created (max. 1 minute). */
-export function ProvisioningRefresher() {
-  const router = useRouter();
-  useEffect(() => {
-    let ticks = 0;
-    const timer = setInterval(() => {
-      ticks += 1;
-      if (ticks > 30) clearInterval(timer);
-      router.refresh();
-    }, 2_000);
-    return () => clearInterval(timer);
-  }, [router]);
-  return null;
 }

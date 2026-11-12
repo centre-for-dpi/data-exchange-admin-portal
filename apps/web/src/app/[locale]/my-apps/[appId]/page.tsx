@@ -2,7 +2,7 @@ import { applicationDetailSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { ProvisioningRefresher } from '../../../../components/apps/app-forms';
+import { AutoRefresh } from '../../../../components/auto-refresh';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { getViewer } from '../../../../lib/viewer';
 
@@ -71,7 +71,7 @@ export default async function ApplicationPage({ params }: PageProps) {
       {app.provisioning === 'pending' ? (
         <>
           <p className="text-sm text-muted-foreground">{t('detail.pendingNote')}</p>
-          <ProvisioningRefresher />
+          <AutoRefresh />
         </>
       ) : null}
 

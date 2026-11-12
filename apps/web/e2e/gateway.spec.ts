@@ -43,13 +43,13 @@ test.describe('gateway route (M1-08)', () => {
     const forged = await fetch(url, { headers: { authorization: 'Bearer not-a-token' } });
     expect(forged.status).toBe(401);
 
-    // A valid gateway token passes authentication and reaches OPA, which fails closed. Until the
-    // rid/authz policy exists (M1-09) its decision is empty and the opa plugin answers 503; M1-09
-    // turns this into 403 no_subscription. The upstream is never reached.
+    // A valid gateway token passes authentication and reaches OPA, which denies: the application
+    // has no subscription. The upstream is never reached.
     const denied = await fetch(url, {
       headers: { authorization: `Bearer ${token}`, 'x-rid-purpose': 'eligibility_check' },
     });
-    expect(denied.status).toBe(503);
+    expect(denied.status).toBe(403);
+    expect(denied.headers.get('x-rid-deny-reason')).toBe('no_subscription');
     expect(denied.headers.get('x-request-id')).toBeTruthy();
   });
 });

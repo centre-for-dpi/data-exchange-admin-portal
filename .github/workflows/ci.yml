@@ -64,3 +64,5 @@ jobs:
           version: 1.21.4
       - run: opa check --strict packages/policy
       - run: opa test --verbose packages/policy
+      # ARCHITECTURE.md §4.2: policy coverage of at least 90 %.
+      - run: opa test --coverage --threshold 90 --format=json packages/policy > /dev/null

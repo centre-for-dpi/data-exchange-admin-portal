@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { RequestDecisionForms } from '../../../../components/subscriptions/subscription-forms';
 import { SubscriptionFacts } from '../../../../components/subscriptions/subscription-view';
+import { AutoRefresh } from '../../../../components/auto-refresh';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { getViewer } from '../../../../lib/viewer';
 
@@ -63,7 +64,10 @@ export default async function AccessRequestPage({ params }: PageProps) {
         </div>
       ) : null}
       {detail.status === 'approved' ? (
-        <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>
+        <>
+          <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>
+          <AutoRefresh />
+        </>
       ) : null}
     </section>
   );

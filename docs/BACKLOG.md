@@ -167,11 +167,17 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Cola:** el worker procesa en lotes de 10, consulta cada segundo y hace que falle solo el trabajo con error. Había un atraso de trabajos `gateway.sync` acumulado desde M1-04, que retrasaba las rutas nuevas.
     - **Privacidad, regla 2:** el access log de nginx en APISIX escribía la ruta con el número de identificación. Queda desactivado y el error log en nivel `error`, con una prueba de regresión en `tests/infra`. Pendiente para M5-01: un error real de nginx todavía puede incluir la línea de la petición.
     - **Limpieza:** la prueba de integración borra al terminar las rutas que crea, porque localmente APISIX se comparte entre la base de desarrollo y la de pruebas.
-- [ ] **M1-09 — Bundle y política OPA**
+- [x] **M1-09 — Bundle y política OPA**
   - `GET /api/v1/opa/bundle.tar.gz` con `ETag`; `data.json` según `ARCHITECTURE.md §4.2`.
   - `rid.authz` con las reglas 1–6 y razones de negación estables; `opa test` con casos positivos y negativos de cada regla.
   - La suscripción pasa a `active` cuando la revisión del bundle que la contiene fue descargada por OPA (se lee `/status` de OPA o métrica equivalente).
   - Prueba de punta a punta (pendiente de la revisión de seguridad de M1-08): ninguna cabecera `X-RID-*` enviada por el cliente llega al proveedor si la política no la devuelve. `X-RID-End-User` nunca llega en claro, y `X-RID-Purpose` llega solo con el valor validado.
+  - _Notas de implementación:_
+    - **Política:** `rid.authz` implementa las reglas 1–6 con las razones `no_subscription`, `app_suspended`, `operation_not_allowed`, `purpose_not_allowed`, `subscription_expired` y `end_user_required`. Tiene 22 pruebas `opa test`, con 100 % de cobertura (el CI exige 90 %). La hora se fija en las pruebas con `with time.now_ns`.
+    - **Bundle:** se arma desde la base en cada consulta, con un tar propio (sin dependencias) reproducible. ETag = revisión, y responde 304. La sal del hash del funcionario (`RID_END_USER_HASH_SALT`) es obligatoria: sin ella el bundle no se sirve.
+    - **Activación:** OPA no expone un "GET status", así que se usa su plugin `status`, que avisa al portal (`POST /api/v1/opa/status`) qué revisión activó. `policy_bundle` guarda qué suscripciones trae cada revisión, y las `approved` pasan a `active` con auditoría. `policy.sync` actualiza el `sync_state` `opa:bundle` para la consola del operador. La UI de la solicitud se refresca sola mientras está "Aprobada (activándose)".
+    - **e2e (`call.spec.ts`, DEMO pasos 5–8):** llamada real con 200 y datos del mock. El proveedor recibe la suscripción, la operación, la entidad y la aplicación que puso OPA, aunque el cliente envíe valores falsos, y solo el hash del funcionario. Se prueban además las negaciones `purpose_not_allowed`, `end_user_required` y `operation_not_allowed` (el POST no solicitado). `gateway.spec.ts` ahora espera `403 no_subscription`.
+    - **Además:** `pathRegex` acepta parámetros dentro de un segmento (`/{id}.json`). El refresco automático de la web pasó a un componente genérico.
 - [ ] **M1-10 — Revocación**
   - `data_steward` revoca; la llamada empieza a fallar con `403 no_subscription` en < 60 s (test automatizado).
 - [ ] **M1-11 — Auditoría encadenada mínima**

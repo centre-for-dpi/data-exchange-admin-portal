@@ -10,12 +10,18 @@ services:
 bundles:
   rid:
     service: portal
-    # GET {url}/bundle.tar.gz, served by apps/api from M1-09; until then downloads fail and OPA
-    # keeps denying everything (no policy loaded).
+    # GET {url}/bundle.tar.gz (apps/api, ETag = revision). Without a bundle OPA has no policy and
+    # the gateway denies every call (fail closed).
     resource: bundle.tar.gz
     polling:
       min_delay_seconds: 10
       max_delay_seconds: 20
+
+# OPA reports its status (including the active bundle revision) to POST {url}/status as soon as a
+# bundle is activated. The portal turns approved subscriptions in that revision into active ones.
+# The report holds bundle and plugin state, never decision inputs.
+status:
+  service: portal
 
 # Decision logs are intentionally NOT configured: each decision input carries request headers
 # (Authorization, X-RID-End-User in clear). Access metadata goes through APISIX -> Fluent Bit.

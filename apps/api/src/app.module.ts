@@ -7,6 +7,8 @@ import {
   SubscriptionsController,
 } from './subscriptions/subscriptions.controller.js';
 import { SubscriptionsService } from './subscriptions/subscriptions.service.js';
+import { OpaController } from './opa/opa.controller.js';
+import { OpaService } from './opa/opa.service.js';
 import { ApisService } from './apis/apis.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CatalogController } from './catalog/catalog.controller.js';
@@ -33,6 +35,7 @@ import { ReviewsService } from './reviews/reviews.service.js';
     ApplicationsController,
     SubscriptionsController,
     AccessRequestsController,
+    OpaController,
   ],
   providers: [
     ApisService,
@@ -40,6 +43,7 @@ import { ReviewsService } from './reviews/reviews.service.js';
     CatalogService,
     ApplicationsService,
     SubscriptionsService,
+    OpaService,
   ],
 })
 export class AppModule {}

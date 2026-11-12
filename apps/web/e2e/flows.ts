@@ -96,3 +96,28 @@ export async function openCatalogApi(page: Page, name: string) {
   await page.getByRole('link', { name }).click();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
+
+/** Opens the request form from the catalogue sheet. A click that lands while the page (and the
+ * Scalar documentation) is still hydrating can be lost, so the click is retried. */
+export async function openRequestForm(page: Page, apiName: string) {
+  await openCatalogApi(page, apiName);
+  const heading = page.getByRole('heading', { level: 1, name: `Solicitar acceso a ${apiName}` });
+  await expect(async () => {
+    await page.getByRole('link', { name: 'Solicitar acceso' }).click();
+    await expect(heading).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 30_000 });
+}
+
+export async function requestAccess(page: Page, apiName: string, appName: string) {
+  await openRequestForm(page, apiName);
+  await page.getByLabel(/^Aplicación que hará las llamadas/).selectOption({ label: appName });
+  await page.getByLabel(/^Finalidad/).selectOption('eligibility_check');
+  await page
+    .getByLabel(/^Para qué usarás los datos/)
+    .fill('Verificar afiliación al asignar el subsidio X.');
+  await page.getByLabel(/^Base legal/).fill('Ley de protección de datos, artículo 10, literal b.');
+  await page.getByLabel(/^Vigencia en meses/).fill('12');
+  await page.getByRole('button', { name: 'Enviar solicitud' }).click();
+  await expect(page.getByTestId('subscription-status')).toHaveText('Pendiente del proveedor');
+  return page.url().split('/my-apps/requests/')[1] ?? '';
+}

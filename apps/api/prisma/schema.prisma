@@ -599,3 +599,16 @@ model ApiVersionReview {
   @@index([apiVersionId, createdAt])
   @@map("api_version_review")
 }
+
+/// Revisions of the OPA bundle served to the gateways (ARCHITECTURE.md §4.2). When OPA reports a
+/// revision as active, the approved subscriptions it contains become active. Technical table:
+/// old revisions are pruned.
+model PolicyBundle {
+  /// SHA-256 of the bundle archive (also its ETag and manifest revision).
+  revision        String   @id
+  subscriptionIds String[] @map("subscription_ids") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@map("policy_bundle")
+}
