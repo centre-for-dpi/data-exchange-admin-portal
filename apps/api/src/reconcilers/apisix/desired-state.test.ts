@@ -14,6 +14,7 @@ const settings: GatewaySettings = {
   opaUrl: 'http://opa:8181',
   accessLogUrl: 'http://fluent-bit:9880/',
   devNodes: parseDevNodes('salud=mock-salud:8000'),
+  resolveHost: () => Promise.resolve(['93.184.215.14']),
 };
 
 const version = (overrides: Partial<VersionForGateway> = {}): VersionForGateway => ({

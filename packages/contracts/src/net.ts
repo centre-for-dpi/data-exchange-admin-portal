@@ -30,21 +30,61 @@ function isPrivateIpv4([a, b]: number[]): boolean {
   );
 }
 
-function isPrivateIpv6(host: string): boolean {
-  const h = host.toLowerCase();
-  if (h === '::' || h === '::1') return true;
-  // IPv4-mapped (::ffff:10.0.0.1) and its hex form are judged as IPv4.
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(h);
-  if (mapped?.[1]) {
-    const v4 = parseIpv4(mapped[1]);
-    return v4 ? isPrivateIpv4(v4) : true;
+/** The 8 groups of an IPv6 address (with an optional dotted IPv4 tail), or undefined. */
+function expandIpv6(host: string): number[] | undefined {
+  let h = host.toLowerCase();
+  const tail = /(\d+\.\d+\.\d+\.\d+)$/.exec(h);
+  if (tail?.[1]) {
+    const v4 = parseIpv4(tail[1]);
+    if (!v4) return undefined;
+    h = `${h.slice(0, -tail[1].length)}${((v4[0]! << 8) | v4[1]!).toString(16)}:${((v4[2]! << 8) | v4[3]!).toString(16)}`;
   }
-  if (h.startsWith('::ffff:')) return true;
+  const halves = h.split('::');
+  if (halves.length > 2) return undefined;
+  const parse = (part: string) => (part ? part.split(':') : []);
+  const head = parse(halves[0] ?? '');
+  const rest = halves.length === 2 ? parse(halves[1] ?? '') : [];
+  const missing = 8 - head.length - rest.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return undefined;
+  const groups = [...head, ...Array<string>(halves.length === 2 ? missing : 0).fill('0'), ...rest];
+  if (!groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return undefined;
+  return groups.map((g) => parseInt(g, 16));
+}
+
+const v4From = (high: number, low: number): number[] => [
+  high >> 8,
+  high & 0xff,
+  low >> 8,
+  low & 0xff,
+];
+
+function isPrivateIpv6(host: string): boolean {
+  const g = expandIpv6(host);
+  if (!g) return true; // unparseable: never trusted
+  const zeros = (from: number, to: number) => g.slice(from, to).every((x) => x === 0);
+  if (zeros(0, 8)) return true; // ::
+  if (zeros(0, 7) && g[7] === 1) return true; // ::1
+  // Addresses that embed an IPv4 one are judged by it: IPv4-compatible ::/96, mapped
+  // ::ffff:0:0/96, NAT64 64:ff9b::/96 and 6to4 2002::/16.
+  if (zeros(0, 6)) return isPrivateIpv4(v4From(g[6]!, g[7]!));
+  if (zeros(0, 5) && g[5] === 0xffff) return isPrivateIpv4(v4From(g[6]!, g[7]!));
+  if (g[0] === 0x64 && g[1] === 0xff9b && zeros(2, 6)) return isPrivateIpv4(v4From(g[6]!, g[7]!));
+  if (g[0] === 0x2002) return isPrivateIpv4(v4From(g[1]!, g[2]!));
+  const first = g[0]!;
   return (
-    /^f[cd]/.test(h) || // unique local fc00::/7
-    /^fe[89ab]/.test(h) || // link-local fe80::/10
-    h.startsWith('ff') // multicast
+    (first & 0xfe00) === 0xfc00 || // unique local fc00::/7
+    (first & 0xffc0) === 0xfe80 || // link-local fe80::/10
+    (first & 0xffc0) === 0xfec0 || // site-local fec0::/10 (deprecated, still routed internally)
+    (first & 0xff00) === 0xff00 || // multicast
+    (first === 0x2001 && g[1] === 0x0db8) // documentation
   );
+}
+
+/** True when `address` (a resolved IPv4 or IPv6 address) is publicly routable. */
+export function isPublicAddress(address: string): boolean {
+  const v4 = parseIpv4(address);
+  if (v4) return !isPrivateIpv4(v4);
+  return address.includes(':') && !isPrivateIpv6(address);
 }
 
 const INTERNAL_SUFFIXES = ['.local', '.localhost', '.internal', '.intranet', '.lan', '.home.arpa'];

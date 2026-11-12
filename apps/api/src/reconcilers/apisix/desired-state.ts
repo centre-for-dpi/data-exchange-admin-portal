@@ -22,6 +22,8 @@ export interface GatewaySettings {
    * (RID_DEV_NODES). Nodes enrolled through the portal replace it.
    */
   devNodes: ReadonlyMap<string, string>;
+  /** Every address a host name resolves to (A and AAAA); injectable for tests. */
+  resolveHost: (host: string) => Promise<string[]>;
 }
 
 /** Headers only the gateway may set: removed if a client sends them (ARCHITECTURE.md §4.1). */

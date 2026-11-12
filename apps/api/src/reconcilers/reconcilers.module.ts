@@ -1,3 +1,4 @@
+import { lookup } from 'node:dns/promises';
 import { Module } from '@nestjs/common';
 import { APISIX_ADMIN, HttpApisixAdmin } from './apisix/apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler } from './apisix/apisix.reconciler.js';
@@ -36,6 +37,8 @@ import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
         opaUrl: process.env.RID_GATEWAY_OPA_URL ?? 'http://opa:8181',
         accessLogUrl: process.env.RID_GATEWAY_ACCESS_LOG_URL ?? 'http://fluent-bit:9880/',
         devNodes: parseDevNodes(process.env.RID_DEV_NODES),
+        resolveHost: async (host) =>
+          (await lookup(host, { all: true, verbatim: true })).map((a) => a.address),
       }),
     },
     ApisixReconciler,

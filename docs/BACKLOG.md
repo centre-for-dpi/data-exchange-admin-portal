@@ -217,6 +217,7 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
 - [ ] **M3-08 — MFA para roles críticos**: roles de plataforma y `data_steward` exigen MFA en Keycloak.
 - [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
 - [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
+  - Pendiente de la revisión de seguridad de M1-08: mTLS hacia upstreams `direct`, y fijar en el upstream la IP que verificó el reconciliador (con `upstream_host`/SNI con el nombre original) para cerrar el DNS rebinding.
 
 **Cierre M3:** llamada con mTLS + token ligado al certificado + límite por suscripción, y revocación de certificado efectiva en < 60 s.
 
@@ -257,7 +258,7 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
 ## M6 — Endurecimiento y producción
 
 - [ ] **SPIKE S-6 — Aserción firmada del gateway hacia el proveedor**
-- [ ] **M6-01 — Revisión ASVS L2** con lista de verificación y correcciones.
+- [ ] **M6-01 — Revisión ASVS L2** con lista de verificación y correcciones. Incluye el filtrado de salida del gateway por red (RFC 1918, link-local y subredes de la plataforma), pendiente de la revisión de seguridad de M1-08.
 - [ ] **M6-02 — Auditoría de accesibilidad** WCAG 2.1 AA de todas las pantallas.
 - [ ] **M6-03 — Prueba de carga** con k6: 500 peticiones/s sostenidas, p95 agregado por el gateway < 50 ms.
 - [ ] **M6-04 — Resiliencia**: con el portal caído, el tráfico sigue; con OPA sin bundle nuevo, se mantiene el último; test documentado.

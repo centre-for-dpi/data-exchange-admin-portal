@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { upstreamSchema } from './apis.js';
-import { isPublicHostname } from './net.js';
+import { isPublicAddress, isPublicHostname } from './net.js';
 
 const hostOf = (url: string) => new URL(url).hostname;
 
@@ -35,12 +35,27 @@ describe('isPublicHostname (SSRF guard for direct upstreams)', () => {
       'https://[fd00::1]',
       'https://[fe80::1]',
       'https://[::ffff:10.0.0.1]',
+      // IPv6 forms that embed a private IPv4 address, and site-local.
+      'https://[::10.0.0.1]',
+      'https://[64:ff9b::a9fe:a9fe]',
+      'https://[2002:c0a8:0101::1]',
+      'https://[fec0::1]',
+      'https://[::]',
       // Alternative IPv4 spellings that URL parsing normalizes to loopback.
       'https://2130706433',
       'https://0x7f000001',
       'https://127.1',
     ]) {
       expect(isPublicHostname(hostOf(url)), url).toBe(false);
+    }
+  });
+
+  it('judges resolved addresses the same way', () => {
+    expect(isPublicAddress('93.184.215.14')).toBe(true);
+    expect(isPublicAddress('2606:2800:21f:cb07:6820:80da:af6b:8b2c')).toBe(true);
+    expect(isPublicAddress('64:ff9b::808:808')).toBe(true); // NAT64 of 8.8.8.8
+    for (const address of ['10.0.0.5', '172.24.0.3', '::ffff:127.0.0.1', '2002:7f00:1::', 'nope']) {
+      expect(isPublicAddress(address), address).toBe(false);
     }
   });
 

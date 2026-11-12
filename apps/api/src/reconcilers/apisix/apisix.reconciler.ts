@@ -6,7 +6,9 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { upstreamSchema } from '@rid/contracts';
+import { isIP } from 'node:net';
+import { isPublicAddress, type Upstream, upstreamSchema } from '@rid/contracts';
+import { ZodError } from 'zod';
 import { listOperations } from '../../apis/lint/openapi-lint.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
@@ -17,6 +19,7 @@ import {
   MANAGED_PREFIX,
   matches,
   routeId,
+  UnsupportedUpstreamError,
   upstreamId,
 } from './desired-state.js';
 
@@ -125,11 +128,13 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
         return existed ? 'deleted' : 'absent';
       }
 
+      const upstreamConfig = upstreamSchema.parse(version.upstream);
+      await this.assertPublicUpstream(upstreamConfig);
       const desired = desiredGateway(
         {
           id: version.id,
           basePath: version.basePath,
-          upstream: upstreamSchema.parse(version.upstream),
+          upstream: upstreamConfig,
           methods: listOperations(version.openapiSpec as Record<string, unknown>).map(
             (o) => o.method,
           ),
@@ -149,8 +154,35 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       if (upstream === 'updated' || route === 'updated') return 'updated';
       return 'unchanged';
     } catch (error) {
+      // A version the gateway must not serve (invalid or internal upstream) loses whatever it had
+      // in APISIX: fail closed instead of leaving an older route working.
+      if (error instanceof UnsupportedUpstreamError || error instanceof ZodError) {
+        await this.removeVersion(apiVersionId).catch((cleanup: unknown) =>
+          this.logger.error(
+            `Could not remove version ${apiVersionId} from APISIX: ${String(cleanup)}`,
+          ),
+        );
+      }
       await this.recordError(target, desiredHash, error);
       throw error;
+    }
+  }
+
+  /**
+   * SSRF guard at reconcile time: every address a direct upstream's host resolves to must be
+   * public (the name itself was checked at registration). A lookup failure is not evidence of an
+   * attack, so it is reported without removing a working route.
+   */
+  private async assertPublicUpstream(upstream: Upstream): Promise<void> {
+    if (upstream.type !== 'direct') return;
+    const host = new URL(upstream.url).hostname.replace(/^[|]$/g, '');
+    if (isIP(host)) return; // literal IPs are fully judged by isPublicHostname
+    const addresses = await this.settings.resolveHost(host);
+    const internal = addresses.filter((address) => !isPublicAddress(address));
+    if (addresses.length === 0 || internal.length > 0) {
+      throw new UnsupportedUpstreamError(
+        `Upstream host ${host} resolves to non-public addresses (${internal.join(', ') || 'none'})`,
+      );
     }
   }
 

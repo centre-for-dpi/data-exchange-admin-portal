@@ -39,7 +39,10 @@ describe('APISIX reconciler (M1-08)', () => {
     accessLogUrl: 'http://fluent-bit:9880/',
     // socioeconomico has no node on purpose: its versions cannot be served.
     devNodes: parseDevNodes('salud=mock-salud:8000'),
+    // A fake DNS the tests steer (an Error means the lookup fails).
+    resolveHost: () => (dns instanceof Error ? Promise.reject(dns) : Promise.resolve(dns)),
   };
+  let dns: string[] | Error = ['93.184.215.14'];
   const created: string[] = [];
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
@@ -197,6 +200,61 @@ describe('APISIX reconciler (M1-08)', () => {
     });
     expect(state?.status).toBe('error');
     expect(state?.lastError).toMatch(/socioeconomico/);
+  });
+
+  describe('SSRF guard at reconcile time (security review)', () => {
+    const setUpstream = (versionId: string, upstream: unknown) =>
+      prisma.apiVersion.update({
+        where: { id: versionId },
+        data: { upstream: upstream as object },
+      });
+
+    it('a served version whose stored upstream is internal loses its route (fail closed)', async () => {
+      const versionId = await publish('salud', `gw-legacy-${run}`);
+      expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+      // A row written before the registration check existed.
+      await setUpstream(versionId, {
+        type: 'direct',
+        url: 'https://keycloak:8443/admin',
+        mtls: false,
+      });
+      await expect(reconciler.reconcileVersion(versionId)).rejects.toThrow();
+      expect(await admin.get('routes', routeId(versionId))).toBeUndefined();
+      expect(await admin.get('upstreams', upstreamId(versionId))).toBeUndefined();
+      const state = await prisma.syncState.findUnique({
+        where: { target: gatewaySyncTarget(versionId) },
+      });
+      expect(state?.status).toBe('error');
+    });
+
+    it('a public name that resolves to a private address is not served', async () => {
+      const versionId = await publish('salud', `gw-dns-${run}`);
+      await setUpstream(versionId, {
+        type: 'direct',
+        url: 'https://api.salud.example/v1',
+        mtls: false,
+      });
+      try {
+        dns = ['93.184.215.14'];
+        expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+        expect(await admin.get('upstreams', upstreamId(versionId))).toMatchObject({
+          nodes: { 'api.salud.example:443': 1 },
+        });
+
+        // A DNS failure is reported, but a working route stays.
+        dns = new Error('getaddrinfo ENOTFOUND');
+        await expect(reconciler.reconcileVersion(versionId)).rejects.toThrow(/ENOTFOUND/);
+        expect(await admin.get('routes', routeId(versionId))).toBeDefined();
+
+        // The name now points inside the network: the route goes away.
+        dns = ['93.184.215.14', '10.0.0.5'];
+        await expect(reconciler.reconcileVersion(versionId)).rejects.toThrow(/non-public/);
+        expect(await admin.get('routes', routeId(versionId))).toBeUndefined();
+        expect(await admin.get('upstreams', upstreamId(versionId))).toBeUndefined();
+      } finally {
+        dns = ['93.184.215.14'];
+      }
+    });
   });
 
   it('a retired version loses its route and upstream', async () => {
