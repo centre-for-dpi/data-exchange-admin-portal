@@ -15,6 +15,11 @@ paths:
   /afiliados/{numeroIdentificacion}:
     get:
       operationId: getAfiliado
+      # Whose data this operation returns (ADR-0015): the person in the path, a cédula.
+      x-rid-data-subject:
+        in: path
+        name: numeroIdentificacion
+        documentType: CC
       tags: [Afiliación]
       summary: Consultar afiliación
       description: Devuelve el régimen, el estado y la aseguradora de la persona afiliada.
@@ -34,6 +39,10 @@ paths:
   /afiliados/verificaciones:
     post:
       operationId: verificarAfiliacion
+      # The identifier travels in the body: consumers also send it in X-RID-Data-Subject.
+      x-rid-data-subject:
+        in: header
+        documentType: CC
       tags: [Afiliación]
       summary: Verificar afiliación
       description: >-

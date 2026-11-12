@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import Markdown from 'react-markdown';
 import { z } from 'zod';
+import { dataSubjectLabel } from '../../../../components/apis/data-subject';
 import { ApiDocs } from '../../../../components/catalog/api-docs';
 import { Button } from '../../../../components/ui/button';
 import { Link } from '../../../../i18n/navigation';
@@ -162,6 +163,33 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
             </tbody>
           </table>
         )}
+
+        <h3 className="font-semibold">{t('catalog.detail.operations')}</h3>
+        <p className="max-w-3xl text-sm text-muted-foreground">{t('dataSubject.note')}</p>
+        <table className="text-left text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th scope="col" className="py-1 pr-6">
+                {t('version.detail.method')}
+              </th>
+              <th scope="col" className="py-1 pr-6">
+                {t('version.detail.path')}
+              </th>
+              <th scope="col" className="py-1">
+                {t('dataSubject.column')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {version.operations.map((op) => (
+              <tr key={op.operationId} className="border-b border-border">
+                <td className="py-1 pr-6 font-mono">{op.method}</td>
+                <td className="py-1 pr-6 font-mono">{op.path}</td>
+                <td className="py-1">{dataSubjectLabel(t, op.dataSubject)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="space-y-3">

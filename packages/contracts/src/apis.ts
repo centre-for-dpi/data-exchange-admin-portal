@@ -23,6 +23,36 @@ const slug = z
   .string()
   .regex(/^[a-z][a-z0-9-]{1,38}[a-z0-9]$/, 'lower-case letters, digits and hyphens (3-40)');
 
+/** Header that carries the data subject when the identifier travels in the body (ADR-0015). */
+export const DATA_SUBJECT_HEADER = 'X-RID-Data-Subject';
+
+/**
+ * Where the data subject of an operation is (OpenAPI extension `x-rid-data-subject`, ADR-0015):
+ * a path parameter, the X-RID-Data-Subject header (identifier in the body), or none. The document
+ * type is fixed (`documentType`), read from another path parameter (`documentTypeParam`), or the
+ * country's default person document type.
+ */
+export const dataSubjectSchema = z.discriminatedUnion('in', [
+  z.object({
+    in: z.literal('path'),
+    name: z.string(),
+    documentType: z.string().optional(),
+    documentTypeParam: z.string().optional(),
+  }),
+  z.object({ in: z.literal('header'), documentType: z.string().optional() }),
+  z.object({ in: z.literal('none') }),
+]);
+export type DataSubject = z.infer<typeof dataSubjectSchema>;
+
+/** An operation of an OpenAPI document; `dataSubject` is null when it is not declared. */
+export const operationSchema = z.object({
+  operationId: z.string(),
+  method: z.string(),
+  path: z.string(),
+  dataSubject: dataSubjectSchema.nullable(),
+});
+export type Operation = z.infer<typeof operationSchema>;
+
 /** Where the service lives (SPEC.md §3.1). X-Road arrives with M4-05. */
 export const upstreamSchema = z.discriminatedUnion('type', [
   z.strictObject({
@@ -149,7 +179,7 @@ export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
   defaultRateLimit: z.number().int(),
   openapiSha256: z.string(),
   lintReport: lintReportSchema,
-  operations: z.array(z.object({ operationId: z.string(), method: z.string(), path: z.string() })),
+  operations: z.array(operationSchema),
   submittedAt: z.iso.datetime().nullable(),
   publishedAt: z.iso.datetime().nullable(),
   reviews: z.array(versionReviewSchema),

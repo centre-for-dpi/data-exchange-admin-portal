@@ -6,7 +6,7 @@ import spectralParsers from '@stoplight/spectral-parsers';
 import spectralRefResolver from '@stoplight/spectral-ref-resolver';
 import spectralRulesets from '@stoplight/spectral-rulesets';
 import { parseDocument } from 'yaml';
-import type { LintIssue, LintReport } from '@rid/contracts';
+import type { DataSubject, LintIssue, LintReport, Operation } from '@rid/contracts';
 
 const { Spectral, Document, createRulesetFunction } = spectralCore;
 const { oas } = spectralRulesets;
@@ -65,6 +65,58 @@ const notIdentifierLike = createRulesetFunction<string, null>(
 export interface LintOptions {
   /** features.lint.noIdInQuery of the country config. */
   noIdInQuery: boolean;
+  /**
+   * Data subject declarations (x-rid-data-subject, ADR-0015). `required` for APIs with personal or
+   * sensitive data; `documentTypes` are the country's person document types. Without it, declared
+   * extensions are still checked for shape.
+   */
+  dataSubject?: { required: boolean; documentTypes: readonly string[] };
+}
+
+export const DATA_SUBJECT_EXTENSION = 'x-rid-data-subject';
+
+/** Path template parameters of an OpenAPI path, e.g. /a/{id}/b/{x}.json -> [id, x]. */
+const templateParams = (path: string): string[] =>
+  [...path.matchAll(/\{([^/{}]+)\}/g)].map((m) => m[1] ?? '');
+
+/**
+ * Reads x-rid-data-subject: "none", or an object { in: path, name, documentType?,
+ * documentTypeParam? } | { in: header, documentType? } | { in: none }. Returns 'invalid' for any
+ * other shape and undefined when the extension is absent.
+ */
+export function parseDataSubject(raw: unknown): DataSubject | 'invalid' | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === 'none') return { in: 'none' };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'invalid';
+  const value = raw as Record<string, unknown>;
+  const optionalString = (key: string) =>
+    value[key] === undefined || (typeof value[key] === 'string' && value[key] !== '');
+  const only = (keys: string[]) => Object.keys(value).every((k) => keys.includes(k));
+  if (value.in === 'none' && only(['in'])) return { in: 'none' };
+  if (value.in === 'header' && only(['in', 'documentType']) && optionalString('documentType')) {
+    return {
+      in: 'header',
+      ...(typeof value.documentType === 'string' ? { documentType: value.documentType } : {}),
+    };
+  }
+  if (
+    value.in === 'path' &&
+    only(['in', 'name', 'documentType', 'documentTypeParam']) &&
+    typeof value.name === 'string' &&
+    value.name !== '' &&
+    optionalString('documentType') &&
+    optionalString('documentTypeParam')
+  ) {
+    return {
+      in: 'path',
+      name: value.name,
+      ...(typeof value.documentType === 'string' ? { documentType: value.documentType } : {}),
+      ...(typeof value.documentTypeParam === 'string'
+        ? { documentTypeParam: value.documentTypeParam }
+        : {}),
+    };
+  }
+  return 'invalid';
 }
 
 /** RID ruleset (M1-03): minimal and strict. Grows with M2-05 (compatibility) and M4-06. */
@@ -109,8 +161,8 @@ export interface ParsedOpenApi {
   spec: Record<string, unknown>;
   sha256: string;
   report: LintReport;
-  /** operationIds declared in the document (input for subscriptions and OPA routes). */
-  operations: Array<{ operationId: string; method: string; path: string }>;
+  /** Operations declared in the document (input for subscriptions and OPA routes). */
+  operations: Operation[];
 }
 
 const SEVERITY: Record<number, LintIssue['severity']> = {
@@ -121,17 +173,100 @@ const SEVERITY: Record<number, LintIssue['severity']> = {
 };
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'];
 
+type RawOperation = { operationId?: unknown; [DATA_SUBJECT_EXTENSION]?: unknown };
+
 export function listOperations(spec: Record<string, unknown>): ParsedOpenApi['operations'] {
-  const paths = (spec.paths ?? {}) as Record<string, Record<string, { operationId?: unknown }>>;
+  const paths = (spec.paths ?? {}) as Record<string, Record<string, RawOperation>>;
   const operations: ParsedOpenApi['operations'] = [];
   for (const [path, item] of Object.entries(paths)) {
     for (const method of HTTP_METHODS) {
-      const operationId = item?.[method]?.operationId;
-      if (typeof operationId === 'string')
-        operations.push({ operationId, method: method.toUpperCase(), path });
+      const operation = item?.[method];
+      const operationId = operation?.operationId;
+      if (typeof operationId !== 'string') continue;
+      const subject = parseDataSubject(operation?.[DATA_SUBJECT_EXTENSION]);
+      operations.push({
+        operationId,
+        method: method.toUpperCase(),
+        path,
+        // An invalid declaration counts as none declared; the lint report says why.
+        dataSubject: subject && subject !== 'invalid' ? subject : null,
+      });
     }
   }
   return operations;
+}
+
+/**
+ * Checks x-rid-data-subject on every operation (ADR-0015): its shape, that the parameters it
+ * names exist in the path template, that document types are the country's, and, for personal or
+ * sensitive APIs, that every operation declares one.
+ */
+function dataSubjectIssues(
+  spec: Record<string, unknown>,
+  options: LintOptions,
+  lineOf: (path: string[]) => number,
+): LintIssue[] {
+  const issues: LintIssue[] = [];
+  const paths = (spec.paths ?? {}) as Record<string, Record<string, RawOperation>>;
+  const issue = (code: string, message: string, at: string[]) =>
+    issues.push({ code, message, severity: 'error', path: at, line: lineOf(at) });
+  for (const [path, item] of Object.entries(paths)) {
+    for (const method of HTTP_METHODS) {
+      const operation = item?.[method];
+      if (!operation || typeof operation !== 'object') continue;
+      const name = typeof operation.operationId === 'string' ? operation.operationId : method;
+      const at = ['paths', path, method];
+      const subject = parseDataSubject(operation[DATA_SUBJECT_EXTENSION]);
+      if (subject === undefined) {
+        if (options.dataSubject?.required) {
+          issue(
+            'rid-data-subject-required',
+            `Operation ${name} must declare whose data it handles: ${DATA_SUBJECT_EXTENSION} with a path parameter, the header, or none`,
+            at,
+          );
+        }
+        continue;
+      }
+      const atExtension = [...at, DATA_SUBJECT_EXTENSION];
+      if (subject === 'invalid') {
+        issue(
+          'rid-data-subject-invalid',
+          `${DATA_SUBJECT_EXTENSION} must be "none", { in: path, name, documentType? or documentTypeParam? } or { in: header, documentType? }`,
+          atExtension,
+        );
+        continue;
+      }
+      if (subject.in === 'none') continue;
+      const types = options.dataSubject?.documentTypes;
+      if (subject.documentType && types && !types.includes(subject.documentType)) {
+        issue(
+          'rid-data-subject-document-type',
+          `Unknown document type "${subject.documentType}" (allowed: ${types.join(', ')})`,
+          atExtension,
+        );
+      }
+      if (subject.in === 'path') {
+        const params = templateParams(path);
+        for (const param of [subject.name, subject.documentTypeParam]) {
+          if (param && !params.includes(param)) {
+            issue(
+              'rid-data-subject-parameter',
+              `Path parameter "${param}" is not in ${path}`,
+              atExtension,
+            );
+          }
+        }
+        if (subject.documentType && subject.documentTypeParam) {
+          issue(
+            'rid-data-subject-invalid',
+            'Use either documentType or documentTypeParam, not both',
+            atExtension,
+          );
+        }
+      }
+    }
+  }
+  return issues;
 }
 
 /**
@@ -226,6 +361,12 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
         line: result.range.start.line + 1,
       });
     }
+    issues.push(
+      ...dataSubjectIssues(spec, options, (path) => {
+        const range = document.getRangeForJsonPath(path, true);
+        return range ? range.start.line + 1 : 1;
+      }),
+    );
   }
 
   issues.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));

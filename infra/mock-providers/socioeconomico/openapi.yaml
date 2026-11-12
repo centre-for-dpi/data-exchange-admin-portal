@@ -15,6 +15,11 @@ paths:
   /hogares/{numeroIdentificacion}:
     get:
       operationId: getHogar
+      # Whose data this operation returns (ADR-0015): the person in the path, a cédula.
+      x-rid-data-subject:
+        in: path
+        name: numeroIdentificacion
+        documentType: CC
       tags: [Hogares]
       summary: Consultar clasificación del hogar
       description: Devuelve el grupo, el puntaje y el número de integrantes del hogar de la persona.

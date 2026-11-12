@@ -215,7 +215,8 @@
       "rateLimit": "Default limit: {limit} requests per minute",
       "documentation": "Interactive documentation",
       "documentationNote": "Read-only documentation. To call the API you need an application and an approved access request.",
-      "deprecated": "Deprecated"
+      "deprecated": "Deprecated",
+      "operations": "Operations"
     },
     "signInRequired": "Sign in to see the catalogue of the network APIs."
   },
@@ -430,5 +431,16 @@
         "revoked": "Access revoked"
       }
     }
+  },
+  "dataSubject": {
+    "column": "Data subject",
+    "path": "Parameter {name}",
+    "pathWithType": "Parameter {name} ({type})",
+    "pathTypeParam": "Parameter {name}, type in {typeParam}",
+    "header": "Header X-RID-Data-Subject",
+    "headerWithType": "Header X-RID-Data-Subject ({type})",
+    "none": "No data subject",
+    "undeclared": "Not declared",
+    "note": "The gateway records whose data each call concerns, as a pseudonym, so citizens can see who consulted it. When the data subject goes in the header, send it on every call."
   }
 }

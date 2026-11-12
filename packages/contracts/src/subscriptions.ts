@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { classificationSchema } from './apis.js';
+import { classificationSchema, operationSchema } from './apis.js';
 import { catalogPurposeSchema } from './catalog.js';
 import { pageOf } from './session.js';
 
@@ -112,7 +112,7 @@ export const subscriptionDetailSchema = subscriptionSummarySchema.extend({
   legalBasisText: z.string(),
   legalReference: z.string().nullable(),
   /** Every operation of the version, to show what was requested and granted. */
-  operations: z.array(z.object({ operationId: z.string(), method: z.string(), path: z.string() })),
+  operations: z.array(operationSchema),
   /** As requested; empty = every read-only operation. */
   requestedOperations: z.array(z.string()),
   /** Granted by the provider; empty until approved. */

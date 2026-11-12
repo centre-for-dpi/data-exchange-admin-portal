@@ -1,5 +1,6 @@
 import type { ApiVersionDetail } from '@rid/contracts';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { dataSubjectLabel } from './data-subject';
 
 /**
  * Service sheet of a version (SPEC.md §3 "ficha del servicio"): what the provider declared and
@@ -99,8 +100,11 @@ export async function VersionSheet({
               <th scope="col" className="py-1 pr-6">
                 {t('version.detail.path')}
               </th>
-              <th scope="col" className="py-1">
+              <th scope="col" className="py-1 pr-6">
                 operationId
+              </th>
+              <th scope="col" className="py-1">
+                {t('dataSubject.column')}
               </th>
             </tr>
           </thead>
@@ -109,7 +113,8 @@ export async function VersionSheet({
               <tr key={op.operationId} className="border-b border-border">
                 <td className="py-1 pr-6 font-mono">{op.method}</td>
                 <td className="py-1 pr-6 font-mono">{op.path}</td>
-                <td className="py-1 font-mono">{op.operationId}</td>
+                <td className="py-1 pr-6 font-mono">{op.operationId}</td>
+                <td className="py-1">{dataSubjectLabel(t, op.dataSubject)}</td>
               </tr>
             ))}
           </tbody>

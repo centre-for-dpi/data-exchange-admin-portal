@@ -215,7 +215,8 @@
       "rateLimit": "Límite por defecto: {limit} peticiones por minuto",
       "documentation": "Documentación interactiva",
       "documentationNote": "Documentación de solo lectura. Para llamar a la API necesitas una aplicación y una solicitud de acceso aprobada.",
-      "deprecated": "Obsoleta"
+      "deprecated": "Obsoleta",
+      "operations": "Operaciones"
     },
     "signInRequired": "Inicia sesión para ver el catálogo de APIs de la red."
   },
@@ -430,5 +431,16 @@
         "revoked": "Acceso revocado"
       }
     }
+  },
+  "dataSubject": {
+    "column": "Titular de los datos",
+    "path": "Parámetro {name}",
+    "pathWithType": "Parámetro {name} ({type})",
+    "pathTypeParam": "Parámetro {name}, tipo en {typeParam}",
+    "header": "Cabecera X-RID-Data-Subject",
+    "headerWithType": "Cabecera X-RID-Data-Subject ({type})",
+    "none": "Sin titular",
+    "undeclared": "No declarado",
+    "note": "El gateway registra de quién son los datos de cada consulta, como seudónimo, para que el ciudadano vea quién los consultó. Si el titular va en la cabecera, envíala en cada llamada."
   }
 }

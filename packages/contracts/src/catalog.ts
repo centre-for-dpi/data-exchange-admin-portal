@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { classificationSchema, exposedFieldSchema } from './apis.js';
+import { classificationSchema, exposedFieldSchema, operationSchema } from './apis.js';
 import { pageOf } from './session.js';
 
 /** Catalogue search (SPEC.md §6). Only published (and deprecated) versions are listed. */
@@ -57,7 +57,7 @@ export const catalogVersionSchema = z.object({
   sunsetAt: z.iso.datetime().nullable(),
   allowedPurposes: z.array(catalogPurposeSchema),
   exposedFields: z.array(exposedFieldSchema),
-  operations: z.array(z.object({ operationId: z.string(), method: z.string(), path: z.string() })),
+  operations: z.array(operationSchema),
   defaultRateLimit: z.number().int(),
   legalBasisText: z.string().nullable(),
   legalReferences: z.array(z.string()),

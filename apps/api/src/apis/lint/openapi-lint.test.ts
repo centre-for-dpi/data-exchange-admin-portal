@@ -39,12 +39,98 @@ describe('OpenAPI lint (RID ruleset)', () => {
     },
   );
 
-  it('lists operations with method and path', async () => {
+  it('lists operations with method, path and data subject', async () => {
     const result = await lintOpenApi(mockSpec('salud'), { noIdInQuery: true });
     expect(result.operations).toEqual([
-      { operationId: 'getAfiliado', method: 'GET', path: '/afiliados/{numeroIdentificacion}' },
-      { operationId: 'verificarAfiliacion', method: 'POST', path: '/afiliados/verificaciones' },
+      {
+        operationId: 'getAfiliado',
+        method: 'GET',
+        path: '/afiliados/{numeroIdentificacion}',
+        dataSubject: { in: 'path', name: 'numeroIdentificacion', documentType: 'CC' },
+      },
+      {
+        operationId: 'verificarAfiliacion',
+        method: 'POST',
+        path: '/afiliados/verificaciones',
+        dataSubject: { in: 'header', documentType: 'CC' },
+      },
     ]);
+  });
+
+  describe('data subject (x-rid-data-subject, ADR-0015)', () => {
+    const personal = {
+      noIdInQuery: true,
+      dataSubject: { required: true, documentTypes: ['CC', 'CE', 'TI'] },
+    };
+    const withSubject = (yaml: string) =>
+      minimal().replace(
+        '      operationId: getThing\n',
+        `      operationId: getThing\n${yaml
+          .split('\n')
+          .map((l) => `      ${l}`)
+          .join('\n')}\n`,
+      );
+    const codes = async (source: string, options = personal) =>
+      (await lintOpenApi(source, options)).report.issues.map((i) => i.code);
+
+    it('requires a declaration on every operation of a personal-data API', async () => {
+      const { report } = await lintOpenApi(minimal(), personal);
+      const issue = report.issues.find((i) => i.code === 'rid-data-subject-required');
+      expect(issue).toMatchObject({ severity: 'error', line: 7 }); // the operation's line
+      expect(issue?.message).toContain('getThing');
+      // APIs without personal data may omit it.
+      expect(
+        await codes(minimal(), {
+          ...personal,
+          dataSubject: { ...personal.dataSubject, required: false },
+        }),
+      ).toEqual([]);
+    });
+
+    it('accepts a path parameter, the header, or none', async () => {
+      for (const yaml of [
+        'x-rid-data-subject:\n  in: path\n  name: thingId',
+        'x-rid-data-subject:\n  in: path\n  name: thingId\n  documentType: CE',
+        'x-rid-data-subject:\n  in: header',
+        'x-rid-data-subject: none',
+      ]) {
+        expect(await codes(withSubject(yaml)), yaml).toEqual([]);
+      }
+      const { operations } = await lintOpenApi(withSubject('x-rid-data-subject: none'), personal);
+      expect(operations[0]?.dataSubject).toEqual({ in: 'none' });
+    });
+
+    it('rejects parameters that are not in the path and unknown document types', async () => {
+      expect(await codes(withSubject('x-rid-data-subject:\n  in: path\n  name: cedula'))).toEqual([
+        'rid-data-subject-parameter',
+      ]);
+      expect(
+        await codes(
+          withSubject(
+            'x-rid-data-subject:\n  in: path\n  name: thingId\n  documentTypeParam: tipo',
+          ),
+        ),
+      ).toEqual(['rid-data-subject-parameter']);
+      expect(
+        await codes(withSubject('x-rid-data-subject:\n  in: header\n  documentType: PASAPORTE')),
+      ).toEqual(['rid-data-subject-document-type']);
+    });
+
+    it('rejects malformed declarations, which then count as undeclared', async () => {
+      for (const yaml of [
+        'x-rid-data-subject: thingId',
+        'x-rid-data-subject:\n  in: query\n  name: thingId',
+        'x-rid-data-subject:\n  in: path',
+        'x-rid-data-subject:\n  in: header\n  name: thingId',
+      ]) {
+        const result = await lintOpenApi(withSubject(yaml), personal);
+        expect(
+          result.report.issues.map((i) => i.code),
+          yaml,
+        ).toEqual(['rid-data-subject-invalid']);
+        expect(result.operations[0]?.dataSubject).toBeNull();
+      }
+    });
   });
 
   it('requires an operationId, with the line of the operation', async () => {
@@ -108,7 +194,9 @@ describe('OpenAPI lint (RID ruleset)', () => {
     });
     const { report, operations } = await lintOpenApi(json, { noIdInQuery: true });
     expect(report.valid).toBe(true);
-    expect(operations).toEqual([{ operationId: 'getX', method: 'GET', path: '/x' }]);
+    expect(operations).toEqual([
+      { operationId: 'getX', method: 'GET', path: '/x', dataSubject: null },
+    ]);
   });
 });
 

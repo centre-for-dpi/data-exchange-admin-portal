@@ -183,6 +183,69 @@ describe('API registration (M1-03)', () => {
       );
       expect(ok.statusCode).toBe(200);
     });
+
+    it('requires personal-data APIs to say whose data each operation handles (ADR-0015)', async () => {
+      // The salud document without its x-rid-data-subject declarations.
+      const undeclared = saludOpenapi.replace(
+        /^ {6}(#.*\n {6})?x-rid-data-subject:\n( {8}.*\n)+/gm,
+        '',
+      );
+      expect(undeclared).not.toContain('x-rid-data-subject');
+
+      const api = await createApi();
+      const res = await request(
+        'POST',
+        `/api/v1/entities/${salud}/apis/${api.id}/versions`,
+        'pedro.publicador',
+        versionBody(undeclared),
+      );
+      const version = apiVersionDetailSchema.parse(res.json());
+      expect(version.lintReport.valid).toBe(false);
+      expect(
+        version.lintReport.issues.filter((i) => i.code === 'rid-data-subject-required'),
+      ).toHaveLength(2);
+      expect(version.operations.map((o) => o.dataSubject)).toEqual([null, null]);
+      const submit = await request(
+        'POST',
+        `/api/v1/entities/${salud}/apis/${api.id}/versions/${version.id}/submit`,
+        'pedro.publicador',
+      );
+      expect(submit.statusCode).toBe(400);
+
+      // The declared document passes, and the version shows where each data subject is.
+      const declared = await request(
+        'PUT',
+        `/api/v1/entities/${salud}/apis/${api.id}/versions/${version.id}/openapi`,
+        'pedro.publicador',
+        { openapi: saludOpenapi },
+      );
+      expect(apiVersionDetailSchema.parse(declared.json())).toMatchObject({
+        lintReport: { valid: true },
+        operations: [
+          { operationId: 'getAfiliado', dataSubject: { in: 'path', name: 'numeroIdentificacion' } },
+          { operationId: 'verificarAfiliacion', dataSubject: { in: 'header' } },
+        ],
+      });
+    });
+
+    it('does not require the declaration on APIs without personal data', async () => {
+      const undeclared = saludOpenapi.replace(
+        /^ {6}(#.*\n {6})?x-rid-data-subject:\n( {8}.*\n)+/gm,
+        '',
+      );
+      const created = await request('POST', `/api/v1/entities/${salud}/apis`, 'pedro.publicador', {
+        ...apiBody(`internas-${run}-${randomUUID().slice(0, 4)}`),
+        classification: 'internal',
+      });
+      const api = apiDetailSchema.parse(created.json());
+      const res = await request(
+        'POST',
+        `/api/v1/entities/${salud}/apis/${api.id}/versions`,
+        'pedro.publicador',
+        versionBody(undeclared),
+      );
+      expect(apiVersionDetailSchema.parse(res.json()).lintReport.valid).toBe(true);
+    });
   });
 
   describe('validation', () => {

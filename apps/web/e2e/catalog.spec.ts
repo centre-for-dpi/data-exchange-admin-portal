@@ -44,6 +44,13 @@ test.describe('catalogue (M1-05)', () => {
     await expect(main.locator('dl').nth(1)).toContainText(
       'Verificación de requisitos de un trámite',
     );
+    // Where the data subject of each operation is (ADR-0015).
+    await expect(
+      main.getByRole('cell', { name: 'Parámetro numeroIdentificacion (CC)' }),
+    ).toBeVisible();
+    await expect(
+      main.getByRole('cell', { name: 'Cabecera X-RID-Data-Subject (CC)' }),
+    ).toBeVisible();
     // Scalar renders the operations of the OpenAPI document, read-only.
     await expect(page.getByText('Consultar afiliación').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: /Test Request/i })).toHaveCount(0);

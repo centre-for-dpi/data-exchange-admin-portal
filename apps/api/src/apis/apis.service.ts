@@ -198,8 +198,19 @@ export class ApisService {
     return (await this.findVersion(entityId, apiId, versionId)).openapiSpec;
   }
 
-  private lint(source: string) {
-    return lintOpenApi(source, { noIdInQuery: getCountryConfig().features.lint.noIdInQuery });
+  /**
+   * Lints an OpenAPI document. APIs with personal or sensitive data must declare the data subject
+   * of every operation (x-rid-data-subject, ADR-0015) with the country's document types.
+   */
+  private lint(source: string, classification: string) {
+    const config = getCountryConfig();
+    return lintOpenApi(source, {
+      noIdInQuery: config.features.lint.noIdInQuery,
+      dataSubject: {
+        required: classification === 'personal' || classification === 'sensitive',
+        documentTypes: config.identifiers.person,
+      },
+    });
   }
 
   async createVersion(
@@ -225,7 +236,7 @@ export class ApisService {
     }
 
     const [major = 0, minor = 0] = data.version.split('.').map(Number);
-    const parsed = await this.lint(data.openapi);
+    const parsed = await this.lint(data.openapi, api.classification);
 
     try {
       const version = await this.prisma.$transaction(async (tx) => {
@@ -284,7 +295,8 @@ export class ApisService {
     if (!isEditable(before.status)) {
       throw new ConflictError(`A version in status ${before.status} cannot be edited`);
     }
-    const parsed = await this.lint(source);
+    const api = await this.findApi(entityId, apiId);
+    const parsed = await this.lint(source, api.classification);
     const updated = await this.prisma.$transaction(async (tx) => {
       const changed = await tx.apiVersion.updateMany({
         where: { id: versionId, status: before.status },

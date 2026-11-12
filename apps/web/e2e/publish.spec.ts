@@ -21,6 +21,9 @@ test.describe('API registration (M1-03)', () => {
     await expect(page.getByTestId('version-status')).toHaveText('Borrador');
     await expect(page.getByText('El documento cumple las reglas de la red.')).toBeVisible();
     await expect(page.getByRole('cell', { name: 'getAfiliado' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'Parámetro numeroIdentificacion (CC)' }),
+    ).toBeVisible();
     await expect(page.getByRole('cell', { name: 'regimen' })).toBeVisible();
     await expectNoAccessibilityViolations(page);
 

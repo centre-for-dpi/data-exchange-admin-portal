@@ -218,10 +218,16 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 - Fuera de alcance: intentos rechazados, reclamos, huella del contenido y consentimiento.
 - La sección de la Carpeta la construye su equipo. Aquí se entregan el API, el protocolo, el verificador y una Carpeta de referencia (mock) para pruebas y demo.
 
-- [ ] **MT-01 — Titular declarado en el OpenAPI**
+- [x] **MT-01 — Titular declarado en el OpenAPI**
   - Extensión `x-rid-data-subject` por operación: parámetro de ruta, cabecera `X-RID-Data-Subject` (cuando el identificador va en el cuerpo) o `none`. Tipo de documento opcional, por defecto el primero de `identifiers.person`.
   - Regla de lint: en APIs `personal` y `sensitive`, toda operación debe declararla (error al enviar a revisión).
   - El revisor y el catálogo muestran dónde está el titular de cada operación. Los mocks declaran sus titulares.
+  - _Notas de implementación:_
+    - **Formato:** `x-rid-data-subject` puede ser `none`, `{ in: path, name, documentType? | documentTypeParam? }` o `{ in: header, documentType? }`. Es un chequeo propio del lint, no de Spectral, porque depende de la clasificación de la API y de `identifiers.person` del país.
+    - **Errores:** con su línea. En APIs `personal` y `sensitive` la declaración es obligatoria (`rid-data-subject-required`). Siempre se validan la forma (`-invalid`), que los parámetros existan en la plantilla de la ruta (`-parameter`) y el tipo de documento (`-document-type`). Una declaración inválida cuenta como no declarada.
+    - **Datos y UI:** `listOperations` y los contratos (`operationSchema`) exponen `dataSubject`. La ficha de versión (publicador y revisor) y el catálogo muestran el titular de cada operación. El catálogo explica que, si va en la cabecera, hay que enviarla.
+    - **Mocks:** `getAfiliado` y `getHogar` declaran el titular en la ruta (CC); `verificarAfiliacion`, en la cabecera.
+    - **Versiones ya publicadas sin declaración:** se registran sin titular hasta que el proveedor suba una versión que lo declare.
 - [ ] **MT-02 — Seudónimo del titular en el gateway**
   - El bundle incluye, por operación, cómo extraer el titular. OPA calcula `X-RID-Subject-Ref = HMAC-SHA-256(clave, país|tipo|número)`. La clave va en el bundle y es obligatoria (`RID_SUBJECT_REF_KEY`).
   - Sin titular declarado en la petición → `403 data_subject_required`. `X-RID-Data-Subject` en claro nunca llega al proveedor.
