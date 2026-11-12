@@ -8,7 +8,9 @@ import {
 } from '../../../../components/subscriptions/subscription-forms';
 import { SubscriptionFacts } from '../../../../components/subscriptions/subscription-view';
 import { AutoRefresh } from '../../../../components/auto-refresh';
+import { AuditTimeline } from '../../../../components/audit/audit-views';
 import { ApiError, apiGet } from '../../../../lib/api';
+import { entityTimeline } from '../../../../lib/audit';
 import { getViewer } from '../../../../lib/viewer';
 
 interface PageProps {
@@ -42,6 +44,7 @@ export default async function AccessRequestPage({ params }: PageProps) {
   setRequestLocale(locale);
   const t = await getTranslations('subscriptions');
   const { detail, entity } = await load(subscriptionId);
+  const timeline = await entityTimeline(entity.entity.id, 'subscription', detail.id);
   const pending = detail.status === 'pending_provider';
   // The API enforces separation of duties; the UI only avoids offering a doomed action. A user who
   // also develops for the requesting entity may be the requester, so the forms stay and the API
@@ -68,6 +71,7 @@ export default async function AccessRequestPage({ params }: PageProps) {
           />
         </div>
       ) : null}
+      <AuditTimeline items={timeline} />
       {detail.status === 'approved' ? (
         <>
           <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>

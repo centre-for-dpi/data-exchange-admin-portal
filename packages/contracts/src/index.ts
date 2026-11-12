@@ -6,3 +6,4 @@ export * from './roles.js';
 export * from './session.js';
 export * from './subscriptions.js';
 export * from './net.js';
+export * from './audit.js';

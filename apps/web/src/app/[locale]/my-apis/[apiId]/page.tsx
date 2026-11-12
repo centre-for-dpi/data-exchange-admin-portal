@@ -4,7 +4,9 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { Button } from '../../../../components/ui/button';
 import { Link } from '../../../../i18n/navigation';
+import { AuditTimeline } from '../../../../components/audit/audit-views';
 import { ApiError, apiGet } from '../../../../lib/api';
+import { entityTimeline } from '../../../../lib/audit';
 import { getViewer } from '../../../../lib/viewer';
 
 interface PageProps {
@@ -37,6 +39,7 @@ export default async function ApiPage({ params }: PageProps) {
   const t = await getTranslations();
   const { entity, api } = await loadApi(apiId);
   const canWrite = entity.roles.includes('api_publisher');
+  const timeline = await entityTimeline(entity.entity.id, 'api', api.id);
 
   return (
     <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
@@ -93,6 +96,7 @@ export default async function ApiPage({ params }: PageProps) {
           </tbody>
         </table>
       )}
+      <AuditTimeline items={timeline} />
     </section>
   );
 }

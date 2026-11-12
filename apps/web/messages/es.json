@@ -324,20 +324,6 @@
     "endUserNotRequired": "No se exige.",
     "regulatorNote": "Esta API maneja datos sensibles: después de tu aprobación, la solicitud pasa al regulador.",
     "activatingNote": "Aprobada. El gateway la aplicará en unos segundos.",
-    "decisions": "Decisiones",
-    "noDecisions": "Aún no hay decisiones.",
-    "decision": {
-      "approved": "Aprobada",
-      "rejected": "Rechazada",
-      "info_requested": "Pidió información",
-      "suspended": "Suspendida",
-      "reactivated": "Reactivada",
-      "revoked": "Revocada"
-    },
-    "by": {
-      "provider": "por la entidad proveedora",
-      "platform": "por el operador o el regulador"
-    },
     "form": {
       "title": "Solicitar acceso a {api}",
       "version": "Versión {version} de {provider}",
@@ -376,6 +362,73 @@
       "revoke": "Revocar acceso",
       "revokeHint": "La entidad consumidora deja de poder llamar a la API en menos de un minuto. No se puede deshacer: para volver a dar acceso hace falta una nueva solicitud.",
       "revokeComment": "Motivo de la revocación"
+    }
+  },
+  "audit": {
+    "title": "Auditoría",
+    "entityNote": "Cada solicitud de acceso y cada API de tu entidad muestran su línea de tiempo en su propia ficha.",
+    "verify": {
+      "title": "Integridad de la bitácora",
+      "description": "Cada evento queda encadenado con el anterior por un hash. Verificar recalcula toda la cadena: si alguien modificó, borró o insertó un evento, se detecta.",
+      "button": "Verificar integridad",
+      "valid": "Cadena íntegra: {verified, plural, one {# evento verificado} other {# eventos verificados}}.",
+      "invalid": "Cadena rota en el evento {seq}: {reason}.",
+      "unchained": "{count, plural, one {# evento anterior} other {# eventos anteriores}} a la cadena no se puede verificar.",
+      "head": "Último eslabón: evento {seq}, hash {hash}.",
+      "checkedAt": "Verificado el {date}.",
+      "reasons": {
+        "gap": "falta un evento (hueco en la secuencia)",
+        "prev_hash_mismatch": "no enlaza con el evento anterior",
+        "hash_mismatch": "su contenido fue modificado",
+        "missing_hash": "se insertó fuera de la cadena"
+      }
+    },
+    "recent": "Eventos recientes",
+    "older": "Eventos anteriores",
+    "timeline": "Línea de tiempo",
+    "timelineTitle": "Línea de tiempo: {kind} {id}",
+    "kinds": {
+      "subscription": "suscripción",
+      "api": "API"
+    },
+    "noEvents": "Sin eventos.",
+    "columns": {
+      "seq": "N.º",
+      "when": "Fecha",
+      "action": "Acción",
+      "actor": "Quién",
+      "target": "Objeto"
+    },
+    "system": "Sistema ({name})",
+    "entityActor": "Persona de {entity}",
+    "statusChange": "Estado: {from} → {to}",
+    "hash": "Hash",
+    "actions": {
+      "api": {
+        "created": "API registrada",
+        "updated": "API actualizada"
+      },
+      "api_version": {
+        "created": "Versión creada",
+        "updated": "Versión actualizada",
+        "submitted": "Versión enviada a revisión",
+        "approved": "Versión aprobada por el operador",
+        "changes_requested": "Cambios solicitados",
+        "published": "Versión publicada"
+      },
+      "application": {
+        "created": "Aplicación creada"
+      },
+      "credential": {
+        "created": "Credencial creada"
+      },
+      "subscription": {
+        "requested": "Acceso solicitado",
+        "approved": "Solicitud aprobada",
+        "rejected": "Solicitud rechazada",
+        "activated": "Acceso activo en el gateway",
+        "revoked": "Acceso revocado"
+      }
     }
   }
 }

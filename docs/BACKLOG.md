@@ -186,9 +186,16 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Interpretación (SPEC §4.4):** revocar no está sujeto a separación de funciones, porque solo quita acceso.
     - **Web:** formulario "Revocar acceso" en la ficha de la solicitud. El consumidor ve la suscripción "Revocada" con el motivo.
     - **e2e (`call.spec.ts`, DEMO paso 9):** tras la llamada exitosa, lucia revoca desde la UI y la misma llamada se repite cada segundo hasta recibir `403 no_subscription`. En local tardó 10,5 s; la prueba exige menos de 60 s.
-- [ ] **M1-11 — Auditoría encadenada mínima**
+- [x] **M1-11 — Auditoría encadenada mínima**
   - Cadena de hash funcionando; línea de tiempo por objeto (API, suscripción) en la UI.
   - Endpoint de verificación de integridad.
+  - _Notas de implementación:_
+    - **Cadena:** `hash = SHA-256(prev_hash ‖ JSON canónico)` con las claves ordenadas, porque `jsonb` no conserva el orden. Los valores se normalizan antes de hashear, así que el hash coincide al releerlos. Bajo un bloqueo consultivo de la transacción, `seq` = último + 1: una transacción revertida no deja huecos, a diferencia de una secuencia. Las escrituras de auditoría quedan serializadas (aceptable a esta escala; ver ARCHITECTURE §7).
+    - **Eventos previos a M1-11:** la tabla rechaza `UPDATE` incluso para el dueño, así que los eventos anteriores no se pueden rellenar. La cadena empieza en el primer evento con hash y la verificación informa cuántos quedan sin encadenar. Un despliegue nuevo no tiene ninguno.
+    - **Verificación:** `GET /api/v1/audit/verify` (operador, revisor, regulador y auditor) recorre toda la cadena por lotes. Detecta un evento modificado (`hash_mismatch`), un enlace roto o un génesis borrado (`prev_hash_mismatch`), un hueco (`gap`) y un evento insertado por fuera (`missing_hash`). Pendiente para M2-09 con el anclaje diario: borrar los últimos eventos (truncar la cola) no se detecta solo con la cadena.
+    - **Línea de tiempo:** para la plataforma en `GET /audit/timeline/{subscription|api}/:id` (la de una API incluye sus versiones), con eventos recientes paginados. Para cada entidad en `GET /entities/:id/audit/timeline/...`: una suscripción la ven la consumidora y la proveedora, y otra entidad recibe 404. La entidad solo ve los nombres de su propia gente; los demás aparecen como "Persona de {entidad}". Se muestran el estado anterior y el nuevo y el comentario, no los snapshots completos.
+    - **Web:** página "Auditoría" con "Verificar integridad" (formulario GET, sin JavaScript) y eventos recientes que enlazan a la línea de tiempo, y la línea de tiempo dentro de las fichas de solicitud y de API. e2e del paso 10 de la demo con axe.
+    - **Pruebas:** manipulaciones de la cadena con datos sintéticos (pruebas unitarias, para no romper la cadena real de `rid_test`), y concurrencia, reversión y verificación contra PostgreSQL.
 - [ ] **M1-12 — Demo automatizada**
   - `pnpm demo` ejecuta el guion de `DEMO.md` contra el stack local y termina en verde.
   - Test e2e Playwright del flujo completo en la UI.

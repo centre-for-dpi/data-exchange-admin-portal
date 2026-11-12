@@ -8,7 +8,10 @@ const operationLabel = (detail: SubscriptionDetail, operationId: string): string
   return op ? `${op.method} ${op.path}` : operationId;
 };
 
-/** Facts of an access request, shared by the consumer and the provider views. */
+/**
+ * Facts of an access request, shared by the consumer and the provider views. Decisions (who,
+ * when, why) are shown by the audit timeline next to it.
+ */
 export async function SubscriptionFacts({
   detail,
   side,
@@ -108,27 +111,6 @@ export async function SubscriptionFacts({
             : t('subscriptions.endUserNotRequired')}
         </dd>
       </dl>
-
-      <div>
-        <h2 className="text-xl font-semibold">{t('subscriptions.decisions')}</h2>
-        {detail.decisions.length === 0 ? (
-          <p className="mt-2 text-sm">{t('subscriptions.noDecisions')}</p>
-        ) : (
-          <ol className="mt-2 space-y-2 text-sm">
-            {detail.decisions.map((d) => (
-              <li key={d.decidedAt + d.decision}>
-                <span className="font-medium">{t(`subscriptions.decision.${d.decision}`)}</span>{' '}
-                {t(`subscriptions.by.${d.by}`)} ·{' '}
-                {format.dateTime(new Date(d.decidedAt), {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
-                {d.comment ? <p className="whitespace-pre-line">{d.comment}</p> : null}
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
     </div>
   );
 }

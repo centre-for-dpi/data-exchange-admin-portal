@@ -64,6 +64,11 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['data_steward'],
     platformRoles: [],
   },
+  /** Timeline of the entity's own objects (its APIs, subscriptions it asked for or received). */
+  'audit.entity.read': {
+    entityRoles: ENTITY_ROLES,
+    platformRoles: [],
+  },
 } as const satisfies Record<string, EntityPermission>;
 
 export type EntityAction = keyof typeof ENTITY_PERMISSIONS;
@@ -77,6 +82,8 @@ export const PLATFORM_PERMISSIONS = {
   'review.read': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Approve or request changes on a version (operator). The regulator step is M2-04. */
   'review.decide': ['platform_admin', 'platform_reviewer'],
+  /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
+  'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;
 
 export type PlatformAction = keyof typeof PLATFORM_PERMISSIONS;

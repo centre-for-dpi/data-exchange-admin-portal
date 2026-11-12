@@ -324,20 +324,6 @@
     "endUserNotRequired": "Not required.",
     "regulatorNote": "This API handles sensitive data: after your approval the request goes to the regulator.",
     "activatingNote": "Approved. The gateway will apply it in a few seconds.",
-    "decisions": "Decisions",
-    "noDecisions": "No decisions yet.",
-    "decision": {
-      "approved": "Approved",
-      "rejected": "Rejected",
-      "info_requested": "Asked for information",
-      "suspended": "Suspended",
-      "reactivated": "Reactivated",
-      "revoked": "Revoked"
-    },
-    "by": {
-      "provider": "by the provider entity",
-      "platform": "by the operator or the regulator"
-    },
     "form": {
       "title": "Request access to {api}",
       "version": "Version {version} by {provider}",
@@ -376,6 +362,73 @@
       "revoke": "Revoke access",
       "revokeHint": "The consumer entity can no longer call the API within a minute. This cannot be undone: access again needs a new request.",
       "revokeComment": "Reason for revoking"
+    }
+  },
+  "audit": {
+    "title": "Audit",
+    "entityNote": "Every access request and API of your entity shows its timeline on its own page.",
+    "verify": {
+      "title": "Audit trail integrity",
+      "description": "Each event is chained to the previous one by a hash. Verifying recomputes the whole chain: a modified, deleted or inserted event is detected.",
+      "button": "Verify integrity",
+      "valid": "Chain intact: {verified, plural, one {# event verified} other {# events verified}}.",
+      "invalid": "Chain broken at event {seq}: {reason}.",
+      "unchained": "{count, plural, one {# event} other {# events}} written before the chain cannot be verified.",
+      "head": "Last link: event {seq}, hash {hash}.",
+      "checkedAt": "Verified on {date}.",
+      "reasons": {
+        "gap": "an event is missing (gap in the sequence)",
+        "prev_hash_mismatch": "it does not link to the previous event",
+        "hash_mismatch": "its content was modified",
+        "missing_hash": "it was inserted outside the chain"
+      }
+    },
+    "recent": "Recent events",
+    "older": "Older events",
+    "timeline": "Timeline",
+    "timelineTitle": "Timeline: {kind} {id}",
+    "kinds": {
+      "subscription": "subscription",
+      "api": "API"
+    },
+    "noEvents": "No events.",
+    "columns": {
+      "seq": "No.",
+      "when": "Date",
+      "action": "Action",
+      "actor": "Who",
+      "target": "Object"
+    },
+    "system": "System ({name})",
+    "entityActor": "Someone at {entity}",
+    "statusChange": "Status: {from} → {to}",
+    "hash": "Hash",
+    "actions": {
+      "api": {
+        "created": "API registered",
+        "updated": "API updated"
+      },
+      "api_version": {
+        "created": "Version created",
+        "updated": "Version updated",
+        "submitted": "Version submitted for review",
+        "approved": "Version approved by the operator",
+        "changes_requested": "Changes requested",
+        "published": "Version published"
+      },
+      "application": {
+        "created": "Application created"
+      },
+      "credential": {
+        "created": "Credential created"
+      },
+      "subscription": {
+        "requested": "Access requested",
+        "approved": "Request approved",
+        "rejected": "Request rejected",
+        "activated": "Access active on the gateway",
+        "revoked": "Access revoked"
+      }
     }
   }
 }

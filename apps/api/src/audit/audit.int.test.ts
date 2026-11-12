@@ -3,7 +3,9 @@ import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CoreModule } from '../core.module.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AuditQueryService } from './audit-query.service.js';
 import { AuditService } from './audit.service.js';
+import { eventHash } from './chain.js';
 import { REDACTED } from './sanitize.js';
 
 describe('AuditService against PostgreSQL (M0-08)', () => {
@@ -87,5 +89,72 @@ describe('AuditService against PostgreSQL (M0-08)', () => {
         }),
       ),
     ).rejects.toThrow(/Invalid audit action/);
+  });
+
+  describe('hash chain (M1-11)', () => {
+    const probe = (targetId: string, after?: unknown) =>
+      prisma.$transaction((tx) =>
+        audit.record(tx, {
+          actor: { type: 'system', id: 'test' },
+          action: 'probe.chained',
+          target: { type: 'probe', id: targetId },
+          after,
+        }),
+      );
+
+    it('links each event to the previous one; the stored hash recomputes after jsonb', async () => {
+      const targetId = randomUUID();
+      // Key order, nested values, dates and NaN: jsonb must give back what was hashed.
+      const first = await probe(targetId, {
+        z: 1,
+        a: { y: [1, 'b'], x: new Date(0) },
+        n: Number.NaN,
+      });
+      const second = await probe(targetId, { status: 'approved' });
+      const [a, b] = await prisma.auditEvent.findMany({
+        where: { targetId },
+        orderBy: { seq: 'asc' },
+      });
+      expect(b?.seq).toBeGreaterThan(first);
+      expect(b?.seq).toBe(second);
+      expect(a?.hash).toBe(eventHash(a?.prevHash ?? null, a!));
+      expect(b?.hash).toBe(eventHash(b?.prevHash ?? null, b!));
+      expect(a?.after).toEqual({
+        z: 1,
+        a: { y: [1, 'b'], x: '1970-01-01T00:00:00.000Z' },
+        n: null,
+      });
+    });
+
+    it('a rolled-back transaction leaves no gap in seq', async () => {
+      const targetId = randomUUID();
+      const before = await probe(targetId);
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await audit.record(tx, {
+            actor: { type: 'system', id: 'test' },
+            action: 'probe.rolled_back',
+            target: { type: 'probe', id: targetId },
+          });
+          throw new Error('rollback');
+        }),
+      ).rejects.toThrow('rollback');
+      const after = await probe(targetId);
+      // Other suites may append meanwhile; what matters is that the chain stays contiguous.
+      expect(after).toBeGreaterThan(before);
+      expect((await new AuditQueryService(prisma).verify()).valid).toBe(true);
+    });
+
+    it('concurrent transactions append in order, contiguous and verifiable', async () => {
+      const targetId = randomUUID();
+      const seqs = await Promise.all(Array.from({ length: 12 }, (_, i) => probe(targetId, { i })));
+      expect(new Set(seqs).size).toBe(12);
+      const check = await new AuditQueryService(prisma).verify();
+      expect(check).toMatchObject({ valid: true });
+      expect(check.verified).toBeGreaterThanOrEqual(12);
+      expect(BigInt(check.lastSeq ?? '0')).toBeGreaterThanOrEqual(
+        seqs.reduce((m, x) => (x > m ? x : m)),
+      );
+    });
   });
 });

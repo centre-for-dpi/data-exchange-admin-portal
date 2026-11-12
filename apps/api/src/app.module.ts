@@ -7,6 +7,8 @@ import {
   SubscriptionsController,
 } from './subscriptions/subscriptions.controller.js';
 import { SubscriptionsService } from './subscriptions/subscriptions.service.js';
+import { AuditController, EntityAuditController } from './audit/audit.controller.js';
+import { AuditQueryService } from './audit/audit-query.service.js';
 import { OpaController } from './opa/opa.controller.js';
 import { OpaService } from './opa/opa.service.js';
 import { ApisService } from './apis/apis.service.js';
@@ -36,6 +38,8 @@ import { ReviewsService } from './reviews/reviews.service.js';
     SubscriptionsController,
     AccessRequestsController,
     OpaController,
+    AuditController,
+    EntityAuditController,
   ],
   providers: [
     ApisService,
@@ -44,6 +48,7 @@ import { ReviewsService } from './reviews/reviews.service.js';
     ApplicationsService,
     SubscriptionsService,
     OpaService,
+    AuditQueryService,
   ],
 })
 export class AppModule {}

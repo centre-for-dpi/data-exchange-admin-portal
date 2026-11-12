@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
+import { canonicalJson } from '../common/canonical-json.js';
 
 /** Escapes RE2 metacharacters (OPA's regex.match uses Go's RE2). */
 const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -56,17 +57,6 @@ export interface BundleData {
 
 /** Top-level data paths the bundle owns; OPA refuses data outside them. */
 export const BUNDLE_ROOTS = ['rid', 'routes', 'clients', 'config'];
-
-/** JSON with object keys sorted, so equal content always yields the same bytes. */
-export function canonicalJson(value: unknown): string {
-  return JSON.stringify(value, (_key, v: unknown) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(
-          Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1)),
-        )
-      : v,
-  );
-}
 
 // --- tar (ustar) ---------------------------------------------------------------------------
 

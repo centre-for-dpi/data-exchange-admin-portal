@@ -45,7 +45,7 @@ test.describe('access requests (M1-07)', () => {
 
     await page.goto(`/my-apps/requests/${id}`);
     await expect(page.getByTestId('subscription-status')).toHaveText('Aprobada (activándose)');
-    await expect(page.getByText('Aprobada por la entidad proveedora')).toBeVisible();
+    await expect(page.getByTestId('audit-timeline')).toContainText('Solicitud aprobada');
     await page.goto('/my-apps');
     await expect(page.getByRole('row', { name: new RegExp(apiName) })).toContainText(
       'Aprobada (activándose)',
