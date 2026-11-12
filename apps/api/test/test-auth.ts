@@ -55,12 +55,21 @@ export async function createTestIssuer(): Promise<TestIssuer> {
   };
 }
 
-/** The real AppModule, with tokens verified against the test issuer instead of Keycloak. */
-export async function createTestApp(issuer: TestIssuer): Promise<NestFastifyApplication> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+/**
+ * The real AppModule, with tokens verified against the test issuer instead of Keycloak. Extra
+ * providers (e.g. the Keycloak admin client) can be replaced with in-memory fakes.
+ */
+export async function createTestApp(
+  issuer: TestIssuer,
+  overrides: Array<{ token: symbol; value: unknown }> = [],
+): Promise<NestFastifyApplication> {
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(TOKEN_VERIFIER)
-    .useValue(issuer.verifier)
-    .compile();
+    .useValue(issuer.verifier);
+  for (const { token, value } of overrides) {
+    builder = builder.overrideProvider(token).useValue(value);
+  }
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestFastifyApplication>(createAdapter(), {
     logger: ['error', 'warn'],
   });

@@ -218,5 +218,68 @@
       "deprecated": "Deprecated"
     },
     "signInRequired": "Sign in to see the catalogue of the network APIs."
+  },
+  "myApps": {
+    "noEntity": "You need to belong to an entity to see its applications.",
+    "empty": "Your entity has no applications yet.",
+    "newApp": "Create application",
+    "readOnly": "You can see the applications of your entity. Only users with the developer role can create them.",
+    "name": "Name",
+    "environment": "Environment",
+    "status": "Status",
+    "provisioning": "Credentials",
+    "environments": {
+      "sandbox": "Testing (sandbox)",
+      "production": "Production"
+    },
+    "appStatus": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "deleted": "Deleted"
+    },
+    "provisioningStatus": {
+      "pending": "Activating",
+      "ready": "Ready",
+      "error": "Failed: contact the operator"
+    },
+    "create": {
+      "title": "Create application",
+      "name": "Application name",
+      "description": "What your entity will use it for",
+      "environment": "Environment",
+      "technicalContact": "Technical contact e-mail",
+      "submit": "Create application"
+    },
+    "secret": {
+      "title": "Save the secret now",
+      "warning": "This secret is shown only once. Copy it and keep it somewhere safe: the portal does not store it and you will not be able to see it again.",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "copy": "Copy",
+      "copied": "Copied",
+      "continue": "Go to the application"
+    },
+    "detail": {
+      "clientId": "Client ID",
+      "tokenUrl": "Token URL",
+      "technicalContact": "Technical contact",
+      "credentials": "Credentials",
+      "credentialKind": {
+        "client_secret": "Client secret",
+        "mtls_certificate": "mTLS certificate"
+      },
+      "credentialStatus": {
+        "active": "Active",
+        "rotating": "Rotating",
+        "revoked": "Revoked",
+        "expired": "Expired"
+      },
+      "created": "Created",
+      "pendingNote": "We are creating the credentials in the identity server. This takes a few seconds.",
+      "guide": "Integration guide",
+      "guideToken": "1. Get an access token (valid for 5 minutes):",
+      "guideCall": "2. Call an API with the token and the purpose of your approved request:",
+      "guideNote": "Replace YOUR_SECRET with the secret you saved when you created the application. You need an approved access request for the gateway to accept the call."
+    }
   }
 }

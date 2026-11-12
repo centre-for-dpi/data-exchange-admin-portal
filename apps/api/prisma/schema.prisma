@@ -442,6 +442,11 @@ model Credential {
   status        CredentialStatus @default(active)
   /// Certificate SHA-256 fingerprint (mTLS), or null for client secrets.
   fingerprint   String?
+  /// SHA-256 of a client secret (identifies it; the secret itself is never stored in clear).
+  secretHash    String?          @map("secret_hash")
+  /// Client secret sealed with AES-256-GCM (RID_SECRETS_KEY) only until the Keycloak reconciler
+  /// has set it on the client; then it is erased.
+  sealedSecret  String?          @map("sealed_secret")
   serial        String?
   notAfter      DateTime?        @map("not_after") @db.Timestamptz(3)
   lastUsedAt    DateTime?        @map("last_used_at") @db.Timestamptz(3)

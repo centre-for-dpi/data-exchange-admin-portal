@@ -218,5 +218,68 @@
       "deprecated": "Obsoleta"
     },
     "signInRequired": "Inicia sesión para ver el catálogo de APIs de la red."
+  },
+  "myApps": {
+    "noEntity": "Necesitas pertenecer a una entidad para ver sus aplicaciones.",
+    "empty": "Tu entidad aún no tiene aplicaciones.",
+    "newApp": "Crear aplicación",
+    "readOnly": "Puedes ver las aplicaciones de tu entidad. Solo quien tiene el rol de desarrollador puede crearlas.",
+    "name": "Nombre",
+    "environment": "Entorno",
+    "status": "Estado",
+    "provisioning": "Credenciales",
+    "environments": {
+      "sandbox": "Pruebas (sandbox)",
+      "production": "Producción"
+    },
+    "appStatus": {
+      "active": "Activa",
+      "suspended": "Suspendida",
+      "deleted": "Eliminada"
+    },
+    "provisioningStatus": {
+      "pending": "Activándose",
+      "ready": "Lista",
+      "error": "Con error: contacta al operador"
+    },
+    "create": {
+      "title": "Crear aplicación",
+      "name": "Nombre de la aplicación",
+      "description": "Para qué la usará tu entidad",
+      "environment": "Entorno",
+      "technicalContact": "Correo del contacto técnico",
+      "submit": "Crear aplicación"
+    },
+    "secret": {
+      "title": "Guarda el secreto ahora",
+      "warning": "Este secreto se muestra una sola vez. Cópialo y guárdalo en un lugar seguro: el portal no lo guarda y no podrás volver a verlo.",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "continue": "Ir a la aplicación"
+    },
+    "detail": {
+      "clientId": "Client ID",
+      "tokenUrl": "URL para obtener el token",
+      "technicalContact": "Contacto técnico",
+      "credentials": "Credenciales",
+      "credentialKind": {
+        "client_secret": "Secreto de cliente",
+        "mtls_certificate": "Certificado mTLS"
+      },
+      "credentialStatus": {
+        "active": "Activa",
+        "rotating": "En rotación",
+        "revoked": "Revocada",
+        "expired": "Vencida"
+      },
+      "created": "Creada",
+      "pendingNote": "Estamos creando las credenciales en el servidor de identidad. Esto toma unos segundos.",
+      "guide": "Guía de integración",
+      "guideToken": "1. Obtén un token de acceso (dura 5 minutos):",
+      "guideCall": "2. Llama a una API con el token y la finalidad de tu solicitud aprobada:",
+      "guideNote": "Reemplaza TU_SECRETO por el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada."
+    }
   }
 }

@@ -136,9 +136,10 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Pendiente:** el botón "Solicitar acceso" llega con M1-07 y "probar en sandbox" con M4-08.
     - **Pendiente:** el modo `publicCatalog: true` no tiene prueba automatizada, porque `co.yaml` lo tiene apagado.
     - **Pendiente, por investigar:** en dos corridas e2e la web recibió `ECONNRESET` del API; no se pudo reproducir con el log del API a la vista. Mitigación: un reintento único en las lecturas (GET).
-- [ ] **M1-06 — Aplicaciones y credenciales OAuth2**
+- [x] **M1-06 — Aplicaciones y credenciales OAuth2**
   - `app_developer` crea una aplicación; el reconciliador crea el cliente en `rid-gateway`; el secreto se muestra una sola vez.
   - Guía de integración con `curl` para obtener token.
+  - _Notas de implementación:_ el portal genera el secreto (32 bytes aleatorios) y lo muestra una sola vez en la respuesta del `POST` (`Cache-Control: no-store`). En la base queda su hash SHA-256 y, solo mientras el reconciliador no lo haya aplicado, una copia sellada con AES-256-GCM (`RID_SECRETS_KEY`, ligada al id de la credencial) que el reconciliador borra al crear el cliente: así el controlador nunca llama a la Admin API de Keycloak y el secreto no sobrevive en claro en ninguna tabla ni en la auditoría. El id de la aplicación se genera en el servicio (UUIDv7) porque el `clientId` determinista `rid-app-<id>` se necesita dentro de la misma transacción. El reconciliador de Keycloak (outbox `keycloak.sync` → pg-boss) es idempotente (`created`/`updated`/`unchanged`), actualiza `sync_state` y corre una reconciliación completa cada 5 min; si el cliente desapareció de Keycloak y ya no hay secreto sellado, marca error y pide rotar la credencial (M3). La web muestra el aprovisionamiento como "Activándose", "Lista" o error y se refresca sola mientras está pendiente. El e2e obtiene un token `client_credentials` real de `rid-gateway` con `azp = rid-app-<id>` y `aud = rid-gateway`.
 - [ ] **M1-07 — Solicitud de acceso y aprobación**
   - Formulario: aplicación, versión, finalidad (solo las permitidas), detalle, base legal, operaciones.
   - Bandeja del `data_steward` de la proveedora: aprobar (puede reducir operaciones y vigencia) o rechazar con motivo.

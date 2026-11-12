@@ -81,6 +81,21 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
     this.knownQueues.add(name);
   }
 
+  /**
+   * Registers a handler (a reconciler) for a queue. A failing job is retried by pg-boss; the
+   * handler must be idempotent (ADR-0007).
+   */
+  async work(
+    topic: string,
+    handler: (data: Record<string, unknown>) => Promise<unknown>,
+  ): Promise<void> {
+    await this.start();
+    await this.ensureQueue(topic);
+    await this.instance.work<Record<string, unknown>>(topic, async (jobs) => {
+      for (const job of jobs) await handler(job.data);
+    });
+  }
+
   /** Moves pending outbox rows to their queues. Returns how many rows were processed. */
   async relayOnce(limit = RELAY_BATCH): Promise<number> {
     if (this.relaying || !this.boss) return 0;

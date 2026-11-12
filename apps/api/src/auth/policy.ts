@@ -34,6 +34,16 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['api_publisher'],
     platformRoles: [],
   },
+  /** See the entity's consumer applications (never their secrets). */
+  'application.read': {
+    entityRoles: ENTITY_ROLES,
+    platformRoles: ['platform_admin', 'regulator'],
+  },
+  /** Create applications and manage their credentials (SPEC.md §2.2). */
+  'application.write': {
+    entityRoles: ['app_developer'],
+    platformRoles: [],
+  },
 } as const satisfies Record<string, EntityPermission>;
 
 export type EntityAction = keyof typeof ENTITY_PERMISSIONS;
