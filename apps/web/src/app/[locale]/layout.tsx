@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { Lora, Outfit } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { CSSProperties, ReactNode } from 'react';
 import { SiteFooter } from '../../components/site-footer';
@@ -9,6 +10,15 @@ import { SkipLink } from '../../components/skip-link';
 import { routing } from '../../i18n/routing';
 import { getSite } from '../../lib/site';
 import '../globals.css';
+
+// Brand typefaces (SIL OFL 1.1). next/font downloads them at build time and serves them from our
+// own origin, so the browser never contacts a third-party host.
+const outfit = Outfit({ subsets: ['latin', 'latin-ext'], variable: '--font-outfit' });
+const lora = Lora({
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-lora',
+  weight: ['600', '700'],
+});
 
 interface LayoutProps {
   children: ReactNode;
@@ -39,12 +49,12 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
   } as CSSProperties;
 
   return (
-    <html lang={locale} style={brand}>
-      <body className="min-h-screen antialiased">
+    <html lang={locale} style={brand} className={`${outfit.variable} ${lora.variable}`}>
+      <body className="flex min-h-screen flex-col antialiased">
         <NextIntlClientProvider>
           <SkipLink />
           <SiteHeader />
-          <main id="main-content" tabIndex={-1} className="focus:outline-none">
+          <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
             {children}
           </main>
           <SiteFooter />

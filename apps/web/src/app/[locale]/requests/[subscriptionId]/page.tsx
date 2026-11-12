@@ -9,6 +9,8 @@ import {
 import { SubscriptionFacts } from '../../../../components/subscriptions/subscription-view';
 import { AutoRefresh } from '../../../../components/auto-refresh';
 import { AuditTimeline } from '../../../../components/audit/audit-views';
+import { Notice } from '../../../../components/ui/notice';
+import { Page, PageHeader, Section } from '../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { entityTimeline } from '../../../../lib/audit';
 import { getViewer } from '../../../../lib/viewer';
@@ -54,36 +56,42 @@ export default async function AccessRequestPage({ params }: PageProps) {
   const canRevoke = steward && ['approved', 'active', 'suspended'].includes(detail.status);
 
   return (
-    <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('detailTitle', { api: detail.api.name })}</h1>
-      <SubscriptionFacts detail={detail} side="provider" />
-      {canDecide ? (
-        <div className="space-y-4">
-          {detail.requiresRegulator ? (
-            <p className="rounded-md border border-border p-3 text-sm">{t('regulatorNote')}</p>
-          ) : null}
-          <RequestDecisionForms
-            subscriptionId={detail.id}
-            operations={detail.operations}
-            requested={detail.effectiveRequestedOperations}
-            requestedMonths={detail.requestedValidityMonths}
-            rateLimit={detail.requestedRateLimit}
-          />
-        </div>
-      ) : null}
-      <AuditTimeline items={timeline} />
+    <Page>
+      <PageHeader
+        eyebrow={detail.application.entity.shortName}
+        title={t('detailTitle', { api: detail.api.name })}
+      />
       {detail.status === 'approved' ? (
         <>
-          <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>
+          <Notice tone="info">{t('activatingNote')}</Notice>
           <AutoRefresh />
         </>
       ) : null}
-      {canRevoke ? (
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold">{t('decide.revoke')}</h2>
-          <RevokeForm subscriptionId={detail.id} />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <SubscriptionFacts detail={detail} side="provider" />
+        <AuditTimeline items={timeline} />
+      </div>
+      {canDecide ? (
+        <div className="space-y-4">
+          {detail.requiresRegulator ? <Notice tone="warning">{t('regulatorNote')}</Notice> : null}
+          <div className="card p-6 md:p-8">
+            <RequestDecisionForms
+              subscriptionId={detail.id}
+              operations={detail.operations}
+              requested={detail.effectiveRequestedOperations}
+              requestedMonths={detail.requestedValidityMonths}
+              rateLimit={detail.requestedRateLimit}
+            />
+          </div>
         </div>
       ) : null}
-    </section>
+      {canRevoke ? (
+        <Section title={t('decide.revoke')}>
+          <div className="card max-w-3xl border-danger-border/40 p-6 md:p-8">
+            <RevokeForm subscriptionId={detail.id} />
+          </div>
+        </Section>
+      ) : null}
+    </Page>
   );
 }

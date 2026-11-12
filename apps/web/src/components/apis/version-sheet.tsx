@@ -1,5 +1,8 @@
 import type { ApiVersionDetail } from '@rid/contracts';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { Badge, StatusBadge } from '../ui/badge';
+import { Notice } from '../ui/notice';
+import { Section } from '../ui/page';
 import { dataSubjectLabel } from './data-subject';
 
 /**
@@ -20,130 +23,135 @@ export async function VersionSheet({
   const upstream =
     version.upstream.type === 'node' ? version.upstream.servicePath : version.upstream.url;
 
+  const yesNo = (value: boolean, tone: 'info' | 'warning') =>
+    value ? <Badge tone={tone}>{t('version.detail.yes')}</Badge> : t('version.detail.no');
+
   return (
     <>
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="font-medium">{t('version.detail.status')}</dt>
-        <dd data-testid="version-status">{t(`versionStatus.${version.status}`)}</dd>
-        <dt className="font-medium">{t('version.detail.basePath')}</dt>
-        <dd className="font-mono">{version.basePath}</dd>
-        <dt className="font-medium">{t('version.detail.upstream')}</dt>
-        <dd className="font-mono">{upstream}</dd>
-        <dt className="font-medium">{t('version.detail.purposes')}</dt>
-        <dd>{version.allowedPurposes.map((code) => purposeNames.get(code) ?? code).join(', ')}</dd>
-      </dl>
+      <div className="card p-6">
+        <dl className="facts">
+          <dt>{t('version.detail.status')}</dt>
+          <dd data-testid="version-status">
+            <StatusBadge status={version.status}>
+              {t(`versionStatus.${version.status}`)}
+            </StatusBadge>
+          </dd>
+          <dt>{t('version.detail.basePath')}</dt>
+          <dd className="font-mono">{version.basePath}</dd>
+          <dt>{t('version.detail.upstream')}</dt>
+          <dd className="font-mono">{upstream}</dd>
+          <dt>{t('version.detail.purposes')}</dt>
+          <dd>
+            {version.allowedPurposes.map((code) => purposeNames.get(code) ?? code).join(', ')}
+          </dd>
+        </dl>
+      </div>
 
       {version.reviews.length > 0 ? (
-        <div>
-          <h2 className="text-xl font-semibold">{t('version.detail.reviews')}</h2>
-          <ul className="mt-2 space-y-2 text-sm">
+        <Section title={t('version.detail.reviews')}>
+          <ul className="space-y-3 text-sm">
             {version.reviews.map((review, index) => (
-              <li key={index} className="rounded-md border border-border p-3">
-                <p className="font-medium">
-                  {t(`reviewDecision.${review.decision}`)} ·{' '}
-                  {format.dateTime(new Date(review.createdAt), {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
+              <li key={index} className="card space-y-2 px-5 py-4">
+                <p className="flex flex-wrap items-center gap-3">
+                  <StatusBadge status={review.decision}>
+                    {t(`reviewDecision.${review.decision}`)}
+                  </StatusBadge>
+                  <span className="text-muted-foreground">
+                    {format.dateTime(new Date(review.createdAt), {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </span>
                 </p>
-                {review.comment ? <p className="mt-1">{review.comment}</p> : null}
+                {review.comment ? <p className="leading-relaxed">{review.comment}</p> : null}
               </li>
             ))}
           </ul>
-        </div>
+        </Section>
       ) : null}
 
-      <div>
-        <h2 className="text-xl font-semibold">{t('version.detail.exposedFields')}</h2>
+      <Section title={t('version.detail.exposedFields')}>
         {version.exposedFields.length === 0 ? (
-          <p className="mt-2">{t('version.detail.none')}</p>
+          <p className="text-sm text-muted-foreground">{t('version.detail.none')}</p>
         ) : (
-          <table className="mt-2 text-left text-sm">
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('version.create.fieldName')}</th>
+                  <th scope="col">{t('version.create.personal')}</th>
+                  <th scope="col">{t('version.create.sensitive')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {version.exposedFields.map((f) => (
+                  <tr key={f.name}>
+                    <td className="font-mono">{f.name}</td>
+                    <td>{yesNo(f.personal, 'info')}</td>
+                    <td>{yesNo(f.sensitive, 'warning')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      <Section title={t('version.detail.operations')}>
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
-              <tr className="border-b border-border">
-                <th scope="col" className="py-1 pr-6">
-                  {t('version.create.fieldName')}
-                </th>
-                <th scope="col" className="py-1 pr-6">
-                  {t('version.create.personal')}
-                </th>
-                <th scope="col" className="py-1">
-                  {t('version.create.sensitive')}
-                </th>
+              <tr>
+                <th scope="col">{t('version.detail.method')}</th>
+                <th scope="col">{t('version.detail.path')}</th>
+                <th scope="col">operationId</th>
+                <th scope="col">{t('dataSubject.column')}</th>
               </tr>
             </thead>
             <tbody>
-              {version.exposedFields.map((f) => (
-                <tr key={f.name} className="border-b border-border">
-                  <td className="py-1 pr-6">{f.name}</td>
-                  <td className="py-1 pr-6">
-                    {f.personal ? t('version.detail.yes') : t('version.detail.no')}
+              {version.operations.map((op) => (
+                <tr key={op.operationId}>
+                  <td>
+                    <Badge tone="brand" className="font-mono">
+                      {op.method}
+                    </Badge>
                   </td>
-                  <td className="py-1">
-                    {f.sensitive ? t('version.detail.yes') : t('version.detail.no')}
-                  </td>
+                  <td className="font-mono">{op.path}</td>
+                  <td className="font-mono">{op.operationId}</td>
+                  <td>{dataSubjectLabel(t, op.dataSubject)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      </Section>
 
-      <div>
-        <h2 className="text-xl font-semibold">{t('version.detail.operations')}</h2>
-        <table className="mt-2 text-left text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th scope="col" className="py-1 pr-6">
-                {t('version.detail.method')}
-              </th>
-              <th scope="col" className="py-1 pr-6">
-                {t('version.detail.path')}
-              </th>
-              <th scope="col" className="py-1 pr-6">
-                operationId
-              </th>
-              <th scope="col" className="py-1">
-                {t('dataSubject.column')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {version.operations.map((op) => (
-              <tr key={op.operationId} className="border-b border-border">
-                <td className="py-1 pr-6 font-mono">{op.method}</td>
-                <td className="py-1 pr-6 font-mono">{op.path}</td>
-                <td className="py-1 pr-6 font-mono">{op.operationId}</td>
-                <td className="py-1">{dataSubjectLabel(t, op.dataSubject)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <h2 className="text-xl font-semibold">{t('version.detail.lint')}</h2>
+      <Section title={t('version.detail.lint')}>
         {version.lintReport.valid ? (
-          <p className="mt-2">{t('version.detail.lintOk')}</p>
+          <Notice tone="success">{t('version.detail.lintOk')}</Notice>
         ) : (
-          <p className="mt-2 text-red-800">
-            {t('version.detail.lintErrors', { count: errors.length })}
-          </p>
+          <Notice tone="danger">{t('version.detail.lintErrors', { count: errors.length })}</Notice>
         )}
         {version.lintReport.issues.length > 0 ? (
-          <ul className="mt-2 list-disc space-y-1 pl-6 text-sm">
+          <ul className="card divide-y divide-border text-sm">
             {version.lintReport.issues.map((issue, index) => (
-              <li key={index}>
+              <li key={index} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-3">
+                <span
+                  aria-hidden="true"
+                  className={`size-2 shrink-0 self-center rounded-full ${
+                    issue.severity === 'error' ? 'bg-danger-border' : 'bg-warning-border'
+                  }`}
+                />
                 {issue.line ? (
-                  <strong>{t('version.detail.line', { line: issue.line })}: </strong>
+                  <strong>{t('version.detail.line', { line: issue.line })}:</strong>
                 ) : null}
-                {issue.message}{' '}
+                <span>{issue.message}</span>
                 <span className="font-mono text-muted-foreground">({issue.code})</span>
               </li>
             ))}
           </ul>
         ) : null}
-      </div>
+      </Section>
     </>
   );
 }

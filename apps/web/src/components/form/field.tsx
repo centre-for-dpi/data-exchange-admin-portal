@@ -6,7 +6,13 @@ import type { FormState } from '../../lib/forms';
 import { cn } from '../../lib/utils';
 
 export const inputClass =
-  'mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm aria-[invalid=true]:border-red-700';
+  'mt-1.5 block w-full rounded-[var(--radius-control)] border border-border-control bg-background px-3.5 py-2.5 text-sm text-foreground-strong shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground hover:border-foreground focus-visible:border-primary-ink focus-visible:ring-4 focus-visible:ring-[var(--primary-ring)] aria-[invalid=true]:border-danger-border aria-[invalid=true]:ring-danger-bg';
+
+/** Native checkbox / radio, tinted with the brand colour. */
+export const checkClass = 'size-4 shrink-0 accent-[var(--primary-ink)]';
+
+/** Error text under a control. */
+export const errorTextClass = 'mt-1.5 text-sm font-medium text-danger-fg';
 
 /**
  * Label + control + hint + errors, wired with aria-describedby / aria-invalid (WCAG 1.3.1, 3.3.1).
@@ -41,12 +47,14 @@ export function Field({
     .join(' ');
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium">
+      <label htmlFor={id} className="block text-sm font-medium text-foreground-strong">
         {label}
-        {required ? <span className="text-muted-foreground"> ({t('required')})</span> : null}
+        {required ? (
+          <span className="font-normal text-muted-foreground"> ({t('required')})</span>
+        ) : null}
       </label>
       {hint ? (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
+        <p id={`${id}-hint`} className="mt-0.5 text-sm text-muted-foreground">
           {hint}
         </p>
       ) : null}
@@ -58,7 +66,7 @@ export function Field({
         ...(describedBy ? { 'aria-describedby': describedBy } : {}),
       })}
       {errors.length ? (
-        <p id={`${id}-error`} className="mt-1 text-sm text-red-700">
+        <p id={`${id}-error`} className={errorTextClass}>
           {errors.join(' ')}
         </p>
       ) : null}
@@ -81,7 +89,9 @@ export function ErrorSummary({ state }: { state: FormState }) {
       ref={ref}
       tabIndex={-1}
       role="alert"
-      className={cn('rounded-md border border-red-700 bg-red-50 p-3 text-sm text-red-800')}
+      className={cn(
+        'rounded-2xl border border-danger-border bg-danger-bg px-4 py-3 text-sm font-medium text-danger-fg',
+      )}
     >
       {state.formError ?? t('errorSummary')}
       {hasFieldErrors && state.formError ? <p>{t('errorSummary')}</p> : null}

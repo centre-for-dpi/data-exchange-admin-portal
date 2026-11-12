@@ -2,7 +2,9 @@ import { applicationPageSchema, subscriptionPageSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { SubscriptionTable } from '../../../components/subscriptions/subscription-view';
+import { Badge, StatusBadge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
+import { EmptyState, Page, PageHeader, Section } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
 import { apiGet } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
@@ -25,10 +27,10 @@ export default async function MyAppsPage({ params }: PageProps) {
 
   if (!entity) {
     return (
-      <section className="mx-auto max-w-6xl px-4 py-10">
-        <h1 className="text-2xl font-bold">{t('nav.myApps')}</h1>
-        <p className="mt-3">{t('myApps.noEntity')}</p>
-      </section>
+      <Page>
+        <PageHeader title={t('nav.myApps')} />
+        <EmptyState>{t('myApps.noEntity')}</EmptyState>
+      </Page>
     );
   }
   const canWrite = entity.roles.includes('app_developer');
@@ -38,59 +40,69 @@ export default async function MyAppsPage({ params }: PageProps) {
   ]);
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">{t('nav.myApps')}</h1>
-        {canWrite ? (
-          <Button asChild>
-            <Link href="/my-apps/new">{t('myApps.newApp')}</Link>
-          </Button>
-        ) : null}
-      </div>
-      {!canWrite ? <p className="text-muted-foreground">{t('myApps.readOnly')}</p> : null}
+    <Page>
+      <PageHeader
+        eyebrow={entity.entity.shortName}
+        title={t('nav.myApps')}
+        description={!canWrite ? t('myApps.readOnly') : undefined}
+        actions={
+          canWrite ? (
+            <Button asChild>
+              <Link href="/my-apps/new">{t('myApps.newApp')}</Link>
+            </Button>
+          ) : null
+        }
+      />
       {page.items.length === 0 ? (
-        <p>{t('myApps.empty')}</p>
+        <EmptyState>{t('myApps.empty')}</EmptyState>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th scope="col" className="py-2">
-                {t('myApps.name')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('myApps.environment')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('myApps.status')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('myApps.provisioning')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {page.items.map((app) => (
-              <tr key={app.id} className="border-b border-border">
-                <td className="py-2">
-                  <Link href={`/my-apps/${app.id}`} className="underline">
-                    {app.name}
-                  </Link>
-                </td>
-                <td className="py-2">{t(`myApps.environments.${app.environment}`)}</td>
-                <td className="py-2">{t(`myApps.appStatus.${app.status}`)}</td>
-                <td className="py-2">{t(`myApps.provisioningStatus.${app.provisioning}`)}</td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">{t('myApps.name')}</th>
+                <th scope="col">{t('myApps.environment')}</th>
+                <th scope="col">{t('myApps.status')}</th>
+                <th scope="col">{t('myApps.provisioning')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {page.items.map((app) => (
+                <tr key={app.id}>
+                  <td>
+                    <Link href={`/my-apps/${app.id}`} className="link">
+                      {app.name}
+                    </Link>
+                  </td>
+                  <td>
+                    <Badge tone={app.environment === 'production' ? 'brand' : 'neutral'}>
+                      {t(`myApps.environments.${app.environment}`)}
+                    </Badge>
+                  </td>
+                  <td>
+                    <StatusBadge status={app.status}>
+                      {t(`myApps.appStatus.${app.status}`)}
+                    </StatusBadge>
+                  </td>
+                  <td>
+                    <StatusBadge status={app.provisioning}>
+                      {t(`myApps.provisioningStatus.${app.provisioning}`)}
+                    </StatusBadge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <h2 className="pt-4 text-xl font-semibold">{t('subscriptions.myRequests')}</h2>
-      {requests.items.length === 0 ? (
-        <p>{t('subscriptions.noRequests')}</p>
-      ) : (
-        <SubscriptionTable items={requests.items} side="consumer" hrefBase="/my-apps/requests" />
-      )}
-    </section>
+      <Section title={t('subscriptions.myRequests')} className="pt-4">
+        {requests.items.length === 0 ? (
+          <EmptyState>{t('subscriptions.noRequests')}</EmptyState>
+        ) : (
+          <SubscriptionTable items={requests.items} side="consumer" hrefBase="/my-apps/requests" />
+        )}
+      </Section>
+    </Page>
   );
 }

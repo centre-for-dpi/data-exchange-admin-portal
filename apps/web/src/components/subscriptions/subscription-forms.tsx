@@ -9,7 +9,7 @@ import {
   requestAccessAction,
   revokeSubscriptionAction,
 } from '../../lib/subscription-actions';
-import { ErrorSummary, Field, inputClass } from '../form/field';
+import { ErrorSummary, Field, checkClass, errorTextClass, inputClass } from '../form/field';
 import { Button } from '../ui/button';
 
 export interface OperationOption {
@@ -44,18 +44,19 @@ function OperationChecks({
       aria-describedby={describedBy || undefined}
       aria-invalid={errors.length ? true : undefined}
     >
-      <legend className="text-sm font-medium">{legend}</legend>
+      <legend className="mb-1 text-sm font-medium text-foreground-strong">{legend}</legend>
       {hint ? (
         <p id={`${name}-hint`} className="text-sm text-muted-foreground">
           {hint}
         </p>
       ) : null}
-      <ul className="space-y-1">
+      <ul className="space-y-2">
         {operations.map((o) => (
           <li key={o.operationId}>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-border-control bg-background px-4 py-3 text-sm has-[:checked]:border-primary-ink has-[:checked]:bg-primary-soft">
               <input
                 type="checkbox"
+                className={checkClass}
                 name={name}
                 value={o.operationId}
                 defaultChecked={checked.includes(o.operationId)}
@@ -69,7 +70,7 @@ function OperationChecks({
         ))}
       </ul>
       {errors.length ? (
-        <p id={`${name}-error`} className="text-sm text-red-700">
+        <p id={`${name}-error`} className={errorTextClass}>
           {errors.join(' ')}
         </p>
       ) : null}
@@ -96,7 +97,7 @@ export function RequestAccessForm({
     initialFormState,
   );
   return (
-    <form action={action} className="max-w-2xl space-y-5" noValidate>
+    <form action={action} className="space-y-5" noValidate>
       <ErrorSummary state={state} />
       <Field name="applicationId" label={t('application')} required state={state}>
         {(p) => (
@@ -203,8 +204,8 @@ export function RequestDecisionForms({
   );
   const busy = approving || rejecting;
   return (
-    <div className="grid gap-8 md:grid-cols-2">
-      <form action={approve} className="space-y-4" aria-label={t('approve')} noValidate>
+    <div className="grid gap-8 md:grid-cols-2 md:gap-0 md:divide-x md:divide-border">
+      <form action={approve} className="space-y-4 md:pr-8" aria-label={t('approve')} noValidate>
         <ErrorSummary state={approveState} />
         <p className="text-sm text-muted-foreground">{t('approveHint')}</p>
         <OperationChecks
@@ -244,12 +245,12 @@ export function RequestDecisionForms({
           {t('approve')}
         </Button>
       </form>
-      <form action={reject} className="space-y-4" aria-label={t('reject')} noValidate>
+      <form action={reject} className="space-y-4 md:pl-8" aria-label={t('reject')} noValidate>
         <ErrorSummary state={rejectState} />
         <Field name="comment" label={t('rejectComment')} required state={rejectState}>
           {(p) => <textarea {...p} rows={3} className={inputClass} />}
         </Field>
-        <Button type="submit" variant="outline" disabled={busy}>
+        <Button type="submit" variant="danger" disabled={busy}>
           {t('reject')}
         </Button>
       </form>
@@ -265,13 +266,13 @@ export function RevokeForm({ subscriptionId }: { subscriptionId: string }) {
     initialFormState,
   );
   return (
-    <form action={action} className="max-w-2xl space-y-4" aria-label={t('revoke')} noValidate>
+    <form action={action} className="space-y-4" aria-label={t('revoke')} noValidate>
       <ErrorSummary state={state} />
       <p className="text-sm text-muted-foreground">{t('revokeHint')}</p>
       <Field name="comment" label={t('revokeComment')} required state={state}>
         {(p) => <textarea {...p} rows={3} className={inputClass} />}
       </Field>
-      <Button type="submit" variant="outline" disabled={pending}>
+      <Button type="submit" variant="danger" disabled={pending}>
         {t('revoke')}
       </Button>
     </form>

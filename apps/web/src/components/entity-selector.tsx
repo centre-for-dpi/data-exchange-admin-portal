@@ -25,14 +25,14 @@ export function EntitySelector({
   const id = useId();
   return (
     <form action={setActiveEntityAction} className="flex items-center gap-2">
-      <label htmlFor={id} className="text-sm">
+      <label htmlFor={id} className="text-sm text-muted-foreground">
         {t('label')}
       </label>
       <select
         id={id}
         name="entityId"
         defaultValue={activeEntityId}
-        className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+        className="h-9 rounded-full border border-border-control bg-background px-3 text-sm text-foreground-strong hover:border-foreground"
       >
         {memberships.map((m) => (
           <option key={m.entity.id} value={m.entity.id}>

@@ -4,6 +4,8 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { ReplaceOpenapiForm, SubmitVersionForm } from '../../../../../../components/apis/api-forms';
 import { VersionSheet } from '../../../../../../components/apis/version-sheet';
+import { Notice } from '../../../../../../components/ui/notice';
+import { Page, PageHeader, Section } from '../../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../../lib/api';
 import { localize } from '../../../../../../lib/localize';
 import { getViewer } from '../../../../../../lib/viewer';
@@ -50,29 +52,41 @@ export default async function VersionPage({ params }: PageProps) {
   const editable = version.status === 'draft' || version.status === 'changes_requested';
 
   return (
-    <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
-      <h1 className="text-2xl font-bold">
-        {t('version.detail.title', { api: api.name, version: version.version })}
-      </h1>
+    <Page>
+      <PageHeader
+        eyebrow={api.name}
+        title={t('version.detail.title', { api: api.name, version: version.version })}
+      />
+
+      {version.status === 'in_review' ? (
+        <Notice tone="warning" role="status">
+          {t('version.detail.inReview')}
+        </Notice>
+      ) : null}
+      {version.status === 'published' ? (
+        <Notice tone="success" role="status">
+          {t('version.detail.published')}
+        </Notice>
+      ) : null}
 
       <VersionSheet version={version} purposeNames={purposeNames} />
 
-      {version.status === 'in_review' ? <p role="status">{t('version.detail.inReview')}</p> : null}
-      {version.status === 'published' ? <p role="status">{t('version.detail.published')}</p> : null}
-
       {canWrite && editable ? (
         <>
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold">{t('version.detail.replace')}</h2>
-            <ReplaceOpenapiForm apiId={api.id} versionId={version.id} />
+          <Section title={t('version.detail.replace')}>
+            <div className="card max-w-3xl p-6 md:p-8">
+              <ReplaceOpenapiForm apiId={api.id} versionId={version.id} />
+            </div>
+          </Section>
+          <div className="card flex flex-wrap items-center justify-between gap-4 bg-surface-panel p-6">
+            <SubmitVersionForm
+              apiId={api.id}
+              versionId={version.id}
+              disabled={!version.lintReport.valid}
+            />
           </div>
-          <SubmitVersionForm
-            apiId={api.id}
-            versionId={version.id}
-            disabled={!version.lintReport.valid}
-          />
         </>
       ) : null}
-    </section>
+    </Page>
   );
 }

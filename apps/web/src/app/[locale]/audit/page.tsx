@@ -4,6 +4,8 @@ import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/serve
 import { notFound } from 'next/navigation';
 import { AuditEventTable } from '../../../components/audit/audit-views';
 import { Button } from '../../../components/ui/button';
+import { Notice } from '../../../components/ui/notice';
+import { EmptyState, Page, PageHeader, Section } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
 import { apiGet } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
@@ -33,10 +35,10 @@ export default async function AuditPage({ params, searchParams }: PageProps) {
   // Entity members see the timelines on each object's page.
   if (!viewer.platformRoles.some((r) => AUDIT_ROLES.includes(r))) {
     return (
-      <section className="mx-auto max-w-6xl space-y-4 px-4 py-10">
-        <h1 className="text-2xl font-bold">{t('title')}</h1>
-        <p>{t('entityNote')}</p>
-      </section>
+      <Page>
+        <PageHeader title={t('title')} />
+        <EmptyState>{t('entityNote')}</EmptyState>
+      </Page>
     );
   }
 
@@ -48,70 +50,71 @@ export default async function AuditPage({ params, searchParams }: PageProps) {
   ]);
 
   return (
-    <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('title')}</h1>
+    <Page>
+      <PageHeader title={t('title')} />
 
-      <section aria-labelledby="verify-heading" className="space-y-3">
-        <h2 id="verify-heading" className="text-xl font-semibold">
-          {t('verify.title')}
-        </h2>
-        <p className="max-w-3xl text-sm">{t('verify.description')}</p>
+      <section
+        aria-labelledby="verify-heading"
+        className="card flex flex-col gap-5 bg-surface-panel p-6 md:flex-row md:items-start md:justify-between md:p-8"
+      >
+        <div className="max-w-3xl space-y-2">
+          <h2 id="verify-heading" className="text-2xl font-bold">
+            {t('verify.title')}
+          </h2>
+          <p className="text-sm leading-relaxed">{t('verify.description')}</p>
+        </div>
         {/* A plain GET form: works without JavaScript and the result is a shareable URL. */}
-        <form method="get">
+        <form method="get" className="shrink-0">
           <input type="hidden" name="verify" value="1" />
           <Button type="submit">{t('verify.button')}</Button>
         </form>
-        {check ? (
-          <div
-            role="status"
-            data-testid="chain-check"
-            className={`max-w-3xl space-y-1 rounded-md border p-3 text-sm ${
-              check.valid ? 'border-green-700' : 'border-red-700 text-red-800'
-            }`}
-          >
-            <p className="font-medium">
-              {check.valid
-                ? t('verify.valid', { verified: check.verified })
-                : t('verify.invalid', {
-                    seq: check.brokenAt?.seq ?? '',
-                    reason: check.brokenAt ? t(`verify.reasons.${check.brokenAt.reason}`) : '',
-                  })}
-            </p>
-            {check.lastSeq && check.lastHash ? (
-              <p className="font-mono text-xs break-all">
-                {t('verify.head', { seq: check.lastSeq, hash: check.lastHash })}
-              </p>
-            ) : null}
-            {check.unchained > 0 ? (
-              <p>{t('verify.unchained', { count: check.unchained })}</p>
-            ) : null}
-            <p className="text-muted-foreground">
-              {t('verify.checkedAt', {
-                date: format.dateTime(new Date(check.checkedAt), {
-                  dateStyle: 'medium',
-                  timeStyle: 'medium',
-                }),
-              })}
-            </p>
-          </div>
-        ) : null}
       </section>
+      {check ? (
+        <Notice
+          tone={check.valid ? 'success' : 'danger'}
+          role="status"
+          data-testid="chain-check"
+          className="max-w-3xl space-y-1"
+        >
+          <p className="font-semibold">
+            {check.valid
+              ? t('verify.valid', { verified: check.verified })
+              : t('verify.invalid', {
+                  seq: check.brokenAt?.seq ?? '',
+                  reason: check.brokenAt ? t(`verify.reasons.${check.brokenAt.reason}`) : '',
+                })}
+          </p>
+          {check.lastSeq && check.lastHash ? (
+            <p className="font-mono text-xs break-all">
+              {t('verify.head', { seq: check.lastSeq, hash: check.lastHash })}
+            </p>
+          ) : null}
+          {check.unchained > 0 ? <p>{t('verify.unchained', { count: check.unchained })}</p> : null}
+          <p>
+            {t('verify.checkedAt', {
+              date: format.dateTime(new Date(check.checkedAt), {
+                dateStyle: 'medium',
+                timeStyle: 'medium',
+              }),
+            })}
+          </p>
+        </Notice>
+      ) : null}
 
-      <section aria-labelledby="recent-heading" className="space-y-3">
-        <h2 id="recent-heading" className="text-xl font-semibold">
-          {t('recent')}
-        </h2>
+      <Section id="recent-heading" title={t('recent')}>
         {events.items.length === 0 ? (
-          <p>{t('noEvents')}</p>
+          <EmptyState>{t('noEvents')}</EmptyState>
         ) : (
           <AuditEventTable items={events.items} />
         )}
         {events.nextCursor ? (
-          <Link href={`/audit?cursor=${events.nextCursor}`} className="underline">
-            {t('older')}
-          </Link>
+          <div className="flex justify-center">
+            <Button asChild variant="outline">
+              <Link href={`/audit?cursor=${events.nextCursor}`}>{t('older')}</Link>
+            </Button>
+          </div>
         ) : null}
-      </section>
-    </section>
+      </Section>
+    </Page>
   );
 }

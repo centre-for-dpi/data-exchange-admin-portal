@@ -2,6 +2,7 @@ import { getCountryConfig } from '@rid/config';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { CreateApiForm } from '../../../../components/apis/api-forms';
+import { EmptyState, Page, PageHeader } from '../../../../components/ui/page';
 import { localize } from '../../../../lib/localize';
 import { getViewer } from '../../../../lib/viewer';
 
@@ -26,15 +27,15 @@ export default async function NewApiPage({ params }: PageProps) {
   }));
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('myApis.create.title')}</h1>
+    <Page>
+      <PageHeader title={t('myApis.create.title')} />
       {viewer.activeEntity?.roles.includes('api_publisher') ? (
-        <div className="mt-6">
+        <div className="card max-w-3xl p-6 md:p-8">
           <CreateApiForm sectors={sectors} />
         </div>
       ) : (
-        <p className="mt-3">{t('myApis.readOnly')}</p>
+        <EmptyState>{t('myApis.readOnly')}</EmptyState>
       )}
-    </section>
+    </Page>
   );
 }

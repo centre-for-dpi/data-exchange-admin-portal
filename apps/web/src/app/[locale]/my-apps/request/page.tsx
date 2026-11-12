@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { RequestAccessForm } from '../../../../components/subscriptions/subscription-forms';
 import { Button } from '../../../../components/ui/button';
+import { EmptyState, Page, PageHeader } from '../../../../components/ui/page';
 import { Link } from '../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { localize } from '../../../../lib/localize';
@@ -53,32 +54,38 @@ export default async function RequestAccessPage({ params, searchParams }: PagePr
   const maxMonths = getCountryConfig().subscriptionMaxValidityMonths[detail.api.classification];
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <div>
-        <h1 className="text-2xl font-bold">{t('form.title', { api: detail.api.name })}</h1>
-        <p className="mt-2 text-muted-foreground">
-          {t('form.version', { version: version.version, provider: detail.entity.legalName })}
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        title={t('form.title', { api: detail.api.name })}
+        description={t('form.version', {
+          version: version.version,
+          provider: detail.entity.legalName,
+        })}
+      />
       {active.length === 0 ? (
-        <div className="space-y-3">
-          <p>{t('form.noApplications')}</p>
-          <Button asChild>
-            <Link href="/my-apps/new">{(await getTranslations('myApps'))('newApp')}</Link>
-          </Button>
-        </div>
+        <EmptyState
+          action={
+            <Button asChild>
+              <Link href="/my-apps/new">{(await getTranslations('myApps'))('newApp')}</Link>
+            </Button>
+          }
+        >
+          {t('form.noApplications')}
+        </EmptyState>
       ) : (
-        <RequestAccessForm
-          apiVersionId={version.id}
-          applications={active.map((a) => ({ id: a.id, name: a.name }))}
-          purposes={version.allowedPurposes.map((p) => ({
-            code: p.code,
-            label: localize(p.name, locale),
-          }))}
-          operations={version.operations}
-          maxMonths={maxMonths}
-        />
+        <div className="card max-w-3xl p-6 md:p-8">
+          <RequestAccessForm
+            apiVersionId={version.id}
+            applications={active.map((a) => ({ id: a.id, name: a.name }))}
+            purposes={version.allowedPurposes.map((p) => ({
+              code: p.code,
+              label: localize(p.name, locale),
+            }))}
+            operations={version.operations}
+            maxMonths={maxMonths}
+          />
+        </div>
       )}
-    </section>
+    </Page>
   );
 }

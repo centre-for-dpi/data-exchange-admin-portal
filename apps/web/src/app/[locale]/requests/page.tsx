@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { SubscriptionTable } from '../../../components/subscriptions/subscription-view';
+import { EmptyState, Page, PageHeader } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
@@ -40,14 +41,22 @@ export default async function RequestsInboxPage({ params, searchParams }: PagePr
   }
   const canDecide = entity.roles.includes('data_steward');
 
+  const tab = (active: boolean) =>
+    active
+      ? 'block rounded-full bg-background px-4 py-1.5 font-medium text-foreground-strong shadow-sm'
+      : 'block rounded-full px-4 py-1.5 text-muted-foreground hover:text-foreground-strong';
+
   return (
-    <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('title')}</h1>
-      {!canDecide ? <p className="text-muted-foreground">{t('readOnly')}</p> : null}
+    <Page>
+      <PageHeader
+        eyebrow={entity.entity.shortName}
+        title={t('title')}
+        description={!canDecide ? t('readOnly') : undefined}
+      />
       <nav aria-label={t('title')}>
-        <ul className="flex gap-4 text-sm">
+        <ul className="inline-flex gap-1 rounded-full border border-border bg-surface-app p-1 text-sm">
           <li>
-            <Link href="/requests" aria-current={all ? undefined : 'page'} className="underline">
+            <Link href="/requests" aria-current={all ? undefined : 'page'} className={tab(!all)}>
               {t('pending')}
             </Link>
           </li>
@@ -55,7 +64,7 @@ export default async function RequestsInboxPage({ params, searchParams }: PagePr
             <Link
               href="/requests?view=all"
               aria-current={all ? 'page' : undefined}
-              className="underline"
+              className={tab(all)}
             >
               {t('all')}
             </Link>
@@ -63,10 +72,10 @@ export default async function RequestsInboxPage({ params, searchParams }: PagePr
         </ul>
       </nav>
       {page.items.length === 0 ? (
-        <p>{t('empty')}</p>
+        <EmptyState>{t('empty')}</EmptyState>
       ) : (
         <SubscriptionTable items={page.items} side="provider" hrefBase="/requests" />
       )}
-    </section>
+    </Page>
   );
 }

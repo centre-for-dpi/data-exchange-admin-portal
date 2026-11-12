@@ -2,6 +2,8 @@ import { reviewQueueSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { Badge, classificationTone } from '../../../components/ui/badge';
+import { EmptyState, Page, PageHeader, Section } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
 import { apiGet } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
@@ -29,56 +31,53 @@ export default async function OperatorPage({ params }: PageProps) {
   const queue = await apiGet('/review/api-versions', reviewQueueSchema);
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('nav.operator')}</h1>
-      <h2 className="text-xl font-semibold">{t('operator.queueTitle')}</h2>
-      {queue.items.length === 0 ? (
-        <p>{t('operator.empty')}</p>
-      ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th scope="col" className="py-2">
-                {t('operator.api')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('operator.version')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('operator.entity')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('operator.classification')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('operator.submittedAt')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.items.map((item) => (
-              <tr key={item.versionId} className="border-b border-border">
-                <td className="py-2">
-                  <Link href={`/operator/reviews/${item.versionId}`} className="underline">
-                    {item.api.name}
-                  </Link>
-                </td>
-                <td className="py-2">{item.version}</td>
-                <td className="py-2">{item.entity.shortName}</td>
-                <td className="py-2">{t(`classification.${item.api.classification}`)}</td>
-                <td className="py-2">
-                  {item.submittedAt
-                    ? format.dateTime(new Date(item.submittedAt), {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      })
-                    : ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
+    <Page>
+      <PageHeader title={t('nav.operator')} />
+      <Section title={t('operator.queueTitle')}>
+        {queue.items.length === 0 ? (
+          <EmptyState>{t('operator.empty')}</EmptyState>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('operator.api')}</th>
+                  <th scope="col">{t('operator.version')}</th>
+                  <th scope="col">{t('operator.entity')}</th>
+                  <th scope="col">{t('operator.classification')}</th>
+                  <th scope="col">{t('operator.submittedAt')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queue.items.map((item) => (
+                  <tr key={item.versionId}>
+                    <td>
+                      <Link href={`/operator/reviews/${item.versionId}`} className="link">
+                        {item.api.name}
+                      </Link>
+                    </td>
+                    <td className="font-mono">{item.version}</td>
+                    <td>{item.entity.shortName}</td>
+                    <td>
+                      <Badge tone={classificationTone(item.api.classification)}>
+                        {t(`classification.${item.api.classification}`)}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap text-muted-foreground">
+                      {item.submittedAt
+                        ? format.dateTime(new Date(item.submittedAt), {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })
+                        : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+    </Page>
   );
 }

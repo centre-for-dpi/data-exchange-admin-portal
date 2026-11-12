@@ -2,6 +2,7 @@ import type { SubscriptionDetail, SubscriptionSummary } from '@rid/contracts';
 import { getFormatter, getLocale, getTranslations } from 'next-intl/server';
 import { Link } from '../../i18n/navigation';
 import { localize } from '../../lib/localize';
+import { StatusBadge } from '../ui/badge';
 
 const operationLabel = (detail: SubscriptionDetail, operationId: string): string => {
   const op = detail.operations.find((o) => o.operationId === operationId);
@@ -25,7 +26,7 @@ export async function SubscriptionFacts({
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
   const decided = detail.approvedOperations.length > 0;
   const operations = (ids: readonly string[]) => (
-    <ul className="font-mono">
+    <ul className="space-y-1 font-mono text-[0.8125rem]">
       {ids.map((id) => (
         <li key={id}>{operationLabel(detail, id)}</li>
       ))}
@@ -33,27 +34,27 @@ export async function SubscriptionFacts({
   );
 
   return (
-    <div className="space-y-8">
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt className="font-medium">{t('subscriptions.status')}</dt>
+    <div className="card p-6">
+      <dl className="facts">
+        <dt>{t('subscriptions.status')}</dt>
         <dd>
-          <span data-testid="subscription-status">{t(`subscriptionStatus.${detail.status}`)}</span>
+          <StatusBadge status={detail.status} data-testid="subscription-status">
+            {t(`subscriptionStatus.${detail.status}`)}
+          </StatusBadge>
         </dd>
-        <dt className="font-medium">
-          {side === 'consumer' ? t('subscriptions.provider') : t('subscriptions.consumer')}
-        </dt>
+        <dt>{side === 'consumer' ? t('subscriptions.provider') : t('subscriptions.consumer')}</dt>
         <dd>
           {side === 'consumer' ? detail.api.entity.shortName : detail.application.entity.shortName}
         </dd>
-        <dt className="font-medium">{t('subscriptions.api')}</dt>
+        <dt>{t('subscriptions.api')}</dt>
         <dd>
           {detail.api.name} · {detail.version.version} ·{' '}
           {t(`classification.${detail.api.classification}`)}
         </dd>
-        <dt className="font-medium">{t('subscriptions.application')}</dt>
+        <dt>{t('subscriptions.application')}</dt>
         <dd>
           {side === 'consumer' ? (
-            <Link href={`/my-apps/${detail.application.id}`} className="underline">
+            <Link href={`/my-apps/${detail.application.id}`} className="link">
               {detail.application.name}
             </Link>
           ) : (
@@ -61,42 +62,42 @@ export async function SubscriptionFacts({
           )}{' '}
           <span className="font-mono text-muted-foreground">({detail.application.clientId})</span>
         </dd>
-        <dt className="font-medium">{t('subscriptions.purpose')}</dt>
+        <dt>{t('subscriptions.purpose')}</dt>
         <dd>
           {localize(detail.purpose.name, locale)}{' '}
           <span className="font-mono text-muted-foreground">({detail.purpose.code})</span>
         </dd>
-        <dt className="font-medium">{t('subscriptions.purposeDetail')}</dt>
+        <dt>{t('subscriptions.purposeDetail')}</dt>
         <dd className="whitespace-pre-line">{detail.purposeDetail}</dd>
-        <dt className="font-medium">{t('subscriptions.legalBasis')}</dt>
+        <dt>{t('subscriptions.legalBasis')}</dt>
         <dd className="whitespace-pre-line">{detail.legalBasisText}</dd>
         {detail.legalReference ? (
           <>
-            <dt className="font-medium">{t('subscriptions.legalReference')}</dt>
+            <dt>{t('subscriptions.legalReference')}</dt>
             <dd>{detail.legalReference}</dd>
           </>
         ) : null}
-        <dt className="font-medium">{t('subscriptions.requestedOperations')}</dt>
+        <dt>{t('subscriptions.requestedOperations')}</dt>
         <dd>
           {detail.requestedOperations.length === 0 ? <p>{t('subscriptions.allReadOnly')}</p> : null}
           {operations(detail.effectiveRequestedOperations)}
         </dd>
         {decided ? (
           <>
-            <dt className="font-medium">{t('subscriptions.approvedOperations')}</dt>
+            <dt>{t('subscriptions.approvedOperations')}</dt>
             <dd>{operations(detail.approvedOperations)}</dd>
-            <dt className="font-medium">{t('subscriptions.validity')}</dt>
+            <dt>{t('subscriptions.validity')}</dt>
             <dd>
               {date(detail.validFrom)} – {date(detail.validUntil)}
             </dd>
           </>
         ) : (
           <>
-            <dt className="font-medium">{t('subscriptions.requestedValidity')}</dt>
+            <dt>{t('subscriptions.requestedValidity')}</dt>
             <dd>{t('subscriptions.months', { count: detail.requestedValidityMonths })}</dd>
           </>
         )}
-        <dt className="font-medium">{t('subscriptions.rateLimit')}</dt>
+        <dt>{t('subscriptions.rateLimit')}</dt>
         <dd>
           {(detail.rateLimitPerMinute ?? detail.requestedRateLimit)
             ? t('subscriptions.perMinute', {
@@ -104,7 +105,7 @@ export async function SubscriptionFacts({
               })
             : t('subscriptions.defaultRateLimit', { limit: detail.defaultRateLimit })}
         </dd>
-        <dt className="font-medium">{t('subscriptions.endUser')}</dt>
+        <dt>{t('subscriptions.endUser')}</dt>
         <dd>
           {detail.endUserIdentificationRequired
             ? t('subscriptions.endUserRequired')
@@ -129,49 +130,43 @@ export async function SubscriptionTable({
   const locale = await getLocale();
   const format = await getFormatter();
   return (
-    <table className="w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-border">
-          <th scope="col" className="py-2 pr-4">
-            {t('subscriptions.api')}
-          </th>
-          <th scope="col" className="py-2 pr-4">
-            {side === 'consumer' ? t('subscriptions.provider') : t('subscriptions.consumer')}
-          </th>
-          <th scope="col" className="py-2 pr-4">
-            {t('subscriptions.application')}
-          </th>
-          <th scope="col" className="py-2 pr-4">
-            {t('subscriptions.purpose')}
-          </th>
-          <th scope="col" className="py-2 pr-4">
-            {t('subscriptions.requestedAt')}
-          </th>
-          <th scope="col" className="py-2">
-            {t('subscriptions.status')}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((s) => (
-          <tr key={s.id} className="border-b border-border">
-            <td className="py-2 pr-4">
-              <Link href={`${hrefBase}/${s.id}`} className="underline">
-                {s.api.name} · {s.version.version}
-              </Link>
-            </td>
-            <td className="py-2 pr-4">
-              {side === 'consumer' ? s.api.entity.shortName : s.application.entity.shortName}
-            </td>
-            <td className="py-2 pr-4">{s.application.name}</td>
-            <td className="py-2 pr-4">{localize(s.purpose.name, locale)}</td>
-            <td className="py-2 pr-4">
-              {format.dateTime(new Date(s.requestedAt), { dateStyle: 'medium' })}
-            </td>
-            <td className="py-2">{t(`subscriptionStatus.${s.status}`)}</td>
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th scope="col">{t('subscriptions.api')}</th>
+            <th scope="col">
+              {side === 'consumer' ? t('subscriptions.provider') : t('subscriptions.consumer')}
+            </th>
+            <th scope="col">{t('subscriptions.application')}</th>
+            <th scope="col">{t('subscriptions.purpose')}</th>
+            <th scope="col">{t('subscriptions.requestedAt')}</th>
+            <th scope="col">{t('subscriptions.status')}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {items.map((s) => (
+            <tr key={s.id}>
+              <td>
+                <Link href={`${hrefBase}/${s.id}`} className="link">
+                  {s.api.name} · {s.version.version}
+                </Link>
+              </td>
+              <td>
+                {side === 'consumer' ? s.api.entity.shortName : s.application.entity.shortName}
+              </td>
+              <td>{s.application.name}</td>
+              <td>{localize(s.purpose.name, locale)}</td>
+              <td className="whitespace-nowrap text-muted-foreground">
+                {format.dateTime(new Date(s.requestedAt), { dateStyle: 'medium' })}
+              </td>
+              <td>
+                <StatusBadge status={s.status}>{t(`subscriptionStatus.${s.status}`)}</StatusBadge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

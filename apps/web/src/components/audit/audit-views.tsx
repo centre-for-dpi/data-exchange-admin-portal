@@ -41,39 +41,57 @@ export async function AuditTimeline({
   const format = await getFormatter();
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
   return (
-    <section aria-labelledby="audit-timeline" className="space-y-3">
-      <Heading id="audit-timeline" className="text-xl font-semibold">
+    <section aria-labelledby="audit-timeline" className="space-y-4">
+      <Heading
+        id="audit-timeline"
+        className={headingLevel === 2 ? 'text-2xl font-bold' : 'text-lg font-semibold'}
+      >
         {t('audit.timeline')}
       </Heading>
       {items.length === 0 ? (
-        <p className="text-sm">{t('audit.noEvents')}</p>
+        <p className="card p-6 text-sm text-muted-foreground">{t('audit.noEvents')}</p>
       ) : (
-        <ol className="space-y-3 border-l border-border pl-4 text-sm" data-testid="audit-timeline">
-          {items.map((item) => (
-            <li key={item.seq}>
-              <p>
-                <span className="font-medium">{actionLabel(t, item.action)}</span>
-                {' · '}
-                <time dateTime={item.occurredAt}>
-                  {format.dateTime(new Date(item.occurredAt), {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
-                </time>
-              </p>
-              <p className="text-muted-foreground">{actorLabel(t, item.actor)}</p>
-              {item.status?.to ? (
+        <div className="card p-6">
+          <ol
+            className="relative space-y-5 text-sm before:absolute before:top-2 before:bottom-2 before:left-[5px] before:w-px before:bg-border"
+            data-testid="audit-timeline"
+          >
+            {items.map((item) => (
+              <li key={item.seq} className="relative space-y-0.5 pl-7">
+                <span
+                  aria-hidden="true"
+                  className="absolute top-1.5 left-0 size-[11px] rounded-full border-2 border-background bg-primary ring-1 ring-primary"
+                />
                 <p>
-                  {t('audit.statusChange', {
-                    from: item.status.from ? statusLabel(t, item.status.from) : '—',
-                    to: statusLabel(t, item.status.to),
-                  })}
+                  <span className="font-semibold text-foreground-strong">
+                    {actionLabel(t, item.action)}
+                  </span>
+                  <span className="text-muted-foreground">{' · '}</span>
+                  <time dateTime={item.occurredAt} className="text-muted-foreground">
+                    {format.dateTime(new Date(item.occurredAt), {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
                 </p>
-              ) : null}
-              {item.comment ? <p className="whitespace-pre-line">{item.comment}</p> : null}
-            </li>
-          ))}
-        </ol>
+                <p className="text-muted-foreground">{actorLabel(t, item.actor)}</p>
+                {item.status?.to ? (
+                  <p>
+                    {t('audit.statusChange', {
+                      from: item.status.from ? statusLabel(t, item.status.from) : '—',
+                      to: statusLabel(t, item.status.to),
+                    })}
+                  </p>
+                ) : null}
+                {item.comment ? (
+                  <p className="mt-1 rounded-xl bg-surface-app px-3 py-2 whitespace-pre-line">
+                    {item.comment}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
     </section>
   );
@@ -84,53 +102,47 @@ export async function AuditEventTable({ items }: { items: readonly AuditItem[] }
   const t = await getTranslations();
   const format = await getFormatter();
   return (
-    <table className="w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-border">
-          <th scope="col" className="py-2 pr-4">
-            {t('audit.columns.seq')}
-          </th>
-          <th scope="col" className="py-2 pr-4">
-            {t('audit.columns.when')}
-          </th>
-          <th scope="col" className="py-2 pr-4">
-            {t('audit.columns.action')}
-          </th>
-          <th scope="col" className="py-2 pr-4">
-            {t('audit.columns.actor')}
-          </th>
-          <th scope="col" className="py-2">
-            {t('audit.columns.target')}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item) => {
-          const href = timelineHref(item.target);
-          return (
-            <tr key={item.seq} className="border-b border-border">
-              <td className="py-2 pr-4 font-mono">{item.seq}</td>
-              <td className="py-2 pr-4">
-                {format.dateTime(new Date(item.occurredAt), {
-                  dateStyle: 'short',
-                  timeStyle: 'short',
-                })}
-              </td>
-              <td className="py-2 pr-4">{actionLabel(t, item.action)}</td>
-              <td className="py-2 pr-4">{actorLabel(t, item.actor)}</td>
-              <td className="py-2 font-mono text-xs break-all">
-                {href ? (
-                  <Link href={href} className="underline">
-                    {item.target.type} {item.target.id}
-                  </Link>
-                ) : (
-                  `${item.target.type} ${item.target.id}`
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th scope="col">{t('audit.columns.seq')}</th>
+            <th scope="col">{t('audit.columns.when')}</th>
+            <th scope="col">{t('audit.columns.action')}</th>
+            <th scope="col">{t('audit.columns.actor')}</th>
+            <th scope="col">{t('audit.columns.target')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const href = timelineHref(item.target);
+            return (
+              <tr key={item.seq}>
+                <td className="font-mono text-muted-foreground">{item.seq}</td>
+                <td className="whitespace-nowrap">
+                  {format.dateTime(new Date(item.occurredAt), {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                </td>
+                <td className="font-medium text-foreground-strong">
+                  {actionLabel(t, item.action)}
+                </td>
+                <td>{actorLabel(t, item.actor)}</td>
+                <td className="font-mono text-xs break-all">
+                  {href ? (
+                    <Link href={href} className="link">
+                      {item.target.type} {item.target.id}
+                    </Link>
+                  ) : (
+                    `${item.target.type} ${item.target.id}`
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

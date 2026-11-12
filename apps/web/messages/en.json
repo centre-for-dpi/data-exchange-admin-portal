@@ -23,6 +23,17 @@
     "regulator": "Regulator view",
     "audit": "Audit"
   },
+  "navHint": {
+    "home": "Overview and shortcuts",
+    "catalog": "Find APIs published by entities",
+    "myEntity": "Your entity details and members",
+    "myApis": "Register and version the APIs you expose",
+    "myApps": "Applications, credentials and requests",
+    "requests": "Access requests awaiting a decision",
+    "operator": "Versions waiting for review",
+    "regulator": "Network oversight",
+    "audit": "Audit log and integrity check"
+  },
   "auth": {
     "signIn": "Sign in",
     "signOut": "Sign out",
@@ -34,7 +45,23 @@
     "welcome": "Hello, {name}",
     "quickAccess": "Quick access",
     "noRoles": "You have no roles in any entity yet. Ask your entity administrator to invite you.",
-    "apiUnavailable": "We could not load your permissions right now. Please try again in a few minutes."
+    "apiUnavailable": "We could not load your permissions right now. Please try again in a few minutes.",
+    "eyebrow": "Data exchange between public entities",
+    "howTitle": "How it works",
+    "steps": {
+      "publish": {
+        "title": "Publish",
+        "body": "The provider entity registers its API and the operator reviews it before it is listed in the catalogue."
+      },
+      "request": {
+        "title": "Request with a purpose",
+        "body": "The consumer entity asks for access stating what it will use the data for; the data steward decides."
+      },
+      "trace": {
+        "title": "Trace every call",
+        "body": "Every change goes into a hash-chained log and the gateway keeps metadata only, never the content."
+      }
+    }
   },
   "footer": {
     "operatedBy": "Operated by {operator}",

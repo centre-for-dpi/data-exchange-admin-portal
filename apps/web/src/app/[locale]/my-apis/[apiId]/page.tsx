@@ -2,7 +2,9 @@ import { apiDetailSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { Badge, StatusBadge, classificationTone } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
+import { Card, EmptyState, Page, PageHeader, Section } from '../../../../components/ui/page';
 import { Link } from '../../../../i18n/navigation';
 import { AuditTimeline } from '../../../../components/audit/audit-views';
 import { ApiError, apiGet } from '../../../../lib/api';
@@ -42,61 +44,67 @@ export default async function ApiPage({ params }: PageProps) {
   const timeline = await entityTimeline(entity.entity.id, 'api', api.id);
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <div>
-        <h1 className="text-2xl font-bold">{api.name}</h1>
-        <p className="mt-2 text-muted-foreground">{api.summary}</p>
-      </div>
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="font-medium">{t('myApis.classification')}</dt>
-        <dd>{t(`classification.${api.classification}`)}</dd>
-        <dt className="font-medium">{t('myApis.status')}</dt>
-        <dd>{t(`apiStatus.${api.status}`)}</dd>
-        <dt className="font-medium">{t('myApis.detail.owner')}</dt>
-        <dd>{api.ownerContact}</dd>
-      </dl>
+    <Page>
+      <PageHeader eyebrow={entity.entity.shortName} title={api.name} description={api.summary} />
+      <Card>
+        <dl className="facts">
+          <dt>{t('myApis.classification')}</dt>
+          <dd>
+            <Badge tone={classificationTone(api.classification)}>
+              {t(`classification.${api.classification}`)}
+            </Badge>
+          </dd>
+          <dt>{t('myApis.status')}</dt>
+          <dd>
+            <StatusBadge status={api.status}>{t(`apiStatus.${api.status}`)}</StatusBadge>
+          </dd>
+          <dt>{t('myApis.detail.owner')}</dt>
+          <dd>{api.ownerContact}</dd>
+        </dl>
+      </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold">{t('myApis.detail.versions')}</h2>
-        {canWrite ? (
-          <Button asChild variant="outline">
-            <Link href={`/my-apis/${api.id}/versions/new`}>{t('myApis.detail.newVersion')}</Link>
-          </Button>
-        ) : null}
-      </div>
-      {api.versions.length === 0 ? (
-        <p>{t('myApis.detail.noVersions')}</p>
-      ) : (
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th scope="col" className="py-2">
-                {t('myApis.detail.version')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('myApis.detail.basePath')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('myApis.status')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {api.versions.map((v) => (
-              <tr key={v.id} className="border-b border-border">
-                <td className="py-2">
-                  <Link href={`/my-apis/${api.id}/versions/${v.id}`} className="underline">
-                    {v.version}
-                  </Link>
-                </td>
-                <td className="py-2 font-mono">{v.basePath}</td>
-                <td className="py-2">{t(`versionStatus.${v.status}`)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <Section
+        title={t('myApis.detail.versions')}
+        actions={
+          canWrite ? (
+            <Button asChild variant="outline">
+              <Link href={`/my-apis/${api.id}/versions/new`}>{t('myApis.detail.newVersion')}</Link>
+            </Button>
+          ) : null
+        }
+      >
+        {api.versions.length === 0 ? (
+          <EmptyState>{t('myApis.detail.noVersions')}</EmptyState>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('myApis.detail.version')}</th>
+                  <th scope="col">{t('myApis.detail.basePath')}</th>
+                  <th scope="col">{t('myApis.status')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {api.versions.map((v) => (
+                  <tr key={v.id}>
+                    <td>
+                      <Link href={`/my-apis/${api.id}/versions/${v.id}`} className="link">
+                        {v.version}
+                      </Link>
+                    </td>
+                    <td className="font-mono">{v.basePath}</td>
+                    <td>
+                      <StatusBadge status={v.status}>{t(`versionStatus.${v.status}`)}</StatusBadge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
       <AuditTimeline items={timeline} />
-    </section>
+    </Page>
   );
 }

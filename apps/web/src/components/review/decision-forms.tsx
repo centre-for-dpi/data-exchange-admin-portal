@@ -19,8 +19,8 @@ export function DecisionForms({ versionId }: { versionId: string }) {
     initialFormState,
   );
   return (
-    <div className="grid gap-8 md:grid-cols-2">
-      <form action={approve} className="space-y-3" aria-label={t('approve')} noValidate>
+    <div className="grid gap-8 md:grid-cols-2 md:gap-0 md:divide-x md:divide-border">
+      <form action={approve} className="space-y-4 md:pr-8" aria-label={t('approve')} noValidate>
         <ErrorSummary state={approveState} />
         <Field name="approveComment" label={t('approveComment')} state={approveState}>
           {(p) => <textarea {...p} name="comment" rows={3} className={inputClass} />}
@@ -31,7 +31,7 @@ export function DecisionForms({ versionId }: { versionId: string }) {
       </form>
       <form
         action={requestChanges}
-        className="space-y-3"
+        className="space-y-4 md:pl-8"
         aria-label={t('requestChanges')}
         noValidate
       >

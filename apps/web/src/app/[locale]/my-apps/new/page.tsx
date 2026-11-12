@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { CreateApplicationForm } from '../../../../components/apps/app-forms';
+import { Page, PageHeader } from '../../../../components/ui/page';
 import { getViewer } from '../../../../lib/viewer';
 
 interface PageProps {
@@ -20,9 +21,11 @@ export default async function NewApplicationPage({ params }: PageProps) {
   const t = await getTranslations('myApps.create');
   if (!(await getViewer()).activeEntity?.roles.includes('app_developer')) notFound();
   return (
-    <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('title')}</h1>
-      <CreateApplicationForm />
-    </section>
+    <Page>
+      <PageHeader title={t('title')} />
+      <div className="card max-w-3xl p-6 md:p-8">
+        <CreateApplicationForm />
+      </div>
+    </Page>
   );
 }

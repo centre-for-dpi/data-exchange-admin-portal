@@ -3,19 +3,23 @@ import { Slot } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cn } from '../../lib/utils';
 
-// shadcn/ui button, adapted to the portal tokens.
+// shadcn/ui button, styled after the CDPI design system: pill-shaped, Outfit medium.
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow] duration-150 disabled:pointer-events-none disabled:opacity-45',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:brightness-90',
-        outline: 'border border-border bg-background text-foreground hover:bg-muted',
-        ghost: 'text-foreground hover:bg-muted',
+        default: 'bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover',
+        secondary: 'bg-primary-soft text-primary-ink hover:bg-surface-panel',
+        outline:
+          'border border-border-control bg-background text-foreground-strong hover:border-foreground hover:bg-surface-app',
+        ghost: 'text-foreground-strong hover:bg-surface-app',
+        danger: 'border border-danger-border bg-background text-danger-fg hover:bg-danger-bg',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 px-3',
+        default: 'h-11 px-5 text-sm',
+        sm: 'h-9 px-4 text-sm',
+        lg: 'h-12 px-6 text-base',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

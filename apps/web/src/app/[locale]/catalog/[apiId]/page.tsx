@@ -7,7 +7,9 @@ import Markdown from 'react-markdown';
 import { z } from 'zod';
 import { dataSubjectLabel } from '../../../../components/apis/data-subject';
 import { ApiDocs } from '../../../../components/catalog/api-docs';
+import { Badge, classificationTone } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
+import { Card, Page, PageHeader, Section } from '../../../../components/ui/page';
 import { Link } from '../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { localize } from '../../../../lib/localize';
@@ -58,145 +60,171 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
     version.status === 'published' &&
     Boolean((await getViewer()).activeEntity?.roles.includes('app_developer'));
 
+  const yesNo = (value: boolean, tone: 'info' | 'warning') =>
+    value ? <Badge tone={tone}>{t('version.detail.yes')}</Badge> : t('version.detail.no');
+
   return (
-    <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
-      <div>
-        <h1 className="text-2xl font-bold">{detail.api.name}</h1>
-        <p className="mt-2 text-lg text-muted-foreground">{detail.api.summary}</p>
-      </div>
-
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="font-medium">{t('catalog.detail.provider')}</dt>
-        <dd>{detail.entity.legalName}</dd>
-        <dt className="font-medium">{t('catalog.sector')}</dt>
-        <dd>{sector ? localize(sector.name, locale) : detail.api.sector}</dd>
-        <dt className="font-medium">{t('catalog.classification')}</dt>
-        <dd>{t(`classification.${detail.api.classification}`)}</dd>
-        <dt className="font-medium">{t('catalog.detail.owner')}</dt>
-        <dd>{detail.api.ownerContact}</dd>
-      </dl>
-
-      <div className="max-w-3xl space-y-2 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-6">
-        {/* react-markdown renders no raw HTML and sanitizes link protocols. */}
-        <Markdown skipHtml>{detail.api.description}</Markdown>
-      </div>
-
-      {detail.versions.length > 1 ? (
-        <nav aria-label={t('catalog.detail.versions')}>
-          <ul className="flex flex-wrap gap-2 text-sm">
-            {detail.versions.map((v) => (
-              <li key={v.id}>
-                <Link
-                  href={`/catalog/${apiId}?version=${v.id}`}
-                  aria-current={v.id === version.id ? 'page' : undefined}
-                  className="underline"
-                >
-                  {t('catalog.detail.version', { version: v.version })}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      ) : null}
-
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">
-          {t('catalog.detail.version', { version: version.version })}
-          {version.status === 'deprecated' ? ` · ${t('catalog.detail.deprecated')}` : ''}
-        </h2>
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-          <dt className="font-medium">{t('catalog.detail.gatewayUrl')}</dt>
-          <dd className="font-mono break-all">{version.gatewayUrl}</dd>
-          <dt className="font-medium">{t('catalog.detail.purposes')}</dt>
-          <dd>{version.allowedPurposes.map((p) => localize(p.name, locale)).join(', ')}</dd>
-          {version.legalBasisText ? (
-            <>
-              <dt className="font-medium">{t('catalog.detail.legalBasis')}</dt>
-              <dd>{version.legalBasisText}</dd>
-            </>
-          ) : null}
-        </dl>
-        <p className="text-sm">
-          {t('catalog.detail.rateLimit', { limit: version.defaultRateLimit })}
-        </p>
-        {canRequest ? (
-          <div className="flex flex-wrap items-center gap-4">
-            <Button asChild>
+    <Page>
+      <PageHeader
+        eyebrow={detail.entity.legalName}
+        title={detail.api.name}
+        description={detail.api.summary}
+        actions={
+          canRequest ? (
+            <Button asChild size="lg">
               <Link href={`/my-apps/request?api=${apiId}&version=${version.id}`}>
                 {t('subscriptions.requestAccess')}
               </Link>
             </Button>
-            <p className="text-sm text-muted-foreground">{t('subscriptions.requestAccessNote')}</p>
+          ) : null
+        }
+      />
+      {canRequest ? (
+        <p className="-mt-4 text-sm text-muted-foreground">
+          {t('subscriptions.requestAccessNote')}
+        </p>
+      ) : null}
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* First in reading order; shown as a sidebar on wide screens. */}
+        <aside className="lg:order-2">
+          <Card className="space-y-2 lg:sticky lg:top-6">
+            <dl className="facts facts-stack">
+              <dt>{t('catalog.detail.provider')}</dt>
+              <dd>{detail.entity.legalName}</dd>
+              <dt>{t('catalog.sector')}</dt>
+              <dd>{sector ? localize(sector.name, locale) : detail.api.sector}</dd>
+              <dt>{t('catalog.classification')}</dt>
+              <dd>
+                <Badge tone={classificationTone(detail.api.classification)}>
+                  {t(`classification.${detail.api.classification}`)}
+                </Badge>
+              </dd>
+              <dt>{t('catalog.detail.owner')}</dt>
+              <dd>{detail.api.ownerContact}</dd>
+            </dl>
+          </Card>
+        </aside>
+
+        <div className="min-w-0 space-y-10">
+          <div className="prose-rid">
+            {/* react-markdown renders no raw HTML and sanitizes link protocols. */}
+            <Markdown skipHtml>{detail.api.description}</Markdown>
           </div>
-        ) : null}
 
-        <h3 className="font-semibold">{t('catalog.detail.exposedFields')}</h3>
-        {version.exposedFields.length === 0 ? (
-          <p className="text-sm">{t('catalog.noPersonalData')}</p>
-        ) : (
-          <table className="text-left text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th scope="col" className="py-1 pr-6">
-                  {t('version.create.fieldName')}
-                </th>
-                <th scope="col" className="py-1 pr-6">
-                  {t('version.create.personal')}
-                </th>
-                <th scope="col" className="py-1">
-                  {t('version.create.sensitive')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {version.exposedFields.map((f) => (
-                <tr key={f.name} className="border-b border-border">
-                  <td className="py-1 pr-6">{f.name}</td>
-                  <td className="py-1 pr-6">
-                    {f.personal ? t('version.detail.yes') : t('version.detail.no')}
-                  </td>
-                  <td className="py-1">
-                    {f.sensitive ? t('version.detail.yes') : t('version.detail.no')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+          <Section
+            title={
+              <span className="flex flex-wrap items-center gap-3">
+                {t('catalog.detail.version', { version: version.version })}
+                {version.status === 'deprecated' ? (
+                  <Badge tone="warning">{t('catalog.detail.deprecated')}</Badge>
+                ) : null}
+              </span>
+            }
+            actions={
+              detail.versions.length > 1 ? (
+                <nav aria-label={t('catalog.detail.versions')}>
+                  <ul className="flex flex-wrap gap-1 rounded-full border border-border bg-background p-1 text-sm">
+                    {detail.versions.map((v) => (
+                      <li key={v.id}>
+                        <Link
+                          href={`/catalog/${apiId}?version=${v.id}`}
+                          aria-current={v.id === version.id ? 'page' : undefined}
+                          className={
+                            v.id === version.id
+                              ? 'block rounded-full bg-primary-soft px-3 py-1 font-medium text-primary-ink'
+                              : 'block rounded-full px-3 py-1 text-muted-foreground hover:text-foreground-strong'
+                          }
+                        >
+                          {v.version}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              ) : null
+            }
+          >
+            <Card className="space-y-3">
+              <dl className="facts">
+                <dt>{t('catalog.detail.gatewayUrl')}</dt>
+                <dd className="font-mono break-all">{version.gatewayUrl}</dd>
+                <dt>{t('catalog.detail.purposes')}</dt>
+                <dd>{version.allowedPurposes.map((p) => localize(p.name, locale)).join(', ')}</dd>
+                {version.legalBasisText ? (
+                  <>
+                    <dt>{t('catalog.detail.legalBasis')}</dt>
+                    <dd>{version.legalBasisText}</dd>
+                  </>
+                ) : null}
+              </dl>
+              <p className="text-sm text-muted-foreground">
+                {t('catalog.detail.rateLimit', { limit: version.defaultRateLimit })}
+              </p>
+            </Card>
 
-        <h3 className="font-semibold">{t('catalog.detail.operations')}</h3>
-        <p className="max-w-3xl text-sm text-muted-foreground">{t('dataSubject.note')}</p>
-        <table className="text-left text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th scope="col" className="py-1 pr-6">
-                {t('version.detail.method')}
-              </th>
-              <th scope="col" className="py-1 pr-6">
-                {t('version.detail.path')}
-              </th>
-              <th scope="col" className="py-1">
-                {t('dataSubject.column')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {version.operations.map((op) => (
-              <tr key={op.operationId} className="border-b border-border">
-                <td className="py-1 pr-6 font-mono">{op.method}</td>
-                <td className="py-1 pr-6 font-mono">{op.path}</td>
-                <td className="py-1">{dataSubjectLabel(t, op.dataSubject)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <h3 className="pt-2 text-lg font-semibold">{t('catalog.detail.exposedFields')}</h3>
+            {version.exposedFields.length === 0 ? (
+              <p className="text-sm">{t('catalog.noPersonalData')}</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t('version.create.fieldName')}</th>
+                      <th scope="col">{t('version.create.personal')}</th>
+                      <th scope="col">{t('version.create.sensitive')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {version.exposedFields.map((f) => (
+                      <tr key={f.name}>
+                        <td className="font-mono">{f.name}</td>
+                        <td>{yesNo(f.personal, 'info')}</td>
+                        <td>{yesNo(f.sensitive, 'warning')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <h3 className="pt-2 text-lg font-semibold">{t('catalog.detail.operations')}</h3>
+            <p className="max-w-3xl text-sm text-muted-foreground">{t('dataSubject.note')}</p>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t('version.detail.method')}</th>
+                    <th scope="col">{t('version.detail.path')}</th>
+                    <th scope="col">{t('dataSubject.column')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {version.operations.map((op) => (
+                    <tr key={op.operationId}>
+                      <td>
+                        <Badge tone="brand" className="font-mono">
+                          {op.method}
+                        </Badge>
+                      </td>
+                      <td className="font-mono">{op.path}</td>
+                      <td>{dataSubjectLabel(t, op.dataSubject)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Section>
+        </div>
       </div>
 
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">{t('catalog.detail.documentation')}</h2>
-        <p className="text-sm text-muted-foreground">{t('catalog.detail.documentationNote')}</p>
+      <Section
+        title={t('catalog.detail.documentation')}
+        description={t('catalog.detail.documentationNote')}
+      >
         <ApiDocs spec={spec} />
-      </div>
-    </section>
+      </Section>
+    </Page>
   );
 }

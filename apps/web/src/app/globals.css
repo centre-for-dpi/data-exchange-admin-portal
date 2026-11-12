@@ -1,36 +1,285 @@
 @import 'tailwindcss';
 
-/* Design tokens. --primary and --primary-foreground are overridden per country from
-   config/country/<code>.yaml (branding.primaryColor) in the root layout. */
+/*
+ * Design tokens, based on the CDPI Design System (Lora + Outfit, indigo core, generous radii,
+ * soft elevation). --primary and --primary-foreground are overridden per country from
+ * config/country/<code>.yaml (branding.primaryColor) in the root layout; every other brand shade
+ * is derived from --primary with color-mix(), so a country colour flows through the whole UI.
+ *
+ * Contrast (WCAG 2.1 AA) is checked against white and --surface-app:
+ *  - text on primary fills uses --primary-foreground (chosen for AA in lib/branding.ts);
+ *  - links and primary-coloured text use --primary-ink (the primary darkened), never --primary;
+ *  - muted text is #606060 (5.9:1 on the app surface); control borders #8e8e8e (3.3:1).
+ */
 :root {
   --primary: #6564db;
   --primary-foreground: #ffffff;
+  --primary-ink: color-mix(in oklab, var(--primary) 72%, black);
+  --primary-hover: color-mix(in oklab, var(--primary) 82%, black);
+  --primary-soft: color-mix(in oklab, var(--primary) 10%, white);
+  --primary-ring: color-mix(in oklab, var(--primary) 30%, transparent);
+
   --background: #ffffff;
-  --foreground: #111827;
-  --muted: #f3f4f6;
-  --muted-foreground: #4b5563;
-  --border: #d1d5db;
-  /* Fixed dark focus ring: guaranteed 3:1 against the light background whatever the brand color. */
-  --ring: #111827;
+  --surface-app: #f6f8fa;
+  --surface-panel: #f3e7ff;
+  --surface-inverse: #1f1f1f;
+  --foreground: #2d3339;
+  --foreground-strong: #0f0f0f;
+  --muted: #f6f8fa;
+  --muted-foreground: #606060;
+  --border: rgb(0 0 0 / 0.1);
+  --border-control: #8e8e8e;
+
+  --success-bg: #e7f4e6;
+  --success-fg: #22521f;
+  --success-border: #337131;
+  --warning-bg: #fff3cc;
+  --warning-fg: #7a5300;
+  --warning-border: #a07400;
+  --danger-bg: #fdecee;
+  --danger-fg: #a3000f;
+  --danger-border: #d00416;
+  --info-bg: #f3ecf9;
+  --info-fg: #5d2b88;
+  --info-border: #853dc2;
+
+  /* Fixed dark focus ring: guaranteed 3:1 against light surfaces whatever the brand color. */
+  --ring: #0f0f0f;
+
+  --shadow-card: 0 3px 50px 0 rgb(0 0 0 / 0.07);
+  --shadow-raised: 0 4px 12px 0 rgb(0 0 0 / 0.06);
 }
 
 @theme inline {
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: var(--font-lora), Georgia, 'Times New Roman', serif;
+
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
   --color-background: var(--background);
+  --color-surface-app: var(--surface-app);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-inverse: var(--surface-inverse);
   --color-foreground: var(--foreground);
+  --color-foreground-strong: var(--foreground-strong);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-border-control: var(--border-control);
   --color-ring: var(--ring);
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+  --color-success-border: var(--success-border);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-border: var(--warning-border);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-border: var(--danger-border);
+  --color-info-bg: var(--info-bg);
+  --color-info-fg: var(--info-fg);
+  --color-info-border: var(--info-border);
+
+  --radius-card: 1.5rem;
+  --radius-control: 0.75rem;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+@layer base {
+  body {
+    background: var(--surface-app);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    color: var(--foreground-strong);
+    letter-spacing: -0.01em;
+  }
+
+  a {
+    text-underline-offset: 3px;
+  }
+
+  code,
+  pre,
+  kbd {
+    font-feature-settings: normal;
+  }
 }
 
 :focus-visible {
   outline: 3px solid var(--ring);
   outline-offset: 2px;
+}
+
+@layer components {
+  /* Inline text link: brand ink, always underlined (WCAG 1.4.1, not colour alone). */
+  .link {
+    color: var(--primary-ink);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    &:hover {
+      text-decoration-thickness: 2px;
+    }
+  }
+
+  /* White card with the brand's hairline border and soft shadow. */
+  .card {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Definition list as a two-column fact sheet. */
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(8rem, max-content) 1fr;
+    column-gap: 1.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    & > dt {
+      color: var(--muted-foreground);
+      font-weight: 500;
+      padding-block: 0.625rem;
+      border-bottom: 1px solid var(--border);
+    }
+    & > dd {
+      color: var(--foreground);
+      padding-block: 0.625rem;
+      border-bottom: 1px solid var(--border);
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    & > dt:last-of-type,
+    & > dd:last-of-type {
+      border-bottom: 0;
+    }
+  }
+  @media (max-width: 40rem) {
+    .facts {
+      grid-template-columns: 1fr;
+      & > dt {
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+      & > dd {
+        padding-top: 0.125rem;
+      }
+    }
+  }
+
+  /* Stacked variant for narrow containers (sidebars). */
+  .facts.facts-stack {
+    grid-template-columns: 1fr;
+    & > dt {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+    & > dd {
+      padding-top: 0.125rem;
+    }
+  }
+
+  /* Data table: header band, roomy rows, row hover. Wrap it in .table-wrap for overflow. */
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+    & th {
+      background: var(--surface-app);
+      color: var(--muted-foreground);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    & td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    & tbody tr:last-child td {
+      border-bottom: 0;
+    }
+    & tbody tr:hover td {
+      background: color-mix(in oklab, var(--primary) 4%, white);
+    }
+  }
+
+  /* Small all-caps label above a heading. */
+  .eyebrow {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Markdown written by providers (rendered without raw HTML). */
+  .prose-rid {
+    max-width: 48rem;
+    line-height: 1.7;
+    & > * + * {
+      margin-top: 0.75rem;
+    }
+    & a {
+      color: var(--primary-ink);
+      text-decoration: underline;
+    }
+    & ul {
+      list-style: disc;
+      padding-left: 1.5rem;
+    }
+    & ol {
+      list-style: decimal;
+      padding-left: 1.5rem;
+    }
+    & h1,
+    & h2,
+    & h3,
+    & h4 {
+      font-family: var(--font-serif);
+      font-weight: 700;
+      color: var(--foreground-strong);
+    }
+    & code {
+      font-family: var(--font-mono);
+      font-size: 0.875em;
+      background: var(--surface-app);
+      border-radius: 0.375rem;
+      padding: 0.1rem 0.35rem;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

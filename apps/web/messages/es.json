@@ -23,6 +23,17 @@
     "regulator": "Vista del regulador",
     "audit": "Auditoría"
   },
+  "navHint": {
+    "home": "Resumen y accesos rápidos",
+    "catalog": "Busca APIs publicadas por las entidades",
+    "myEntity": "Datos y miembros de tu entidad",
+    "myApis": "Registra y versiona las APIs que expones",
+    "myApps": "Aplicaciones, credenciales y solicitudes",
+    "requests": "Solicitudes de acceso por decidir",
+    "operator": "Versiones pendientes de revisión",
+    "regulator": "Supervisión de la red",
+    "audit": "Bitácora y verificación de integridad"
+  },
   "auth": {
     "signIn": "Iniciar sesión",
     "signOut": "Cerrar sesión",
@@ -34,7 +45,23 @@
     "welcome": "Hola, {name}",
     "quickAccess": "Accesos rápidos",
     "noRoles": "Aún no tienes roles asignados en una entidad. Pide al administrador de tu entidad que te invite.",
-    "apiUnavailable": "No pudimos cargar tus permisos en este momento. Intenta de nuevo en unos minutos."
+    "apiUnavailable": "No pudimos cargar tus permisos en este momento. Intenta de nuevo en unos minutos.",
+    "eyebrow": "Intercambio de datos entre entidades públicas",
+    "howTitle": "Cómo funciona",
+    "steps": {
+      "publish": {
+        "title": "Publica",
+        "body": "La entidad proveedora registra su API y el operador la revisa antes de publicarla en el catálogo."
+      },
+      "request": {
+        "title": "Solicita con finalidad",
+        "body": "La entidad consumidora pide acceso declarando para qué usará los datos; el responsable de datos decide."
+      },
+      "trace": {
+        "title": "Traza cada consulta",
+        "body": "Cada cambio queda en una bitácora encadenada y el gateway solo guarda metadatos, nunca el contenido."
+      }
+    }
   },
   "footer": {
     "operatedBy": "Operado por {operator}",

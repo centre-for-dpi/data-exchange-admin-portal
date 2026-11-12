@@ -3,6 +3,9 @@ import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { AutoRefresh } from '../../../../components/auto-refresh';
+import { Badge, StatusBadge } from '../../../../components/ui/badge';
+import { Notice } from '../../../../components/ui/notice';
+import { Card, Page, PageHeader, Section } from '../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { getViewer } from '../../../../lib/viewer';
 
@@ -48,58 +51,94 @@ export default async function ApplicationPage({ params }: PageProps) {
   ].join('\n');
 
   return (
-    <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
-      <h1 className="text-2xl font-bold">{app.name}</h1>
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="font-medium">{t('environment')}</dt>
-        <dd>{t(`environments.${app.environment}`)}</dd>
-        <dt className="font-medium">{t('status')}</dt>
-        <dd>{t(`appStatus.${app.status}`)}</dd>
-        <dt className="font-medium">{t('provisioning')}</dt>
-        <dd>
-          <span role="status" data-testid="provisioning">
-            {t(`provisioningStatus.${app.provisioning}`)}
-          </span>
-        </dd>
-        <dt className="font-medium">{t('detail.clientId')}</dt>
-        <dd className="font-mono break-all">{app.clientId}</dd>
-        <dt className="font-medium">{t('detail.tokenUrl')}</dt>
-        <dd className="font-mono break-all">{app.tokenUrl}</dd>
-        <dt className="font-medium">{t('detail.technicalContact')}</dt>
-        <dd>{app.technicalContact}</dd>
-      </dl>
+    <Page>
+      <PageHeader title={app.name} />
       {app.provisioning === 'pending' ? (
         <>
-          <p className="text-sm text-muted-foreground">{t('detail.pendingNote')}</p>
+          <Notice tone="info">{t('detail.pendingNote')}</Notice>
           <AutoRefresh />
         </>
       ) : null}
 
-      <div>
-        <h2 className="text-xl font-semibold">{t('detail.credentials')}</h2>
-        <ul className="mt-2 space-y-1 text-sm">
-          {app.credentials.map((c) => (
-            <li key={c.id}>
-              {t(`detail.credentialKind.${c.kind}`)} · {t(`detail.credentialStatus.${c.status}`)} ·{' '}
-              {t('detail.created')}{' '}
-              {format.dateTime(new Date(c.createdAt), { dateStyle: 'medium', timeStyle: 'short' })}
-            </li>
-          ))}
-        </ul>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Card>
+          <dl className="facts">
+            <dt>{t('environment')}</dt>
+            <dd>
+              <Badge tone={app.environment === 'production' ? 'brand' : 'neutral'}>
+                {t(`environments.${app.environment}`)}
+              </Badge>
+            </dd>
+            <dt>{t('status')}</dt>
+            <dd>
+              <StatusBadge status={app.status}>{t(`appStatus.${app.status}`)}</StatusBadge>
+            </dd>
+            <dt>{t('provisioning')}</dt>
+            <dd>
+              <StatusBadge status={app.provisioning} role="status" data-testid="provisioning">
+                {t(`provisioningStatus.${app.provisioning}`)}
+              </StatusBadge>
+            </dd>
+            <dt>{t('detail.clientId')}</dt>
+            <dd className="font-mono break-all">{app.clientId}</dd>
+            <dt>{t('detail.tokenUrl')}</dt>
+            <dd className="font-mono break-all">{app.tokenUrl}</dd>
+            <dt>{t('detail.technicalContact')}</dt>
+            <dd>{app.technicalContact}</dd>
+          </dl>
+        </Card>
+
+        <Section title={t('detail.credentials')}>
+          <ul className="space-y-3">
+            {app.credentials.map((c) => (
+              <li
+                key={c.id}
+                className="card flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm"
+              >
+                <span className="space-y-0.5">
+                  <span className="block font-medium text-foreground-strong">
+                    {t(`detail.credentialKind.${c.kind}`)}
+                  </span>
+                  <span className="block text-muted-foreground">
+                    {t('detail.created')}{' '}
+                    {format.dateTime(new Date(c.createdAt), {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </span>
+                </span>
+                <StatusBadge status={c.status}>
+                  {t(`detail.credentialStatus.${c.status}`)}
+                </StatusBadge>
+              </li>
+            ))}
+          </ul>
+        </Section>
       </div>
 
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">{t('detail.guide')}</h2>
-        <p className="text-sm">{t('detail.guideToken')}</p>
-        <pre className="overflow-x-auto rounded-md bg-muted p-3 text-sm" tabIndex={0}>
-          <code>{tokenCommand}</code>
-        </pre>
-        <p className="text-sm">{t('detail.guideCall')}</p>
-        <pre className="overflow-x-auto rounded-md bg-muted p-3 text-sm" tabIndex={0}>
-          <code>{callCommand}</code>
-        </pre>
+      <Section title={t('detail.guide')}>
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <p className="text-sm">{t('detail.guideToken')}</p>
+            <pre
+              className="overflow-x-auto rounded-2xl bg-surface-inverse p-5 text-sm leading-relaxed text-[#f6f8fa]"
+              tabIndex={0}
+            >
+              <code>{tokenCommand}</code>
+            </pre>
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm">{t('detail.guideCall')}</p>
+            <pre
+              className="overflow-x-auto rounded-2xl bg-surface-inverse p-5 text-sm leading-relaxed text-[#f6f8fa]"
+              tabIndex={0}
+            >
+              <code>{callCommand}</code>
+            </pre>
+          </div>
+        </div>
         <p className="text-sm text-muted-foreground">{t('detail.guideNote')}</p>
-      </div>
-    </section>
+      </Section>
+    </Page>
   );
 }

@@ -34,30 +34,30 @@ function SecretReveal({ created }: { created: NonNullable<CreateApplicationState
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
   return (
-    <section className="max-w-2xl space-y-4" aria-labelledby="secret-heading">
-      <h2 id="secret-heading" ref={heading} tabIndex={-1} className="text-xl font-semibold">
+    <section className="space-y-5" aria-labelledby="secret-heading">
+      <h2 id="secret-heading" ref={heading} tabIndex={-1} className="text-2xl font-bold">
         {t('title')}
       </h2>
       <p
         role="alert"
-        className="rounded-md border border-red-700 bg-red-50 p-3 text-sm text-red-800"
+        className="rounded-2xl border border-danger-border bg-danger-bg px-4 py-3 text-sm font-medium text-danger-fg"
       >
         {t('warning')}
       </p>
-      <dl className="space-y-3 text-sm">
+      <dl className="space-y-4 text-sm">
         <div>
-          <dt className="font-medium">{t('clientId')}</dt>
-          <dd className="flex flex-wrap items-center gap-2">
-            <code data-testid="client-id" className="break-all">
+          <dt>{t('clientId')}</dt>
+          <dd className="mt-1.5 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface-app py-2 pr-2 pl-4">
+            <code data-testid="client-id" className="flex-1 break-all">
               {created.clientId}
             </code>
             <CopyButton value={created.clientId} label={t('clientId')} />
           </dd>
         </div>
         <div>
-          <dt className="font-medium">{t('clientSecret')}</dt>
-          <dd className="flex flex-wrap items-center gap-2">
-            <code data-testid="client-secret" className="break-all">
+          <dt>{t('clientSecret')}</dt>
+          <dd className="mt-1.5 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface-app py-2 pr-2 pl-4">
+            <code data-testid="client-secret" className="flex-1 break-all">
               {created.clientSecret}
             </code>
             <CopyButton value={created.clientSecret} label={t('clientSecret')} />
@@ -76,7 +76,7 @@ export function CreateApplicationForm() {
   const [state, action, pending] = useActionState(createApplicationAction, {});
   if (state.created) return <SecretReveal created={state.created} />;
   return (
-    <form action={action} className="max-w-2xl space-y-5" noValidate>
+    <form action={action} className="space-y-5" noValidate>
       <ErrorSummary state={state} />
       <Field name="name" label={t('create.name')} required state={state}>
         {(p) => <input {...p} type="text" className={inputClass} />}

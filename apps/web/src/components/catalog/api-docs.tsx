@@ -34,7 +34,7 @@ const accessibleColors = `
  */
 export function ApiDocs({ spec }: { spec: Record<string, unknown> }) {
   return (
-    <div className="rounded-md border border-border">
+    <div className="card overflow-hidden">
       <ApiReferenceReact
         configuration={{
           content: spec,

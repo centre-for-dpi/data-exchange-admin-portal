@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { CreateVersionForm } from '../../../../../../components/apis/api-forms';
 import { ApiError, apiGet } from '../../../../../../lib/api';
+import { Page, PageHeader } from '../../../../../../components/ui/page';
 import { localize } from '../../../../../../lib/localize';
 import { getViewer } from '../../../../../../lib/viewer';
 
@@ -38,11 +39,11 @@ export default async function NewVersionPage({ params }: PageProps) {
   }));
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('version.create.title', { api: api.name })}</h1>
-      <div className="mt-6">
+    <Page>
+      <PageHeader title={t('version.create.title', { api: api.name })} />
+      <div className="card max-w-3xl p-6 md:p-8">
         <CreateVersionForm apiId={api.id} purposes={purposes} />
       </div>
-    </section>
+    </Page>
   );
 }

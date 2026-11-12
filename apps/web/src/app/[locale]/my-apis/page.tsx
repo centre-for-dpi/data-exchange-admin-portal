@@ -1,7 +1,9 @@
 import { apiPageSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { Badge, StatusBadge, classificationTone } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
+import { EmptyState, Page, PageHeader } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
 import { apiGet } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
@@ -25,60 +27,64 @@ export default async function MyApisPage({ params }: PageProps) {
 
   if (!entity) {
     return (
-      <section className="mx-auto max-w-6xl px-4 py-10">
-        <h1 className="text-2xl font-bold">{t('nav.myApis')}</h1>
-        <p className="mt-3">{t('myApis.noEntity')}</p>
-      </section>
+      <Page>
+        <PageHeader title={t('nav.myApis')} />
+        <EmptyState>{t('myApis.noEntity')}</EmptyState>
+      </Page>
     );
   }
 
   const canWrite = entity.roles.includes('api_publisher');
   const page = await apiGet(`/entities/${entity.entity.id}/apis?limit=100`, apiPageSchema);
+  const newApi = canWrite ? (
+    <Button asChild>
+      <Link href="/my-apis/new">{t('myApis.newApi')}</Link>
+    </Button>
+  ) : null;
 
   return (
-    <section className="mx-auto max-w-6xl px-4 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">{t('nav.myApis')}</h1>
-        {canWrite ? (
-          <Button asChild>
-            <Link href="/my-apis/new">{t('myApis.newApi')}</Link>
-          </Button>
-        ) : null}
-      </div>
-      {!canWrite ? <p className="mt-3 text-muted-foreground">{t('myApis.readOnly')}</p> : null}
+    <Page>
+      <PageHeader
+        eyebrow={entity.entity.shortName}
+        title={t('nav.myApis')}
+        description={!canWrite ? t('myApis.readOnly') : undefined}
+        actions={newApi}
+      />
 
       {page.items.length === 0 ? (
-        <p className="mt-6">{t('myApis.empty')}</p>
+        <EmptyState>{t('myApis.empty')}</EmptyState>
       ) : (
-        <table className="mt-6 w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th scope="col" className="py-2">
-                {t('myApis.name')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('myApis.classification')}
-              </th>
-              <th scope="col" className="py-2">
-                {t('myApis.status')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {page.items.map((api) => (
-              <tr key={api.id} className="border-b border-border">
-                <td className="py-2">
-                  <Link href={`/my-apis/${api.id}`} className="underline">
-                    {api.name}
-                  </Link>
-                </td>
-                <td className="py-2">{t(`classification.${api.classification}`)}</td>
-                <td className="py-2">{t(`apiStatus.${api.status}`)}</td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">{t('myApis.name')}</th>
+                <th scope="col">{t('myApis.classification')}</th>
+                <th scope="col">{t('myApis.status')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {page.items.map((api) => (
+                <tr key={api.id}>
+                  <td>
+                    <Link href={`/my-apis/${api.id}`} className="link">
+                      {api.name}
+                    </Link>
+                  </td>
+                  <td>
+                    <Badge tone={classificationTone(api.classification)}>
+                      {t(`classification.${api.classification}`)}
+                    </Badge>
+                  </td>
+                  <td>
+                    <StatusBadge status={api.status}>{t(`apiStatus.${api.status}`)}</StatusBadge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </section>
+    </Page>
   );
 }

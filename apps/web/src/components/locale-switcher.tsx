@@ -11,7 +11,7 @@ export function LocaleSwitcher() {
   const current = useLocale();
   return (
     <nav aria-label={t('a11y.language')}>
-      <ul className="flex gap-1">
+      <ul className="flex rounded-full border border-border bg-surface-app p-0.5">
         {routing.locales.map((locale) => (
           <li key={locale}>
             <Link
@@ -20,8 +20,10 @@ export function LocaleSwitcher() {
               lang={locale}
               aria-current={locale === current ? 'true' : undefined}
               className={cn(
-                'block rounded-md px-2 py-1 text-sm',
-                locale === current ? 'font-semibold underline' : 'hover:bg-muted',
+                'block rounded-full px-3 py-1 text-sm transition-colors duration-150',
+                locale === current
+                  ? 'bg-background font-semibold text-foreground-strong shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground-strong',
               )}
             >
               {t(`locale.${locale}`)}

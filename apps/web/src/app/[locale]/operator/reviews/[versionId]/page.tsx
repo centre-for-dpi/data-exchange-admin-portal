@@ -5,6 +5,9 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { VersionSheet } from '../../../../../components/apis/version-sheet';
 import { DecisionForms } from '../../../../../components/review/decision-forms';
+import { Badge, classificationTone } from '../../../../../components/ui/badge';
+import { Notice } from '../../../../../components/ui/notice';
+import { Card, EmptyState, Page, PageHeader, Section } from '../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../lib/api';
 import { localize } from '../../../../../lib/localize';
 import { getViewer } from '../../../../../lib/viewer';
@@ -48,49 +51,61 @@ export default async function ReviewPage({ params }: PageProps) {
   const inReview = review.version.status === 'in_review';
 
   return (
-    <section className="mx-auto max-w-6xl space-y-8 px-4 py-10">
-      <h1 className="text-2xl font-bold">
-        {t('operator.review.title', { api: review.api.name, version: review.version.version })}
-      </h1>
+    <Page>
+      <PageHeader
+        eyebrow={review.entity.legalName}
+        title={t('operator.review.title', {
+          api: review.api.name,
+          version: review.version.version,
+        })}
+        description={review.api.summary}
+      />
 
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="font-medium">{t('operator.review.entity')}</dt>
-        <dd>{review.entity.legalName}</dd>
-        <dt className="font-medium">{t('operator.classification')}</dt>
-        <dd>{t(`classification.${review.api.classification}`)}</dd>
-        <dt className="font-medium">{t('operator.review.sector')}</dt>
-        <dd>{sector ? localize(sector.name, locale) : review.api.sector}</dd>
-        <dt className="font-medium">{t('operator.review.owner')}</dt>
-        <dd>{review.api.ownerContact}</dd>
-        <dt className="font-medium">{t('operator.review.summary')}</dt>
-        <dd>{review.api.summary}</dd>
-      </dl>
-      <div>
-        <h2 className="text-xl font-semibold">{t('operator.review.description')}</h2>
-        <p className="mt-2 whitespace-pre-line">{review.api.description}</p>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Card>
+          <dl className="facts">
+            <dt>{t('operator.review.entity')}</dt>
+            <dd>{review.entity.legalName}</dd>
+            <dt>{t('operator.classification')}</dt>
+            <dd>
+              <Badge tone={classificationTone(review.api.classification)}>
+                {t(`classification.${review.api.classification}`)}
+              </Badge>
+            </dd>
+            <dt>{t('operator.review.sector')}</dt>
+            <dd>{sector ? localize(sector.name, locale) : review.api.sector}</dd>
+            <dt>{t('operator.review.owner')}</dt>
+            <dd>{review.api.ownerContact}</dd>
+            <dt>{t('operator.review.summary')}</dt>
+            <dd>{review.api.summary}</dd>
+          </dl>
+        </Card>
+        <div className="space-y-4">
+          <Section title={t('operator.review.description')}>
+            <p className="leading-relaxed whitespace-pre-line">{review.api.description}</p>
+          </Section>
+          <Notice tone="info">{t('operator.review.minimization')}</Notice>
+          {review.requiresRegulator ? (
+            <Notice tone="warning">{t('operator.review.requiresRegulator')}</Notice>
+          ) : null}
+        </div>
       </div>
-
-      <p className="rounded-md border border-border bg-muted p-3 text-sm">
-        {t('operator.review.minimization')}
-      </p>
-      {review.requiresRegulator ? (
-        <p className="rounded-md border border-border p-3 text-sm">
-          {t('operator.review.requiresRegulator')}
-        </p>
-      ) : null}
 
       <VersionSheet version={review.version} purposeNames={purposeNames} />
 
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">{t('operator.review.decision')}</h2>
+      <Section title={t('operator.review.decision')}>
         {!inReview ? (
-          <p role="status">{t('operator.review.decided')}</p>
+          <Notice tone="success" role="status">
+            {t('operator.review.decided')}
+          </Notice>
         ) : canDecide ? (
-          <DecisionForms versionId={versionId} />
+          <div className="card p-6 md:p-8">
+            <DecisionForms versionId={versionId} />
+          </div>
         ) : (
-          <p>{t('operator.review.readOnly')}</p>
+          <EmptyState>{t('operator.review.readOnly')}</EmptyState>
         )}
-      </div>
-    </section>
+      </Section>
+    </Page>
   );
 }

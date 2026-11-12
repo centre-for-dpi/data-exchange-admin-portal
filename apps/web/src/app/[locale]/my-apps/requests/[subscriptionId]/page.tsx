@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 import { SubscriptionFacts } from '../../../../../components/subscriptions/subscription-view';
 import { AutoRefresh } from '../../../../../components/auto-refresh';
 import { AuditTimeline } from '../../../../../components/audit/audit-views';
+import { Notice } from '../../../../../components/ui/notice';
+import { Page, PageHeader } from '../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../lib/api';
 import { entityTimeline } from '../../../../../lib/audit';
 import { getViewer } from '../../../../../lib/viewer';
@@ -41,16 +43,21 @@ export default async function ConsumerSubscriptionPage({ params }: PageProps) {
   const detail = await load(subscriptionId);
   const timeline = await entityTimeline(detail.application.entity.id, 'subscription', detail.id);
   return (
-    <section className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-      <h1 className="text-2xl font-bold">{t('detailTitle', { api: detail.api.name })}</h1>
+    <Page>
+      <PageHeader
+        eyebrow={detail.application.name}
+        title={t('detailTitle', { api: detail.api.name })}
+      />
       {detail.status === 'approved' ? (
         <>
-          <p className="text-sm text-muted-foreground">{t('activatingNote')}</p>
+          <Notice tone="info">{t('activatingNote')}</Notice>
           <AutoRefresh />
         </>
       ) : null}
-      <SubscriptionFacts detail={detail} side="consumer" />
-      <AuditTimeline items={timeline} />
-    </section>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <SubscriptionFacts detail={detail} side="consumer" />
+        <AuditTimeline items={timeline} />
+      </div>
+    </Page>
   );
 }
