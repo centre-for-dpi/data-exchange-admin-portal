@@ -220,6 +220,16 @@ describe('API registration (M1-03)', () => {
       });
       expect(httpUpstream.statusCode).toBe(400);
 
+      // SSRF guard: a provider cannot point the gateway at the platform's own network.
+      for (const url of ['https://keycloak:8443/admin', 'https://169.254.169.254/latest']) {
+        const internal = await request('POST', versions, 'pedro.publicador', {
+          ...versionBody(),
+          upstream: { type: 'direct', url, mtls: false },
+        });
+        expect(internal.statusCode, url).toBe(400);
+        expect(internal.json()).toMatchObject({ errors: [{ path: 'upstream.url' }] });
+      }
+
       expect((await request('POST', versions, 'pedro.publicador', versionBody())).statusCode).toBe(
         201,
       );

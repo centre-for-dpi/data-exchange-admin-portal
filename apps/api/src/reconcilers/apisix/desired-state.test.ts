@@ -107,6 +107,9 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       { upstream: { type: 'direct', url: 'https://api.salud.example', mtls: true } },
       { upstream: { type: 'node', servicePath: '/salud', nodeId: crypto.randomUUID() } },
       { entitySlug: 'socioeconomico' },
+      // Never proxy towards the platform's own network (SSRF).
+      { upstream: { type: 'direct', url: 'https://keycloak:8443/admin', mtls: false } },
+      { upstream: { type: 'direct', url: 'https://169.254.169.254', mtls: false } },
     ];
     for (const overrides of cases) {
       expect(() => desiredGateway(version(overrides), settings)).toThrow(UnsupportedUpstreamError);

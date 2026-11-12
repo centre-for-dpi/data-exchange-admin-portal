@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isPublicHostname } from './net.js';
 import { pageOf } from './session.js';
 
 export const CLASSIFICATIONS = ['public', 'internal', 'personal', 'sensitive'] as const;
@@ -27,7 +28,11 @@ export const upstreamSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('direct'),
     /** Existing HTTPS API of the entity. */
-    url: z.url({ protocol: /^https$/, error: 'must be an https:// URL' }),
+    url: z
+      .url({ protocol: /^https$/, error: 'must be an https:// URL' })
+      .refine((value) => isPublicHostname(new URL(value).hostname), {
+        error: 'must be a public host name or IP, not an internal address',
+      }),
     mtls: z.boolean().default(false),
   }),
   z.strictObject({

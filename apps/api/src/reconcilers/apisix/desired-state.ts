@@ -1,4 +1,4 @@
-import type { Upstream } from '@rid/contracts';
+import { isPublicHostname, type Upstream } from '@rid/contracts';
 import type { ApisixObject } from './apisix-admin.js';
 
 /** Deterministic ids (ARCHITECTURE.md §4): reconciling needs no extra state. */
@@ -102,6 +102,10 @@ function resolveUpstream(v: VersionForGateway, settings: GatewaySettings): Resol
       throw new UnsupportedUpstreamError('mTLS towards upstreams arrives with M3 (ADR-0010)');
     }
     const url = new URL(v.upstream.url);
+    // Also checked when the version is registered; repeated here for rows written before.
+    if (!isPublicHostname(url.hostname)) {
+      throw new UnsupportedUpstreamError(`Upstream host ${url.hostname} is not a public address`);
+    }
     return {
       upstream: {
         ...base,

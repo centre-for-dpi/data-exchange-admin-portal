@@ -171,6 +171,7 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
   - `GET /api/v1/opa/bundle.tar.gz` con `ETag`; `data.json` según `ARCHITECTURE.md §4.2`.
   - `rid.authz` con las reglas 1–6 y razones de negación estables; `opa test` con casos positivos y negativos de cada regla.
   - La suscripción pasa a `active` cuando la revisión del bundle que la contiene fue descargada por OPA (se lee `/status` de OPA o métrica equivalente).
+  - Prueba de punta a punta (pendiente de la revisión de seguridad de M1-08): ninguna cabecera `X-RID-*` enviada por el cliente llega al proveedor si la política no la devuelve. `X-RID-End-User` nunca llega en claro, y `X-RID-Purpose` llega solo con el valor validado.
 - [ ] **M1-10 — Revocación**
   - `data_steward` revoca; la llamada empieza a fallar con `403 no_subscription` en < 60 s (test automatizado).
 - [ ] **M1-11 — Auditoría encadenada mínima**

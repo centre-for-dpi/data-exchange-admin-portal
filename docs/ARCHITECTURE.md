@@ -115,7 +115,7 @@ Reconciliador
 
 **Upstream** `rid-upstream-<apiVersionId>`
 - `node`: `nodes = { "<tunnelIp>:<port>": 1 }`, `scheme = https`, `tls.client_cert/client_key` = certificado del gateway emitido por step-ca (mTLS hacia el nodo). El servicio vive en el `servicePath` del nodo (la ruta pública se reescribe a `servicePath/...`). **Hasta M4** no hay nodos enrolados: el reconciliador resuelve el nodo con `RID_DEV_NODES` (`slug-entidad=host:puerto` del mock de esa entidad, `scheme = http`), y una versión cuyo upstream tiene `nodeId` o cuya entidad no figura ahí queda en error de sincronización, sin escribir nada en APISIX.
-- `direct`: host de la API existente, `scheme = https`, `pass_host = node`, y la ruta del URL como prefijo. mTLS opcional; mientras no exista (M3, ADR-0010), una versión que lo pide queda en error de sincronización en lugar de publicarse sin él.
+- `direct`: host de la API existente, `scheme = https`, `pass_host = node`, y la ruta del URL como prefijo. mTLS opcional; mientras no exista (M3, ADR-0010), una versión que lo pide queda en error de sincronización en lugar de publicarse sin él. **SSRF:** el host debe ser un nombre DNS público o una IP pública. Se rechazan IPs privadas, de loopback, link-local o de metadatos, y nombres sin dominio o internos (`keycloak`, `*.local`, `*.internal`). Se valida al registrar la versión (`isPublicHostname` en `packages/contracts`) y otra vez en el reconciliador. Un nombre público puede resolver a una IP privada (DNS rebinding), así que en producción la salida del gateway también debe restringirse por red.
 - `xroad`: Security Server del operador (ver §10).
 
 **Route** `rid-route-<apiVersionId>`
