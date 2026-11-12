@@ -128,9 +128,12 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     });
     expect(nested.res.status).toBe(400);
     expect(nested.res.headers.get('x-rid-deny-reason')).toBeNull();
-    const withCharset = await verify({ numeroIdentificacion: '1000000001' }, {
-      'content-type': 'application/json; charset=utf-8',
-    });
+    const withCharset = await verify(
+      { numeroIdentificacion: '1000000001' },
+      {
+        'content-type': 'application/json; charset=utf-8',
+      },
+    );
     expect(withCharset.res.status).toBe(200);
 
     // Another person, another reference.

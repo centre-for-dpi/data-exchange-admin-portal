@@ -46,10 +46,7 @@ export default async function RequestAccessPage({ params, searchParams }: PagePr
   // Only published versions take new requests.
   if (!version || version.status !== 'published') notFound();
 
-  const apps = await apiGetAll(
-    `/entities/${entity.entity.id}/applications`,
-    applicationPageSchema,
-  );
+  const apps = await apiGetAll(`/entities/${entity.entity.id}/applications`, applicationPageSchema);
   const active = apps.items.filter((a) => a.status === 'active');
   const maxMonths = getCountryConfig().subscriptionMaxValidityMonths[detail.api.classification];
 
