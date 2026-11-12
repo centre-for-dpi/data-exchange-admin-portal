@@ -27,6 +27,8 @@ import {
 export const GATEWAY_SYNC_TOPIC = 'gateway.sync';
 export const APISIX_SETTINGS = Symbol('APISIX_SETTINGS');
 const FULL_RECONCILE_MS = 5 * 60 * 1000;
+const UPSTREAM_DELETE_ATTEMPTS = 20;
+const UPSTREAM_DELETE_DELAY_MS = 250;
 
 /** Versions the gateway serves: deprecated ones keep working until they are retired. */
 const SERVED = ['published', 'deprecated'] as const;
@@ -107,7 +109,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       this.logger.log(`Removed orphan APISIX route ${id}`);
     }
     for (const id of managed(await this.admin.list('upstreams'), 'upstream')) {
-      await this.admin.delete('upstreams', id);
+      await this.deleteUpstream(id);
       this.logger.log(`Removed orphan APISIX upstream ${id}`);
     }
   }
@@ -202,8 +204,25 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     const route = await this.admin.get('routes', routeId(apiVersionId));
     const upstream = await this.admin.get('upstreams', upstreamId(apiVersionId));
     if (route) await this.admin.delete('routes', routeId(apiVersionId));
-    if (upstream) await this.admin.delete('upstreams', upstreamId(apiVersionId));
+    if (upstream) await this.deleteUpstream(upstreamId(apiVersionId));
     return Boolean(route || upstream);
+  }
+
+  /**
+   * APISIX checks that no route uses an upstream against its own config cache, which follows etcd
+   * with a short delay: right after deleting the route it may still refuse. Retry only that case.
+   */
+  private async deleteUpstream(id: string): Promise<void> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await this.admin.delete('upstreams', id);
+        return;
+      } catch (error) {
+        const stillUsed = error instanceof Error && /still using it/.test(error.message);
+        if (!stillUsed || attempt >= UPSTREAM_DELETE_ATTEMPTS) throw error;
+        await new Promise((r) => setTimeout(r, UPSTREAM_DELETE_DELAY_MS));
+      }
+    }
   }
 
   private async recordSuccess(target: string, desiredHash: string): Promise<void> {
