@@ -312,11 +312,25 @@ test_operations_without_a_subject_carry_no_reference if {
 	none := headers_for(get_path("/salud/afiliacion/v1/estadisticas"), all_operations)
 	none["X-RID-Subscription"] == "sub-1"
 	not none["X-RID-Subject-Ref"]
-	# Versions published before the declaration existed: allowed, without a reference.
-	legacy := headers_for(get_path("/salud/afiliacion/v1/legado"), all_operations)
-	legacy["X-RID-Subscription"] == "sub-1"
-	not legacy["X-RID-Subject-Ref"]
 }
+
+test_personal_data_without_a_valid_declaration_fails_closed if {
+	# A stale version (no declaration, or one no longer accepted) cannot say whose data it is.
+	denied(get_path("/salud/afiliacion/v1/legado"), all_operations, "data_subject_required")
+	denied(get_path("/salud/afiliacion/v1/legado"), sensitive_route(all_operations), "data_subject_required")
+}
+
+test_public_data_without_a_declaration_is_allowed if {
+	h := headers_for(get_path("/salud/afiliacion/v1/legado"), public_route(all_operations))
+	h["X-RID-Subscription"] == "sub-1"
+	not h["X-RID-Subject-Ref"]
+}
+
+with_classification(b, classification) := object.union(b, {"routes": {route_id: object.union(b.routes[route_id], {"classification": classification})}})
+
+sensitive_route(b) := with_classification(b, "sensitive")
+
+public_route(b) := with_classification(b, "public")
 
 test_a_denial_never_carries_the_reference if {
 	h := headers_for(with_headers({"x-rid-purpose": "benefit_targeting"}), bundle)

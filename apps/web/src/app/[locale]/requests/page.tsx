@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { SubscriptionTable } from '../../../components/subscriptions/subscription-view';
 import { EmptyState, Page, PageHeader } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
-import { ApiError, apiGet } from '../../../lib/api';
+import { ApiError, apiGetAll } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
 
 interface PageProps {
@@ -27,11 +27,11 @@ export default async function RequestsInboxPage({ params, searchParams }: PagePr
   const entity = (await getViewer()).activeEntity;
   if (!entity) notFound();
   const all = (await searchParams).view === 'all';
-  const query = all ? 'limit=100' : 'status=pending_provider&limit=100';
+  const query = all ? '' : '?status=pending_provider';
   let page;
   try {
-    page = await apiGet(
-      `/entities/${entity.entity.id}/access-requests?${query}`,
+    page = await apiGetAll(
+      `/entities/${entity.entity.id}/access-requests${query}`,
       subscriptionPageSchema,
     );
   } catch (error) {

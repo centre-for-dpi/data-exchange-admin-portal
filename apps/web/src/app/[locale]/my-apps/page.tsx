@@ -6,7 +6,7 @@ import { Badge, StatusBadge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { EmptyState, Page, PageHeader, Section } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
-import { apiGet } from '../../../lib/api';
+import { apiGetAll } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
 
 interface PageProps {
@@ -35,8 +35,8 @@ export default async function MyAppsPage({ params }: PageProps) {
   }
   const canWrite = entity.roles.includes('app_developer');
   const [page, requests] = await Promise.all([
-    apiGet(`/entities/${entity.entity.id}/applications?limit=100`, applicationPageSchema),
-    apiGet(`/entities/${entity.entity.id}/subscriptions?limit=100`, subscriptionPageSchema),
+    apiGetAll(`/entities/${entity.entity.id}/applications`, applicationPageSchema),
+    apiGetAll(`/entities/${entity.entity.id}/subscriptions`, subscriptionPageSchema),
   ]);
 
   return (

@@ -7,7 +7,7 @@ import { RequestAccessForm } from '../../../../components/subscriptions/subscrip
 import { Button } from '../../../../components/ui/button';
 import { EmptyState, Page, PageHeader } from '../../../../components/ui/page';
 import { Link } from '../../../../i18n/navigation';
-import { ApiError, apiGet } from '../../../../lib/api';
+import { ApiError, apiGet, apiGetAll } from '../../../../lib/api';
 import { localize } from '../../../../lib/localize';
 import { getViewer } from '../../../../lib/viewer';
 
@@ -46,8 +46,8 @@ export default async function RequestAccessPage({ params, searchParams }: PagePr
   // Only published versions take new requests.
   if (!version || version.status !== 'published') notFound();
 
-  const apps = await apiGet(
-    `/entities/${entity.entity.id}/applications?limit=100`,
+  const apps = await apiGetAll(
+    `/entities/${entity.entity.id}/applications`,
     applicationPageSchema,
   );
   const active = apps.items.filter((a) => a.status === 'active');

@@ -5,7 +5,7 @@ import { Badge, StatusBadge, classificationTone } from '../../../components/ui/b
 import { Button } from '../../../components/ui/button';
 import { EmptyState, Page, PageHeader } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
-import { apiGet } from '../../../lib/api';
+import { apiGetAll } from '../../../lib/api';
 import { getViewer } from '../../../lib/viewer';
 
 interface PageProps {
@@ -35,7 +35,7 @@ export default async function MyApisPage({ params }: PageProps) {
   }
 
   const canWrite = entity.roles.includes('api_publisher');
-  const page = await apiGet(`/entities/${entity.entity.id}/apis?limit=100`, apiPageSchema);
+  const page = await apiGetAll(`/entities/${entity.entity.id}/apis`, apiPageSchema);
   const newApi = canWrite ? (
     <Button asChild>
       <Link href="/my-apis/new">{t('myApis.newApi')}</Link>

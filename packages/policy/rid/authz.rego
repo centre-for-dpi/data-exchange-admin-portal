@@ -99,6 +99,14 @@ end_user_missing if {
 
 declares_subject if operation.subject.in in {"path", "body"}
 
+# Fail closed: personal or sensitive data without a valid declaration (absent, or a form no longer
+# accepted, such as the old consumer header) cannot say whose data it is, so it is denied. The lint
+# requires the declaration for these classifications, so only stale versions get here.
+declares_subject if {
+	route.classification in {"personal", "sensitive"}
+	not operation.subject
+}
+
 # Document numbers are compared without spaces, dots or hyphens, in upper case.
 normalized(value) := upper(replace(replace(replace(trim_space(value), " ", ""), ".", ""), "-", ""))
 

@@ -49,6 +49,32 @@ export async function apiGet<S extends z.ZodType>(
   return schema.parse(await res.json());
 }
 
+/** Most pages apiGetAll follows; lists are per entity, so this is a safety cap, not a limit. */
+const MAX_PAGES = 50;
+
+/**
+ * Reads every page of a cursor-paginated list (`?cursor=&limit=`, ARCHITECTURE conventions) and
+ * returns them as one page. For screens that show or offer the whole list (an entity's
+ * applications, APIs, requests); a single page would silently hide the newest items.
+ */
+export async function apiGetAll<
+  S extends z.ZodType<{ items: unknown[]; nextCursor: string | null }>,
+>(path: string, schema: S): Promise<z.output<S>> {
+  const separator = path.includes('?') ? '&' : '?';
+  const first = await apiGet(`${path}${separator}limit=100`, schema);
+  const items = [...first.items];
+  let cursor = first.nextCursor;
+  for (let pages = 1; cursor && pages < MAX_PAGES; pages++) {
+    const next = await apiGet(
+      `${path}${separator}limit=100&cursor=${encodeURIComponent(cursor)}`,
+      schema,
+    );
+    items.push(...next.items);
+    cursor = next.nextCursor;
+  }
+  return { ...first, items, nextCursor: null };
+}
+
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; problem?: Problem };
 
 /** Problem details as returned by the portal API (RFC 9457). */

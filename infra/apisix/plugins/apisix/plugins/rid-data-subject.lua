@@ -6,7 +6,10 @@
 -- OPA in X-RID-Body-Subject ("TYPE:NUMBER" or "NUMBER"). OPA turns it into X-RID-Subject-Ref and
 -- never returns X-RID-Body-Subject, so the value is removed before the upstream (SPIKE S-1).
 --
--- A client cannot assert the subject: any X-RID-Body-Subject it sends is removed first. The body
+-- A client cannot assert the subject: any X-RID-Body-Subject it sends is removed first. The gateway
+-- and the provider must read the same person, so the plugin gives no subject (OPA then denies) when
+-- the body is not declared as JSON, repeats a member name (I-JSON, RFC 7493) or the value has a
+-- colon. The body
 -- is never stored or logged (golden rule 2). Runs in the rewrite phase after openid-connect
 -- (2599), so unauthenticated calls are rejected before any body is read, and before
 -- proxy-rewrite (1008) and opa (access phase).
@@ -87,6 +90,62 @@ local function as_text(value)
     return nil
 end
 
+-- application/json or any +json media type.
+local function is_json(content_type)
+    return content_type ~= nil
+        and ngx.re.find(content_type, [[^\s*application/([a-z0-9.+-]*\+)?json\s*(;|$)]], "joi") ~= nil
+end
+
+-- True when some object in a (valid) JSON text repeats a member name. Parsers disagree on which
+-- value wins, so the gateway and the provider could read different people.
+local function has_duplicate_names(body)
+    local stack = {}
+    local i = 1
+    while true do
+        local at, _, char = body:find('(["{}%[%],])', i)
+        if not at then
+            return false
+        end
+        local top = stack[#stack]
+        if char == "{" then
+            stack[#stack + 1] = { object = true, names = {}, expect_name = true }
+        elseif char == "[" then
+            stack[#stack + 1] = { object = false }
+        elseif char == "}" or char == "]" then
+            stack[#stack] = nil
+        elseif char == "," then
+            if top and top.object then
+                top.expect_name = true
+            end
+        else
+            -- A string: find its closing quote, skipping escapes.
+            local j = at + 1
+            while true do
+                local k, _, c = body:find('(["\\])', j)
+                if not k then
+                    return false
+                end
+                if c == "\\" then
+                    j = k + 2
+                else
+                    j = k
+                    break
+                end
+            end
+            if top and top.object and top.expect_name then
+                local name = cjson.decode(body:sub(at, j))
+                if name == nil or top.names[name] then
+                    return true
+                end
+                top.names[name] = true
+                top.expect_name = false
+            end
+            at = j
+        end
+        i = at + 1
+    end
+end
+
 function _M.rewrite(conf, ctx)
     -- Never trust a value the client sent.
     core.request.set_header(ctx, HEADER, nil)
@@ -104,22 +163,32 @@ function _M.rewrite(conf, ctx)
         return
     end
 
+    if not is_json(core.request.header(ctx, "Content-Type")) then
+        return
+    end
     local body = core.request.get_body(conf.max_body_bytes, ctx)
     if not body then
         return
     end
     local document = cjson.decode(body)
-    if type(document) ~= "table" then
+    if type(document) ~= "table" or has_duplicate_names(body) then
         return
     end
 
     local number = as_text(resolve(document, operation.pointer))
-    if not number then
+    if not number or number:find(":", 1, true) then
         return
     end
-    local document_type = operation.type_pointer
-        and as_text(resolve(document, operation.type_pointer))
-    -- Colons separate type and number: a value containing one is malformed (OPA denies).
+    local document_type
+    if operation.type_pointer then
+        document_type = as_text(resolve(document, operation.type_pointer))
+        -- A declared type that is missing or malformed is no subject (OPA denies).
+        if not document_type or document_type:find(":", 1, true) then
+            return
+        end
+    end
+    -- Colons separate type and number; neither may contain one, so the consumer cannot pick
+    -- the document type through the number.
     if document_type then
         core.request.set_header(ctx, HEADER, document_type .. ":" .. number)
     else

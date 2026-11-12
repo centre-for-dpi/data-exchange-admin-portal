@@ -17,7 +17,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     const apiName = `Afiliación ${slug}`;
     await publishNewApi(browser, { slug, name: apiName });
 
-    // carlos asks for both operations: the GET (subject in the path) and the POST (in the header).
+    // carlos asks for both operations: the GET (subject in the path) and the POST (in the body).
     await signIn(page, 'carlos.dev', '/my-apps');
     const appName = `Verificador ${slug}`;
     const clientId = await createApplication(page, appName);
@@ -97,6 +97,41 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     const anonymous = await verify({});
     expect(anonymous.res.status).toBe(403);
     expect(anonymous.res.headers.get('x-rid-deny-reason')).toBe('data_subject_required');
+
+    // Bodies the gateway and the provider could read as different people are denied too: a
+    // repeated member name (parsers disagree on which wins), a body not declared as JSON, and a
+    // colon in the number (it would let the consumer pick the document type).
+    const ambiguous = [
+      call('/verificaciones', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{"numeroIdentificacion":"1000000001","numeroIdentificacion":"1000000002"}',
+      }),
+      call('/verificaciones', {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain' },
+        body: JSON.stringify({ numeroIdentificacion: '1000000001' }),
+      }),
+      verify({ numeroIdentificacion: 'CE:1000000001' }),
+    ];
+    for (const { res } of await Promise.all(ambiguous)) {
+      expect(res.status).toBe(403);
+      expect(res.headers.get('x-rid-deny-reason')).toBe('data_subject_required');
+    }
+    // A JSON media type with parameters still counts as JSON, and the same name in different
+    // objects is no repetition: the gateway lets it through (the strict mock provider then
+    // rejects the extra member with 400, which is its call, not the gateway's).
+    const nested = await call('/verificaciones', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ numeroIdentificacion: '1000000001', otros: { a: 1, b: [{ a: 2 }] } }),
+    });
+    expect(nested.res.status).toBe(400);
+    expect(nested.res.headers.get('x-rid-deny-reason')).toBeNull();
+    const withCharset = await verify({ numeroIdentificacion: '1000000001' }, {
+      'content-type': 'application/json; charset=utf-8',
+    });
+    expect(withCharset.res.status).toBe(200);
 
     // Another person, another reference.
     const other = await call('/1000000002');
