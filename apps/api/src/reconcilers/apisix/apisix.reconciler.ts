@@ -12,7 +12,7 @@ import { ZodError } from 'zod';
 import { listOperations } from '../../apis/lint/openapi-lint.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
-import { APISIX_ADMIN, type ApisixAdmin } from './apisix-admin.js';
+import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apisix-admin.js';
 import {
   desiredGateway,
   type GatewaySettings,
@@ -27,8 +27,6 @@ import {
 export const GATEWAY_SYNC_TOPIC = 'gateway.sync';
 export const APISIX_SETTINGS = Symbol('APISIX_SETTINGS');
 const FULL_RECONCILE_MS = 5 * 60 * 1000;
-const UPSTREAM_DELETE_ATTEMPTS = 20;
-const UPSTREAM_DELETE_DELAY_MS = 250;
 
 /** Versions the gateway serves: deprecated ones keep working until they are retired. */
 const SERVED = ['published', 'deprecated'] as const;
@@ -212,17 +210,8 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * APISIX checks that no route uses an upstream against its own config cache, which follows etcd
    * with a short delay: right after deleting the route it may still refuse. Retry only that case.
    */
-  private async deleteUpstream(id: string): Promise<void> {
-    for (let attempt = 1; ; attempt += 1) {
-      try {
-        await this.admin.delete('upstreams', id);
-        return;
-      } catch (error) {
-        const stillUsed = error instanceof Error && /still using it/.test(error.message);
-        if (!stillUsed || attempt >= UPSTREAM_DELETE_ATTEMPTS) throw error;
-        await new Promise((r) => setTimeout(r, UPSTREAM_DELETE_DELAY_MS));
-      }
-    }
+  private deleteUpstream(id: string): Promise<void> {
+    return deleteUpstreamWhenUnused(this.admin, id);
   }
 
   private async recordSuccess(target: string, desiredHash: string): Promise<void> {

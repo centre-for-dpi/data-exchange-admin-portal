@@ -20,6 +20,28 @@ export interface ApisixAdmin {
 
 export class ApisixAdminError extends Error {}
 
+/**
+ * Deletes an upstream right after the route that used it. APISIX checks that no route uses an
+ * upstream against its own config cache, which follows etcd with a short delay, so it may still
+ * refuse for a moment: only that refusal is retried (for up to `attempts` × `delayMs`).
+ */
+export async function deleteUpstreamWhenUnused(
+  admin: ApisixAdmin,
+  id: string,
+  { attempts = 20, delayMs = 250 } = {},
+): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await admin.delete('upstreams', id);
+      return;
+    } catch (error) {
+      const stillUsed = error instanceof Error && /still using it/.test(error.message);
+      if (!stillUsed || attempt >= attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 /** Fields APISIX adds to what was stored; they are not part of the desired state. */
 const SERVER_FIELDS = new Set(['id', 'create_time', 'update_time']);
 

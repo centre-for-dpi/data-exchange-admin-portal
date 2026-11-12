@@ -9,7 +9,7 @@ import { AuditService } from '../../audit/audit.service.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readRealmUsers } from '../../seed/realm.js';
 import { runSeed } from '../../seed/seed.js';
-import { HttpApisixAdmin } from './apisix-admin.js';
+import { deleteUpstreamWhenUnused, HttpApisixAdmin } from './apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler, gatewaySyncTarget } from './apisix.reconciler.js';
 import { type GatewaySettings, parseDevNodes, routeId, upstreamId } from './desired-state.js';
 
@@ -109,10 +109,10 @@ describe('APISIX reconciler (M1-08)', () => {
     // The full pass also served every published version of the test database. Locally APISIX is
     // shared with the development database, so remove everything this suite may have created.
     const served = await prisma.apiVersion.findMany({ select: { id: true } });
-    for (const id of new Set([...created, ...served.map((v) => v.id)])) {
-      await admin.delete('routes', routeId(id));
-      await admin.delete('upstreams', upstreamId(id));
-    }
+    const ids = [...new Set([...created, ...served.map((v) => v.id)])];
+    // Routes first; upstreams once APISIX no longer sees them in use.
+    for (const id of ids) await admin.delete('routes', routeId(id));
+    for (const id of ids) await deleteUpstreamWhenUnused(admin, upstreamId(id));
     await app.close();
     await prisma.$disconnect();
   });
