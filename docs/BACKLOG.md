@@ -196,11 +196,15 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **Línea de tiempo:** para la plataforma en `GET /audit/timeline/{subscription|api}/:id` (la de una API incluye sus versiones), con eventos recientes paginados. Para cada entidad en `GET /entities/:id/audit/timeline/...`: una suscripción la ven la consumidora y la proveedora, y otra entidad recibe 404. La entidad solo ve los nombres de su propia gente; los demás aparecen como "Persona de {entidad}". Se muestran el estado anterior y el nuevo y el comentario, no los snapshots completos.
     - **Web:** página "Auditoría" con "Verificar integridad" (formulario GET, sin JavaScript) y eventos recientes que enlazan a la línea de tiempo, y la línea de tiempo dentro de las fichas de solicitud y de API. e2e del paso 10 de la demo con axe.
     - **Pruebas:** manipulaciones de la cadena con datos sintéticos (pruebas unitarias, para no romper la cadena real de `rid_test`), y concurrencia, reversión y verificación contra PostgreSQL.
-- [ ] **M1-12 — Demo automatizada**
+- [x] **M1-12 — Demo automatizada**
   - `pnpm demo` ejecuta el guion de `DEMO.md` contra el stack local y termina en verde.
   - Test e2e Playwright del flujo completo en la UI.
+  - _Notas de implementación:_
+    - **`pnpm demo`** (`scripts/demo.mjs`, sin dependencias): los cinco personajes inician sesión en Keycloak con Authorization Code + PKCE, igual que en la web, y usan el API del portal. Narra los 10 pasos y comprueba lo que se promete a la audiencia: ruta creada sola, `403 no_subscription` antes de suscribirse, activación, 200 con las cabeceras que recibe el proveedor (sin el funcionario en claro), `purpose_not_allowed`, revocación en menos de 60 s, línea de tiempo y cadena íntegra. Termina con código 1 en el primer paso que falle. Usa una API por corrida (`afiliacion-<corrida>`) para poder repetirse. Corrida local: 21 s, activación en 2,1 s y revocación en 12,2 s.
+    - **e2e:** `demo.spec.ts` (antes `call.spec.ts`) recorre los 10 pasos en la UI.
+    - **`DEMO.md` corregido:** el `curl` del paso 7 no enviaba `X-RID-End-User`, así que una API `personal` respondía `403 end_user_required` en vivo. El `403 no_subscription` se muestra en el paso 4 (hace falta un token), y se agregaron el comando para ver las cabeceras en el mock y el bucle de la revocación.
 
-**Cierre M1:** demo en vivo según `DEMO.md`.
+**Cierre M1:** demo en vivo según `DEMO.md`. ✅ Ensayada de forma automática (`pnpm demo` y `e2e/demo.spec.ts`, en verde el 2026-11-12); falta la presentación en vivo.
 
 ---
 

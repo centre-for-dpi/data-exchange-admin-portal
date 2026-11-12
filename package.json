@@ -28,7 +28,8 @@
     "test:e2e": "pnpm --filter @rid/web test:e2e",
     "db:migrate": "pnpm --filter @rid/api db:migrate",
     "db:deploy": "pnpm --filter @rid/api db:deploy",
-    "db:seed": "pnpm --filter @rid/api db:seed"
+    "db:seed": "pnpm --filter @rid/api db:seed",
+    "demo": "node scripts/demo.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

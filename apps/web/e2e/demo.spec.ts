@@ -1,11 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { expect, type Page, test } from '@playwright/test';
-import { createApplication, publishNewApi, requestAccess, signIn } from './flows';
+import { createApplication, openCatalogApi, publishNewApi, requestAccess, signIn } from './flows';
+import { expectNoAccessibilityViolations } from './helpers';
 
-// M1-09: the first real call end to end (DEMO.md steps 5-8). OPA allows it only with an active
-// subscription, the right operation, purpose and official; the provider receives the gateway's
-// trace headers and never a value the client forged.
+// M1-12: the whole of docs/DEMO.md in the UI, steps 1-10 (pnpm demo runs the same script from the
+// terminal). The call itself (M1-09): OPA allows it only with an active subscription, the right
+// operation, purpose and official; the provider receives the gateway's trace headers and never a
+// value the client forged. Revocation (M1-10) takes effect in under 60 s.
 const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
 const keycloak = process.env.KEYCLOAK_URL ?? 'http://localhost:8080';
 
@@ -43,20 +45,42 @@ async function approveAsSteward(page: Page, subscriptionId: string) {
   await expect(page.getByTestId('subscription-status')).toHaveText(/Aprobada|Activa/);
 }
 
-test.describe('a call through the gateway (M1-09)', () => {
-  test('subscribed call reaches the provider with trusted headers only', async ({
+test.describe('DEMO.md end to end (M1-12)', () => {
+  test('publish, review, discover, subscribe, call, revoke and audit', async ({
     browser,
     page,
   }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(360_000);
     const slug = `call-${Date.now().toString(36)}`;
     const apiName = `Afiliación ${slug}`;
+    // Steps 1-2: pedro publishes, ana approves; the reconciler creates the route by itself.
     await publishNewApi(browser, { slug, name: apiName });
+    const base = `${gateway}/salud/${slug}/v1/afiliados`;
+    await expect
+      .poll(async () => (await fetch(`${base}/1000000001`)).status, { timeout: 60_000 })
+      .toBe(401);
 
+    // Step 3: carlos discovers it in the catalogue, with its interactive documentation.
     await signIn(page, 'carlos.dev', '/my-apps');
-    const appName = `Validador ${slug}`;
+    await openCatalogApi(page, apiName);
+    await expect(page.getByRole('heading', { name: 'Documentación interactiva' })).toBeVisible();
+
+    // Step 4: credentials. With a token but no subscription the gateway says why.
+    const appName = `Validador de subsidios ${slug}`;
     const clientId = await createApplication(page, appName);
     const clientSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
+    await page.getByRole('link', { name: 'Ir a la aplicación' }).click();
+    await expect(page.getByTestId('provisioning')).toHaveText('Lista', { timeout: 60_000 });
+    const early = await fetch(`${base}/1000000001`, {
+      headers: {
+        authorization: `Bearer ${await gatewayToken(clientId, clientSecret)}`,
+        'x-rid-purpose': 'eligibility_check',
+      },
+    });
+    expect(early.status).toBe(403);
+    expect(early.headers.get('x-rid-deny-reason')).toBe('no_subscription');
+
+    // Steps 5-6: request with a purpose; lucia approves for 6 months.
     const subscriptionId = await requestAccess(page, apiName, appName);
 
     const steward = await (await browser.newContext()).newPage();
@@ -67,8 +91,8 @@ test.describe('a call through the gateway (M1-09)', () => {
     await page.goto(`/my-apps/requests/${subscriptionId}`);
     await expect(page.getByTestId('subscription-status')).toHaveText('Activa', { timeout: 60_000 });
 
+    // Steps 7-8: the call, and the denials.
     const token = await gatewayToken(clientId, clientSecret);
-    const base = `${gateway}/salud/${slug}/v1/afiliados`;
     const headers = (extra: Record<string, string> = {}) => ({
       authorization: `Bearer ${token}`,
       'x-rid-purpose': 'eligibility_check',
@@ -158,5 +182,23 @@ test.describe('a call through the gateway (M1-09)', () => {
     await page.goto(`/my-apps/requests/${subscriptionId}`);
     await expect(page.getByTestId('subscription-status')).toHaveText('Revocada');
     await expect(page.getByText('El convenio de intercambio terminó.')).toBeVisible();
+
+    // Step 10: marta reads the subscription's whole story and verifies the chain.
+    const regulator = await (await browser.newContext()).newPage();
+    await signIn(regulator, 'marta.regulador', `/audit/subscription/${subscriptionId}`);
+    const timeline = regulator.getByTestId('audit-timeline');
+    for (const action of [
+      'Acceso solicitado',
+      'Solicitud aprobada',
+      'Acceso activo en el gateway',
+      'Acceso revocado',
+    ]) {
+      await expect(timeline).toContainText(action);
+    }
+    await regulator.goto('/audit');
+    await regulator.getByRole('button', { name: 'Verificar integridad' }).click();
+    await expect(regulator.getByTestId('chain-check')).toContainText('Cadena íntegra');
+    await expectNoAccessibilityViolations(regulator);
+    await regulator.context().close();
   });
 });
