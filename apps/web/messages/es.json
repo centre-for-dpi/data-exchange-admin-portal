@@ -437,10 +437,10 @@
     "path": "Parámetro {name}",
     "pathWithType": "Parámetro {name} ({type})",
     "pathTypeParam": "Parámetro {name}, tipo en {typeParam}",
-    "header": "Cabecera X-RID-Data-Subject",
-    "headerWithType": "Cabecera X-RID-Data-Subject ({type})",
     "none": "Sin titular",
     "undeclared": "No declarado",
-    "note": "El gateway registra de quién son los datos de cada consulta, como seudónimo, para que el ciudadano vea quién los consultó. Si el titular va en la cabecera, envíala en cada llamada."
+    "note": "El gateway registra de quién son los datos de cada consulta, como seudónimo, para que el ciudadano vea quién los consultó. Si el titular va en el cuerpo, el gateway lo lee de ahí: no hace falta enviarlo aparte.",
+    "body": "Cuerpo: {pointer}",
+    "bodyWithType": "Cuerpo: {pointer} ({type})"
   }
 }

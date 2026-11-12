@@ -15,7 +15,7 @@ const ID_PATTERN = '^[0-9]{6,12}$';
 /** Headers the gateway adds (ARCHITECTURE.md §6). Logged so the demo can show what arrived. */
 const TRACE_HEADER = /^x-rid-|^x-request-id$/;
 /** Never log these values in clear, even if the gateway forwards them. */
-const MASKED_HEADERS = new Set(['x-rid-end-user', 'x-rid-data-subject']);
+const MASKED_HEADERS = new Set(['x-rid-end-user', 'x-rid-data-subject', 'x-rid-body-subject']);
 
 export function traceHeaders(
   headers: Record<string, string | string[] | undefined>,

@@ -22,10 +22,47 @@ const version = (overrides: Partial<VersionForGateway> = {}): VersionForGateway 
   basePath: '/salud/afiliacion/v1',
   upstream: { type: 'node', servicePath: '/salud' },
   methods: ['get', 'POST', 'GET'],
+  bodySubjects: [],
   entitySlug: 'salud',
   apiName: 'Consulta de afiliación',
   version: '1.0',
   ...overrides,
+});
+
+describe('data subject read from the body (ADR-0017)', () => {
+  it('adds rid-data-subject only to routes with body subjects', () => {
+    const without = desiredGateway(version(), settings).route.plugins as Plugins;
+    expect(without).not.toHaveProperty('rid-data-subject');
+
+    const plugins = desiredGateway(
+      version({
+        bodySubjects: [
+          {
+            method: 'post',
+            pathRegex: '^/salud/afiliacion/v1/afiliados/verificaciones$',
+            pointer: '/numeroIdentificacion',
+          },
+          { method: 'POST', pathRegex: '^/x$', pointer: '/n', typePointer: '/t' },
+        ],
+      }),
+      settings,
+    ).route.plugins as Plugins;
+    expect(plugins['rid-data-subject']).toEqual({
+      operations: [
+        {
+          method: 'POST',
+          uri: '^/salud/afiliacion/v1/afiliados/verificaciones$',
+          pointer: '/numeroIdentificacion',
+        },
+        { method: 'POST', uri: '^/x$', pointer: '/n', type_pointer: '/t' },
+      ],
+    });
+    // OPA reads what the plugin extracted and never returns it: it does not reach the provider.
+    expect(plugins.opa?.send_headers_upstream).toContain('X-RID-Body-Subject');
+    // proxy-rewrite runs after the plugin and must not remove its value.
+    const removed = (plugins['proxy-rewrite']?.headers as { remove: string[] }).remove;
+    expect(removed).not.toContain('X-RID-Body-Subject');
+  });
 });
 
 type Plugins = Record<string, Record<string, unknown>>;
@@ -71,10 +108,10 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     expect(removed).toContain('X-RID-Subject-Ref');
     expect(removed).not.toContain('X-RID-Purpose');
     expect(removed).not.toContain('X-RID-End-User');
-    expect(removed).not.toContain('X-RID-Data-Subject');
+    expect(removed).not.toContain('X-RID-Body-Subject');
     // OPA decides these; the clear official and data subject are listed and never returned.
     const decided = plugins.opa?.send_headers_upstream as string[];
-    for (const header of ['X-RID-Subject-Ref', 'X-RID-End-User', 'X-RID-Data-Subject']) {
+    for (const header of ['X-RID-Subject-Ref', 'X-RID-End-User', 'X-RID-Body-Subject']) {
       expect(decided).toContain(header);
     }
   });

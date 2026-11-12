@@ -49,7 +49,7 @@ test.describe('catalogue (M1-05)', () => {
       main.getByRole('cell', { name: 'Parámetro numeroIdentificacion (CC)' }),
     ).toBeVisible();
     await expect(
-      main.getByRole('cell', { name: 'Cabecera X-RID-Data-Subject (CC)' }),
+      main.getByRole('cell', { name: 'Cuerpo: /numeroIdentificacion (CC)' }),
     ).toBeVisible();
     // Scalar renders the operations of the OpenAPI document, read-only.
     await expect(page.getByText('Consultar afiliación').first()).toBeVisible({ timeout: 15_000 });

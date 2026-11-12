@@ -27,14 +27,15 @@ export function pathRegex(basePath: string, openapiPath: string): string {
  * How OPA finds the data subject of an operation (ADR-0015):
  * - path: `regex` is the operation's path regex with capture groups around the subject's number
  *   (and, if any, its document type); the group numbers say which is which.
- * - header: X-RID-Data-Subject, as "TYPE:NUMBER" or just "NUMBER" (then `documentType`, or the
- *   country's default).
+ * - body: the gateway plugin rid-data-subject reads it from the JSON body (ADR-0017) and passes
+ *   it as X-RID-Body-Subject, "TYPE:NUMBER" or just "NUMBER" (then `documentType`, or the
+ *   country's default). The consumer cannot assert it.
  * - none: the operation has no data subject.
  * Operations of versions published before MT-01 carry no `subject`: no reference is computed.
  */
 export type BundleSubject =
   | { in: 'path'; regex: string; numberGroup: number; typeGroup?: number; documentType?: string }
-  | { in: 'header'; documentType?: string }
+  | { in: 'body'; documentType?: string }
   | { in: 'none' };
 
 export interface BundleOperation {
@@ -61,9 +62,10 @@ export function bundleSubject(
 ): BundleSubject | undefined {
   if (!subject) return undefined;
   if (subject.in === 'none') return { in: 'none' };
-  if (subject.in === 'header') {
+  if (subject.in === 'body') {
+    // The pointers stay with the gateway plugin; OPA only reads what the plugin extracted.
     return {
-      in: 'header',
+      in: 'body',
       ...(subject.documentType ? { documentType: subject.documentType } : {}),
     };
   }

@@ -88,6 +88,7 @@ services:
       APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?set APISIX_ADMIN_KEY in .env}
     volumes:
       - ../apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ../apisix/plugins:/usr/local/apisix/rid:ro
     ports:
       - 127.0.0.1:${APISIX_HTTP_PORT:-9080}:9080
       - 127.0.0.1:${APISIX_HTTPS_PORT:-9443}:9443

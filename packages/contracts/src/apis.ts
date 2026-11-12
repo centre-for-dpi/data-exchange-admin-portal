@@ -23,13 +23,11 @@ const slug = z
   .string()
   .regex(/^[a-z][a-z0-9-]{1,38}[a-z0-9]$/, 'lower-case letters, digits and hyphens (3-40)');
 
-/** Header that carries the data subject when the identifier travels in the body (ADR-0015). */
-export const DATA_SUBJECT_HEADER = 'X-RID-Data-Subject';
-
 /**
- * Where the data subject of an operation is (OpenAPI extension `x-rid-data-subject`, ADR-0015):
- * a path parameter, the X-RID-Data-Subject header (identifier in the body), or none. The document
- * type is fixed (`documentType`), read from another path parameter (`documentTypeParam`), or the
+ * Where the data subject of an operation is (OpenAPI extension `x-rid-data-subject`, ADR-0015,
+ * ADR-0017): a path parameter, a JSON pointer into the request body (read by the gateway, never
+ * asserted by the consumer), or none. The document type is fixed (`documentType`), read from
+ * another path parameter or body field (`documentTypeParam`, `documentTypePointer`), or the
  * country's default person document type.
  */
 export const dataSubjectSchema = z.discriminatedUnion('in', [
@@ -39,7 +37,12 @@ export const dataSubjectSchema = z.discriminatedUnion('in', [
     documentType: z.string().optional(),
     documentTypeParam: z.string().optional(),
   }),
-  z.object({ in: z.literal('header'), documentType: z.string().optional() }),
+  z.object({
+    in: z.literal('body'),
+    pointer: z.string(),
+    documentType: z.string().optional(),
+    documentTypePointer: z.string().optional(),
+  }),
   z.object({ in: z.literal('none') }),
 ]);
 export type DataSubject = z.infer<typeof dataSubjectSchema>;

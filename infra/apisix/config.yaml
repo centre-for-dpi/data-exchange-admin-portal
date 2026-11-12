@@ -3,6 +3,8 @@
 apisix:
   node_listen: 9080
   enable_ipv6: false
+  # Our own plugins (infra/apisix/plugins, mounted read-only): rid-data-subject (ADR-0017).
+  extra_lua_path: /usr/local/apisix/rid/?.lua
   ssl:
     enable: true
     listen:
@@ -51,3 +53,118 @@ plugin_attr:
     export_addr:
       ip: 0.0.0.0
       port: 9091
+
+# Declaring one plugin replaces APISIX's default list: these are the defaults of 3.19 plus ours.
+# (Trimming the list to what routes use is hardening for M6.)
+plugins:
+  - real-ip
+  - ai
+  - client-control
+  - proxy-buffering
+  - proxy-control
+  - request-id
+  - zipkin
+  - ext-plugin-pre-req
+  - fault-injection
+  - mocking
+  - serverless-pre-function
+  - cors
+  - ip-restriction
+  - ua-restriction
+  - referer-restriction
+  - csrf
+  - uri-blocker
+  - request-validation
+  - chaitin-waf
+  - multi-auth
+  - openid-connect
+  - saml-auth
+  - cas-auth
+  - authz-casbin
+  - authz-casdoor
+  - wolf-rbac
+  - ldap-auth-advanced
+  - ldap-auth
+  - hmac-auth
+  - basic-auth
+  - jwt-auth
+  - jwe-decrypt
+  - key-auth
+  - dingtalk-auth
+  - feishu-auth
+  - acl
+  - consumer-restriction
+  - attach-consumer-label
+  - forward-auth
+  - opa
+  - authz-keycloak
+  - data-mask
+  - proxy-cache
+  - body-transformer
+  - ai-prompt-template
+  - ai-prompt-decorator
+  - ai-prompt-guard
+  - ai-rag
+  - ai-rate-limiting
+  - ai-proxy-multi
+  - ai-proxy
+  - ai-cache
+  - ai-aws-content-moderation
+  - ai-aliyun-content-moderation
+  - ai-lakera-guard
+  - proxy-mirror
+  - graphql-proxy-cache
+  - proxy-rewrite
+  - workflow
+  - api-breaker
+  - graphql-limit-count
+  - limit-conn
+  - limit-count
+  - limit-req
+  - gzip
+  - server-info
+  - traffic-label
+  - traffic-split
+  - redirect
+  - response-rewrite
+  - openapi-to-mcp
+  - oas-validator
+  - mcp-bridge
+  - degraphql
+  - kafka-proxy
+  - websocket-proxy
+  - grpc-transcode
+  - grpc-web
+  - http-dubbo
+  - public-api
+  - prometheus
+  - datadog
+  - lago
+  - loki-logger
+  - elasticsearch-logger
+  - echo
+  - loggly
+  - http-logger
+  - splunk-hec-logging
+  - skywalking-logger
+  - google-cloud-logging
+  - sls-logger
+  - tcp-logger
+  - kafka-logger
+  - rocketmq-logger
+  - syslog
+  - udp-logger
+  - file-logger
+  - clickhouse-logger
+  - tencent-cloud-cls
+  - inspect
+  - example-plugin
+  - aws-lambda
+  - azure-functions
+  - openwhisk
+  - openfunction
+  - serverless-post-function
+  - ext-plugin-post-req
+  - ext-plugin-post-resp
+  - ai-request-rewrite
+  - rid-data-subject

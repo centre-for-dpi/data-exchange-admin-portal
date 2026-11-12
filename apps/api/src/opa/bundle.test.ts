@@ -56,11 +56,11 @@ describe('bundleSubject (where OPA finds the data subject, ADR-0015)', () => {
     });
   });
 
-  it('passes header and none declarations through; undeclared operations get nothing', () => {
-    expect(bundleSubject('/a/b/v1', '/x', { in: 'header', documentType: 'PP' })).toEqual({
-      in: 'header',
-      documentType: 'PP',
-    });
+  it('keeps body pointers with the gateway plugin; undeclared operations get nothing', () => {
+    // OPA only reads what the plugin extracted: the pointers do not go into the bundle.
+    expect(
+      bundleSubject('/a/b/v1', '/x', { in: 'body', pointer: '/persona/id', documentType: 'PP' }),
+    ).toEqual({ in: 'body', documentType: 'PP' });
     expect(bundleSubject('/a/b/v1', '/x', { in: 'none' })).toEqual({ in: 'none' });
     expect(bundleSubject('/a/b/v1', '/x', null)).toBeUndefined();
   });

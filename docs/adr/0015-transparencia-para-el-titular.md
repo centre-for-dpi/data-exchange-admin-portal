@@ -3,6 +3,7 @@
 - Estado: Aceptado
 - Fecha: 2026-11-12
 - Precisa: ADR-0006 (sigue vigente: no se guarda contenido ni rutas)
+- Precisado por: ADR-0017 (el titular en el cuerpo lo lee el gateway; la cabecera `X-RID-Data-Subject` declarada por el consumidor queda descartada)
 
 ## Contexto
 

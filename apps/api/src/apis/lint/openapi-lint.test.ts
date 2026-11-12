@@ -52,7 +52,7 @@ describe('OpenAPI lint (RID ruleset)', () => {
         operationId: 'verificarAfiliacion',
         method: 'POST',
         path: '/afiliados/verificaciones',
-        dataSubject: { in: 'header', documentType: 'CC' },
+        dataSubject: { in: 'body', pointer: '/numeroIdentificacion', documentType: 'CC' },
       },
     ]);
   });
@@ -87,17 +87,71 @@ describe('OpenAPI lint (RID ruleset)', () => {
       ).toEqual([]);
     });
 
-    it('accepts a path parameter, the header, or none', async () => {
+    it('accepts a path parameter or none', async () => {
       for (const yaml of [
         'x-rid-data-subject:\n  in: path\n  name: thingId',
         'x-rid-data-subject:\n  in: path\n  name: thingId\n  documentType: CE',
-        'x-rid-data-subject:\n  in: header',
         'x-rid-data-subject: none',
       ]) {
         expect(await codes(withSubject(yaml)), yaml).toEqual([]);
       }
       const { operations } = await lintOpenApi(withSubject('x-rid-data-subject: none'), personal);
       expect(operations[0]?.dataSubject).toEqual({ in: 'none' });
+    });
+
+    describe('in the body, read by the gateway (ADR-0017)', () => {
+      const post = (subject: string) => `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /checks:
+    post:
+      operationId: check
+${subject
+  .split('\n')
+  .map((l) => `      ${l}`)
+  .join('\n')}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: ok
+`;
+
+      it('accepts a JSON pointer, with a fixed or a body document type', async () => {
+        for (const yaml of [
+          'x-rid-data-subject:\n  in: body\n  pointer: /numeroIdentificacion',
+          'x-rid-data-subject:\n  in: body\n  pointer: /persona/numero\n  documentType: CE',
+          'x-rid-data-subject:\n  in: body\n  pointer: /persona/numero\n  documentTypePointer: /persona/tipo',
+        ]) {
+          expect(await codes(post(yaml)), yaml).toEqual([]);
+        }
+        const { operations } = await lintOpenApi(
+          post('x-rid-data-subject:\n  in: body\n  pointer: /persona/numero'),
+          personal,
+        );
+        expect(operations[0]?.dataSubject).toEqual({ in: 'body', pointer: '/persona/numero' });
+      });
+
+      it('rejects bad pointers, both type sources, and operations without a JSON body', async () => {
+        expect(
+          await codes(post('x-rid-data-subject:\n  in: body\n  pointer: numeroIdentificacion')),
+        ).toEqual(['rid-data-subject-pointer']);
+        expect(
+          await codes(
+            post(
+              'x-rid-data-subject:\n  in: body\n  pointer: /n\n  documentType: CC\n  documentTypePointer: /t',
+            ),
+          ),
+        ).toEqual(['rid-data-subject-invalid']);
+        expect(
+          await codes(withSubject('x-rid-data-subject:\n  in: body\n  pointer: /numero')),
+        ).toEqual(['rid-data-subject-body']);
+      });
     });
 
     it('rejects parameters that are not in the path and unknown document types', async () => {
@@ -112,7 +166,11 @@ describe('OpenAPI lint (RID ruleset)', () => {
         ),
       ).toEqual(['rid-data-subject-parameter']);
       expect(
-        await codes(withSubject('x-rid-data-subject:\n  in: header\n  documentType: PASAPORTE')),
+        await codes(
+          withSubject(
+            'x-rid-data-subject:\n  in: path\n  name: thingId\n  documentType: PASAPORTE',
+          ),
+        ),
       ).toEqual(['rid-data-subject-document-type']);
     });
 
@@ -121,7 +179,8 @@ describe('OpenAPI lint (RID ruleset)', () => {
         'x-rid-data-subject: thingId',
         'x-rid-data-subject:\n  in: query\n  name: thingId',
         'x-rid-data-subject:\n  in: path',
-        'x-rid-data-subject:\n  in: header\n  name: thingId',
+        // The consumer-declared header (before ADR-0017) is no longer accepted.
+        'x-rid-data-subject:\n  in: header',
       ]) {
         const result = await lintOpenApi(withSubject(yaml), personal);
         expect(

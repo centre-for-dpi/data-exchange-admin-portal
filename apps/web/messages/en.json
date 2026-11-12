@@ -437,10 +437,10 @@
     "path": "Parameter {name}",
     "pathWithType": "Parameter {name} ({type})",
     "pathTypeParam": "Parameter {name}, type in {typeParam}",
-    "header": "Header X-RID-Data-Subject",
-    "headerWithType": "Header X-RID-Data-Subject ({type})",
     "none": "No data subject",
     "undeclared": "Not declared",
-    "note": "The gateway records whose data each call concerns, as a pseudonym, so citizens can see who consulted it. When the data subject goes in the header, send it on every call."
+    "note": "The gateway records whose data each call concerns, as a pseudonym, so citizens can see who consulted it. When the data subject is in the body, the gateway reads it there: nothing else to send.",
+    "body": "Body: {pointer}",
+    "bodyWithType": "Body: {pointer} ({type})"
   }
 }

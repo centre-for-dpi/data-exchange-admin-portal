@@ -10,6 +10,7 @@ import { isIP } from 'node:net';
 import { isPublicAddress, type Upstream, upstreamSchema } from '@rid/contracts';
 import { ZodError } from 'zod';
 import { listOperations } from '../../apis/lint/openapi-lint.js';
+import { pathRegex } from '../../opa/bundle.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
 import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apisix-admin.js';
@@ -129,14 +130,27 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       }
 
       const upstreamConfig = upstreamSchema.parse(version.upstream);
+      const operations = listOperations(version.openapiSpec as Record<string, unknown>);
       await this.assertPublicUpstream(upstreamConfig);
       const desired = desiredGateway(
         {
           id: version.id,
           basePath: version.basePath,
           upstream: upstreamConfig,
-          methods: listOperations(version.openapiSpec as Record<string, unknown>).map(
-            (o) => o.method,
+          methods: operations.map((o) => o.method),
+          bodySubjects: operations.flatMap((o) =>
+            o.dataSubject?.in === 'body'
+              ? [
+                  {
+                    method: o.method,
+                    pathRegex: pathRegex(version.basePath, o.path),
+                    pointer: o.dataSubject.pointer,
+                    ...(o.dataSubject.documentTypePointer
+                      ? { typePointer: o.dataSubject.documentTypePointer }
+                      : {}),
+                  },
+                ]
+              : [],
           ),
           entitySlug: version.api.entity.slug,
           apiName: version.api.name,

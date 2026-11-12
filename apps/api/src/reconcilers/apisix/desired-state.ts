@@ -38,8 +38,8 @@ export const GATEWAY_ONLY_HEADERS = [
 
 /**
  * Headers OPA decides on; any of them the policy does not return is removed (S-1). The policy
- * never returns X-RID-End-User nor X-RID-Data-Subject: the clear values the client sent for OPA
- * to read (the official, the data subject) do not reach the provider (ADR-0015).
+ * never returns X-RID-End-User nor X-RID-Body-Subject: the clear values OPA reads (the official,
+ * the data subject the gateway took from the body) do not reach the provider (ADR-0015, ADR-0017).
  */
 export const OPA_UPSTREAM_HEADERS = [
   'X-RID-Consumer-Entity',
@@ -50,6 +50,8 @@ export const OPA_UPSTREAM_HEADERS = [
   'X-RID-End-User-Hash',
   'X-RID-Subject-Ref',
   'X-RID-End-User',
+  'X-RID-Body-Subject',
+  // Legacy consumer-declared header (before ADR-0017): never forwarded either.
   'X-RID-Data-Subject',
   'X-Request-Id',
 ];
@@ -83,6 +85,14 @@ export interface VersionForGateway {
   upstream: Upstream;
   /** HTTP methods declared in the OpenAPI document. */
   methods: readonly string[];
+  /** Operations whose data subject is in the JSON body (x-rid-data-subject in: body). */
+  bodySubjects: ReadonlyArray<{
+    method: string;
+    /** Anchored regex on the full public path (as in the OPA bundle). */
+    pathRegex: string;
+    pointer: string;
+    typePointer?: string;
+  }>;
   entitySlug: string;
   apiName: string;
   version: string;
@@ -191,6 +201,20 @@ export function desiredGateway(v: VersionForGateway, settings: GatewaySettings):
         inactive_timeout: 2,
         log_format: ACCESS_LOG_FORMAT,
       },
+      // Data subjects declared in the body are read by the gateway, never asserted by the
+      // consumer (ADR-0017). Only routes that have such operations carry the plugin.
+      ...(v.bodySubjects.length > 0
+        ? {
+            'rid-data-subject': {
+              operations: v.bodySubjects.map((s) => ({
+                method: s.method.toUpperCase(),
+                uri: s.pathRegex,
+                pointer: s.pointer,
+                ...(s.typePointer ? { type_pointer: s.typePointer } : {}),
+              })),
+            },
+          }
+        : {}),
     },
   };
   return { upstream, route };

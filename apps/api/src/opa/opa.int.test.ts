@@ -187,7 +187,7 @@ describe('OPA bundle and activation (M1-09)', () => {
             id: 'verificarAfiliacion',
             method: 'POST',
             pathRegex: `^/salud/opa-${run}/v1/afiliados/verificaciones$`,
-            subject: { in: 'header', documentType: 'CC' },
+            subject: { in: 'body', documentType: 'CC' },
           },
         ],
       });

@@ -3,9 +3,10 @@ import { expect, test } from '@playwright/test';
 import { createApplication, openRequestForm, publishNewApi, signIn } from './flows';
 import { approveAsSteward, gateway, gatewayToken, providerSaw } from './gateway-flows';
 
-// MT-02 (ADR-0015): the gateway turns the data subject of every call into a keyed pseudonym,
-// X-RID-Subject-Ref. The provider gets the pseudonym, never the X-RID-Data-Subject header in clear;
-// an operation that declares a data subject is denied without one.
+// MT-02 (ADR-0015, ADR-0017): the gateway turns the data subject of every call into a keyed
+// pseudonym, X-RID-Subject-Ref, reading it from the path or from the JSON body itself (never from
+// a consumer claim). The provider gets the pseudonym only; an operation that declares a data
+// subject is denied without one.
 test.describe('data subject pseudonym at the gateway (MT-02)', () => {
   test('same person, same reference, wherever the identifier travels', async ({
     browser,
@@ -73,21 +74,26 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     const ref = (await seenBy(byPath.requestId))['x-rid-subject-ref'] ?? '';
     expect(ref).toMatch(/^[0-9a-f]{64}$/);
 
-    // Same person, identifier in the body and declared in the header: same reference, and the
-    // header in clear never reaches the provider (the mock would log it, masked).
-    const verify = (headers: Record<string, string>) =>
+    // Same person, identifier in the body: the gateway reads it there (ADR-0017) and gets the same
+    // reference. Whatever the consumer claims in headers about another person changes nothing,
+    // and none of those values reaches the provider (the mock would log them, masked).
+    const verify = (body: Record<string, unknown>, headers: Record<string, string> = {}) =>
       call('/verificaciones', {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...headers },
-        body: JSON.stringify({ numeroIdentificacion: '1000000001' }),
+        body: JSON.stringify(body),
       });
-    const byHeader = await verify({ 'x-rid-data-subject': 'CC:1000000001' });
-    expect(byHeader.res.status).toBe(200);
-    const headerSeen = await seenBy(byHeader.requestId);
-    expect(headerSeen['x-rid-subject-ref']).toBe(ref);
-    expect(headerSeen).not.toHaveProperty('x-rid-data-subject');
+    const byBody = await verify(
+      { numeroIdentificacion: '1000000001' },
+      { 'x-rid-body-subject': 'CC:1000000999', 'x-rid-data-subject': 'CC:1000000999' },
+    );
+    expect(byBody.res.status).toBe(200);
+    const bodySeen = await seenBy(byBody.requestId);
+    expect(bodySeen['x-rid-subject-ref']).toBe(ref);
+    expect(bodySeen).not.toHaveProperty('x-rid-body-subject');
+    expect(bodySeen).not.toHaveProperty('x-rid-data-subject');
 
-    // Without the header, the gateway does not know whose data it is: denied.
+    // A body without the identifier: the gateway does not know whose data it is, denied.
     const anonymous = await verify({});
     expect(anonymous.res.status).toBe(403);
     expect(anonymous.res.headers.get('x-rid-deny-reason')).toBe('data_subject_required');

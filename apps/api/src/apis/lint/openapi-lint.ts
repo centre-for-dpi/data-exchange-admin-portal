@@ -79,10 +79,13 @@ export const DATA_SUBJECT_EXTENSION = 'x-rid-data-subject';
 const templateParams = (path: string): string[] =>
   [...path.matchAll(/\{([^/{}]+)\}/g)].map((m) => m[1] ?? '');
 
+/** RFC 6901 JSON pointer, as the gateway plugin accepts it (non-empty, starting with "/"). */
+export const JSON_POINTER = /^(\/([^~/]|~[01])*)+$/;
+
 /**
  * Reads x-rid-data-subject: "none", or an object { in: path, name, documentType?,
- * documentTypeParam? } | { in: header, documentType? } | { in: none }. Returns 'invalid' for any
- * other shape and undefined when the extension is absent.
+ * documentTypeParam? } | { in: body, pointer, documentType?, documentTypePointer? } | { in: none }.
+ * Returns 'invalid' for any other shape and undefined when the extension is absent.
  */
 export function parseDataSubject(raw: unknown): DataSubject | 'invalid' | undefined {
   if (raw === undefined) return undefined;
@@ -93,10 +96,21 @@ export function parseDataSubject(raw: unknown): DataSubject | 'invalid' | undefi
     value[key] === undefined || (typeof value[key] === 'string' && value[key] !== '');
   const only = (keys: string[]) => Object.keys(value).every((k) => keys.includes(k));
   if (value.in === 'none' && only(['in'])) return { in: 'none' };
-  if (value.in === 'header' && only(['in', 'documentType']) && optionalString('documentType')) {
+  if (
+    value.in === 'body' &&
+    only(['in', 'pointer', 'documentType', 'documentTypePointer']) &&
+    typeof value.pointer === 'string' &&
+    value.pointer !== '' &&
+    optionalString('documentType') &&
+    optionalString('documentTypePointer')
+  ) {
     return {
-      in: 'header',
+      in: 'body',
+      pointer: value.pointer,
       ...(typeof value.documentType === 'string' ? { documentType: value.documentType } : {}),
+      ...(typeof value.documentTypePointer === 'string'
+        ? { documentTypePointer: value.documentTypePointer }
+        : {}),
     };
   }
   if (
@@ -221,7 +235,7 @@ function dataSubjectIssues(
         if (options.dataSubject?.required) {
           issue(
             'rid-data-subject-required',
-            `Operation ${name} must declare whose data it handles: ${DATA_SUBJECT_EXTENSION} with a path parameter, the header, or none`,
+            `Operation ${name} must declare whose data it handles: ${DATA_SUBJECT_EXTENSION} with a path parameter, a body pointer, or none`,
             at,
           );
         }
@@ -231,7 +245,7 @@ function dataSubjectIssues(
       if (subject === 'invalid') {
         issue(
           'rid-data-subject-invalid',
-          `${DATA_SUBJECT_EXTENSION} must be "none", { in: path, name, documentType? or documentTypeParam? } or { in: header, documentType? }`,
+          `${DATA_SUBJECT_EXTENSION} must be "none", { in: path, name, documentType? or documentTypeParam? } or { in: body, pointer, documentType? or documentTypePointer? }`,
           atExtension,
         );
         continue;
@@ -260,6 +274,34 @@ function dataSubjectIssues(
           issue(
             'rid-data-subject-invalid',
             'Use either documentType or documentTypeParam, not both',
+            atExtension,
+          );
+        }
+      }
+      if (subject.in === 'body') {
+        // The gateway reads the subject from a JSON body: the operation must take one.
+        const body = (operation as { requestBody?: { content?: Record<string, unknown> } })
+          .requestBody;
+        if (!body?.content?.['application/json']) {
+          issue(
+            'rid-data-subject-body',
+            `Operation ${name} declares its data subject in the body but takes no application/json request body`,
+            atExtension,
+          );
+        }
+        for (const pointer of [subject.pointer, subject.documentTypePointer]) {
+          if (pointer && !JSON_POINTER.test(pointer)) {
+            issue(
+              'rid-data-subject-pointer',
+              `"${pointer}" is not a JSON pointer (RFC 6901), e.g. /numeroIdentificacion`,
+              atExtension,
+            );
+          }
+        }
+        if (subject.documentType && subject.documentTypePointer) {
+          issue(
+            'rid-data-subject-invalid',
+            'Use either documentType or documentTypePointer, not both',
             atExtension,
           );
         }

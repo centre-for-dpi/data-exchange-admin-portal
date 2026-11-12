@@ -39,9 +39,10 @@ paths:
   /afiliados/verificaciones:
     post:
       operationId: verificarAfiliacion
-      # The identifier travels in the body: consumers also send it in X-RID-Data-Subject.
+      # The identifier travels in the body: the gateway reads it there (ADR-0017).
       x-rid-data-subject:
-        in: header
+        in: body
+        pointer: /numeroIdentificacion
         documentType: CC
       tags: [Afiliación]
       summary: Verificar afiliación

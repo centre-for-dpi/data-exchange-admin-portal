@@ -21,7 +21,7 @@ bundle := {
 			{
 				"id": "verificarAfiliacion", "method": "POST",
 				"pathRegex": "^/salud/afiliacion/v1/afiliados/verificaciones$",
-				"subject": {"in": "header", "documentType": "CC"},
+				"subject": {"in": "body", "documentType": "CC"},
 			},
 			{
 				"id": "getPersona", "method": "GET",
@@ -289,23 +289,23 @@ test_a_malformed_number_is_denied if {
 	denied(get_path("/salud/afiliacion/v1/afiliados/1000%2F0001"), bundle, "data_subject_required")
 }
 
-test_the_header_subject_becomes_a_reference_and_never_reaches_the_provider if {
-	h := headers_for(post_verification({"x-rid-data-subject": "CC:1000000001"}), all_operations)
+test_the_body_subject_read_by_the_gateway_becomes_a_reference if {
+	h := headers_for(post_verification({"x-rid-body-subject": "CC:1000000001"}), all_operations)
 	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
-	not h["X-RID-Data-Subject"]
-	not h["x-rid-data-subject"]
+	not h["X-RID-Body-Subject"]
+	not h["x-rid-body-subject"]
 }
 
-test_a_bare_number_in_the_header_uses_the_operation_document_type if {
-	h := headers_for(post_verification({"x-rid-data-subject": " 1000000001 "}), all_operations)
+test_a_bare_number_uses_the_operation_document_type if {
+	h := headers_for(post_verification({"x-rid-body-subject": " 1000000001 "}), all_operations)
 	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
 }
 
-test_an_operation_with_a_header_subject_requires_it if {
+test_an_operation_with_a_body_subject_requires_it if {
 	denied(post_verification({}), all_operations, "data_subject_required")
-	denied(post_verification({"x-rid-data-subject": ["CC:1000000001", "CC:1000000002"]}), all_operations, "data_subject_required")
-	denied(post_verification({"x-rid-data-subject": "CC:1000:0001"}), all_operations, "data_subject_required")
-	denied(post_verification({"x-rid-data-subject": "XX:1000000001"}), all_operations, "data_subject_required")
+	denied(post_verification({"x-rid-body-subject": ["CC:1000000001", "CC:1000000002"]}), all_operations, "data_subject_required")
+	denied(post_verification({"x-rid-body-subject": "CC:1000:0001"}), all_operations, "data_subject_required")
+	denied(post_verification({"x-rid-body-subject": "XX:1000000001"}), all_operations, "data_subject_required")
 }
 
 test_operations_without_a_subject_carry_no_reference if {
@@ -321,6 +321,11 @@ test_operations_without_a_subject_carry_no_reference if {
 test_a_denial_never_carries_the_reference if {
 	h := headers_for(with_headers({"x-rid-purpose": "benefit_targeting"}), bundle)
 	not h["X-RID-Subject-Ref"]
+}
+
+test_the_consumer_cannot_assert_the_subject_in_a_header if {
+	# Only the gateway plugin sets x-rid-body-subject; the old consumer header is ignored.
+	denied(post_verification({"x-rid-data-subject": "CC:1000000001"}), all_operations, "data_subject_required")
 }
 
 # --- Rule 6: deny response ------------------------------------------------------------------

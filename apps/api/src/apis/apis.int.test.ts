@@ -223,7 +223,10 @@ describe('API registration (M1-03)', () => {
         lintReport: { valid: true },
         operations: [
           { operationId: 'getAfiliado', dataSubject: { in: 'path', name: 'numeroIdentificacion' } },
-          { operationId: 'verificarAfiliacion', dataSubject: { in: 'header' } },
+          {
+            operationId: 'verificarAfiliacion',
+            dataSubject: { in: 'body', pointer: '/numeroIdentificacion' },
+          },
         ],
       });
     });

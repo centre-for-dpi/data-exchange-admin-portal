@@ -97,7 +97,7 @@ end_user_missing if {
 # The operation says where its data subject is (bundle `subject`, from x-rid-data-subject). The
 # policy turns it into a keyed pseudonym; the document number itself never leaves the request.
 
-declares_subject if operation.subject.in in {"path", "header"}
+declares_subject if operation.subject.in in {"path", "body"}
 
 # Document numbers are compared without spaces, dots or hyphens, in upper case.
 normalized(value) := upper(replace(replace(replace(trim_space(value), " ", ""), ".", ""), "-", ""))
@@ -116,8 +116,10 @@ subject_type := upper(path_match[operation.subject.typeGroup]) if {
 
 subject_number := normalized(path_match[operation.subject.numberGroup])
 
-# Header form: "TYPE:NUMBER", or just "NUMBER" with the operation's (or the country's) type.
-header_parts := split(header("x-rid-data-subject"), ":") if operation.subject.in == "header"
+# Body subjects: the gateway plugin rid-data-subject read them from the JSON body (ADR-0017) and
+# passes "TYPE:NUMBER", or just "NUMBER" with the operation's (or the country's) type. Any value
+# the client sent in that header was removed before; the consumer cannot assert the subject.
+header_parts := split(header("x-rid-body-subject"), ":") if operation.subject.in == "body"
 
 subject_type := upper(trim_space(header_parts[0])) if count(header_parts) == 2
 
@@ -185,7 +187,7 @@ subject_header := {"X-RID-Subject-Ref": subject_ref} if subject_ref
 
 else := {}
 
-# X-RID-End-User and X-RID-Data-Subject are never returned: the opa plugin then removes the
+# X-RID-End-User and X-RID-Body-Subject are never returned: the opa plugin then removes the
 # clear values the client sent (SPIKE S-1).
 headers := object.union_n([base_headers, end_user_header, subject_header]) if allow
 
@@ -212,5 +214,5 @@ details := {
 	"purpose_not_allowed": "Send X-RID-Purpose with a purpose approved for this subscription.",
 	"subscription_expired": "The subscription is not valid at this time.",
 	"end_user_required": "This API requires X-RID-End-User with the official making the request.",
-	"data_subject_required": "Identify whose data you request: in the path, or in X-RID-Data-Subject as TYPE:NUMBER.",
+	"data_subject_required": "The request does not say whose data it asks for, in the path or in the body as the API documents.",
 }
