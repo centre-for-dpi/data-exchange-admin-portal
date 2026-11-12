@@ -244,6 +244,7 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 - [ ] **MT-03 — Registro de consultas por titular**
   - APISIX `tcp-logger` → Fluent Bit (perfil base, búfer en disco) → colector `POST /internal/subject-access` (token de servicio) → tabla de solo inserción, enriquecida con la entidad proveedora, la API, los datos expuestos y la finalidad.
   - Retención `retention.subjectAccessMonths`. Prueba de que el número de documento no aparece en logs, búferes ni tablas.
+  - Cada registro guarda **de dónde salió el titular**: la ruta (verificada por el gateway) o la cabecera (declarada por el consumidor; revisión de seguridad de MT-02). Así, una consulta con titular declarado no se presenta como verificada.
 - [ ] **MT-04 — Evidencia verificable**
   - Lotes Merkle (RFC 9162) con punto de control firmado (JWS EdDSA y JWKS), sello RFC 3161 de una TSA independiente (contenedor de desarrollo) y anclaje en la bitácora.
   - Comprobante por consulta y verificador abierto (`packages/transparency-verifier` y CLI).
