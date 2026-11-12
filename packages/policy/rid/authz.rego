@@ -92,6 +92,49 @@ end_user_missing if {
 	not end_user
 }
 
+# --- Data subject (ADR-0015) ----------------------------------------------------------------
+#
+# The operation says where its data subject is (bundle `subject`, from x-rid-data-subject). The
+# policy turns it into a keyed pseudonym; the document number itself never leaves the request.
+
+declares_subject if operation.subject.in in {"path", "header"}
+
+# Document numbers are compared without spaces, dots or hyphens, in upper case.
+normalized(value) := upper(replace(replace(replace(trim_space(value), " ", ""), ".", ""), "-", ""))
+
+default_document_type := object.get(operation.subject, "documentType", data.config.documentTypes[0])
+
+path_match := regex.find_all_string_submatch_n(operation.subject.regex, input.request.path, 1)[0] if {
+	operation.subject.in == "path"
+}
+
+subject_type := upper(path_match[operation.subject.typeGroup]) if {
+	operation.subject.typeGroup
+} else := default_document_type if {
+	operation.subject.in == "path"
+}
+
+subject_number := normalized(path_match[operation.subject.numberGroup])
+
+# Header form: "TYPE:NUMBER", or just "NUMBER" with the operation's (or the country's) type.
+header_parts := split(header("x-rid-data-subject"), ":") if operation.subject.in == "header"
+
+subject_type := upper(trim_space(header_parts[0])) if count(header_parts) == 2
+
+subject_type := default_document_type if count(header_parts) == 1
+
+subject_number := normalized(header_parts[1]) if count(header_parts) == 2
+
+subject_number := normalized(header_parts[0]) if count(header_parts) == 1
+
+subject_ref := crypto.hmac.sha256(
+	concat("|", [data.config.country, subject_type, subject_number]),
+	data.config.subjectRefKey,
+) if {
+	subject_type in data.config.documentTypes
+	regex.match(`^[A-Z0-9]{3,20}$`, subject_number)
+}
+
 # --- Decision -------------------------------------------------------------------------------
 
 # The first failing check names the reason (stable codes, ARCHITECTURE.md §4.2).
@@ -113,6 +156,9 @@ deny_reason := "no_subscription" if {
 	count(current) == 0
 } else := "end_user_required" if {
 	end_user_missing
+} else := "data_subject_required" if {
+	declares_subject
+	not subject_ref
 }
 
 default allow := false
@@ -131,15 +177,17 @@ base_headers := {
 	"X-Request-Id": object.get(input.request.headers, "x-request-id", ""),
 }
 
-headers := object.union(base_headers, {"X-RID-End-User-Hash": end_user_hash}) if {
-	allow
-	end_user_hash
-}
+end_user_header := {"X-RID-End-User-Hash": end_user_hash} if end_user_hash
 
-headers := base_headers if {
-	allow
-	not end_user_hash
-}
+else := {}
+
+subject_header := {"X-RID-Subject-Ref": subject_ref} if subject_ref
+
+else := {}
+
+# X-RID-End-User and X-RID-Data-Subject are never returned: the opa plugin then removes the
+# clear values the client sent (SPIKE S-1).
+headers := object.union_n([base_headers, end_user_header, subject_header]) if allow
 
 # Rule 6, deny: response headers and a problem+json body.
 headers := {
@@ -164,4 +212,5 @@ details := {
 	"purpose_not_allowed": "Send X-RID-Purpose with a purpose approved for this subscription.",
 	"subscription_expired": "The subscription is not valid at this time.",
 	"end_user_required": "This API requires X-RID-End-User with the official making the request.",
+	"data_subject_required": "Identify whose data you request: in the path, or in X-RID-Data-Subject as TYPE:NUMBER.",
 }

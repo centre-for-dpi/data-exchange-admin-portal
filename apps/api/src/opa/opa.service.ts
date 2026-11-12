@@ -1,4 +1,5 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import { getCountryConfig } from '@rid/config';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -10,6 +11,7 @@ import {
   type BundleClient,
   type BundleData,
   buildBundle,
+  bundleSubject,
   pathRegex,
 } from './bundle.js';
 import { readPolicies } from './policy-files.js';
@@ -53,8 +55,19 @@ export class OpaService implements OnApplicationBootstrap {
     return salt;
   }
 
+  private subjectRefKey(): string {
+    const key = process.env.RID_SUBJECT_REF_KEY ?? '';
+    // Document numbers are a small space: without a strong key the reference is reversible.
+    if (key.length < 32) {
+      throw new BundleUnavailableError('RID_SUBJECT_REF_KEY is missing or shorter than 32');
+    }
+    return key;
+  }
+
   async data(): Promise<{ data: BundleData; subscriptionIds: string[] }> {
     const salt = this.salt();
+    const subjectRefKey = this.subjectRefKey();
+    const country = getCountryConfig();
     const versions = await this.prisma.apiVersion.findMany({
       where: { status: { in: [...SERVED_VERSIONS] } },
       include: { api: true },
@@ -66,11 +79,15 @@ export class OpaService implements OnApplicationBootstrap {
       routes[routeId(v.id)] = {
         apiVersionId: v.id,
         classification: v.api.classification,
-        operations: listOperations(v.openapiSpec as Record<string, unknown>).map((o) => ({
-          id: o.operationId,
-          method: o.method,
-          pathRegex: pathRegex(v.basePath, o.path),
-        })),
+        operations: listOperations(v.openapiSpec as Record<string, unknown>).map((o) => {
+          const subject = bundleSubject(v.basePath, o.path, o.dataSubject);
+          return {
+            id: o.operationId,
+            method: o.method,
+            pathRegex: pathRegex(v.basePath, o.path),
+            ...(subject ? { subject } : {}),
+          };
+        }),
       };
       defaultRate.set(v.id, v.defaultRateLimit);
     }
@@ -115,7 +132,19 @@ export class OpaService implements OnApplicationBootstrap {
       };
       clients[app.keycloakClientId] = client;
     }
-    return { data: { routes, clients, config: { endUserHashSalt: salt } }, subscriptionIds };
+    return {
+      data: {
+        routes,
+        clients,
+        config: {
+          endUserHashSalt: salt,
+          subjectRefKey,
+          country: country.country.code,
+          documentTypes: [...country.identifiers.person],
+        },
+      },
+      subscriptionIds,
+    };
   }
 
   /** The current bundle; its revision is recorded so a later status report can be resolved. */

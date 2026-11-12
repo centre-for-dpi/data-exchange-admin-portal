@@ -228,10 +228,19 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Datos y UI:** `listOperations` y los contratos (`operationSchema`) exponen `dataSubject`. La ficha de versión (publicador y revisor) y el catálogo muestran el titular de cada operación. El catálogo explica que, si va en la cabecera, hay que enviarla.
     - **Mocks:** `getAfiliado` y `getHogar` declaran el titular en la ruta (CC); `verificarAfiliacion`, en la cabecera.
     - **Versiones ya publicadas sin declaración:** se registran sin titular hasta que el proveedor suba una versión que lo declare.
-- [ ] **MT-02 — Seudónimo del titular en el gateway**
+- [x] **MT-02 — Seudónimo del titular en el gateway**
   - El bundle incluye, por operación, cómo extraer el titular. OPA calcula `X-RID-Subject-Ref = HMAC-SHA-256(clave, país|tipo|número)`. La clave va en el bundle y es obligatoria (`RID_SUBJECT_REF_KEY`).
   - Sin titular declarado en la petición → `403 data_subject_required`. `X-RID-Data-Subject` en claro nunca llega al proveedor.
   - `opa test` con casos de cada regla; e2e: el proveedor recibe la referencia y no la cabecera en claro.
+  - _Notas de implementación:_
+    - **Bundle:** cada operación lleva `subject`. Si el titular va en la ruta, trae una expresión con grupos de captura alrededor del número (y del tipo, si viene en otro parámetro). Si va en la cabecera, trae el tipo por defecto. Si no tiene titular, `none`. La configuración agrega `subjectRefKey`, `country` y `documentTypes`.
+    - **Clave:** `RID_SUBJECT_REF_KEY` es obligatoria (32 caracteres o más); sin ella el bundle no se sirve (falla cerrado, como la sal del funcionario).
+    - **Seudónimo:** `HMAC-SHA-256(clave, país|tipo|número)`. El número se normaliza (sin espacios, puntos ni guiones, en mayúsculas) y debe tener entre 3 y 20 caracteres alfanuméricos; el tipo debe ser del país. La cabecera acepta `TIPO:NÚMERO` o solo `NÚMERO`, que toma el tipo de la operación o el primero del país.
+    - **Negación:** si la operación declara titular y no se puede leer (falta, está repetido, mal formado o el tipo no existe) → `403 data_subject_required`. Es la última razón del orden de negación.
+    - **Operaciones sin titular:** las `none` y las de versiones anteriores a MT-01 pasan sin seudónimo.
+    - **APISIX:** el cliente no puede enviar `X-RID-Subject-Ref` (`proxy-rewrite`). OPA decide `X-RID-Subject-Ref` y `X-RID-Data-Subject`, y como nunca devuelve la segunda, el número en claro no llega al proveedor. Los logs de analítica no incluyen el seudónimo (prueba unitaria).
+    - **Proveedor:** recibe `X-RID-Subject-Ref` (ADR-0015). El mock enmascara `x-rid-data-subject` en sus logs como defensa en profundidad.
+    - **Pruebas:** 32 `opa test` con 100 % de cobertura. El e2e `subject.spec.ts`, contra el gateway real, comprueba que la misma persona tiene el mismo seudónimo con el número en la ruta o en la cabecera, que la cabecera en claro no llega, que sin ella se niega, que otra persona tiene otro seudónimo y que un seudónimo falsificado se sobrescribe.
 - [ ] **MT-03 — Registro de consultas por titular**
   - APISIX `tcp-logger` → Fluent Bit (perfil base, búfer en disco) → colector `POST /internal/subject-access` (token de servicio) → tabla de solo inserción, enriquecida con la entidad proveedora, la API, los datos expuestos y la finalidad.
   - Retención `retention.subjectAccessMonths`. Prueba de que el número de documento no aparece en logs, búferes ni tablas.

@@ -171,11 +171,23 @@ describe('OPA bundle and activation (M1-09)', () => {
         apiVersionId: versionId,
         classification: 'personal',
         operations: [
-          { id: 'getAfiliado', method: 'GET', pathRegex: `^/salud/opa-${run}/v1/afiliados/[^/]+$` },
+          {
+            id: 'getAfiliado',
+            method: 'GET',
+            pathRegex: `^/salud/opa-${run}/v1/afiliados/[^/]+$`,
+            // Where OPA finds the data subject (ADR-0015): the captured path segment, a cédula.
+            subject: {
+              in: 'path',
+              regex: `^/salud/opa-${run}/v1/afiliados/([^/]+)$`,
+              numberGroup: 1,
+              documentType: 'CC',
+            },
+          },
           {
             id: 'verificarAfiliacion',
             method: 'POST',
             pathRegex: `^/salud/opa-${run}/v1/afiliados/verificaciones$`,
+            subject: { in: 'header', documentType: 'CC' },
           },
         ],
       });
@@ -194,7 +206,12 @@ describe('OPA bundle and activation (M1-09)', () => {
       // A request still waiting for the provider grants nothing.
       const all = Object.values(data.clients).flatMap((c) => c.subscriptions.map((s) => s.id));
       expect(all).not.toContain(pendingId);
-      expect(data.config.endUserHashSalt).toBe(process.env.RID_END_USER_HASH_SALT);
+      expect(data.config).toEqual({
+        endUserHashSalt: process.env.RID_END_USER_HASH_SALT,
+        subjectRefKey: process.env.RID_SUBJECT_REF_KEY,
+        country: 'CO',
+        documentTypes: ['CC', 'CE', 'TI', 'PEP', 'PPT', 'PA'],
+      });
     });
 
     it('answers 304 to the current ETag and records the revision', async () => {

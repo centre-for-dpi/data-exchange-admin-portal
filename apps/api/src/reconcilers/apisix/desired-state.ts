@@ -33,17 +33,24 @@ export const GATEWAY_ONLY_HEADERS = [
   'X-RID-Subscription',
   'X-RID-Operation',
   'X-RID-End-User-Hash',
+  'X-RID-Subject-Ref',
 ];
 
-/** Headers OPA decides on; any of them the policy does not return is removed (S-1). */
-const OPA_UPSTREAM_HEADERS = [
+/**
+ * Headers OPA decides on; any of them the policy does not return is removed (S-1). The policy
+ * never returns X-RID-End-User nor X-RID-Data-Subject: the clear values the client sent for OPA
+ * to read (the official, the data subject) do not reach the provider (ADR-0015).
+ */
+export const OPA_UPSTREAM_HEADERS = [
   'X-RID-Consumer-Entity',
   'X-RID-Consumer-App',
   'X-RID-Subscription',
   'X-RID-Purpose',
   'X-RID-Operation',
   'X-RID-End-User-Hash',
+  'X-RID-Subject-Ref',
   'X-RID-End-User',
+  'X-RID-Data-Subject',
   'X-Request-Id',
 ];
 

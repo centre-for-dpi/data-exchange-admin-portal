@@ -1,50 +1,13 @@
-import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { createApplication, openCatalogApi, publishNewApi, requestAccess, signIn } from './flows';
+import { approveAsSteward, gateway, gatewayToken, providerSaw } from './gateway-flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 // M1-12: the whole of docs/DEMO.md in the UI, steps 1-10 (pnpm demo runs the same script from the
 // terminal). The call itself (M1-09): OPA allows it only with an active subscription, the right
 // operation, purpose and official; the provider receives the gateway's trace headers and never a
 // value the client forged. Revocation (M1-10) takes effect in under 60 s.
-const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
-const keycloak = process.env.KEYCLOAK_URL ?? 'http://localhost:8080';
-
-/** Headers the salud mock logged for a request (it logs X-RID-* and X-Request-Id only). */
-function providerSaw(requestId: string, since: string): Record<string, string> | undefined {
-  const logs = spawnSync('docker', ['logs', '--since', since, 'rid-mock-salud-1'], {
-    encoding: 'utf8',
-  });
-  for (const line of `${logs.stdout}${logs.stderr}`.split('\n')) {
-    if (!line.includes(requestId)) continue;
-    const entry = JSON.parse(line) as { rid?: Record<string, string> };
-    if (entry.rid?.['x-request-id'] === requestId) return entry.rid;
-  }
-  return undefined;
-}
-
-async function gatewayToken(clientId: string, clientSecret: string): Promise<string> {
-  const res = await fetch(`${keycloak}/realms/rid-gateway/protocol/openid-connect/token`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded',
-      authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-    },
-    body: 'grant_type=client_credentials',
-  });
-  expect(res.status).toBe(200);
-  return ((await res.json()) as { access_token: string }).access_token;
-}
-
-async function approveAsSteward(page: Page, subscriptionId: string) {
-  await signIn(page, 'lucia.datos', `/requests/${subscriptionId}`);
-  const approve = page.getByRole('form', { name: 'Aprobar' });
-  await approve.getByLabel(/^Vigencia aprobada en meses/).fill('6');
-  await approve.getByRole('button', { name: 'Aprobar' }).click();
-  await expect(page.getByTestId('subscription-status')).toHaveText(/Aprobada|Activa/);
-}
-
 test.describe('DEMO.md end to end (M1-12)', () => {
   test('publish, review, discover, subscribe, call, revoke and audit', async ({
     browser,

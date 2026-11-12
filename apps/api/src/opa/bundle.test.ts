@@ -1,6 +1,6 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { type BundleData, buildBundle, pathRegex, tarGz } from './bundle.js';
+import { type BundleData, buildBundle, bundleSubject, pathRegex, tarGz } from './bundle.js';
 import { untar } from '../../test/untar.js';
 import { readPolicies } from './policy-files.js';
 
@@ -15,7 +15,55 @@ const data = (salt = 'salt-for-tests-0001'): BundleData => ({
     },
   },
   clients: {},
-  config: { endUserHashSalt: salt },
+  config: {
+    endUserHashSalt: salt,
+    subjectRefKey: 'subject-key-for-tests-0000000000000001',
+    country: 'XX',
+    documentTypes: ['ID', 'PP'],
+  },
+});
+
+describe('bundleSubject (where OPA finds the data subject, ADR-0015)', () => {
+  it('captures the subject path parameter, numbering groups by their order in the path', () => {
+    const subject = bundleSubject('/salud/a/v1', '/afiliados/{numero}', {
+      in: 'path',
+      name: 'numero',
+      documentType: 'ID',
+    });
+    expect(subject).toEqual({
+      in: 'path',
+      regex: '^/salud/a/v1/afiliados/([^/]+)$',
+      numberGroup: 1,
+      documentType: 'ID',
+    });
+    const match = new RegExp(subject?.in === 'path' ? subject.regex : '').exec(
+      '/salud/a/v1/afiliados/1000000001',
+    );
+    expect(match?.[1]).toBe('1000000001');
+  });
+
+  it('captures the document type parameter too, and leaves other parameters uncaptured', () => {
+    const subject = bundleSubject('/r/p/v1', '/{region}/personas/{tipo}/{numero}', {
+      in: 'path',
+      name: 'numero',
+      documentTypeParam: 'tipo',
+    });
+    expect(subject).toEqual({
+      in: 'path',
+      regex: '^/r/p/v1/[^/]+/personas/([^/]+)/([^/]+)$',
+      numberGroup: 2,
+      typeGroup: 1,
+    });
+  });
+
+  it('passes header and none declarations through; undeclared operations get nothing', () => {
+    expect(bundleSubject('/a/b/v1', '/x', { in: 'header', documentType: 'PP' })).toEqual({
+      in: 'header',
+      documentType: 'PP',
+    });
+    expect(bundleSubject('/a/b/v1', '/x', { in: 'none' })).toEqual({ in: 'none' });
+    expect(bundleSubject('/a/b/v1', '/x', null)).toBeUndefined();
+  });
 });
 
 describe('pathRegex (operations on the full public path, SPIKE S-1)', () => {

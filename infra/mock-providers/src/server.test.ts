@@ -216,8 +216,18 @@ describe('request logging', () => {
 
   it('masks the end-user header and ignores unrelated headers', () => {
     expect(
-      traceHeaders({ 'x-rid-end-user': '123', 'x-rid-purpose': 'p', cookie: 'c', host: 'h' }),
-    ).toEqual({ 'x-rid-end-user': '[masked]', 'x-rid-purpose': 'p' });
+      traceHeaders({
+        'x-rid-end-user': '123',
+        'x-rid-data-subject': 'CC:1000000001',
+        'x-rid-purpose': 'p',
+        cookie: 'c',
+        host: 'h',
+      }),
+    ).toEqual({
+      'x-rid-end-user': '[masked]',
+      'x-rid-data-subject': '[masked]',
+      'x-rid-purpose': 'p',
+    });
   });
 });
 

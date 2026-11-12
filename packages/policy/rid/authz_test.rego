@@ -13,8 +13,27 @@ bundle := {
 		"apiVersionId": "v1",
 		"classification": "personal",
 		"operations": [
-			{"id": "getAfiliado", "method": "GET", "pathRegex": "^/salud/afiliacion/v1/afiliados/[^/]+$"},
-			{"id": "verificarAfiliacion", "method": "POST", "pathRegex": "^/salud/afiliacion/v1/afiliados/verificaciones$"},
+			{
+				"id": "getAfiliado", "method": "GET",
+				"pathRegex": "^/salud/afiliacion/v1/afiliados/[^/]+$",
+				"subject": {"in": "path", "regex": "^/salud/afiliacion/v1/afiliados/([^/]+)$", "numberGroup": 1, "documentType": "CC"},
+			},
+			{
+				"id": "verificarAfiliacion", "method": "POST",
+				"pathRegex": "^/salud/afiliacion/v1/afiliados/verificaciones$",
+				"subject": {"in": "header", "documentType": "CC"},
+			},
+			{
+				"id": "getPersona", "method": "GET",
+				"pathRegex": "^/salud/afiliacion/v1/personas/[^/]+/[^/]+$",
+				"subject": {"in": "path", "regex": "^/salud/afiliacion/v1/personas/([^/]+)/([^/]+)$", "numberGroup": 2, "typeGroup": 1},
+			},
+			{
+				"id": "getEstadisticas", "method": "GET",
+				"pathRegex": "^/salud/afiliacion/v1/estadisticas$",
+				"subject": {"in": "none"},
+			},
+			{"id": "getLegado", "method": "GET", "pathRegex": "^/salud/afiliacion/v1/legado$"},
 		],
 	}},
 	"clients": {"rid-app-a": {
@@ -34,7 +53,41 @@ bundle := {
 		}],
 		"revokedCertFingerprints": [],
 	}},
-	"config": {"endUserHashSalt": "test-salt"},
+	"config": {
+		"endUserHashSalt": "test-salt",
+		"subjectRefKey": "subject-key-for-tests-0000000000000001",
+		"country": "CO",
+		"documentTypes": ["CC", "CE", "TI"],
+	},
+}
+
+subject_ref_of(type, number) := crypto.hmac.sha256(concat("|", ["CO", type, number]), bundle.config.subjectRefKey)
+
+# The subscription granted every operation of the route, for data subject tests.
+all_operations := with_subscription({"operations": ["getAfiliado", "verificarAfiliacion", "getPersona", "getEstadisticas", "getLegado"]})
+
+post_verification(headers) := object.union(
+	{
+		"request": object.union(
+			object.remove(request({}).request, ["headers", "method", "path"]),
+			{
+				"method": "POST",
+				"path": "/salud/afiliacion/v1/afiliados/verificaciones",
+				"headers": object.union(request({}).request.headers, headers),
+			},
+		),
+	},
+	{"route": {"id": route_id}},
+)
+
+get_path(path) := request({"request": {"path": path}})
+
+headers_for(inp, data_override) := h if {
+	h := authz.headers with input as inp
+		with data.routes as data_override.routes
+		with data.clients as data_override.clients
+		with data.config as data_override.config
+		with time.now_ns as june_2026
 }
 
 # 2026-06-01T00:00:00Z, inside the subscription's validity.
@@ -206,6 +259,68 @@ test_denies_a_subscription_not_yet_valid if {
 
 test_denies_without_end_user_when_required if {
 	denied(without_header("x-rid-end-user"), bundle, "end_user_required")
+}
+
+# --- Data subject (ADR-0015) ----------------------------------------------------------------
+
+test_the_path_subject_becomes_a_keyed_reference if {
+	h := headers_for(request({}), bundle)
+	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+}
+
+test_the_same_person_gets_the_same_reference_and_another_a_different_one if {
+	formatted := headers_for(get_path("/salud/afiliacion/v1/afiliados/1.000.000.001"), bundle)
+	formatted["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+	other := headers_for(get_path("/salud/afiliacion/v1/afiliados/1000000002"), bundle)
+	other["X-RID-Subject-Ref"] != formatted["X-RID-Subject-Ref"]
+}
+
+test_the_document_type_may_come_from_the_path if {
+	h := headers_for(get_path("/salud/afiliacion/v1/personas/ce/123456"), all_operations)
+	h["X-RID-Subject-Ref"] == subject_ref_of("CE", "123456")
+}
+
+test_an_unknown_document_type_is_denied if {
+	denied(get_path("/salud/afiliacion/v1/personas/xx/123456"), all_operations, "data_subject_required")
+}
+
+test_a_malformed_number_is_denied if {
+	denied(get_path("/salud/afiliacion/v1/afiliados/12"), bundle, "data_subject_required")
+	denied(get_path("/salud/afiliacion/v1/afiliados/1000%2F0001"), bundle, "data_subject_required")
+}
+
+test_the_header_subject_becomes_a_reference_and_never_reaches_the_provider if {
+	h := headers_for(post_verification({"x-rid-data-subject": "CC:1000000001"}), all_operations)
+	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+	not h["X-RID-Data-Subject"]
+	not h["x-rid-data-subject"]
+}
+
+test_a_bare_number_in_the_header_uses_the_operation_document_type if {
+	h := headers_for(post_verification({"x-rid-data-subject": " 1000000001 "}), all_operations)
+	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+}
+
+test_an_operation_with_a_header_subject_requires_it if {
+	denied(post_verification({}), all_operations, "data_subject_required")
+	denied(post_verification({"x-rid-data-subject": ["CC:1000000001", "CC:1000000002"]}), all_operations, "data_subject_required")
+	denied(post_verification({"x-rid-data-subject": "CC:1000:0001"}), all_operations, "data_subject_required")
+	denied(post_verification({"x-rid-data-subject": "XX:1000000001"}), all_operations, "data_subject_required")
+}
+
+test_operations_without_a_subject_carry_no_reference if {
+	none := headers_for(get_path("/salud/afiliacion/v1/estadisticas"), all_operations)
+	none["X-RID-Subscription"] == "sub-1"
+	not none["X-RID-Subject-Ref"]
+	# Versions published before the declaration existed: allowed, without a reference.
+	legacy := headers_for(get_path("/salud/afiliacion/v1/legado"), all_operations)
+	legacy["X-RID-Subscription"] == "sub-1"
+	not legacy["X-RID-Subject-Ref"]
+}
+
+test_a_denial_never_carries_the_reference if {
+	h := headers_for(with_headers({"x-rid-purpose": "benefit_targeting"}), bundle)
+	not h["X-RID-Subject-Ref"]
 }
 
 # --- Rule 6: deny response ------------------------------------------------------------------

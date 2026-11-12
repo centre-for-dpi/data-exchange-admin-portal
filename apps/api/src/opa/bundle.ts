@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
+import type { DataSubject } from '@rid/contracts';
 import { canonicalJson } from '../common/canonical-json.js';
 
 /** Escapes RE2 metacharacters (OPA's regex.match uses Go's RE2). */
@@ -22,10 +23,73 @@ export function pathRegex(basePath: string, openapiPath: string): string {
   return `^${segments.join('/')}$`;
 }
 
+/**
+ * How OPA finds the data subject of an operation (ADR-0015):
+ * - path: `regex` is the operation's path regex with capture groups around the subject's number
+ *   (and, if any, its document type); the group numbers say which is which.
+ * - header: X-RID-Data-Subject, as "TYPE:NUMBER" or just "NUMBER" (then `documentType`, or the
+ *   country's default).
+ * - none: the operation has no data subject.
+ * Operations of versions published before MT-01 carry no `subject`: no reference is computed.
+ */
+export type BundleSubject =
+  | { in: 'path'; regex: string; numberGroup: number; typeGroup?: number; documentType?: string }
+  | { in: 'header'; documentType?: string }
+  | { in: 'none' };
+
+export interface BundleOperation {
+  id: string;
+  method: string;
+  pathRegex: string;
+  subject?: BundleSubject;
+}
+
 export interface BundleRoute {
   apiVersionId: string;
   classification: string;
-  operations: Array<{ id: string; method: string; pathRegex: string }>;
+  operations: BundleOperation[];
+}
+
+/**
+ * The bundle form of an operation's x-rid-data-subject. For a path subject, the regex captures the
+ * named parameters, numbered by their order in the path.
+ */
+export function bundleSubject(
+  basePath: string,
+  openapiPath: string,
+  subject: DataSubject | null,
+): BundleSubject | undefined {
+  if (!subject) return undefined;
+  if (subject.in === 'none') return { in: 'none' };
+  if (subject.in === 'header') {
+    return {
+      in: 'header',
+      ...(subject.documentType ? { documentType: subject.documentType } : {}),
+    };
+  }
+  const captured = [subject.name, subject.documentTypeParam].filter(Boolean);
+  const order: string[] = [];
+  const segments = `${basePath}${openapiPath}`.split('/').map((segment) =>
+    segment
+      .split(/(\{[^/{}]+\})/)
+      .map((part) => {
+        const param = /^\{([^/{}]+)\}$/.exec(part)?.[1];
+        if (!param) return escapeRegex(part);
+        if (!captured.includes(param)) return '[^/]+';
+        order.push(param);
+        return '([^/]+)';
+      })
+      .join(''),
+  );
+  const numberGroup = order.indexOf(subject.name) + 1;
+  const typeGroup = subject.documentTypeParam ? order.indexOf(subject.documentTypeParam) + 1 : 0;
+  return {
+    in: 'path',
+    regex: `^${segments.join('/')}$`,
+    numberGroup,
+    ...(typeGroup > 0 ? { typeGroup } : {}),
+    ...(subject.documentType ? { documentType: subject.documentType } : {}),
+  };
 }
 
 export interface BundleSubscription {
@@ -52,7 +116,15 @@ export interface BundleClient {
 export interface BundleData {
   routes: Record<string, BundleRoute>;
   clients: Record<string, BundleClient>;
-  config: { endUserHashSalt: string };
+  config: {
+    endUserHashSalt: string;
+    /** HMAC key of the data subject reference (RID_SUBJECT_REF_KEY, ADR-0015). */
+    subjectRefKey: string;
+    /** Country code, part of the reference: CC 123 in one country is not CC 123 in another. */
+    country: string;
+    /** Person document types of the country; the first one is the default. */
+    documentTypes: string[];
+  };
 }
 
 /** Top-level data paths the bundle owns; OPA refuses data outside them. */

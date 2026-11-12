@@ -68,8 +68,15 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     // Clients cannot forge gateway headers; purpose and end user stay for OPA to read.
     const removed = (plugins['proxy-rewrite']?.headers as { remove: string[] }).remove;
     expect(removed).toContain('X-RID-Subscription');
+    expect(removed).toContain('X-RID-Subject-Ref');
     expect(removed).not.toContain('X-RID-Purpose');
     expect(removed).not.toContain('X-RID-End-User');
+    expect(removed).not.toContain('X-RID-Data-Subject');
+    // OPA decides these; the clear official and data subject are listed and never returned.
+    const decided = plugins.opa?.send_headers_upstream as string[];
+    for (const header of ['X-RID-Subject-Ref', 'X-RID-End-User', 'X-RID-Data-Subject']) {
+      expect(decided).toContain(header);
+    }
   });
 
   it('logs metadata only: never the real path, query or body (ARCHITECTURE.md §8)', () => {
@@ -82,6 +89,9 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       '$upstream_uri',
       '$args',
       '$http_authorization',
+      // Analytics never learn whose data was consulted (ADR-0015).
+      '$http_x_rid_subject_ref',
+      '$http_x_rid_data_subject',
     ]) {
       expect(values).not.toContain(forbidden);
     }
