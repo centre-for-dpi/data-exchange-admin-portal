@@ -53,6 +53,10 @@ Un usuario puede pertenecer a varias entidades con roles distintos. Un mismo usu
 
 Puede ver la página pública del catálogo **solo** si `features.publicCatalog: true` en la configuración del país, y solo APIs con clasificación `public`.
 
+### 2.4 Titular de los datos (ciudadano)
+
+No usa el portal. Ve **quién consultó sus datos**, cuándo, qué dato, para qué y con qué funcionario (como referencia), desde la Carpeta Ciudadana Digital del país, autenticado con la identidad digital nacional. También activa avisos y descarga un comprobante verificable de cada consulta. En esta versión solo ve las consultas que pasan por el gateway (ADR-0015).
+
 ## 3. Modelo de dominio
 
 Los nombres son los del código. Todos los registros tienen `id` (UUIDv7), `createdAt`, `updatedAt`, `createdBy`.
@@ -190,6 +194,13 @@ enrollment_issued → enrolled → online ⇄ offline
 2. El kit, al instalarse, llama a `POST /api/v1/nodes/enroll` con el token, su CSR y su clave pública WireGuard. Recibe certificado, configuración del túnel y el ID del nodo.
 3. El nodo envía heartbeat cada 60 s con versión y servicios expuestos. Sin heartbeat por 5 min → `offline` y alerta.
 4. Las APIs con upstream `node` muestran el estado del nodo.
+
+### 4.7 Transparencia para el titular (ADR-0015, ADR-0016)
+
+1. Al publicar una versión de una API `personal` o `sensitive`, cada operación declara dónde está el titular (`x-rid-data-subject`) o que no tiene titular (`none`).
+2. En cada llamada autorizada, el gateway calcula un seudónimo del titular y registra la consulta: entidad y aplicación que consultaron, entidad proveedora, API y datos expuestos, operación, finalidad, funcionario (hash), fecha y resultado. Nunca registra el contenido ni el número de documento.
+3. Las consultas se agrupan en lotes sellados (firma del operador y sello de tiempo de una TSA independiente). Cada consulta tiene un comprobante que cualquiera puede verificar.
+4. El ciudadano ve sus consultas en la Carpeta Ciudadana Digital. El portal solo responde a la Carpeta con el token del ciudadano, y le avisa de consultas nuevas si el ciudadano lo pidió.
 
 ## 5. Reglas de negocio transversales
 

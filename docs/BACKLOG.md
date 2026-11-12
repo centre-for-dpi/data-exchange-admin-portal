@@ -6,6 +6,7 @@ Trabaja en orden. Un hito se cierra cuando todas sus historias están en `[x]` y
 | :-- | :-- | :-- |
 | M0 | Fundaciones: monorepo, infraestructura local, configuración por país | 12–14 nov |
 | M1 | **Flujo de punta a punta (demo de fin de noviembre)** | 17–28 nov |
+| MT | Transparencia para el titular: quién consultó mis datos, avisos y comprobante verificable | adelantado a M2 |
 | M2 | Gobierno completo: entidades, roles, aprobaciones, auditoría | 1–12 dic |
 | M3 | Seguridad de credenciales y del tráfico | 14 dic – 9 ene |
 | M4 | Nodos del kit y onboarding (listo para el bootcamp) | 12–23 ene |
@@ -205,6 +206,44 @@ Meta: en la demo, una entidad publica una API, otra solicita acceso con finalida
     - **`DEMO.md` corregido:** el `curl` del paso 7 no enviaba `X-RID-End-User`, así que una API `personal` respondía `403 end_user_required` en vivo. El `403 no_subscription` se muestra en el paso 4 (hace falta un token), y se agregaron el comando para ver las cabeceras en el mock y el bucle de la revocación.
 
 **Cierre M1:** demo en vivo según `DEMO.md`. ✅ Ensayada de forma automática (`pnpm demo` y `e2e/demo.spec.ts`, en verde el 2026-11-12); falta la presentación en vivo.
+
+---
+
+## MT — Transparencia para el titular (ADR-0015, ADR-0016)
+
+Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó sus datos, cuándo y para qué; que reciba avisos; y que cada consulta tenga un comprobante verificable que nadie, ni el operador, pueda alterar sin que se note. Se adelanta a M2 por decisión del dueño del producto (2026-11-12).
+
+- Alcance de esta versión: solo las consultas que pasan por el gateway.
+- Para la siguiente: X-Road, con el modelo distribuido de Estonia y Ucrania, en el que cada registro reporta sus consultas.
+- Fuera de alcance: intentos rechazados, reclamos, huella del contenido y consentimiento.
+- La sección de la Carpeta la construye su equipo. Aquí se entregan el API, el protocolo, el verificador y una Carpeta de referencia (mock) para pruebas y demo.
+
+- [ ] **MT-01 — Titular declarado en el OpenAPI**
+  - Extensión `x-rid-data-subject` por operación: parámetro de ruta, cabecera `X-RID-Data-Subject` (cuando el identificador va en el cuerpo) o `none`. Tipo de documento opcional, por defecto el primero de `identifiers.person`.
+  - Regla de lint: en APIs `personal` y `sensitive`, toda operación debe declararla (error al enviar a revisión).
+  - El revisor y el catálogo muestran dónde está el titular de cada operación. Los mocks declaran sus titulares.
+- [ ] **MT-02 — Seudónimo del titular en el gateway**
+  - El bundle incluye, por operación, cómo extraer el titular. OPA calcula `X-RID-Subject-Ref = HMAC-SHA-256(clave, país|tipo|número)`. La clave va en el bundle y es obligatoria (`RID_SUBJECT_REF_KEY`).
+  - Sin titular declarado en la petición → `403 data_subject_required`. `X-RID-Data-Subject` en claro nunca llega al proveedor.
+  - `opa test` con casos de cada regla; e2e: el proveedor recibe la referencia y no la cabecera en claro.
+- [ ] **MT-03 — Registro de consultas por titular**
+  - APISIX `tcp-logger` → Fluent Bit (perfil base, búfer en disco) → colector `POST /internal/subject-access` (token de servicio) → tabla de solo inserción, enriquecida con la entidad proveedora, la API, los datos expuestos y la finalidad.
+  - Retención `retention.subjectAccessMonths`. Prueba de que el número de documento no aparece en logs, búferes ni tablas.
+- [ ] **MT-04 — Evidencia verificable**
+  - Lotes Merkle (RFC 9162) con punto de control firmado (JWS EdDSA y JWKS), sello RFC 3161 de una TSA independiente (contenedor de desarrollo) y anclaje en la bitácora.
+  - Comprobante por consulta y verificador abierto (`packages/transparency-verifier` y CLI).
+  - Pruebas de alteración, borrado e inserción detectados; si la TSA no responde, el lote queda pendiente y se reintenta.
+- [ ] **MT-05 — API para el titular**
+  - Realm `rid-citizens` (simula Autenticación Digital) con ciudadanos semilla.
+  - `GET /api/v1/data-subjects/me/accesses` y su comprobante, solo con token de ciudadano y desde aplicaciones ciudadanas autorizadas.
+  - Pruebas: otro ciudadano no ve nada, sin token 401, token de otro emisor 401.
+- [ ] **MT-06 — Avisos**
+  - El titular se suscribe por clasificación de datos (`PUT /data-subjects/me/alerts`). Webhook firmado a la Carpeta (outbox, con reintentos) con un identificador opaco: sin número ni contacto.
+- [ ] **MT-07 — Carpeta de referencia y demo**
+  - Mock de la Carpeta con login del ciudadano, la sección "¿Quién consultó mis datos?", avisos por Mailpit y verificación del comprobante.
+  - e2e con axe; paso 11 en `DEMO.md` y en `pnpm demo`.
+
+**Cierre MT:** el ciudadano de la demo ve en la Carpeta de referencia la consulta de carlos, recibe el aviso y verifica el comprobante sin depender del portal.
 
 ---
 

@@ -300,7 +300,26 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 - API: rate limit por usuario, tamaño máximo de cuerpo, validación zod en todas las entradas, problem+json sin trazas internas.
 - Dependencias: `pnpm audit` y verificación de licencias en CI.
 
-## 13. Spikes abiertos
+## 13. Transparencia para el titular (ADR-0015, ADR-0016)
+
+```
+Consumidor ─▶ APISIX ─(opa: X-RID-Subject-Ref = HMAC(clave, país|tipo|número))─▶ Proveedor
+                │ tcp-logger (formato de transparencia, sin ruta ni número)
+                ▼
+            Fluent Bit (búfer en disco, reintentos) ─▶ API: colector ─▶ subject_access_record (solo inserción)
+                                                            │ lotes Merkle + firma JWS + sello TSA RFC 3161
+                                                            ▼
+                                                  transparency_checkpoint ─▶ bitácora (anclaje)
+Carpeta Ciudadana ─(token del ciudadano)─▶ API: /data-subjects/me/accesses, comprobantes, avisos (webhook)
+```
+
+- **Titular en el OpenAPI.** Se declara con `x-rid-data-subject` en cada operación (MT-01). El bundle lleva, por operación, cómo extraerlo: el segmento de ruta o la cabecera `X-RID-Data-Subject`, y el tipo de documento.
+- **Seudónimo.** Lo calcula OPA y sale como `X-RID-Subject-Ref`. La clave (`RID_SUBJECT_REF_KEY`) viaja en el bundle, que solo se sirve por la red interna, igual que la sal del funcionario. La cabecera `X-RID-Data-Subject` está en `send_headers_upstream` y la política nunca la devuelve, así que el proveedor no la recibe en claro.
+- **Registros separados de la analítica.** Los logs de analítica (`http-logger`, §8) siguen sin titular. El registro de transparencia usa otro logger y otro camino.
+- **Identidad del ciudadano.** La da el emisor de identidad digital configurado (`RID_CITIZEN_ISSUER`; en desarrollo, el realm `rid-citizens`). El API deriva la referencia de los claims de documento del token y solo atiende a las aplicaciones ciudadanas autorizadas.
+- **Contrato con el proveedor.** Cuando el titular viaja en el cuerpo, el proveedor (o el kit) debe verificar que coincide con `X-RID-Data-Subject`. Se agrega al contrato de §10.
+
+## 14. Spikes abiertos
 
 | ID | Pregunta | Hito |
 | :-- | :-- | :-- |
