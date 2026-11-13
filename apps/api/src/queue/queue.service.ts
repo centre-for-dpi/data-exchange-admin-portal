@@ -11,6 +11,21 @@ export const PGBOSS_SCHEMA = 'pgboss';
 const RELAY_INTERVAL_MS = 1_000;
 const RELAY_BATCH = 100;
 
+/**
+ * Queues that are not reconcilers. Reconciliation queues coalesce by aggregate (`stately`);
+ * notification queues deliver every message and retry longer, with backoff.
+ */
+const QUEUE_OPTIONS: Record<string, Parameters<PgBoss['createQueue']>[1]> = {
+  // Citizen notices (MT-06): up to ~17 hours of retries (30 s doubling, capped at 1 h).
+  'citizen.alert': {
+    policy: 'standard',
+    retryLimit: 20,
+    retryDelay: 30,
+    retryBackoff: true,
+    retryDelayMax: 3600,
+  },
+};
+
 interface PendingMessage {
   id: string;
   topic: string;
@@ -76,7 +91,7 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
   private async ensureQueue(name: string): Promise<void> {
     if (this.knownQueues.has(name)) return;
     if (!(await this.instance.getQueue(name))) {
-      await this.instance.createQueue(name, { policy: 'stately' });
+      await this.instance.createQueue(name, QUEUE_OPTIONS[name] ?? { policy: 'stately' });
     }
     this.knownQueues.add(name);
   }

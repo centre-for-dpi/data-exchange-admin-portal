@@ -32,6 +32,7 @@ import { CitizenGuard } from './transparency/citizen/citizen.guard.js';
 import { DataSubjectsController } from './transparency/citizen/data-subjects.controller.js';
 import { DataSubjectsService } from './transparency/citizen/data-subjects.service.js';
 import { TransparencySigningKey } from './transparency/evidence/signing-key.js';
+import { SubjectAlertsService } from './transparency/alerts/subject-alerts.service.js';
 import { TransparencyEvidenceService } from './transparency/evidence/transparency-evidence.service.js';
 import { TransparencyController } from './transparency/evidence/transparency.controller.js';
 import { TsaClient } from './transparency/evidence/tsa.client.js';
@@ -71,6 +72,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     TransparencySigningKey,
     TsaClient,
     DataSubjectsService,
+    SubjectAlertsService,
     CitizenGuard,
     {
       provide: CITIZEN_TOKEN_VERIFIER,

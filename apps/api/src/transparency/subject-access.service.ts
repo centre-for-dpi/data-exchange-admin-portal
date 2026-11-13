@@ -12,6 +12,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { QueueService } from '../queue/queue.service.js';
 import { routeId } from '../reconcilers/apisix/desired-state.js';
+import { SubjectAlertsService } from './alerts/subject-alerts.service.js';
 
 const HEX_64 = /^[0-9a-f]{64}$/;
 /** Optional gateway field: APISIX sends "" (or nothing) when the variable is empty. */
@@ -66,6 +67,7 @@ export class SubjectAccessService implements OnApplicationBootstrap, OnApplicati
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly alerts: SubjectAlertsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -105,7 +107,7 @@ export class SubjectAccessService implements OnApplicationBootstrap, OnApplicati
             apiId: true,
             openapiSpec: true,
             exposedFields: true,
-            api: { select: { entityId: true } },
+            api: { select: { entityId: true, classification: true } },
           },
         },
       },
@@ -159,13 +161,30 @@ export class SubjectAccessService implements OnApplicationBootstrap, OnApplicati
 
     // In slices: PostgreSQL takes at most 65,535 bind parameters per statement, and a Fluent Bit
     // chunk can hold far more rows than that allows. Each slice is idempotent, so a retry after a
-    // partial failure only adds the missing ones.
+    // partial failure only adds the missing ones. Notices for the citizens who asked (MT-06) go
+    // to the outbox in the same transaction, only for rows actually inserted: a retried record
+    // does not notify twice.
+    const classificationOf = new Map(
+      subscriptions.map((s) => [s.apiVersion.id, s.apiVersion.api.classification]),
+    );
     let count = 0;
     for (let i = 0; i < rows.length; i += INSERT_SLICE) {
       const slice = rows.slice(i, i + INSERT_SLICE);
-      count += (
-        await this.prisma.subjectAccessRecord.createMany({ data: slice, skipDuplicates: true })
-      ).count;
+      count += await this.prisma.$transaction(async (tx) => {
+        const inserted = await tx.subjectAccessRecord.createManyAndReturn({
+          data: slice,
+          skipDuplicates: true,
+          select: { id: true, subjectRef: true, occurredAt: true, apiVersionId: true },
+        });
+        await this.alerts.enqueueFor(
+          tx,
+          inserted.flatMap((r) => {
+            const classification = classificationOf.get(r.apiVersionId);
+            return classification ? [{ ...r, classification }] : [];
+          }),
+        );
+        return inserted.length;
+      });
     }
     const result = { accepted: count, duplicates: rows.length - count, dropped };
     if (Object.keys(dropped).length > 0) {

@@ -738,3 +738,21 @@ model TransparencyTimestamp {
 
   @@map("transparency_timestamp")
 }
+
+/// A citizen's request to be told about new consultations of their data (ADR-0015, MT-06), per
+/// citizen app. The id is the only thing a webhook carries: the app keeps the link to its user.
+model SubjectAlert {
+  /// Opaque and random (v4): it reveals neither the person nor when they subscribed.
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Keyed pseudonym of the citizen as data subject (same as subject_access_record).
+  subjectRef      String           @map("subject_ref")
+  /// Citizen app that subscribed and receives the webhooks (azp of the citizen token).
+  clientId        String           @map("client_id")
+  /// Data classifications that trigger a notice; empty means notices are off.
+  classifications Classification[]
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([subjectRef, clientId])
+  @@map("subject_alert")
+}

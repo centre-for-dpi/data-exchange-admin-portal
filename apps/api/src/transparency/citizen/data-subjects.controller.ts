@@ -1,5 +1,8 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
 import {
+  type PutSubjectAlerts,
+  putSubjectAlertsSchema,
+  subjectAlertsSchema,
   subjectAccessesQuerySchema,
   type SubjectAccessesQuery,
   subjectAccessPageSchema,
@@ -10,6 +13,7 @@ import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import { ApiOperation } from '../../openapi/api-operation.decorator.js';
 import type { CitizenIdentity } from './citizen-token-verifier.js';
 import { CitizenAccess, CurrentCitizen } from './citizen.guard.js';
+import { SubjectAlertsService } from '../alerts/subject-alerts.service.js';
 import { DataSubjectsService } from './data-subjects.service.js';
 
 const accessParamsSchema = z.strictObject({ id: z.uuid() });
@@ -22,7 +26,10 @@ const accessParamsSchema = z.strictObject({ id: z.uuid() });
 @Controller('data-subjects/me')
 @CitizenAccess()
 export class DataSubjectsController {
-  constructor(private readonly dataSubjects: DataSubjectsService) {}
+  constructor(
+    private readonly dataSubjects: DataSubjectsService,
+    private readonly alerts: SubjectAlertsService,
+  ) {}
 
   @Get('accesses')
   @ApiOperation({
@@ -62,5 +69,42 @@ export class DataSubjectsController {
     @Param(new ZodValidationPipe(accessParamsSchema)) params: { id: string },
   ) {
     return this.dataSubjects.receipt(citizen.ref, params.id);
+  }
+
+  @Get('alerts')
+  @ApiOperation({
+    operationId: 'getMyDataAlerts',
+    summary: 'My notices of new consultations of my data',
+    description:
+      'Which data classifications trigger a notice to the citizen app, and the opaque id the ' +
+      'app receives in each webhook. Citizen token only.',
+    tags: ['data-subjects'],
+    authenticated: 'citizen',
+    responses: { 200: { description: 'Current notices', schema: subjectAlertsSchema } },
+    errors: [401],
+  })
+  getAlerts(@CurrentCitizen() citizen: CitizenIdentity) {
+    return this.alerts.get(citizen);
+  }
+
+  @Put('alerts')
+  @ApiOperation({
+    operationId: 'putMyDataAlerts',
+    summary: 'Choose which consultations of my data I am notified about',
+    description:
+      'personal and/or sensitive; an empty list turns notices off. Each new matching ' +
+      'consultation sends a signed webhook (Standard Webhooks) to the citizen app with only the ' +
+      'opaque alert id and the consultation id.',
+    tags: ['data-subjects'],
+    authenticated: 'citizen',
+    body: putSubjectAlertsSchema,
+    responses: { 200: { description: 'Notices saved', schema: subjectAlertsSchema } },
+    errors: [400, 401],
+  })
+  putAlerts(
+    @CurrentCitizen() citizen: CitizenIdentity,
+    @Body(new ZodValidationPipe(putSubjectAlertsSchema)) body: PutSubjectAlerts,
+  ) {
+    return this.alerts.put(citizen, body.classifications);
   }
 }

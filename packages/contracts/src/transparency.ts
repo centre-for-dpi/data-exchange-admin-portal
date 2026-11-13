@@ -171,3 +171,37 @@ export const subjectAccessesQuerySchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 export type SubjectAccessesQuery = z.infer<typeof subjectAccessesQuerySchema>;
+
+/** Classifications a citizen can be notified about: the ones with a data subject. */
+export const alertClassificationSchema = z.enum(['personal', 'sensitive']);
+
+/** The citizen's notices for new consultations (MT-06). */
+export const subjectAlertsSchema = z.object({
+  /** Opaque identifier the citizen app keeps for this citizen; null until they subscribe. */
+  alertId: z.uuid().nullable(),
+  /** Empty: notices are off. */
+  classifications: z.array(alertClassificationSchema),
+});
+export type SubjectAlerts = z.infer<typeof subjectAlertsSchema>;
+
+export const putSubjectAlertsSchema = z.strictObject({
+  classifications: z.array(alertClassificationSchema).max(2),
+});
+export type PutSubjectAlerts = z.infer<typeof putSubjectAlertsSchema>;
+
+/**
+ * Body of the signed webhook (Standard Webhooks) the portal sends to the citizen app. Only the
+ * opaque alert id identifies the person: no document number, no contact, no name.
+ */
+export const subjectAccessWebhookSchema = z.object({
+  type: z.literal('subject_access.created'),
+  timestamp: z.iso.datetime(),
+  data: z.object({
+    alertId: z.uuid(),
+    /** The consultation, to open it once the citizen signs in. */
+    accessId: z.uuid(),
+    occurredAt: z.iso.datetime(),
+    classification: alertClassificationSchema,
+  }),
+});
+export type SubjectAccessWebhook = z.infer<typeof subjectAccessWebhookSchema>;
