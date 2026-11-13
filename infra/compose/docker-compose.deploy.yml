@@ -14,6 +14,8 @@
 #       /auth        -> rid-keycloak:8080     (Keycloak, relative path /auth)
 #       /gw          -> rid-apisix:9080       (gateway, prefix stripped by the proxy)
 #       /mail        -> rid-mailpit:8025      (Mailpit, demo mail, behind MAILPIT_UI_AUTH)
+#       /carpeta     -> rid-carpeta:3100      (reference citizen folder, MT-07)
+#       /tsa/api/v1/timestamp/certchain -> rid-tsa:3004 (the TSA certificates, for verifiers)
 #   - the API and the web app run in containers (apps/*/Dockerfile); the API applies migrations
 #     and the idempotent seed on start (RID_ALLOW_SEED=true).
 
@@ -74,6 +76,10 @@ services:
   tsa:
     <<: *no-ports
     restart: unless-stopped
+    networks:
+      default: {}
+      edge:
+        aliases: [rid-tsa]
 
   mailpit:
     <<: *no-ports
@@ -135,6 +141,34 @@ services:
       default: {}
       edge:
         aliases: [rid-portal-web]
+
+  carpeta:
+    build:
+      context: ../..
+      dockerfile: infra/mock-citizen-app/Dockerfile
+    image: rid/mock-citizen-app:deploy
+    restart: unless-stopped
+    env_file: ../../.env
+    environment:
+      CITIZEN_APP_PORTAL_API_URL: http://api:4000
+      # Public material, fetched where anyone would: the operator JWKS and the TSA chain.
+      CITIZEN_APP_JWKS_URL: ${RID_PUBLIC_URL}/api/v1/transparency/jwks
+      CITIZEN_APP_TSA_ROOT_URL: ${RID_PUBLIC_URL}/tsa/api/v1/timestamp/certchain
+      CITIZEN_APP_SMTP_HOST: mailpit
+      CITIZEN_APP_SMTP_PORT: '1025'
+      CITIZEN_APP_DATA_FILE: /repo/infra/mock-citizen-app/data/alerts.json
+    volumes:
+      - carpeta-data:/repo/infra/mock-citizen-app/data
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      default: {}
+      edge:
+        aliases: [rid-carpeta]
+
+volumes:
+  carpeta-data:
 
 networks:
   edge:

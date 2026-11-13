@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { expect, type Page } from '@playwright/test';
-import { signIn } from './flows';
+import { type Browser, expect, type Page } from '@playwright/test';
+import { createApplication, openRequestForm, publishNewApi, signIn } from './flows';
 
 /** Calls through the real gateway (M1-09 onwards). */
 export const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
@@ -40,6 +40,39 @@ export async function approveAsSteward(page: Page, subscriptionId: string) {
   await approve.getByLabel(/^Vigencia aprobada en meses/).fill('6');
   await approve.getByRole('button', { name: 'Aprobar' }).click();
   await expect(page.getByTestId('subscription-status')).toHaveText(/Aprobada|Activa/);
+}
+
+/**
+ * The setting of the transparency stories: salud publishes an affiliation API (data subject in
+ * the path and in the body), carlos asks for both operations for eligibility_check, lucia
+ * approves, and the subscription is active at the gateway.
+ */
+export async function activeAffiliationSubscription(browser: Browser, page: Page, slug: string) {
+  const apiName = `Afiliación ${slug}`;
+  await publishNewApi(browser, { slug, name: apiName });
+  await signIn(page, 'carlos.dev', '/my-apps');
+  const appName = `Verificador ${slug}`;
+  const clientId = await createApplication(page, appName);
+  const clientSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
+  await openRequestForm(page, apiName);
+  await page.getByLabel(/^Aplicación que hará las llamadas/).selectOption({ label: appName });
+  await page.getByLabel(/^Finalidad/).selectOption('eligibility_check');
+  await page
+    .getByLabel(/^Para qué usarás los datos/)
+    .fill('Verificar afiliación al asignar el subsidio X.');
+  await page.getByLabel(/^Base legal/).fill('Ley de protección de datos, artículo 10, literal b.');
+  await page.getByRole('checkbox', { name: /getAfiliado/ }).check();
+  await page.getByRole('checkbox', { name: /verificarAfiliacion/ }).check();
+  await page.getByLabel(/^Vigencia en meses/).fill('12');
+  await page.getByRole('button', { name: 'Enviar solicitud' }).click();
+  await expect(page.getByTestId('subscription-status')).toHaveText('Pendiente del proveedor');
+  const subscriptionId = page.url().split('/my-apps/requests/')[1] ?? '';
+  const steward = await (await browser.newContext()).newPage();
+  await approveAsSteward(steward, subscriptionId);
+  await steward.context().close();
+  await page.goto(`/my-apps/requests/${subscriptionId}`);
+  await expect(page.getByTestId('subscription-status')).toHaveText('Activa', { timeout: 60_000 });
+  return { apiName, appName, clientId, clientSecret, subscriptionId };
 }
 
 // A timeout so that a stuck command fails the test instead of blocking the worker forever.

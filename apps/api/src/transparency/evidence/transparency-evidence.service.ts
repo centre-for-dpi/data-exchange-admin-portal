@@ -301,7 +301,10 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
    * leaves, every stamp, and every record against its leaf. Detects altered, deleted and inserted
    * records and batches. Records past retention may be gone: their leaves keep the batch whole.
    */
-  async verify(): Promise<TransparencyVerification> {
+  async verify(options: { fromSeq?: number } = {}): Promise<TransparencyVerification> {
+    // From a checkpoint on: a monitor that already checked the earlier ones only checks what is
+    // new, chained to the last checkpoint it trusts. Without it, the whole register.
+    const fromSeq = Math.max(1, options.fromSeq ?? 1);
     const problems: Problem[] = [];
     const jwks = this.key.jwks();
     let tsaRoots: string[] | null = null;
@@ -312,15 +315,24 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
     }
 
     const checkpoints = await this.prisma.transparencyCheckpoint.findMany({
+      where: { seq: { gte: fromSeq } },
       orderBy: { seq: 'asc' },
       include: { timestamp: true, leaves: { orderBy: { leafIndex: 'asc' } } },
     });
     let pendingTimestamps = 0;
-    let previousHash: string | null = null;
+    let previousHash: string | null =
+      fromSeq > 1
+        ? ((
+            await this.prisma.transparencyCheckpoint.findUnique({
+              where: { seq: fromSeq - 1 },
+              select: { hash: true },
+            })
+          )?.hash ?? 'missing')
+        : null;
     /** Leaf format of each batch, from its signed checkpoint. */
     const versions = new Map<number, 1 | 2>();
     for (const [i, cp] of checkpoints.entries()) {
-      if (cp.seq !== i + 1 || cp.prev !== previousHash) {
+      if (cp.seq !== fromSeq + i || cp.prev !== previousHash) {
         problems.push({ kind: 'chain_broken', seq: cp.seq, recordId: null });
       }
       let payload: CheckpointPayload | undefined;
@@ -426,6 +438,7 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
     const bySeq = new Map(checkpoints.map((cp) => [cp.seq, cp]));
     for (const anchor of anchors) {
       const seq = Number(anchor.targetId);
+      if (seq < fromSeq) continue;
       const after = (anchor.after ?? {}) as { hash?: unknown; root?: unknown };
       anchored.add(seq);
       const cp = bySeq.get(seq);

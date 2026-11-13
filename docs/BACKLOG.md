@@ -260,11 +260,12 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 - [x] **MT-06 — Avisos**
   - El titular se suscribe por clasificación de datos (`PUT /data-subjects/me/alerts`). Webhook firmado a la Carpeta (outbox, con reintentos) con un identificador opaco: sin número ni contacto.
   - _Notas de implementación:_ la firma sigue el estándar Standard Webhooks, probado con el vector de la especificación. El aviso entra al outbox en la misma transacción que el registro y solo para filas nuevas, así un reintento del pipeline no notifica dos veces. La entrega se reintenta con espera exponencial y se omite si el ciudadano apagó los avisos mientras tanto. El cambio de avisos se audita con la aplicación ciudadana como actor. Pruebas de integración con un servidor que hace de Carpeta: firma válida, cuerpo sin número ni seudónimo, `webhook-id` estable, reintento ante 503 y aviso omitido tras apagarlo.
-- [ ] **MT-07 — Carpeta de referencia y demo**
+- [x] **MT-07 — Carpeta de referencia y demo**
   - Mock de la Carpeta con login del ciudadano, la sección "¿Quién consultó mis datos?", avisos por Mailpit y verificación del comprobante.
   - e2e con axe; paso 11 en `DEMO.md` y en `pnpm demo`.
+  - _Notas de implementación:_ la carpeta está en `infra/mock-citizen-app` (Fastify, sin framework de UI, es/en, CSP estricta) y corre con `pnpm dev` en el puerto 3100. Los webhooks se verifican con la librería de referencia de Standard Webhooks, como prueba de interoperabilidad. El correo vive solo en la carpeta. El comprobante se verifica con el verificador abierto y material público. La e2e `carpeta.spec.ts` cubre el cierre del hito: login con la identidad simulada, activar avisos, llamada por el gateway, correo en Mailpit sin datos, la consulta en la tabla y "Comprobante válido", con axe en cada pantalla. `pnpm demo` agrega el paso 11, que verifica el comprobante desde el script.
 
-**Cierre MT:** el ciudadano de la demo ve en la Carpeta de referencia la consulta de carlos, recibe el aviso y verifica el comprobante sin depender del portal.
+**Cierre MT:** el ciudadano de la demo ve en la Carpeta de referencia la consulta de carlos, recibe el aviso y verifica el comprobante sin depender del portal. **Cerrado** (2026-11-13): `e2e/carpeta.spec.ts` y el paso 11 de `pnpm demo`.
 
 ---
 

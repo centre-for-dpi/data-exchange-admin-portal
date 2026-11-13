@@ -13,6 +13,7 @@ Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todo
 | `lucia.datos` | Entidad de Salud (ficticia) | `data_steward` |
 | `carlos.dev` | Entidad de Programas Sociales (ficticia) | `app_developer` |
 | `marta.regulador` | Regulador (MinTIC) | `regulator` |
+| `ciudadana.demo` | Titular de los datos (CC 1000000001), en la Carpeta de referencia; realm `rid-citizens` | — |
 
 ## Pasos
 
@@ -37,6 +38,12 @@ Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todo
    while true; do curl -s -o /dev/null -w "%{http_code} " http://localhost:9080/salud/afiliacion/v1/afiliados/1000000001      -H "Authorization: Bearer $TOKEN" -H "X-RID-Purpose: eligibility_check" -H "X-RID-End-User: funcionario-42"; sleep 1; done
    ```
 10. **Auditar** (marta.regulador): en "Auditoría", abrir la suscripción desde los eventos recientes y mostrar su línea de tiempo: solicitada, aprobada, activa en el gateway, revocada, con quién y por qué. Luego pulsar "Verificar integridad" para mostrar que la cadena de hash está íntegra.
+11. **¿Quién consultó mis datos?** (ciudadana.demo, en la Carpeta de referencia, `http://localhost:3100`). Para mostrar el aviso, hacer la primera parte antes del paso 7.
+    - Ingresar con la identidad digital simulada (`ciudadana.demo`, documento CC 1000000001, el mismo que consulta el paso 7).
+    - En "Avisos", marcar "Datos personales" y escribir un correo. El portal no conoce ese correo: solo guarda la elección y un identificador opaco.
+    - Tras el paso 7, Mailpit (`http://localhost:8025`) muestra el aviso "Una entidad consultó tus datos", sin datos de la persona ni de la consulta.
+    - En "¿Quién consultó mis datos?" aparece la consulta: Programas Sociales, qué API y qué datos, para "Verificación de requisitos de un trámite", con el funcionario como referencia.
+    - Cuando deja de decir "En sellado" (unos segundos), pulsar "Verificar". La Carpeta comprueba por su cuenta la firma del operador, la inclusión en el lote sellado y el sello de tiempo de la TSA, sin confiar en el portal. El comprobante se puede descargar y verificar también con `rid-verify-receipt`.
 
 ## Mensajes clave para la audiencia
 

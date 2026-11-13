@@ -44,6 +44,7 @@ const signingJwk = {
 };
 
 const db = { owner: secret(), app: secret(), keycloak: secret() };
+const webhookSecret = `whsec_${randomBytes(32).toString('base64')}`;
 const set = {
   POSTGRES_PASSWORD: db.owner,
   RID_APP_DB_PASSWORD: db.app,
@@ -85,6 +86,14 @@ const set = {
   // Random unless asked: the seed users include platform administrators.
   RID_DEMO_USER_PASSWORD: values['demo-password'] ?? secret(12),
   MAILPIT_UI_AUTH: `mail:${secret(12)}`,
+  // Notices (MT-06) to the reference citizen folder (MT-07), over the Compose network.
+  RID_CITIZEN_APPS: `'${JSON.stringify({
+    'carpeta-ciudadana': {
+      webhookUrl: 'http://carpeta:3100/carpeta/api/rid/alerts',
+      webhookSecret: webhookSecret,
+    },
+  })}'`,
+  CITIZEN_APP_WEBHOOK_SECRET: webhookSecret,
 };
 
 const lines = readFileSync(resolve(root, '.env.example'), 'utf8').split('\n');

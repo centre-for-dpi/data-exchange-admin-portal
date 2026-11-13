@@ -85,7 +85,8 @@ rid-portal/
 │   ├── opa/                 # config de OPA (apunta al bundle del portal)
 │   ├── step-ca/             # init de la CA de dev
 │   ├── fluent-bit/          # pipeline de logs con enmascarado
-│   └── mock-providers/      # servicios de ejemplo (Fastify + datos sintéticos, ADR-0009)
+│   ├── mock-providers/      # servicios de ejemplo (Fastify + datos sintéticos, ADR-0009)
+│   └── mock-citizen-app/    # carpeta ciudadana de referencia (MT-07): consultas, avisos, comprobantes
 ├── scripts/                 # seed, license-check, demo
 └── docs/
     ├── SPEC.md
@@ -115,7 +116,7 @@ pnpm license:check       # falla si hay una licencia no permitida
 pnpm demo                # ejecuta el guion de docs/DEMO.md de forma automatizada
 ```
 
-Puertos de desarrollo: web 3000, api 4000, Keycloak 8080, APISIX proxy 9080/9443, APISIX admin 9180, OPA 8181, step-ca 9000, OpenSearch 9200, Mailpit 8025, Postgres 5432, TSA de desarrollo 3004.
+Puertos de desarrollo: web 3000, api 4000, Keycloak 8080, APISIX proxy 9080/9443, APISIX admin 9180, OPA 8181, step-ca 9000, OpenSearch 9200, Mailpit 8025, Postgres 5432, TSA de desarrollo 3004, carpeta ciudadana de referencia 3100.
 
 ## Cómo trabajar
 

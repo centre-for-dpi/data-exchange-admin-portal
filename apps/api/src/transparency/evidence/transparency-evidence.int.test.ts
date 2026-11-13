@@ -78,8 +78,10 @@ describe('transparency evidence (MT-04)', () => {
     return rows.map((r) => r.id);
   };
 
+  /** Checkpoints sealed by this run start after this one; earlier runs are not re-checked. */
+  let fromSeq = 1;
   const verification = async () => {
-    const res = await call('GET', '/transparency/verify', 'sofia.auditora');
+    const res = await call('GET', `/transparency/verify?fromSeq=${fromSeq}`, 'sofia.auditora');
     expect(res.statusCode, res.body).toBe(200);
     return transparencyVerificationSchema.parse(res.json());
   };
@@ -177,7 +179,9 @@ describe('transparency evidence (MT-04)', () => {
 
     // Whatever earlier runs left unsealed or unstamped, so each test starts from a clean state.
     await evidence.sealPending();
-    await evidence.stampPending();
+    while ((await evidence.stampPending()).length > 0);
+    fromSeq =
+      ((await prisma.transparencyCheckpoint.findFirst({ orderBy: { seq: 'desc' } }))?.seq ?? 0) + 1;
   });
 
   afterAll(async () => {

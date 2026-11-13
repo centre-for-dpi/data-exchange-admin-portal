@@ -1,0 +1,98 @@
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+
+/**
+ * Configuration of the reference citizen app. It plays the country's citizen folder: it has its
+ * own users (through the national identity), its own contact data and its own notices, and it
+ * talks to the portal only through the citizen API and the public evidence endpoints.
+ */
+export interface CitizenAppConfig {
+  /** Public base URL, possibly with a path (https://host/carpeta). Routes live under its path. */
+  publicUrl: string;
+  basePath: string;
+  port: number;
+  /** Shown in the header; the app is a reference, not the real folder of any country. */
+  name: { es: string; en: string };
+  oidc: {
+    /** Public issuer of the national identity (rid-citizens in development). */
+    issuer: string;
+    /** Where this server reaches the issuer (in containers, by service name); default issuer. */
+    internalUrl: string;
+    clientId: string;
+    clientSecret: string;
+  };
+  portal: {
+    /** Citizen API of the portal. */
+    apiUrl: string;
+    /**
+     * Public material the app chooses to trust for receipts, fetched from where it is
+     * published: the operator's JWKS and the TSA's certificate chain.
+     */
+    jwksUrl: string;
+    tsaRootUrl: string;
+  };
+  /** Standard Webhooks secret shared with the portal (RID_CITIZEN_APPS). */
+  webhookSecret: string;
+  smtp: { host: string; port: number; from: string };
+  /** Where the app keeps which alert id belongs to which of its users. */
+  dataFile: string;
+}
+
+/** Loads the repo-root .env in development, as apps/web and apps/api do. */
+export function loadRootEnv(start = process.cwd()): void {
+  let dir = resolve(start);
+  for (;;) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) {
+      const file = join(dir, '.env');
+      if (existsSync(file)) process.loadEnvFile(file);
+      return;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return;
+    dir = parent;
+  }
+}
+
+const required = (name: string): string => {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set (see .env.example)`);
+  return value;
+};
+
+export function configFromEnv(): CitizenAppConfig {
+  const publicUrl = (process.env.RID_CARPETA_URL ?? 'http://localhost:3100').replace(/\/+$/, '');
+  const issuer = process.env.RID_CITIZEN_ISSUER ?? 'http://localhost:8080/realms/rid-citizens';
+  const apiUrl = (
+    process.env.CITIZEN_APP_PORTAL_API_URL ??
+    process.env.RID_API_URL ??
+    'http://localhost:4000'
+  ).replace(/\/+$/, '');
+  const tsaUrl = (process.env.RID_TSA_URL ?? 'http://localhost:3004').replace(/\/+$/, '');
+  return {
+    publicUrl,
+    basePath: new URL(publicUrl).pathname.replace(/\/+$/, ''),
+    port: Number(process.env.CITIZEN_APP_PORT ?? 3100),
+    name: {
+      es: process.env.CITIZEN_APP_NAME_ES ?? 'Carpeta ciudadana (referencia)',
+      en: process.env.CITIZEN_APP_NAME_EN ?? 'Citizen folder (reference)',
+    },
+    oidc: {
+      issuer,
+      internalUrl: process.env.CITIZEN_APP_ISSUER_INTERNAL_URL ?? issuer,
+      clientId: process.env.CITIZEN_APP_CLIENT_ID ?? 'carpeta-ciudadana',
+      clientSecret: required('RID_CARPETA_CLIENT_SECRET'),
+    },
+    portal: {
+      apiUrl,
+      jwksUrl: process.env.CITIZEN_APP_JWKS_URL ?? `${apiUrl}/api/v1/transparency/jwks`,
+      tsaRootUrl: process.env.CITIZEN_APP_TSA_ROOT_URL ?? `${tsaUrl}/api/v1/timestamp/certchain`,
+    },
+    webhookSecret: required('CITIZEN_APP_WEBHOOK_SECRET'),
+    smtp: {
+      host: process.env.CITIZEN_APP_SMTP_HOST ?? 'localhost',
+      port: Number(process.env.CITIZEN_APP_SMTP_PORT ?? process.env.MAILPIT_SMTP_PORT ?? 1025),
+      from: process.env.CITIZEN_APP_MAIL_FROM ?? 'avisos@carpeta.demo.rid.example',
+    },
+    dataFile: process.env.CITIZEN_APP_DATA_FILE ?? resolve('data/alerts.json'),
+  };
+}

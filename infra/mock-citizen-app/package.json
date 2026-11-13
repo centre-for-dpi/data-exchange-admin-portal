@@ -1,0 +1,32 @@
+{
+  "name": "@rid/mock-citizen-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference citizen app (a Carpeta-like folder): who consulted my data, notices and receipt verification (MT-07)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.5",
+    "@fastify/formbody": "9.0.1",
+    "@rid/transparency-verifier": "workspace:*",
+    "fastify": "^5.12.8",
+    "jose": "^6.2.17",
+    "nodemailer": "10.3.1",
+    "standardwebhooks": "1.1.1",
+    "@rid/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/nodemailer": "8.0.2",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0"
+  }
+}

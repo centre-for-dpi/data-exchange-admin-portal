@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env'));
@@ -57,12 +57,26 @@ async function waitFor(probe, { timeoutMs, everyMs = 1_000, what }) {
 
 // --- Keycloak login (Authorization Code + PKCE, like the web app) ------------------------------
 
-async function login(username) {
-  const realm = `${KEYCLOAK}/realms/rid-portal/protocol/openid-connect`;
-  const redirectUri = `${WEB}/api/auth/callback/keycloak`;
+const PORTAL_CLIENT = {
+  realm: 'rid-portal',
+  clientId: env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web'),
+  secret: env('RID_PORTAL_WEB_CLIENT_SECRET', ''),
+  redirectUri: `${WEB}/api/auth/callback/keycloak`,
+};
+/** The reference citizen folder in the (simulated) national identity (MT-05, MT-07). */
+const CITIZEN_CLIENT = {
+  realm: 'rid-citizens',
+  clientId: 'carpeta-ciudadana',
+  secret: env('RID_CARPETA_CLIENT_SECRET', ''),
+  redirectUri: `${env('RID_CARPETA_URL', 'http://localhost:3100')}/auth/callback`,
+};
+
+async function login(username, client = PORTAL_CLIENT) {
+  const realm = `${KEYCLOAK}/realms/${client.realm}/protocol/openid-connect`;
+  const redirectUri = client.redirectUri;
   const verifier = randomBytes(32).toString('base64url');
   const params = new URLSearchParams({
-    client_id: env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web'),
+    client_id: client.clientId,
     response_type: 'code',
     scope: 'openid',
     redirect_uri: redirectUri,
@@ -93,8 +107,7 @@ async function login(username) {
   });
   const code = new URL(submitted.headers.get('location') ?? 'http://x/').searchParams.get('code');
   expect(code, `Login failed for ${username} (is RID_DEMO_USER_PASSWORD right?)`);
-  const clientId = env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web');
-  const secret = env('RID_PORTAL_WEB_CLIENT_SECRET', '');
+  const { clientId, secret } = client;
   const tokens = await fetch(`${realm}/token`, {
     method: 'POST',
     headers: {
@@ -393,6 +406,57 @@ async function main() {
   ok(
     `Cadena íntegra: ${check.verified} eventos verificados, último hash ${check.lastHash.slice(0, 16)}…`,
   );
+
+  step('Ver quién consultó mis datos', 'ciudadana.demo');
+  const citizenToken = await login('ciudadana.demo', CITIZEN_CLIENT);
+  const asCitizen = async (path) => {
+    const res = await fetch(`${API}/data-subjects/me${path}`, {
+      headers: { authorization: `Bearer ${citizenToken}` },
+    });
+    expect(res.ok, `ciudadana.demo: GET ${path} -> ${res.status}`);
+    return res.json();
+  };
+  const demoApi = `Consulta de afiliación (demo ${RUN})`;
+  const mine = await waitFor(
+    async () =>
+      (await asCitizen('/accesses?limit=100')).items.find(
+        (a) => a.api?.name === demoApi && a.status === 200,
+      ),
+    { timeoutMs: 30_000, what: 'the citizen does not see the call of step 7' },
+  );
+  ok(
+    `${mine.consumer.entity?.shortName} consultó ${mine.api.name} para "${mine.purpose.name?.es ?? mine.purpose.code}"`,
+  );
+  info(`  funcionario (referencia): ${mine.officialRef?.slice(0, 16)}…`);
+  const receipt = await waitFor(
+    async () => {
+      const sealed = (await asCitizen('/accesses?limit=100')).items.find(
+        (a) => a.id === mine.id && a.sealed,
+      );
+      if (!sealed) return undefined;
+      const r = await asCitizen(`/accesses/${mine.id}/receipt`);
+      return r.timestamp ? r : undefined;
+    },
+    { timeoutMs: 90_000, everyMs: 3_000, what: 'the consultation was not sealed and stamped' },
+  );
+  const verifierPath = resolve(root, 'packages/transparency-verifier/dist/index.js');
+  expect(
+    existsSync(verifierPath),
+    'build the verifier first: pnpm --filter @rid/transparency-verifier build',
+  );
+  const { verifyReceipt, certificatesInPem } = await import(pathToFileURL(verifierPath).href);
+  const jwks = await (await fetch(`${API}/transparency/jwks`)).json();
+  const tsaRootUrl = env(
+    'CITIZEN_APP_TSA_ROOT_URL',
+    `${env('RID_TSA_URL', 'http://localhost:3004')}/api/v1/timestamp/certchain`,
+  );
+  const tsaChain = await (await fetch(tsaRootUrl)).text();
+  const result = await verifyReceipt(receipt, { jwks, tsaRoots: certificatesInPem(tsaChain) });
+  expect(result.valid, `the receipt does not verify: ${result.errors.join('; ')}`);
+  ok(
+    `Comprobante válido: firma del operador, inclusión en el lote ${result.checkpoint.seq} y sello de tiempo (${result.stampedAt})`,
+  );
+  info(`  Carpeta de referencia: ${env('RID_CARPETA_URL', 'http://localhost:3100')}`);
 
   console.log(
     `\n${green(bold('Demo completa en verde'))} ${dim(`(${((Date.now() - started) / 1000).toFixed(0)} s)`)}`,

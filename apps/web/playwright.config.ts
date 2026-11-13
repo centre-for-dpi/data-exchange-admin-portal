@@ -34,6 +34,14 @@ export default defineConfig({
       timeout: 240_000,
     },
     {
+      // The reference citizen folder (MT-07).
+      command:
+        'pnpm -w exec turbo run build --filter=@rid/mock-citizen-app... && pnpm --filter @rid/mock-citizen-app start',
+      url: `${process.env.RID_CARPETA_URL ?? 'http://localhost:3100'}/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 240_000,
+    },
+    {
       command: 'pnpm -w exec turbo run build --filter=@rid/web... && pnpm start',
       url: baseURL,
       reuseExistingServer: !process.env.CI,

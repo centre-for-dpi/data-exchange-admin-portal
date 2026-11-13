@@ -16,6 +16,10 @@ import { ApiOperation } from '../../openapi/api-operation.decorator.js';
 import { TransparencyEvidenceService } from './transparency-evidence.service.js';
 
 const recordParamsSchema = z.strictObject({ id: z.uuid() });
+const verifyQuerySchema = z.strictObject({
+  /** Check from this checkpoint on (chained to the previous one); default, the whole register. */
+  fromSeq: z.coerce.number().int().min(1).max(2_147_483_647).optional(),
+});
 
 /**
  * Evidence of the transparency register (ADR-0016, MT-04).
@@ -108,12 +112,13 @@ export class TransparencyController {
       'Checkpoint chain and signatures, every batch root, every time-stamp, and every record ' +
       'against its leaf: altered, deleted or inserted records and batches are reported.',
     tags: ['transparency'],
+    query: verifyQuerySchema,
     responses: {
       200: { description: 'Verification result', schema: transparencyVerificationSchema },
     },
-    errors: [401, 403],
+    errors: [400, 401, 403],
   })
-  verify() {
-    return this.evidence.verify();
+  verify(@Query(new ZodValidationPipe(verifyQuerySchema)) query: { fromSeq?: number }) {
+    return this.evidence.verify(query);
   }
 }

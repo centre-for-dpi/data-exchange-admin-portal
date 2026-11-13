@@ -93,3 +93,19 @@ export async function myAccesses(token: string): Promise<CitizenAccess[]> {
   }
   return items;
 }
+
+/** The reference citizen folder (infra/mock-citizen-app, MT-07). */
+export const carpeta = process.env.RID_CARPETA_URL ?? 'http://localhost:3100';
+const mailpit = `http://localhost:${process.env.MAILPIT_UI_PORT ?? '8025'}/api/v1`;
+
+/** Messages Mailpit received for an address. */
+export async function mailsTo(address: string): Promise<Array<{ ID: string; Subject: string }>> {
+  const res = await fetch(`${mailpit}/search?query=${encodeURIComponent(`to:"${address}"`)}`);
+  if (!res.ok) throw new Error(`mailpit: HTTP ${res.status}`);
+  return ((await res.json()) as { messages: Array<{ ID: string; Subject: string }> }).messages;
+}
+
+export async function mailText(id: string): Promise<string> {
+  const res = await fetch(`${mailpit}/message/${id}`);
+  return ((await res.json()) as { Text: string }).Text;
+}

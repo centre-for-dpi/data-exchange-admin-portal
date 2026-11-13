@@ -20,7 +20,7 @@ pnpm db:migrate && pnpm db:seed
 pnpm dev
 ```
 
-Abre http://localhost:3000. Usuarios de prueba en `docs/DEMO.md`.
+Abre http://localhost:3000. Usuarios de prueba en `docs/DEMO.md`. La carpeta ciudadana de referencia ("¿Quién consultó mis datos?", MT-07) queda en http://localhost:3100 con `ciudadana.demo`.
 
 Para las pruebas e2e (`pnpm test:e2e`, con el stack arriba) instala una vez el navegador: `pnpm --filter @rid/web exec playwright install chromium`.
 
