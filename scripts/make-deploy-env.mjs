@@ -3,7 +3,9 @@
 // .env.example: fresh random secrets, a new transparency signing key, the internal service names
 // of the Compose network and the public URL. Prints nothing secret.
 //
-//   node scripts/make-deploy-env.mjs https://portal.example.org [--out .env] [--demo-password demo]
+//   node scripts/make-deploy-env.mjs https://portal.example.org [--out .env] [--demo-password <pw>]
+//
+// The seed users' password is random unless --demo-password is given.
 //
 // Refuses to overwrite an existing file: secrets of a running deployment (database passwords,
 // the signing key, the subject key) must not change under it.
@@ -80,7 +82,9 @@ const set = {
   RID_TRANSPARENCY_COLLECTOR_HOST: 'api',
   RID_TSA_URL: 'http://tsa:3004',
   TRAEFIK_NETWORK: values['traefik-network'],
-  ...(values['demo-password'] ? { RID_DEMO_USER_PASSWORD: values['demo-password'] } : {}),
+  // Random unless asked: the seed users include platform administrators.
+  RID_DEMO_USER_PASSWORD: values['demo-password'] ?? secret(12),
+  MAILPIT_UI_AUTH: `mail:${secret(12)}`,
 };
 
 const lines = readFileSync(resolve(root, '.env.example'), 'utf8').split('\n');
@@ -101,3 +105,6 @@ if (extra.length > 0) {
 }
 writeFileSync(out, `${result.join('\n').trimEnd()}\n`, { mode: 0o600 });
 console.log(`Wrote ${out} for ${publicUrl} (kid ${signingJwk.kid}).`);
+console.log(
+  'Demo users password: RID_DEMO_USER_PASSWORD; Mailpit login: MAILPIT_UI_AUTH (in that file).',
+);

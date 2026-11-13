@@ -13,7 +13,7 @@
 #                                              off the public host)
 #       /auth        -> rid-keycloak:8080     (Keycloak, relative path /auth)
 #       /gw          -> rid-apisix:9080       (gateway, prefix stripped by the proxy)
-#       /mail        -> rid-mailpit:8025      (Mailpit, demo mail)
+#       /mail        -> rid-mailpit:8025      (Mailpit, demo mail, behind MAILPIT_UI_AUTH)
 #   - the API and the web app run in containers (apps/*/Dockerfile); the API applies migrations
 #     and the idempotent seed on start (RID_ALLOW_SEED=true).
 
@@ -77,6 +77,9 @@ services:
     restart: unless-stopped
     environment:
       MP_WEBROOT: /mail
+      # Behind a login: Keycloak sends password resets here, so an open inbox would let anyone
+      # take over a demo account.
+      MP_UI_AUTH: ${MAILPIT_UI_AUTH:?set MAILPIT_UI_AUTH in .env}
     networks:
       default: {}
       edge:
