@@ -34,6 +34,9 @@ services:
       # Health stays at /health/ready on the management port (the health check above).
       KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
       KC_PROXY_HEADERS: xforwarded
+    healthcheck:
+      # A shared host can take minutes to boot Keycloak (realm import included).
+      start_period: 300s
     networks:
       default: {}
       edge:
