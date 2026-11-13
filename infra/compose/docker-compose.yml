@@ -225,6 +225,40 @@ services:
       <<: *healthcheck-defaults
       test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:2020/api/v1/health']
 
+  # Development RFC 3161 time-stamping authority (ADR-0016, MT-04): seals the checkpoints of the
+  # transparency register. sigstore timestamp-server (Apache-2.0) with a file signer; tsa-init
+  # creates its certificate chain once (infra/tsa/init.sh). In production, the country's
+  # accredited TSA.
+  tsa-init:
+    image: smallstep/step-ca:0.30.2
+    entrypoint: ['sh', '/init/init.sh']
+    user: root
+    volumes:
+      - ../tsa:/init:ro
+      - tsa-data:/tsa
+
+  tsa:
+    image: ghcr.io/sigstore/timestamp-server:v2.1.4
+    command:
+      [
+        'timestamp-server',
+        'serve',
+        '--host=0.0.0.0',
+        '--port=3004',
+        '--timestamp-signer=file',
+        '--file-signer-key-path=/tsa/tsa.key',
+        '--certificate-chain-path=/tsa/chain.pem',
+        '--disable-ntp-monitoring',
+      ]
+    depends_on:
+      tsa-init:
+        condition: service_completed_successfully
+    volumes:
+      - tsa-data:/tsa:ro
+    ports:
+      - 127.0.0.1:${RID_TSA_PORT:-3004}:3004
+    # Distroless image, nothing to run a health check with: the API retries while it is down.
+
   mailpit:
     image: axllent/mailpit:v1.32.0
     ports:
@@ -265,3 +299,4 @@ volumes:
   step-ca-data:
   opensearch-data:
   transparency-buffer:
+  tsa-data:

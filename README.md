@@ -29,7 +29,7 @@ Para las pruebas e2e (`pnpm test:e2e`, con el stack arriba) instala una vez el n
 | Comando | Qué hace |
 | :-- | :-- |
 | `pnpm infra:up` | Levanta todo y espera a que cada servicio esté sano |
-| `pnpm infra:up:core` | Igual, sin OpenSearch ni el Fluent Bit de analítica (más liviano). Incluye el Fluent Bit del registro de transparencia |
+| `pnpm infra:up:core` | Igual, sin OpenSearch ni el Fluent Bit de analítica (más liviano). Incluye el Fluent Bit del registro de transparencia y la TSA de desarrollo (puerto 3004) |
 | `pnpm infra:ps` / `pnpm infra:logs` | Estado y logs |
 | `pnpm infra:down` | Detiene los servicios (conserva datos) |
 | `pnpm infra:reset` | Detiene y **borra** volúmenes (base de datos, CA, índices) |

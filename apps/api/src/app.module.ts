@@ -23,6 +23,10 @@ import { PurposesController } from './purposes/purposes.controller.js';
 import { ReconcilersModule } from './reconcilers/reconcilers.module.js';
 import { ReviewsController } from './reviews/reviews.controller.js';
 import { ReviewsService } from './reviews/reviews.service.js';
+import { TransparencySigningKey } from './transparency/evidence/signing-key.js';
+import { TransparencyEvidenceService } from './transparency/evidence/transparency-evidence.service.js';
+import { TransparencyController } from './transparency/evidence/transparency.controller.js';
+import { TsaClient } from './transparency/evidence/tsa.client.js';
 import { SubjectAccessController } from './transparency/subject-access.controller.js';
 import { SubjectAccessService } from './transparency/subject-access.service.js';
 
@@ -43,6 +47,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     AuditController,
     EntityAuditController,
     SubjectAccessController,
+    TransparencyController,
   ],
   providers: [
     ApisService,
@@ -53,6 +58,9 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     OpaService,
     AuditQueryService,
     SubjectAccessService,
+    TransparencyEvidenceService,
+    TransparencySigningKey,
+    TsaClient,
   ],
 })
 export class AppModule {}

@@ -682,3 +682,56 @@ model SubjectAccessPurgeLog {
 
   @@map("subject_access_purge_log")
 }
+
+/// A sealed batch of the transparency register (ADR-0016, MT-04): Merkle root of its records,
+/// chained to the previous checkpoint and signed by the operator (compact JWS, EdDSA).
+/// Insert-only.
+model TransparencyCheckpoint {
+  seq       Int      @id
+  treeSize  Int      @map("tree_size")
+  /// Merkle root (RFC 9162), hex.
+  root      String
+  /// checkpointHash of seq - 1; null for the first.
+  prev      String?
+  /// checkpointHash of this one: what the next checkpoint links to.
+  hash      String   @unique
+  sealedAt  DateTime @map("sealed_at") @db.Timestamptz(3)
+  /// Key that signed it (JWKS kid).
+  kid       String
+  jws       String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  leaves    TransparencyLeaf[]
+  timestamp TransparencyTimestamp?
+
+  @@map("transparency_checkpoint")
+}
+
+/// Position of a record in its batch. Keeps the leaf hash, so the tree can be rebuilt after the
+/// record itself is purged by retention. Insert-only.
+model TransparencyLeaf {
+  recordId      String                 @id @map("record_id") @db.Uuid
+  checkpointSeq Int                    @map("checkpoint_seq")
+  leafIndex     Int                    @map("leaf_index")
+  leafHash      String                 @map("leaf_hash")
+  /// When the call happened: tells a record purged by retention from one deleted early.
+  occurredAt    DateTime               @map("occurred_at") @db.Timestamptz(3)
+  checkpoint    TransparencyCheckpoint @relation(fields: [checkpointSeq], references: [seq])
+
+  @@unique([checkpointSeq, leafIndex])
+  @@map("transparency_leaf")
+}
+
+/// RFC 3161 time-stamp of a checkpoint's JWS by an independent TSA. Separate table so the
+/// checkpoint is never updated; absent while the TSA has not answered. Insert-only.
+model TransparencyTimestamp {
+  checkpointSeq Int                    @id @map("checkpoint_seq")
+  /// DER TimeStampToken (CMS ContentInfo).
+  token         Bytes
+  genTime       DateTime               @map("gen_time") @db.Timestamptz(3)
+  serialNumber  String                 @map("serial_number")
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  checkpoint    TransparencyCheckpoint @relation(fields: [checkpointSeq], references: [seq])
+
+  @@map("transparency_timestamp")
+}

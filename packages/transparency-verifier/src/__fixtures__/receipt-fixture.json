@@ -1,0 +1,148 @@
+{
+  "privateJwk": {
+    "crv": "Ed25519",
+    "d": "_TIejGwJjub4nvejkLoMpeMvfko9UBWmfSbYGVJoi-E",
+    "x": "W2K7esSEpYOXHAJQxtSB2XZK10mtSJr2c1jYwCtOJZg",
+    "kty": "OKP",
+    "kid": "test-2026",
+    "alg": "EdDSA",
+    "use": "sig"
+  },
+  "records": [
+    {
+      "v": 1,
+      "id": "45838405-7174-463a-be30-617edb6f5925",
+      "occurredAt": "2026-11-13T12:00:00.000Z",
+      "subjectRef": "fdf58d309a61426a1137d3aec8255473f021a165823f8b2cb3257537c2b910f1",
+      "subjectSource": "path",
+      "providerEntityId": "b32e6acf-f0e0-4770-aff9-7db2480abb21",
+      "apiId": "72cc08e6-8cdc-4b30-b3a5-601df7b8d44a",
+      "apiVersionId": "fab89aba-42f2-49a6-bb09-9a8c43e07aa4",
+      "operationId": "getAfiliado",
+      "exposedFields": [
+        {
+          "name": "regimen",
+          "personal": true,
+          "sensitive": false
+        }
+      ],
+      "consumerEntityId": "6b1e7439-3180-4a36-8d2f-9743040dea43",
+      "applicationId": "d3058e81-d5ce-4826-9ff0-20a2288f52ca",
+      "subscriptionId": "016f33be-8cda-48e1-948f-f2ce4f32ad76",
+      "purposeCode": "eligibility_check",
+      "endUserHash": "c7fe25aeb25d3a9626fea41cd196cdad516f36b50712e45d47c0f948965f22df",
+      "status": 200,
+      "gatewayNode": "apisix-test",
+      "gatewayRequestId": "9a95a0b037330f8b63dc00e52d799669"
+    },
+    {
+      "v": 1,
+      "id": "3127f9c5-5621-4d86-aee7-6da39cbe862d",
+      "occurredAt": "2026-11-13T12:00:01.000Z",
+      "subjectRef": "e789e189adc420899550bfbddf63197c7cb0556ad99f66334caaf7a3f34a5543",
+      "subjectSource": "body",
+      "providerEntityId": "1c3a60ab-28bd-4c32-8e0f-f9a4f863be1d",
+      "apiId": "10c5348e-36f9-402f-a06e-8cf6c797567b",
+      "apiVersionId": "92fb8592-9a7c-4648-a7db-b2b6c33ed436",
+      "operationId": "verificarAfiliacion",
+      "exposedFields": [
+        {
+          "name": "regimen",
+          "personal": true,
+          "sensitive": false
+        }
+      ],
+      "consumerEntityId": "cc86883d-7d74-43dd-bba6-8a270e8f7da7",
+      "applicationId": "1ab11795-a249-4274-9f60-7947ac8206b5",
+      "subscriptionId": "c3dd979b-be32-453f-9bcf-ce36941cf647",
+      "purposeCode": "eligibility_check",
+      "endUserHash": "d6d2492da26dec7bd626a37160135dd309a18246759a0e3ad17b12569bf3ea78",
+      "status": 200,
+      "gatewayNode": "apisix-test",
+      "gatewayRequestId": "8528c5f101a37e7b1db92518b09928cf"
+    },
+    {
+      "v": 1,
+      "id": "92950fff-cd3f-40df-83d2-ba0651f85ee6",
+      "occurredAt": "2026-11-13T12:00:02.000Z",
+      "subjectRef": "c5829db06eff3613b4718b01c6ec8c55b5ddc91582a756bf840455b72ef6090b",
+      "subjectSource": "path",
+      "providerEntityId": "b87475cc-625d-4987-8c6b-e349c6fb683e",
+      "apiId": "94736e85-cf2a-4d23-8895-5b51831b4dff",
+      "apiVersionId": "de89e889-7464-4c72-8dc4-8a1e7526e83c",
+      "operationId": "getAfiliado",
+      "exposedFields": [
+        {
+          "name": "regimen",
+          "personal": true,
+          "sensitive": false
+        }
+      ],
+      "consumerEntityId": "ec9d9cfe-097d-4de4-b5f5-7575f43960c2",
+      "applicationId": "295968cc-1f16-4d5f-bf02-afe42cf3b41f",
+      "subscriptionId": "65690ab2-cb54-4d94-83bd-8c4120941d3c",
+      "purposeCode": "eligibility_check",
+      "endUserHash": "603eef22ff433db5ec7beda972cd3c52a6b1d0729c2f993c27e0626421f61083",
+      "status": 200,
+      "gatewayNode": "apisix-test",
+      "gatewayRequestId": "cb9d19e7e8e4c50abafadedf0ebef340"
+    },
+    {
+      "v": 1,
+      "id": "a747437a-2214-4c53-bc53-f23034acbf71",
+      "occurredAt": "2026-11-13T12:00:03.000Z",
+      "subjectRef": "4b2a3118f24c465194321e6d770325974aecb2b5dd5fe9cbd670e63aa74e15e1",
+      "subjectSource": "body",
+      "providerEntityId": "fc413250-c483-477f-906c-85cb9644b1ff",
+      "apiId": "2da14bcd-706a-4169-bdcf-48c5b61b3239",
+      "apiVersionId": "8161ecd8-f393-4a64-8989-e2a1864f4096",
+      "operationId": "verificarAfiliacion",
+      "exposedFields": [
+        {
+          "name": "regimen",
+          "personal": true,
+          "sensitive": false
+        }
+      ],
+      "consumerEntityId": "0f11f8cb-ca05-4855-8b23-d2d75facf1cb",
+      "applicationId": "0aa20663-eb01-46a6-add9-af6bfc1a95e4",
+      "subscriptionId": "26043383-0b39-4d19-a689-961491eb125c",
+      "purposeCode": "eligibility_check",
+      "endUserHash": null,
+      "status": 200,
+      "gatewayNode": "apisix-test",
+      "gatewayRequestId": "c9214487fe21a2762eed69396d751e71"
+    },
+    {
+      "v": 1,
+      "id": "ed95f38f-4c5a-49a4-a52b-f1238f5c6556",
+      "occurredAt": "2026-11-13T12:00:04.000Z",
+      "subjectRef": "3cd7f00e87d01542705dda18ee685b5641a0a9eb7cec5fb7bf0f1346d812db14",
+      "subjectSource": "path",
+      "providerEntityId": "b4a36083-7d2a-4167-bca4-57ac1cadfcd1",
+      "apiId": "7f68c3a8-b6e5-4276-a47f-2c7ec4f9dfb4",
+      "apiVersionId": "9103161f-4ada-4c93-9973-347fed9b4796",
+      "operationId": "getAfiliado",
+      "exposedFields": [
+        {
+          "name": "regimen",
+          "personal": true,
+          "sensitive": false
+        }
+      ],
+      "consumerEntityId": "c6e422f1-6c5c-4ca9-9353-e15e9a845dee",
+      "applicationId": "d20cbc88-bd1c-4a24-9a87-f5de45e35798",
+      "subscriptionId": "f456145f-cbcc-4f62-818e-944ef7143c7a",
+      "purposeCode": "eligibility_check",
+      "endUserHash": "b52446043b02293acf0649e9088321aa18eecb80a1b20a12d15a8270a1f866c9",
+      "status": 404,
+      "gatewayNode": "apisix-test",
+      "gatewayRequestId": "9bc4a40c5587739e433a91c13b21d7ad"
+    }
+  ],
+  "checkpoint": "eyJhbGciOiJFZERTQSIsImtpZCI6InRlc3QtMjAyNiIsInR5cCI6InJpZC1jaGVja3BvaW50K2p3cyJ9.eyJsb2ciOiJyaWQtdHJhbnNwYXJlbmN5LXRlc3QiLCJwcmV2IjpudWxsLCJyb290IjoiMzc2NGMyMTA0NmYwNTI4MDU4Yzc2NWQ5ODRkN2IxOGQ0NThkYzY3M2QxM2UzN2EyMDkxMTA1NjgwNjdkNmYyYyIsInNlYWxlZEF0IjoiMjAyNi0xMS0xM1QxMjowMDoxMC4wMDBaIiwic2VxIjoxLCJ0cmVlU2l6ZSI6NSwidiI6MX0.r8tx-lkbRFVj7A2dNiw6pJf0DKR4CWYK3tdIdkHeX4ZeuYdA20gKw-cBtSHyMJ9NBxQeY1Uju-DjqBV40uEkBw",
+  "timestamp": "MIID+wYJKoZIhvcNAQcCoIID7DCCA+gCAQMxDTALBglghkgBZQMEAgEwgaoGCyqGSIb3DQEJEAEEoIGaBIGXMIGUAgEBBgkrBgEEAYO/MAIwMTANBglghkgBZQMEAgEFAAQgWwxdlwM3FaOOZY1nkYDKfMDXxsUDxt3aq59pwQ2xN/oCFQC5ak3iXkdL+DFMHus422FCrcW1eRgPMjAyNjExMTMxMzAxMTFaMAMCAQECCFska9riywo7oBqkGDAWMRQwEgYDVQQDEwtSSUQgRGV2IFRTQaCCAawwggGoMIIBTaADAgECAhBID4ZxWqd/61mifp3DWj61MAoGCCqGSM49BAMCMBsxGTAXBgNVBAMTEFJJRCBEZXYgVFNBIFJvb3QwHhcNMjYxMTEzMTIyMzA5WhcNMzExMTEyMTIyMzA5WjAWMRQwEgYDVQQDEwtSSUQgRGV2IFRTQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABOEA8qZ5b5S5Tl5iUwRo8V8kN4M+/VAjEzKFw1U6YUycbckdhXlTLz9b9nOOJ316iTFf8/SZKMBkwl+uaTXHlSmjeDB2MA4GA1UdDwEB/wQEAwIHgDAMBgNVHRMBAf8EAjAAMB0GA1UdDgQWBBSz7WISDl1mTEvIY08i4kZi2bLCbTAfBgNVHSMEGDAWgBReyIhpVHT8gbBccWoXygNVOz4m4TAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDAKBggqhkjOPQQDAgNJADBGAiEA+a7uLnhvBjYvuq/1V7J9eGiC4pgbEcFrviRh+0hs6LQCIQD4HargxofwXo7dQBTF8uTT9o3AP+U6Ml8nc/fz/tgj8TGCAXUwggFxAgEBMC8wGzEZMBcGA1UEAxMQUklEIERldiBUU0EgUm9vdAIQSA+GcVqnf+tZon6dw1o+tTALBglghkgBZQMEAgGggdkwGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNjExMTMxMzAxMTFaMC8GCSqGSIb3DQEJBDEiBCDDg9Mv9CitlmQNB+zNQJUQJpdh2COrdFID2MUQAkrugTBsBgsqhkiG9w0BCRACLzFdMFswWTBXBCD7AwPb0zQgcBbxMd/mwdI77v3nxHzjapI2ZNjCRm61oDAzMB+kHTAbMRkwFwYDVQQDExBSSUQgRGV2IFRTQSBSb290AhBID4ZxWqd/61mifp3DWj61MAoGCCqGSM49BAMCBEYwRAIgawGFyoVdk9tNCkhTy2XFBFiWhHikFyyxUlr8eK9SrT8CIF+aAlJJ3Wrpworacl0uJqPf336Kfn2zwivzVqCuACsb",
+  "tsaRoot": "-----BEGIN CERTIFICATE-----\nMIIBejCCASCgAwIBAgIRAIlvu0HTGio9TO3t2y8KCm8wCgYIKoZIzj0EAwIwGzEZ\nMBcGA1UEAxMQUklEIERldiBUU0EgUm9vdDAeFw0yNjExMTMxMjIzMDlaFw0zNjEx\nMTAxMjIzMDlaMBsxGTAXBgNVBAMTEFJJRCBEZXYgVFNBIFJvb3QwWTATBgcqhkjO\nPQIBBggqhkjOPQMBBwNCAASvdOpmxp+vKlqM/N6g2kLqjLLGIWtV5flYA0sLAmCS\nqrL4rZzsXg8yoHXbtQMTV58lkD9n58ViXVVF9XqH3IuIo0UwQzAOBgNVHQ8BAf8E\nBAMCAQYwEgYDVR0TAQH/BAgwBgEB/wIBATAdBgNVHQ4EFgQUXsiIaVR0/IGwXHFq\nF8oDVTs+JuEwCgYIKoZIzj0EAwIDSAAwRQIgC1hTARfXFFAoxfzYUbnC2nTCv9GV\nfEp5VpX1pO2hg/MCIQD6/QHX/Jpz8gHHIkCDX1AvCXfXZLoYvXWU7YycVQ9nKg==\n-----END CERTIFICATE-----\n",
+  "otherRoot": "-----BEGIN CERTIFICATE-----\nMIIBbDCCAROgAwIBAgIQD8LnekFKKRrUHtii0bPcXDAKBggqhkjOPQQDAjAVMRMw\nEQYDVQQDEwpPdGhlciBSb290MB4XDTI2MTExMzEzMDExOVoXDTM2MTExMDEzMDEx\nOVowFTETMBEGA1UEAxMKT3RoZXIgUm9vdDBZMBMGByqGSM49AgEGCCqGSM49AwEH\nA0IABARLdhHJH4aTtYWMDc9j7A5Ma1uydsD7la6RrHXbb9BXBFQUMR31QxER20PO\nA+0/c/xrOaPQDcUg+GAgmHA0zWCjRTBDMA4GA1UdDwEB/wQEAwIBBjASBgNVHRMB\nAf8ECDAGAQH/AgEBMB0GA1UdDgQWBBRefX5H0QzKMWpi9FKF9IyVDLeeIjAKBggq\nhkjOPQQDAgNHADBEAiAuMeIDpoT3CsNR3COrgS1/raUMkPChM8nnYjIUXq/HxQIg\nWIsMgD3tzxQQmqBnyfndgt8V/aWJ99icH+eT6OCGDkk=\n-----END CERTIFICATE-----\n",
+  "_note": "Test fixture only: the key signs nothing but this file. Regenerate with scripts/make-fixture.mjs."
+}

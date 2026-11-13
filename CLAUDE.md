@@ -72,6 +72,7 @@ rid-portal/
 ├── packages/
 │   ├── contracts/           # esquemas zod + tipos compartidos + códigos de error
 │   ├── policy/              # políticas Rego de OPA + tests (opa test)
+│   ├── transparency-verifier/ # verificador abierto de comprobantes (librería + CLI, ADR-0016)
 │   └── config/              # carga y validación de config/country/*.yaml
 ├── config/
 │   └── country/
@@ -114,7 +115,7 @@ pnpm license:check       # falla si hay una licencia no permitida
 pnpm demo                # ejecuta el guion de docs/DEMO.md de forma automatizada
 ```
 
-Puertos de desarrollo: web 3000, api 4000, Keycloak 8080, APISIX proxy 9080/9443, APISIX admin 9180, OPA 8181, step-ca 9000, OpenSearch 9200, Mailpit 8025, Postgres 5432.
+Puertos de desarrollo: web 3000, api 4000, Keycloak 8080, APISIX proxy 9080/9443, APISIX admin 9180, OPA 8181, step-ca 9000, OpenSearch 9200, Mailpit 8025, Postgres 5432, TSA de desarrollo 3004.
 
 ## Cómo trabajar
 
