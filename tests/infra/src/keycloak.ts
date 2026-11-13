@@ -70,16 +70,40 @@ export interface AuthorizationCodeResult {
  * Runs the browser login of apps/web (Authorization Code + PKCE S256) against realm rid-portal,
  * submitting Keycloak's login form like a user would.
  */
+export interface LoginClient {
+  realm: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}
+
+/** apps/web in realm rid-portal. */
+export const portalWebClient = (): LoginClient => ({
+  realm: 'rid-portal',
+  clientId: env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web'),
+  clientSecret: env('RID_PORTAL_WEB_CLIENT_SECRET'),
+  redirectUri: `${webUrl()}/api/auth/callback/keycloak`,
+});
+
+/** The reference Carpeta Ciudadana in realm rid-citizens (MT-05, MT-07). */
+export const carpetaClient = (): LoginClient => ({
+  realm: 'rid-citizens',
+  clientId: 'carpeta-ciudadana',
+  clientSecret: env('RID_CARPETA_CLIENT_SECRET'),
+  redirectUri: `${env('RID_CARPETA_URL', 'http://localhost:3100')}/auth/callback`,
+});
+
 export async function loginWithAuthorizationCode(
   username: string,
   password: string,
-  options: { pkce?: boolean; redirectUri?: string } = {},
+  options: { pkce?: boolean; redirectUri?: string; client?: LoginClient } = {},
 ): Promise<AuthorizationCodeResult> {
-  const realmUrl = `${keycloakUrl()}/realms/rid-portal/protocol/openid-connect`;
-  const redirectUri = options.redirectUri ?? `${webUrl()}/api/auth/callback/keycloak`;
+  const client = options.client ?? portalWebClient();
+  const realmUrl = `${keycloakUrl()}/realms/${client.realm}/protocol/openid-connect`;
+  const redirectUri = options.redirectUri ?? client.redirectUri;
   const verifier = randomBytes(32).toString('base64url');
   const params = new URLSearchParams({
-    client_id: env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web'),
+    client_id: client.clientId,
     response_type: 'code',
     scope: 'openid',
     redirect_uri: redirectUri,
@@ -117,10 +141,7 @@ export async function loginWithAuthorizationCode(
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
-      authorization: basicAuth(
-        env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web'),
-        env('RID_PORTAL_WEB_CLIENT_SECRET'),
-      ),
+      authorization: basicAuth(client.clientId, client.clientSecret),
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',

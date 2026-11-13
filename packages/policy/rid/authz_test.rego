@@ -268,6 +268,14 @@ test_the_path_subject_becomes_a_keyed_reference if {
 	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
 }
 
+# Shared vector with the portal API (apps/api/src/transparency/subject-ref.test.ts): the citizen
+# API derives the reference from the citizen's token and must get exactly what the gateway put
+# in X-RID-Subject-Ref.
+test_the_reference_matches_the_portal_vector if {
+	h := headers_for(request({}), bundle)
+	h["X-RID-Subject-Ref"] == "0d0deea2958985c2da0174f52dfb3bd1a9a88d0115ce41a4a3d1166e889b9062"
+}
+
 test_the_same_person_gets_the_same_reference_and_another_a_different_one if {
 	formatted := headers_for(get_path("/salud/afiliacion/v1/afiliados/1.000.000.001"), bundle)
 	formatted["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")

@@ -22,8 +22,11 @@ export interface OperationSpec {
   responses: Record<number, ResponseSpec>;
   /** Error statuses this endpoint can return (documented as application/problem+json). */
   errors?: number[];
-  /** false for endpoints that do not require authentication. Defaults to true. */
-  authenticated?: boolean;
+  /**
+   * false for endpoints that do not require authentication; 'citizen' for endpoints that take a
+   * citizen token of the national identity provider instead of a portal token. Defaults to true.
+   */
+  authenticated?: boolean | 'citizen';
 }
 
 /** Documents an endpoint in /api/docs (ADR-0013). Every route must have it (checked by a test). */

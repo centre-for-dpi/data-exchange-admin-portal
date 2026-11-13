@@ -27,6 +27,21 @@ Keycloak importa al arrancar (`--import-realm`) los archivos `*-realm.json` de e
 - Solo tres client scopes: `basic` (`sub`), `service_account` (`client_id`) y `rid-gateway-audience` (`aud = rid-gateway`). Los tokens de aplicación no llevan perfil, correo, roles ni IP del cliente. Duran 5 minutos.
 - Cliente `rid-portal-provisioner` con cuenta de servicio: solo `realm-management/manage-clients` en este realm. No puede ver usuarios ni roles, ni tocar otros realms.
 
+## Realm `rid-citizens` (ciudadanos, MT-05)
+
+Simula la identidad digital nacional, que en producción es la del país (`RID_CITIZEN_ISSUER`).
+
+- Cliente `carpeta-ciudadana`: la Carpeta Ciudadana de referencia (MT-07, `RID_CARPETA_URL`). Es confidencial, usa Authorization Code + PKCE S256 y no tiene password grant. El access token lleva `aud = rid-transparency-api`, `sub` y el documento verificado (`document_type`, `document_number`); sin nombre ni correo. Dura 5 minutos.
+- El documento lo fija el proveedor de identidad: el perfil de usuario solo deja editarlo al administrador.
+- Ciudadanos semilla, con contraseña `RID_DEMO_USER_PASSWORD`:
+
+| Usuario | ID (`sub`) | Documento |
+| :-- | :-- | :-- |
+| `ciudadana.demo` | `0193a6c0-0000-7000-8000-000000000101` | CC 1000000001 |
+| `ciudadano.otro` | `0193a6c0-0000-7000-8000-000000000102` | CC 1000000002 |
+
+Son los números que usan las e2e y la demo: `ciudadana.demo` ve en la API del titular las consultas que el gateway registró con su número.
+
 ## Pruebas
 
 - `pnpm test` incluye verificaciones estáticas de estos archivos (`tests/infra`).

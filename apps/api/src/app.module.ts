@@ -23,6 +23,14 @@ import { PurposesController } from './purposes/purposes.controller.js';
 import { ReconcilersModule } from './reconcilers/reconcilers.module.js';
 import { ReviewsController } from './reviews/reviews.controller.js';
 import { ReviewsService } from './reviews/reviews.service.js';
+import {
+  CITIZEN_TOKEN_VERIFIER,
+  citizenTokenOptions,
+  createCitizenTokenVerifier,
+} from './transparency/citizen/citizen-token-verifier.js';
+import { CitizenGuard } from './transparency/citizen/citizen.guard.js';
+import { DataSubjectsController } from './transparency/citizen/data-subjects.controller.js';
+import { DataSubjectsService } from './transparency/citizen/data-subjects.service.js';
 import { TransparencySigningKey } from './transparency/evidence/signing-key.js';
 import { TransparencyEvidenceService } from './transparency/evidence/transparency-evidence.service.js';
 import { TransparencyController } from './transparency/evidence/transparency.controller.js';
@@ -48,6 +56,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     EntityAuditController,
     SubjectAccessController,
     TransparencyController,
+    DataSubjectsController,
   ],
   providers: [
     ApisService,
@@ -61,6 +70,12 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     TransparencyEvidenceService,
     TransparencySigningKey,
     TsaClient,
+    DataSubjectsService,
+    CitizenGuard,
+    {
+      provide: CITIZEN_TOKEN_VERIFIER,
+      useFactory: () => createCitizenTokenVerifier(citizenTokenOptions()),
+    },
   ],
 })
 export class AppModule {}

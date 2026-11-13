@@ -93,3 +93,43 @@ describe('realm rid-gateway', () => {
     expect(provisioner?.secret).toMatch(/^\$\{[A-Z_]+\}$/);
   });
 });
+
+describe('realm rid-citizens (MT-05)', () => {
+  const realm = readRealm('rid-citizens') as RealmFile & {
+    components?: Record<string, Array<{ config: Record<string, string[]> }>>;
+    users: Array<{ attributes?: Record<string, string[]> }>;
+  };
+  const carpeta = realm.clients?.find((c) => c.clientId === 'carpeta-ciudadana');
+
+  it('has one citizen app: confidential, code + PKCE, no password grant', () => {
+    expect(realm.clients).toHaveLength(1);
+    expect(carpeta).toMatchObject({
+      publicClient: false,
+      directAccessGrantsEnabled: false,
+      serviceAccountsEnabled: false,
+      secret: '${RID_CARPETA_CLIENT_SECRET}',
+    });
+    expect(carpeta?.attributes?.['pkce.code.challenge.method']).toBe('S256');
+    expect(realm.registrationAllowed).toBe(false);
+  });
+
+  it('gives every citizen a verified document the citizen cannot edit', () => {
+    for (const user of realm.users) {
+      expect(user.attributes?.document_type?.[0]).toMatch(/^[A-Z]{2,4}$/);
+      expect(user.attributes?.document_number?.[0]).toMatch(/^[0-9]{6,12}$/);
+    }
+    const raw =
+      realm.components?.['org.keycloak.userprofile.UserProfileProvider']?.[0]?.config[
+        'kc.user.profile.config'
+      ]?.[0] ?? '{}';
+    const profile = JSON.parse(raw) as {
+      attributes: Array<{ name: string; permissions: { edit: string[] } }>;
+      unmanagedAttributePolicy?: string;
+    };
+    for (const name of ['document_type', 'document_number']) {
+      expect(profile.attributes.find((a) => a.name === name)?.permissions.edit).toEqual(['admin']);
+    }
+    // No other attribute the citizen could set and the token could carry.
+    expect(profile.unmanagedAttributePolicy).toBeUndefined();
+  });
+});

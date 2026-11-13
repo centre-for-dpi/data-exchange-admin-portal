@@ -125,3 +125,49 @@ export const transparencyVerificationSchema = z.object({
   ),
 });
 export type TransparencyVerification = z.infer<typeof transparencyVerificationSchema>;
+
+/** Text from the country config or the database: a string or { es, en }. */
+const localizedSchema = z.union([z.string(), z.record(z.string(), z.string())]);
+
+/**
+ * One consultation of the citizen's data, as the citizen sees it in the Carpeta (ADR-0015, SPEC
+ * §2.4): who consulted, when, which data, for what purpose and with which official (as an opaque
+ * reference). Never the document number.
+ */
+export const subjectAccessItemSchema = z.object({
+  id: z.uuid(),
+  occurredAt: z.iso.datetime(),
+  consumer: z.object({
+    entity: z.object({ name: z.string(), shortName: z.string() }).nullable(),
+    application: z.string().nullable(),
+  }),
+  provider: z.object({ name: z.string(), shortName: z.string() }).nullable(),
+  api: z.object({ name: z.string(), version: z.string() }).nullable(),
+  operation: z.object({ id: z.string(), summary: z.string().nullable() }),
+  purpose: z.object({ code: z.string(), name: localizedSchema.nullable() }),
+  /** What the API exposes, as declared when it was published. */
+  data: z.array(z.object({ name: z.string(), personal: z.boolean(), sensitive: z.boolean() })),
+  /** Keyed hash of the official behind the call; lets the citizen ask about it in a complaint. */
+  officialRef: z.string().nullable(),
+  /** HTTP status the consumer got (404: the provider had nothing about the citizen). */
+  status: z.number().int(),
+  /** Whether it is already in a sealed batch: only then a receipt can be downloaded. */
+  sealed: z.boolean(),
+});
+export type SubjectAccessItem = z.infer<typeof subjectAccessItemSchema>;
+
+export const subjectAccessPageSchema = z.object({
+  items: z.array(subjectAccessItemSchema),
+  nextCursor: z.string().nullable(),
+});
+export type SubjectAccessPage = z.infer<typeof subjectAccessPageSchema>;
+
+export const subjectAccessesQuerySchema = z.strictObject({
+  /** Opaque: from nextCursor of the previous page (consultations are listed newest first). */
+  cursor: z
+    .string()
+    .regex(/^\d{1,15}_[0-9a-f-]{36}$/)
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export type SubjectAccessesQuery = z.infer<typeof subjectAccessesQuerySchema>;

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import { citizenToken, myAccesses } from './citizen';
 import { createApplication, openRequestForm, publishNewApi, signIn } from './flows';
 import {
   approveAsSteward,
@@ -173,5 +174,23 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     // The document number itself appears nowhere: gateway logs, pipeline logs and buffer, the
     // portal database (ADR-0015, golden rule 2).
     expect(placesHolding(unseen)).toEqual([]);
+
+    // MT-05: the citizen behind 1000000001 logs in to the Carpeta with the (simulated) national
+    // identity and sees exactly these calls: the portal derived the same pseudonym from the
+    // verified document in the token as the gateway did from the request.
+    const mine = (await myAccesses(await citizenToken('ciudadana.demo'))).filter(
+      (a) => a.api?.name === apiName,
+    );
+    expect(mine.map((a) => [a.operation.id, a.status])).toEqual([
+      ['verificarAfiliacion', 200],
+      ['verificarAfiliacion', 400],
+      ['verificarAfiliacion', 200],
+      ['getAfiliado', 200],
+    ]);
+    // Andrés (1000000002) sees his one call; nobody sees the unknown number's.
+    const his = (await myAccesses(await citizenToken('ciudadano.otro'))).filter(
+      (a) => a.api?.name === apiName,
+    );
+    expect(his.map((a) => [a.operation.id, a.status])).toEqual([['getAfiliado', 200]]);
   });
 });

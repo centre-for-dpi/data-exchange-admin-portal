@@ -82,6 +82,7 @@ function operation(route: RouteDoc): JsonSchema {
       : {}),
     responses,
     ...(spec.authenticated === false ? { security: [] } : {}),
+    ...(spec.authenticated === 'citizen' ? { security: [{ citizenBearer: [] }] } : {}),
   };
 }
 
@@ -105,6 +106,14 @@ export function buildOpenApiDocument(routes: RouteDoc[], info: { title: string; 
     components: {
       securitySchemes: {
         bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        citizenBearer: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description:
+            'Access token of the national digital identity, issued to an authorized citizen app ' +
+            '(the Carpeta Ciudadana). Development: realm rid-citizens.',
+        },
       },
       schemas: { Problem: toSchema(problemDetailsSchema) },
     },
