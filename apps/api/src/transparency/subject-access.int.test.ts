@@ -319,6 +319,14 @@ describe('transparency register collector (MT-03)', () => {
       await expect(
         prisma.$executeRaw`UPDATE subject_access_retention SET min_months = 1`,
       ).rejects.toThrow();
+      // Nor shadow the floor with a temporary table of its own (search_path hijack).
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`CREATE TEMP TABLE subject_access_retention (min_months integer) ON COMMIT DROP`;
+          await tx.$executeRaw`INSERT INTO subject_access_retention VALUES (1)`;
+          await tx.$queryRaw`SELECT purge_subject_access_records(1)`;
+        }),
+      ).rejects.toThrow(/at least \d+ months/);
       await expect(
         prisma.$executeRaw`DELETE FROM subject_access_purge_log WHERE true`,
       ).rejects.toThrow();
