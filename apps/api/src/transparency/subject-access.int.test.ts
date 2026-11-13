@@ -161,6 +161,20 @@ describe('transparency register collector (MT-03)', () => {
       expect((await ingest({ not: 'an array' }, 'Bearer wrong-token')).statusCode).toBe(401);
       expect((await ingest({ not: 'an array' })).statusCode).toBe(400);
     });
+
+    it('rejects an unauthenticated caller before reading the body', async () => {
+      // Over the API's default limit, under the collector's: only a valid token gets it parsed.
+      // More rows than one INSERT can carry (65,535 parameters), so it also goes in slices.
+      const large = Array.from({ length: 5_000 }, () => record());
+      expect(JSON.stringify(large).length).toBeGreaterThan(1024 * 1024);
+      const anonymous = await ingest(large, 'Bearer wrong-token');
+      expect(anonymous.statusCode).toBe(401);
+      expect(anonymous.headers['content-type']).toMatch(/problem\+json/);
+      expect(anonymous.json()).toMatchObject({ code: 'unauthenticated', status: 401 });
+      const accepted = await ingest(large);
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.json()).toMatchObject({ accepted: 5_000, duplicates: 0 });
+    });
   });
 
   describe('ingest', () => {
@@ -172,7 +186,10 @@ describe('transparency register collector (MT-03)', () => {
       expect(res.json()).toEqual({ accepted: 2, duplicates: 0, dropped: {} });
 
       const rows = await prisma.subjectAccessRecord.findMany({
-        where: { subscriptionId },
+        where: {
+          subscriptionId,
+          gatewayRequestId: { in: [byPath.gateway_request_id, byBody.gateway_request_id] },
+        },
         orderBy: { operationId: 'asc' },
       });
       expect(rows).toHaveLength(2);
@@ -289,8 +306,25 @@ describe('transparency register collector (MT-03)', () => {
       expect(await prisma.auditEvent.count({ where: { action: 'subject_access.purged' } })).toBe(
         before,
       );
-      // A retention under one month is refused by the database itself.
+      // Every purge is logged by the database itself, whoever called it.
+      const logged = await prisma.subjectAccessPurgeLog.findFirstOrThrow({
+        orderBy: { purgedAt: 'desc' },
+      });
+      expect(logged).toMatchObject({ calledBy: 'rid_app', retentionMonths: months, deleted: 0n });
+
+      // The runtime role cannot shorten retention: the floor is the schema owner's, and the
+      // database refuses anything under it.
       await expect(prisma.$queryRaw`SELECT purge_subject_access_records(0)`).rejects.toThrow();
+      await expect(prisma.$queryRaw`SELECT purge_subject_access_records(1)`).rejects.toThrow();
+      await expect(
+        prisma.$executeRaw`UPDATE subject_access_retention SET min_months = 1`,
+      ).rejects.toThrow();
+      await expect(
+        prisma.$executeRaw`DELETE FROM subject_access_purge_log WHERE true`,
+      ).rejects.toThrow();
+      await expect(
+        prisma.$executeRaw`INSERT INTO subject_access_purge_log (called_by, retention_months, min_months, deleted) VALUES ('x', 1, 1, 0)`,
+      ).rejects.toThrow();
     });
   });
 });

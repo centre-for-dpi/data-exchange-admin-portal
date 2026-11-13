@@ -13,6 +13,19 @@ export const SUBJECT_ACCESS_BODY_LIMIT_BYTES = 16 * 1024 * 1024;
 /** Fluent Bit's http output (format json): an array of records. Each one is checked apart. */
 const batchSchema = z.array(z.unknown()).max(100_000);
 
+/**
+ * Whether an Authorization header carries the ingest service token (timing-safe). An unset token
+ * matches nothing (fail closed). Also checked before the body is read (onRequest hook in app.ts),
+ * so an unauthenticated caller cannot make the API buffer and parse large bodies.
+ */
+export function ingestTokenMatches(authorization: string | undefined): boolean {
+  const expected = process.env.RID_TRANSPARENCY_INGEST_TOKEN ?? '';
+  const given = /^Bearer (.+)$/.exec(authorization ?? '')?.[1] ?? '';
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return expected !== '' && a.length === b.length && timingSafeEqual(a, b);
+}
+
 const ingestResultSchema = z.object({
   accepted: z.number(),
   duplicates: z.number(),
@@ -31,14 +44,7 @@ export class SubjectAccessController {
   constructor(private readonly service: SubjectAccessService) {}
 
   private authorize(authorization: string | undefined): void {
-    const expected = process.env.RID_TRANSPARENCY_INGEST_TOKEN ?? '';
-    const given = /^Bearer (.+)$/.exec(authorization ?? '')?.[1] ?? '';
-    const a = Buffer.from(given);
-    const b = Buffer.from(expected);
-    // An unset token rejects everyone (fail closed).
-    if (!expected || a.length !== b.length || !timingSafeEqual(a, b)) {
-      throw new UnauthorizedException();
-    }
+    if (!ingestTokenMatches(authorization)) throw new UnauthorizedException();
   }
 
   @Post()

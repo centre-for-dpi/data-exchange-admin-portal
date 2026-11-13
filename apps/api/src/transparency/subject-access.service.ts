@@ -46,6 +46,7 @@ export interface IngestResult {
   dropped: Partial<Record<DropReason, number>>;
 }
 
+const INSERT_SLICE = 1_000;
 const PURGE_EVERY_MS = 6 * 60 * 60 * 1000;
 
 /**
@@ -156,10 +157,16 @@ export class SubjectAccessService implements OnApplicationBootstrap, OnApplicati
       });
     }
 
-    const { count } =
-      rows.length > 0
-        ? await this.prisma.subjectAccessRecord.createMany({ data: rows, skipDuplicates: true })
-        : { count: 0 };
+    // In slices: PostgreSQL takes at most 65,535 bind parameters per statement, and a Fluent Bit
+    // chunk can hold far more rows than that allows. Each slice is idempotent, so a retry after a
+    // partial failure only adds the missing ones.
+    let count = 0;
+    for (let i = 0; i < rows.length; i += INSERT_SLICE) {
+      const slice = rows.slice(i, i + INSERT_SLICE);
+      count += (
+        await this.prisma.subjectAccessRecord.createMany({ data: slice, skipDuplicates: true })
+      ).count;
+    }
     const result = { accepted: count, duplicates: rows.length - count, dropped };
     if (Object.keys(dropped).length > 0) {
       this.logger.warn(`Transparency records dropped: ${JSON.stringify(dropped)}`);

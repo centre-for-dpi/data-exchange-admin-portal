@@ -2,9 +2,11 @@ import type { Type } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module.js';
-import { ProblemDetailsFilter } from './common/problem.filter.js';
+import { PROBLEM_CONTENT_TYPE, toProblem } from './common/problem.js';
+import { instancePath, ProblemDetailsFilter } from './common/problem.filter.js';
 import { registerApiDocs } from './openapi/docs.js';
 import {
+  ingestTokenMatches,
   SUBJECT_ACCESS_BODY_LIMIT_BYTES,
   SUBJECT_ACCESS_PATH,
 } from './transparency/subject-access.controller.js';
@@ -18,10 +20,20 @@ export function createAdapter(): FastifyAdapter {
   // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
   adapter.getInstance().removeContentTypeParser('text/plain');
   // The transparency collector receives whole Fluent Bit chunks (internal, service token only).
+  // Its larger body limit applies only once the token is checked: onRequest runs before the body
+  // is read, so an unauthenticated caller gets 401 without the API buffering anything.
   adapter.getInstance().addHook('onRoute', (route) => {
-    if (route.url === `/${API_PREFIX}/${SUBJECT_ACCESS_PATH}`) {
-      route.bodyLimit = SUBJECT_ACCESS_BODY_LIMIT_BYTES;
-    }
+    if (route.url !== `/${API_PREFIX}/${SUBJECT_ACCESS_PATH}`) return;
+    route.bodyLimit = SUBJECT_ACCESS_BODY_LIMIT_BYTES;
+    const existing = route.onRequest ? [route.onRequest].flat() : [];
+    route.onRequest = [
+      ...existing,
+      async (request, reply) => {
+        if (ingestTokenMatches(request.headers.authorization)) return;
+        const problem = toProblem({ statusCode: 401 }, instancePath(request.url));
+        await reply.code(401).type(PROBLEM_CONTENT_TYPE).send(problem);
+      },
+    ];
   });
   return adapter;
 }

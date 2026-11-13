@@ -660,3 +660,25 @@ model SubjectAccessRecord {
   @@index([occurredAt])
   @@map("subject_access_record")
 }
+
+/// Retention floor of the transparency register (one row): only the schema owner writes it, so
+/// the runtime role cannot shorten retention. See the migration subject_access_retention_floor.
+model SubjectAccessRetention {
+  singleton Boolean @id @default(true)
+  minMonths Int     @map("min_months")
+
+  @@map("subject_access_retention")
+}
+
+/// One row per purge of the transparency register, written by the purge function itself.
+model SubjectAccessPurgeLog {
+  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  purgedAt        DateTime @default(now()) @map("purged_at") @db.Timestamptz(3)
+  /// Database role that called the purge.
+  calledBy        String   @map("called_by")
+  retentionMonths Int      @map("retention_months")
+  minMonths       Int      @map("min_months")
+  deleted         BigInt
+
+  @@map("subject_access_purge_log")
+}
