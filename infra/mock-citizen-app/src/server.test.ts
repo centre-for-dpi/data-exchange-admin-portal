@@ -114,6 +114,18 @@ describe('reference citizen folder (MT-07)', () => {
     );
   });
 
+  it('accepts a sign-in callback only in the browser that started it (login CSRF)', async () => {
+    const login = await app.inject({ url: '/carpeta/login' });
+    const state = new URL(login.headers.location ?? '').searchParams.get('state') ?? '';
+    const cookie = login.cookies.find((c) => c.name === 'citizen_login');
+    expect(cookie).toMatchObject({ value: state, httpOnly: true, sameSite: 'Lax' });
+    // Another browser (no cookie) arriving with this state and a code is sent home, signed out.
+    const forged = await app.inject({ url: `/carpeta/auth/callback?state=${state}&code=x` });
+    expect(forged.statusCode).toBe(302);
+    expect(forged.headers.location).toBe('/carpeta/');
+    expect(forged.cookies.find((c) => c.name === 'citizen_session')).toBeUndefined();
+  });
+
   it('escapes everything it renders', () => {
     expect(html`<p>${'<script>alert(1)</script>'}</p>`.value).toBe(
       '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>',

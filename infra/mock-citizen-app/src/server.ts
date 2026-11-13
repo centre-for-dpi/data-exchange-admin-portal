@@ -49,6 +49,7 @@ interface Access {
 }
 
 const SESSION_COOKIE = 'citizen_session';
+const LOGIN_COOKIE = 'citizen_login';
 const LOGIN_TTL_MS = 10 * 60 * 1000;
 const PUBLIC_MATERIAL_TTL_MS = 5 * 60 * 1000;
 
@@ -202,6 +203,14 @@ export function buildServer(
           if (Date.now() - login.createdAt > LOGIN_TTL_MS) logins.delete(key);
         }
         logins.set(state, { verifier, nonce, createdAt: Date.now() });
+        // Binds the login to this browser: a callback URL started elsewhere (login CSRF) fails.
+        void reply.setCookie(LOGIN_COOKIE, state, {
+          path: base || '/',
+          httpOnly: true,
+          sameSite: 'lax',
+          secure,
+          maxAge: LOGIN_TTL_MS / 1000,
+        });
         const params = new URLSearchParams({
           client_id: config.oidc.clientId,
           response_type: 'code',
@@ -219,7 +228,9 @@ export function buildServer(
         const { code, state } = request.query as { code?: string; state?: string };
         const login = logins.get(state ?? '');
         logins.delete(state ?? '');
-        if (!code || !login || Date.now() - login.createdAt > LOGIN_TTL_MS) {
+        const startedHere = Boolean(state) && request.cookies[LOGIN_COOKIE] === state;
+        void reply.clearCookie(LOGIN_COOKIE, { path: base || '/' });
+        if (!code || !login || !startedHere || Date.now() - login.createdAt > LOGIN_TTL_MS) {
           return reply.redirect(`${base}/`);
         }
         const res = await fetchFn(oidc.token, {
