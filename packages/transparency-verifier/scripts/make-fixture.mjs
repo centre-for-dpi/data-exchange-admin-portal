@@ -35,9 +35,9 @@ const records = Array.from({ length: 5 }, (_, i) => ({
   gatewayNode: 'apisix-test',
   gatewayRequestId: hex(16),
 }));
-const leaves = records.map(v.recordLeafHash);
+const leaves = records.map((r) => v.recordLeafHash(r, 2));
 const payload = {
-  v: 1,
+  v: 2,
   log: 'rid-transparency-test',
   seq: 1,
   treeSize: records.length,

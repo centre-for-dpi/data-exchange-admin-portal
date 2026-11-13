@@ -17,7 +17,8 @@ import { toHex } from './merkle.js';
  * signs it (JWS, EdDSA) and a TSA stamps the signed form (RFC 3161).
  */
 export interface CheckpointPayload {
-  v: 1;
+  /** Format: 2 for leaves over a LeafEntry (record.ts); 1 for the first batches. */
+  v: 1 | 2;
   /** Identifies the register (one per deployment). */
   log: string;
   /** 1, 2, 3… with no gaps. */
@@ -90,7 +91,7 @@ function isCheckpointPayload(value: unknown): value is CheckpointPayload {
   const keys = Object.keys(p).sort().join(',');
   return (
     keys === 'log,prev,root,sealedAt,seq,treeSize,v' &&
-    p.v === 1 &&
+    (p.v === 1 || p.v === 2) &&
     typeof p.log === 'string' &&
     p.log.length > 0 &&
     Number.isSafeInteger(p.seq) &&

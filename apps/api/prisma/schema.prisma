@@ -714,8 +714,11 @@ model TransparencyLeaf {
   checkpointSeq Int                    @map("checkpoint_seq")
   leafIndex     Int                    @map("leaf_index")
   leafHash      String                 @map("leaf_hash")
-  /// When the call happened: tells a record purged by retention from one deleted early.
+  /// When the call happened: tells a record purged by retention from one deleted early. From
+  /// format 2 on it is part of the leaf hash, so it cannot be moved without breaking the root.
   occurredAt    DateTime               @map("occurred_at") @db.Timestamptz(3)
+  /// SHA-256 of the record's canonical JSON (format 2); null in format 1 batches.
+  recordDigest  String?                @map("record_digest")
   checkpoint    TransparencyCheckpoint @relation(fields: [checkpointSeq], references: [seq])
 
   @@unique([checkpointSeq, leafIndex])

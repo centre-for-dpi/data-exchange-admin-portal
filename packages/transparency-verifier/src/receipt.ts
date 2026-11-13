@@ -74,7 +74,7 @@ export async function verifyReceipt(
   if (checkpoint) {
     try {
       checks.inclusion = verifyInclusion(
-        recordLeafHash(receipt.record),
+        recordLeafHash(receipt.record, checkpoint.v),
         receipt.leafIndex,
         checkpoint.treeSize,
         receipt.proof.map(fromHex),

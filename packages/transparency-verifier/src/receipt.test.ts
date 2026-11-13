@@ -8,7 +8,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { checkpointHash, signCheckpoint, verifyCheckpoint } from './checkpoint.js';
 import { inclusionProof, toHex, treeRoot } from './merkle.js';
 import { type Receipt, verifyReceipt } from './receipt.js';
-import { type AccessRecord, recordLeafHash } from './record.js';
+import {
+  type AccessRecord,
+  entryLeafHash,
+  leafEntryOf,
+  recordDigest,
+  recordLeafHash,
+} from './record.js';
 import { certificatesInPem, verifyTimestampToken } from './tsa.js';
 
 interface Fixture {
@@ -26,7 +32,7 @@ const fixture = JSON.parse(
 const { d: _private, ...publicJwk } = fixture.privateJwk;
 const jwks = { keys: [publicJwk] };
 const tsaRoots = certificatesInPem(fixture.tsaRoot);
-const leaves = fixture.records.map(recordLeafHash);
+const leaves = fixture.records.map((r) => recordLeafHash(r));
 
 const receiptFor = (index: number): Receipt => ({
   v: 1,
@@ -45,7 +51,7 @@ describe('receipt verification (ADR-0016)', () => {
       expect(result).toMatchObject({
         valid: true,
         checks: { signature: true, inclusion: true, timestamp: 'valid' },
-        checkpoint: { seq: 1, treeSize: fixture.records.length, prev: null },
+        checkpoint: { v: 2, seq: 1, treeSize: fixture.records.length, prev: null },
       });
       expect(Date.parse(result.stampedAt ?? '')).toBeGreaterThan(0);
     }
@@ -138,6 +144,45 @@ describe('receipt verification (ADR-0016)', () => {
     // A non-first checkpoint without prev, or a first one with it, is malformed.
     const broken = await signCheckpoint({ ...first, seq: 2 }, key, fixture.privateJwk.kid);
     await expect(verifyCheckpoint(broken, jwks)).rejects.toThrow(/malformed/);
+  });
+});
+
+describe('leaf format', () => {
+  it('binds the id and the time of the call to the signed root, not only the record digest', () => {
+    const record = fixture.records[0] as AccessRecord;
+    const entry = leafEntryOf(record);
+    expect(entry).toEqual({
+      v: 1,
+      id: record.id,
+      occurredAt: record.occurredAt,
+      digest: recordDigest(record),
+    });
+    expect(toHex(entryLeafHash(entry))).toBe(toHex(recordLeafHash(record)));
+    // Moving the time of a purged record (only its leaf remains) changes the leaf.
+    expect(toHex(entryLeafHash({ ...entry, occurredAt: '2001-01-01T00:00:00.000Z' }))).not.toBe(
+      toHex(entryLeafHash(entry)),
+    );
+  });
+
+  it('still verifies receipts of the first format (v1)', async () => {
+    const v1 = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, '__fixtures__/receipt-fixture-v1.json'), 'utf8'),
+    ) as Fixture;
+    const { d: _d, ...key } = v1.privateJwk;
+    const v1Leaves = v1.records.map((r) => recordLeafHash(r, 1));
+    const result = await verifyReceipt(
+      {
+        v: 1,
+        record: v1.records[2] as AccessRecord,
+        leafIndex: 2,
+        proof: inclusionProof(v1Leaves, 2).map(toHex),
+        checkpoint: v1.checkpoint,
+        timestamp: v1.timestamp,
+      },
+      { jwks: { keys: [key] }, tsaRoots: certificatesInPem(v1.tsaRoot) },
+    );
+    expect(result.errors).toEqual([]);
+    expect(result).toMatchObject({ valid: true, checkpoint: { v: 1 } });
   });
 });
 

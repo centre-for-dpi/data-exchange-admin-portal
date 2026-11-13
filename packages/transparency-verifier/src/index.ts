@@ -24,7 +24,14 @@ export {
   verifyReceipt,
   type VerifyOptions,
 } from './receipt.js';
-export { type AccessRecord, recordLeafData, recordLeafHash } from './record.js';
+export {
+  type AccessRecord,
+  entryLeafHash,
+  leafEntryOf,
+  type LeafEntry,
+  recordDigest,
+  recordLeafHash,
+} from './record.js';
 export {
   certificateFromPem,
   certificatesInPem,

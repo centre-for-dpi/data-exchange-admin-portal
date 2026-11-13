@@ -17,6 +17,9 @@ import {
   checkpointHash,
   fromHex,
   inclusionProof,
+  entryLeafHash,
+  leafEntryOf,
+  recordDigest,
   recordLeafHash,
   signCheckpoint,
   toHex,
@@ -153,14 +156,15 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
         });
         const byId = new Map(rows.map((r) => [r.id, r]));
         const records = pending.map((p) => byId.get(p.id)).filter((r) => r !== undefined);
-        const leaves = records.map((r) => recordLeafHash(toAccessRecord(r)));
+        const entries = records.map((r) => leafEntryOf(toAccessRecord(r)));
+        const leaves = entries.map(entryLeafHash);
 
         const last = await tx.transparencyCheckpoint.findFirst({
           orderBy: { seq: 'desc' },
           select: { seq: true, hash: true },
         });
         const payload: CheckpointPayload = {
-          v: 1,
+          v: 2,
           log: logId(),
           seq: (last?.seq ?? 0) + 1,
           treeSize: records.length,
@@ -190,6 +194,7 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
             leafIndex,
             leafHash: toHex(leaves[leafIndex] as Uint8Array),
             occurredAt: r.occurredAt,
+            recordDigest: entries[leafIndex]?.digest ?? null,
           })),
         });
         // Anchored in the audit chain too: altering a checkpoint takes breaking both chains.
@@ -312,6 +317,8 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
     });
     let pendingTimestamps = 0;
     let previousHash: string | null = null;
+    /** Leaf format of each batch, from its signed checkpoint. */
+    const versions = new Map<number, 1 | 2>();
     for (const [i, cp] of checkpoints.entries()) {
       if (cp.seq !== i + 1 || cp.prev !== previousHash) {
         problems.push({ kind: 'chain_broken', seq: cp.seq, recordId: null });
@@ -322,6 +329,7 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
       } catch {
         problems.push({ kind: 'signature_invalid', seq: cp.seq, recordId: null });
       }
+      versions.set(cp.seq, payload?.v ?? (cp.leaves.some((l) => l.recordDigest !== null) ? 2 : 1));
       if (
         payload &&
         (payload.seq !== cp.seq ||
@@ -378,20 +386,60 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
     }
     let purged = 0;
     for (const leaf of leaves) {
+      const version = versions.get(leaf.checkpointSeq) ?? 2;
+      const problem = (kind: Problem['kind']) =>
+        problems.push({ kind, seq: leaf.checkpointSeq, recordId: leaf.recordId });
+      if (version === 2) {
+        // The id, the time and the digest kept in the leaf row must be what the root commits to:
+        // otherwise someone moved the time of a deleted record to make it look purged.
+        const entry = {
+          v: 1 as const,
+          id: leaf.recordId,
+          occurredAt: leaf.occurredAt.toISOString(),
+          digest: leaf.recordDigest ?? '',
+        };
+        if (toHex(entryLeafHash(entry)) !== leaf.leafHash) {
+          problem('leaf_altered');
+          continue;
+        }
+      }
       const record = records.get(leaf.recordId);
       if (!record) {
         if (leaf.occurredAt < cutoff) purged++;
-        else {
-          problems.push({
-            kind: 'record_deleted',
-            seq: leaf.checkpointSeq,
-            recordId: leaf.recordId,
-          });
-        }
-      } else if (toHex(recordLeafHash(toAccessRecord(record))) !== leaf.leafHash) {
-        problems.push({ kind: 'record_altered', seq: leaf.checkpointSeq, recordId: leaf.recordId });
+        else problem('record_deleted');
+      } else if (
+        version === 2
+          ? recordDigest(toAccessRecord(record)) !== leaf.recordDigest
+          : toHex(recordLeafHash(toAccessRecord(record), 1)) !== leaf.leafHash
+      ) {
+        problem('record_altered');
       }
     }
+
+    // Each checkpoint is anchored in the audit chain when it is sealed: an anchor without its
+    // checkpoint means batches were removed (also from the end, which the chain alone misses).
+    const anchors = await this.prisma.auditEvent.findMany({
+      where: { action: 'transparency.checkpoint' },
+      select: { targetId: true, after: true },
+    });
+    const anchored = new Set<number>();
+    const bySeq = new Map(checkpoints.map((cp) => [cp.seq, cp]));
+    for (const anchor of anchors) {
+      const seq = Number(anchor.targetId);
+      const after = (anchor.after ?? {}) as { hash?: unknown; root?: unknown };
+      anchored.add(seq);
+      const cp = bySeq.get(seq);
+      if (!cp) problems.push({ kind: 'checkpoint_missing', seq, recordId: null });
+      else if (cp.hash !== after.hash || cp.root !== after.root) {
+        problems.push({ kind: 'chain_broken', seq, recordId: null });
+      }
+    }
+    for (const cp of checkpoints) {
+      if (!anchored.has(cp.seq)) {
+        problems.push({ kind: 'anchor_missing', seq: cp.seq, recordId: null });
+      }
+    }
+
     const [{ unsealed } = { unsealed: 0n }] = await this.prisma.$queryRaw<
       Array<{ unsealed: bigint }>
     >`SELECT count(*) AS unsealed FROM subject_access_record r

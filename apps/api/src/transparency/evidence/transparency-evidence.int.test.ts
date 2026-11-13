@@ -88,7 +88,12 @@ describe('transparency evidence (MT-04)', () => {
   const tampered = async (tamper: string, undo: string, check: () => Promise<void>) => {
     const triggers = (on: boolean) =>
       owner.query(
-        ['subject_access_record', 'transparency_checkpoint', 'transparency_leaf']
+        [
+          'subject_access_record',
+          'transparency_checkpoint',
+          'transparency_leaf',
+          'transparency_timestamp',
+        ]
           .map((t) => `ALTER TABLE ${t} ${on ? 'ENABLE' : 'DISABLE'} TRIGGER USER;`)
           .join(' '),
       );
@@ -320,6 +325,65 @@ describe('transparency evidence (MT-04)', () => {
         );
       } finally {
         await owner.query(`DROP TABLE ${backup}`);
+      }
+      expect((await verification()).valid).toBe(true);
+    });
+
+    it('detects a record deleted early whose leaf was moved back to look purged', async () => {
+      const [id] = await ingest(1);
+      await evidence.sealPending();
+      const backup = 'subject_access_record_moved_' + run;
+      const leaf = await prisma.transparencyLeaf.findUniqueOrThrow({ where: { recordId: id } });
+      await owner.query(
+        `CREATE TABLE ${backup} AS SELECT * FROM subject_access_record WHERE id = '${id}'`,
+      );
+      try {
+        await tampered(
+          `DELETE FROM subject_access_record WHERE id = '${id}';
+           UPDATE transparency_leaf SET occurred_at = '2001-01-01' WHERE record_id = '${id}'`,
+          `INSERT INTO subject_access_record SELECT * FROM ${backup};
+           UPDATE transparency_leaf SET occurred_at = '${leaf.occurredAt.toISOString()}'
+           WHERE record_id = '${id}'`,
+          async () => {
+            const result = await verification();
+            expect(result.problems).toContainEqual(
+              expect.objectContaining({ kind: 'leaf_altered', recordId: id }),
+            );
+          },
+        );
+      } finally {
+        await owner.query(`DROP TABLE ${backup}`);
+      }
+      expect((await verification()).valid).toBe(true);
+    });
+
+    it('detects batches removed from the end of the chain', async () => {
+      await ingest(1);
+      const [seq] = await evidence.sealPending();
+      await evidence.stampPending();
+      const tables = ['transparency_timestamp', 'transparency_leaf', 'transparency_checkpoint'];
+      const column = (t: string) => (t === 'transparency_checkpoint' ? 'seq' : 'checkpoint_seq');
+      for (const t of tables) {
+        await owner.query(
+          `CREATE TABLE ${t}_cut_${run} AS SELECT * FROM ${t} WHERE ${column(t)} = ${seq}`,
+        );
+      }
+      try {
+        await tampered(
+          tables.map((t) => `DELETE FROM ${t} WHERE ${column(t)} = ${seq};`).join(' '),
+          [...tables]
+            .reverse()
+            .map((t) => `INSERT INTO ${t} SELECT * FROM ${t}_cut_${run};`)
+            .join(' '),
+          async () => {
+            // The chain alone still looks whole; the audit anchor says a batch is missing.
+            expect((await verification()).problems).toContainEqual(
+              expect.objectContaining({ kind: 'checkpoint_missing', seq }),
+            );
+          },
+        );
+      } finally {
+        for (const t of tables) await owner.query(`DROP TABLE ${t}_cut_${run}`);
       }
       expect((await verification()).valid).toBe(true);
     });

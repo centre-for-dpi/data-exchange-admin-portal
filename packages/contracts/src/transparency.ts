@@ -94,6 +94,12 @@ export const transparencyProblemKindSchema = z.enum([
   'root_mismatch',
   'record_altered',
   'record_deleted',
+  /** A leaf row no longer matches what the signed root commits to (format 2). */
+  'leaf_altered',
+  /** Anchored in the audit chain but absent: batches were removed. */
+  'checkpoint_missing',
+  /** A checkpoint the audit chain does not know: inserted outside the sealer. */
+  'anchor_missing',
   'timestamp_invalid',
 ]);
 
