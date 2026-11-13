@@ -164,7 +164,11 @@ describe('validation', () => {
       enrollmentTokenValidityHours: 72,
       nodeOfflineAfterMinutes: 5,
     });
-    expect(loaded.retention).toEqual({ auditYears: 5, accessLogMonths: 12 });
+    expect(loaded.retention).toEqual({
+      auditYears: 5,
+      accessLogMonths: 12,
+      subjectAccessMonths: 60,
+    });
   });
 
   it('accepts plain strings as localized texts', () => {

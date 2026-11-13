@@ -46,6 +46,7 @@ const settings: GatewaySettings = {
   audience: 'rid-gateway',
   opaUrl: 'http://opa:8181',
   accessLogUrl: 'http://fluent-bit:9880/',
+  transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes(''),
   resolveHost: () => Promise.resolve([]),
 };

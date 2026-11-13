@@ -612,3 +612,51 @@ model PolicyBundle {
   @@index([createdAt])
   @@map("policy_bundle")
 }
+
+/// Where the gateway read the data subject of a registered call (ADR-0015, ADR-0017).
+enum SubjectSource {
+  path
+  body
+
+  @@map("subject_source")
+}
+
+/// Transparency register (ADR-0015, MT-03): one row per call that reached a provider on an
+/// operation with a data subject. The subject is only the keyed pseudonym OPA computed; never
+/// the document number, the path or any content. Insert-only: rid_app may not update or delete,
+/// a trigger refuses it to everyone, and only purge_subject_access_records() removes rows past
+/// retention. Ids are snapshots, without foreign keys: the record is evidence and must outlive
+/// later changes to what it points to.
+model SubjectAccessRecord {
+  id               String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// When the gateway finished the call ($msec).
+  occurredAt       DateTime      @map("occurred_at") @db.Timestamptz(3)
+  receivedAt       DateTime      @default(now()) @map("received_at") @db.Timestamptz(3)
+  gatewayNode      String        @map("gateway_node")
+  /// nginx $request_id: random, chosen by the gateway; with the node, the idempotency key.
+  gatewayRequestId String        @map("gateway_request_id")
+  /// X-Request-Id for correlation with the consumer and the provider (the client may set it).
+  requestId        String?       @map("request_id")
+  /// HMAC-SHA-256(subject key, country|type|number), hex.
+  subjectRef       String        @map("subject_ref")
+  subjectSource    SubjectSource @map("subject_source")
+  providerEntityId String        @map("provider_entity_id") @db.Uuid
+  apiId            String        @map("api_id") @db.Uuid
+  apiVersionId     String        @map("api_version_id") @db.Uuid
+  operationId      String        @map("operation_id")
+  /// The data the version exposes, as declared when it was published.
+  exposedFields    Json          @map("exposed_fields")
+  consumerEntityId String        @map("consumer_entity_id") @db.Uuid
+  applicationId    String        @map("application_id") @db.Uuid
+  subscriptionId   String        @map("subscription_id") @db.Uuid
+  purposeCode      String        @map("purpose_code")
+  /// Keyed hash of the official behind the call, when the consumer sent one.
+  endUserHash      String?       @map("end_user_hash")
+  /// HTTP status the consumer received.
+  status           Int
+
+  @@unique([gatewayNode, gatewayRequestId])
+  @@index([subjectRef, occurredAt])
+  @@index([occurredAt])
+  @@map("subject_access_record")
+}

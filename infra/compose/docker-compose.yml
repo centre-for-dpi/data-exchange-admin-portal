@@ -204,6 +204,27 @@ services:
       # The -debug image ships curl; the plain image has no tools at all.
       test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:2020/api/v1/health']
 
+  # Transparency register (ADR-0015, MT-03): APISIX tcp-logger -> this Fluent Bit -> portal
+  # collector. Base profile, separate from the analytics pipeline above: without it, citizens
+  # would not see the calls. Buffers on disk and retries while the collector is unreachable.
+  fluent-bit-transparency:
+    image: fluent/fluent-bit:5.1.5-debug
+    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/transparency.yaml']
+    environment:
+      RID_TRANSPARENCY_INGEST_TOKEN: ${RID_TRANSPARENCY_INGEST_TOKEN:?set RID_TRANSPARENCY_INGEST_TOKEN in .env}
+      RID_TRANSPARENCY_COLLECTOR_HOST: ${RID_TRANSPARENCY_COLLECTOR_HOST:-host.docker.internal}
+      RID_TRANSPARENCY_COLLECTOR_PORT: ${RID_TRANSPARENCY_COLLECTOR_PORT:-4000}
+    volumes:
+      - ../fluent-bit:/fluent-bit/etc/rid:ro
+      - transparency-buffer:/var/lib/fluent-bit
+    extra_hosts:
+      # The portal API runs on the host during development.
+      - host.docker.internal:host-gateway
+    # Not published: APISIX sends records over the Compose network (fluent-bit-transparency:5170).
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:2020/api/v1/health']
+
   mailpit:
     image: axllent/mailpit:v1.32.0
     ports:
@@ -243,3 +264,4 @@ volumes:
   etcd-data:
   step-ca-data:
   opensearch-data:
+  transparency-buffer:

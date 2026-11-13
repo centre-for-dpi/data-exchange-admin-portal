@@ -4,6 +4,8 @@ import {
   type GatewaySettings,
   matches,
   parseDevNodes,
+  parseHostPort,
+  TRANSPARENCY_LOG_FORMAT,
   UnsupportedUpstreamError,
   type VersionForGateway,
 } from './desired-state.js';
@@ -13,6 +15,7 @@ const settings: GatewaySettings = {
   audience: 'rid-gateway',
   opaUrl: 'http://opa:8181',
   accessLogUrl: 'http://fluent-bit:9880/',
+  transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes('salud=mock-salud:8000'),
   resolveHost: () => Promise.resolve(['93.184.215.14']),
 };
@@ -23,6 +26,7 @@ const version = (overrides: Partial<VersionForGateway> = {}): VersionForGateway 
   upstream: { type: 'node', servicePath: '/salud' },
   methods: ['get', 'POST', 'GET'],
   bodySubjects: [],
+  hasDataSubjects: false,
   entitySlug: 'salud',
   apiName: 'Consulta de afiliación',
   version: '1.0',
@@ -161,6 +165,47 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     ];
     for (const overrides of cases) {
       expect(() => desiredGateway(version(overrides), settings)).toThrow(UnsupportedUpstreamError);
+    }
+  });
+});
+
+describe('transparency register (ADR-0015, MT-03)', () => {
+  it('logs calls of routes with data subjects to their own pipeline, never the path', () => {
+    const without = desiredGateway(version(), settings).route.plugins as Plugins;
+    expect(without).not.toHaveProperty('tcp-logger');
+
+    const plugins = desiredGateway(version({ hasDataSubjects: true }), settings).route
+      .plugins as Plugins;
+    expect(plugins['tcp-logger']).toMatchObject({
+      host: 'fluent-bit-transparency',
+      port: 5170,
+      include_req_body: false,
+      include_resp_body: false,
+      log_format: TRANSPARENCY_LOG_FORMAT,
+    });
+    const variables = Object.values(TRANSPARENCY_LOG_FORMAT).join(' ');
+    // Nothing that carries the path, the query, bodies or the clear data subject.
+    for (const forbidden of ['$uri', '$request_uri', '$upstream_uri', '$args', '$request_body']) {
+      expect(variables).not.toContain(forbidden);
+    }
+    expect(variables).not.toMatch(/body_subject|data_subject/);
+    // The official only as their keyed hash, never X-RID-End-User in clear.
+    expect(Object.values(TRANSPARENCY_LOG_FORMAT)).not.toContain('$http_x_rid_end_user');
+    // The idempotency key is nginx's own id, not the client-chosen X-Request-Id.
+    expect(TRANSPARENCY_LOG_FORMAT.gateway_request_id).toBe('$request_id');
+    // The analytics log stays without the data subject.
+    expect(JSON.stringify(plugins['http-logger'])).not.toContain('subject');
+  });
+});
+
+describe('parseHostPort', () => {
+  it('reads host:port and rejects anything else', () => {
+    expect(parseHostPort(' fluent-bit-transparency:5170 ')).toEqual({
+      host: 'fluent-bit-transparency',
+      port: 5170,
+    });
+    for (const bad of ['fluent-bit', 'host:0', 'host:70000', 'http://host:1', ':5170']) {
+      expect(() => parseHostPort(bad)).toThrow();
     }
   });
 });

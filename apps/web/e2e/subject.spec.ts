@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { createApplication, openRequestForm, publishNewApi, signIn } from './flows';
-import { approveAsSteward, gateway, gatewayToken, providerSaw } from './gateway-flows';
+import {
+  approveAsSteward,
+  gateway,
+  gatewayToken,
+  placesHolding,
+  providerSaw,
+  registeredCalls,
+} from './gateway-flows';
 
 // MT-02 (ADR-0015, ADR-0017): the gateway turns the data subject of every call into a keyed
 // pseudonym, X-RID-Subject-Ref, reading it from the path or from the JSON body itself (never from
@@ -139,6 +146,32 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     // Another person, another reference.
     const other = await call('/1000000002');
     expect(other.res.status).toBe(200);
-    expect((await seenBy(other.requestId))['x-rid-subject-ref']).not.toBe(ref);
+    const otherRef = (await seenBy(other.requestId))['x-rid-subject-ref'];
+    expect(otherRef).not.toBe(ref);
+
+    // MT-03: a number never seen before, for a person the provider does not know (404). The call
+    // still reached the provider, so it is registered, with the status the consumer got.
+    const unseen = `7${String(Date.now()).slice(-9)}`;
+    const unknown = await call(`/${unseen}`);
+    expect(unknown.res.status).toBe(404);
+
+    // Transparency register: every call that reached the provider, from the path or the body;
+    // none of the denied ones. The citizen's pseudonym is the one the provider received.
+    await expect.poll(() => registeredCalls(subscriptionId).length, { timeout: 30_000 }).toBe(6);
+    const registered = registeredCalls(subscriptionId);
+    expect(registered.map((r) => [r.operation, r.source, r.status])).toEqual([
+      ['getAfiliado', 'path', 200],
+      ['verificarAfiliacion', 'body', 200],
+      ['verificarAfiliacion', 'body', 400],
+      ['verificarAfiliacion', 'body', 200],
+      ['getAfiliado', 'path', 200],
+      ['getAfiliado', 'path', 404],
+    ]);
+    expect(registered.slice(0, 4).every((r) => r.subjectRef === ref)).toBe(true);
+    expect(registered[4]?.subjectRef).toBe(otherRef);
+
+    // The document number itself appears nowhere: gateway logs, pipeline logs and buffer, the
+    // portal database (ADR-0015, golden rule 2).
+    expect(placesHolding(unseen)).toEqual([]);
   });
 });

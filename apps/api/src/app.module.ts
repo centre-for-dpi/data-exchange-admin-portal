@@ -23,6 +23,8 @@ import { PurposesController } from './purposes/purposes.controller.js';
 import { ReconcilersModule } from './reconcilers/reconcilers.module.js';
 import { ReviewsController } from './reviews/reviews.controller.js';
 import { ReviewsService } from './reviews/reviews.service.js';
+import { SubjectAccessController } from './transparency/subject-access.controller.js';
+import { SubjectAccessService } from './transparency/subject-access.service.js';
 
 @Module({
   imports: [CoreModule, AuthModule, ReconcilersModule],
@@ -40,6 +42,7 @@ import { ReviewsService } from './reviews/reviews.service.js';
     OpaController,
     AuditController,
     EntityAuditController,
+    SubjectAccessController,
   ],
   providers: [
     ApisService,
@@ -49,6 +52,7 @@ import { ReviewsService } from './reviews/reviews.service.js';
     SubscriptionsService,
     OpaService,
     AuditQueryService,
+    SubjectAccessService,
   ],
 })
 export class AppModule {}

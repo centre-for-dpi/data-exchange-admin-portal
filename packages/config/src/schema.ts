@@ -137,8 +137,10 @@ export const countryConfigSchema = z.strictObject({
     .strictObject({
       auditYears: z.number().int().min(1).default(5),
       accessLogMonths: z.number().int().min(1).default(12),
+      /** Transparency register, consultations per data subject (ADR-0015). */
+      subjectAccessMonths: z.number().int().min(1).default(60),
     })
-    .default({ auditYears: 5, accessLogMonths: 12 }),
+    .default({ auditYears: 5, accessLogMonths: 12, subjectAccessMonths: 60 }),
   branding: z.strictObject({
     productName: nonEmpty,
     /** Path relative to the country YAML file. */

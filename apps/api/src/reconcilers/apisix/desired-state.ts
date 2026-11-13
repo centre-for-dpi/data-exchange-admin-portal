@@ -17,6 +17,8 @@ export interface GatewaySettings {
   opaUrl: string;
   /** Fluent Bit HTTP input for access logs (ARCHITECTURE.md §8). */
   accessLogUrl: string;
+  /** Fluent Bit TCP input of the transparency register (ADR-0015, ARCHITECTURE.md §13). */
+  transparencyLog: { host: string; port: number };
   /**
    * Development stand-in for kit nodes until M4: entity slug -> host:port of its mock provider
    * (RID_DEV_NODES). Nodes enrolled through the portal replace it.
@@ -79,6 +81,31 @@ const ACCESS_LOG_FORMAT = {
   deny_reason: '$sent_http_x_rid_deny_reason',
 };
 
+/**
+ * Transparency record (ADR-0015, MT-03): who consulted whose data, as the keyed pseudonym OPA
+ * computed. Like the access log, never the path, the query or bodies, so the document number
+ * cannot reach the pipeline. A record only counts when the call reached the provider
+ * ($upstream_status, set by nginx, never by the client) and carries the reference OPA returned
+ * (the gateway removes a client-sent one before OPA). $request_id is nginx's random id, which a
+ * client cannot choose (unlike X-Request-Id): it is the record's idempotency key.
+ */
+export const TRANSPARENCY_LOG_FORMAT = {
+  ts: '$msec',
+  gateway_node: '$hostname',
+  gateway_request_id: '$request_id',
+  request_id: '$http_x_request_id',
+  route_id: '$route_id',
+  operation: '$http_x_rid_operation',
+  subscription_id: '$http_x_rid_subscription',
+  consumer_entity: '$http_x_rid_consumer_entity',
+  consumer_app: '$http_x_rid_consumer_app',
+  purpose: '$http_x_rid_purpose',
+  end_user_hash: '$http_x_rid_end_user_hash',
+  subject_ref: '$http_x_rid_subject_ref',
+  status: '$status',
+  upstream_status: '$upstream_status',
+};
+
 export interface VersionForGateway {
   id: string;
   basePath: string;
@@ -93,6 +120,8 @@ export interface VersionForGateway {
     pointer: string;
     typePointer?: string;
   }>;
+  /** True when some operation declares its data subject (path or body): calls are registered. */
+  hasDataSubjects: boolean;
   entitySlug: string;
   apiName: string;
   version: string;
@@ -201,6 +230,24 @@ export function desiredGateway(v: VersionForGateway, settings: GatewaySettings):
         inactive_timeout: 2,
         log_format: ACCESS_LOG_FORMAT,
       },
+      // Calls on operations with a data subject go to the transparency register (ADR-0015), on
+      // a pipeline of their own, separate from the analytics log above.
+      ...(v.hasDataSubjects
+        ? {
+            'tcp-logger': {
+              host: settings.transparencyLog.host,
+              port: settings.transparencyLog.port,
+              include_req_body: false,
+              include_resp_body: false,
+              batch_max_size: 100,
+              inactive_timeout: 1,
+              // Fluent Bit keeps its own disk buffer; these retries cover it restarting.
+              max_retry_count: 10,
+              retry_delay: 2,
+              log_format: TRANSPARENCY_LOG_FORMAT,
+            },
+          }
+        : {}),
       // Data subjects declared in the body are read by the gateway, never asserted by the
       // consumer (ADR-0017). Only routes that have such operations carry the plugin.
       ...(v.bodySubjects.length > 0
@@ -248,4 +295,14 @@ export function parseDevNodes(value: string | undefined): Map<string, string> {
     if (slug && hostPort && /^[a-z0-9.-]+:\d{1,5}$/i.test(hostPort)) nodes.set(slug, hostPort);
   }
   return nodes;
+}
+
+/** `host:port` (e.g. RID_GATEWAY_TRANSPARENCY_LOG); a malformed value is a startup error. */
+export function parseHostPort(value: string): { host: string; port: number } {
+  const match = /^([a-z0-9.-]+):(\d{1,5})$/i.exec(value.trim());
+  const port = Number(match?.[2]);
+  if (!match?.[1] || port < 1 || port > 65535) {
+    throw new Error(`Expected host:port, got "${value}"`);
+  }
+  return { host: match[1], port };
 }

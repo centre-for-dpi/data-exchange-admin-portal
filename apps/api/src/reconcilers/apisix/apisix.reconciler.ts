@@ -138,6 +138,9 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
           basePath: version.basePath,
           upstream: upstreamConfig,
           methods: operations.map((o) => o.method),
+          hasDataSubjects: operations.some(
+            (o) => o.dataSubject?.in === 'path' || o.dataSubject?.in === 'body',
+          ),
           bodySubjects: operations.flatMap((o) =>
             o.dataSubject?.in === 'body'
               ? [

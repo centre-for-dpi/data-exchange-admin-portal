@@ -100,6 +100,8 @@ lifecycle:
 retention:
   auditYears: 5
   accessLogMonths: 12
+  # Who consulted whose data (ADR-0015), aligned with the audit trail.
+  subjectAccessMonths: 60
 
 branding:
   productName: Red de Intercambio de Datos

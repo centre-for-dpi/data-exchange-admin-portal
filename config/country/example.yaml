@@ -76,6 +76,8 @@ lifecycle:
 retention:
   auditYears: 5
   accessLogMonths: 12
+  # Consultations per data subject (transparency register, ADR-0015).
+  subjectAccessMonths: 60
 
 branding:
   productName: Data Exchange Network

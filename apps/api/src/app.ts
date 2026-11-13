@@ -4,6 +4,10 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { AppModule } from './app.module.js';
 import { ProblemDetailsFilter } from './common/problem.filter.js';
 import { registerApiDocs } from './openapi/docs.js';
+import {
+  SUBJECT_ACCESS_BODY_LIMIT_BYTES,
+  SUBJECT_ACCESS_PATH,
+} from './transparency/subject-access.controller.js';
 
 export const API_PREFIX = 'api/v1';
 /** Maximum JSON body (CLAUDE.md, ARCHITECTURE.md §12). Document uploads get their own limit. */
@@ -13,6 +17,12 @@ export function createAdapter(): FastifyAdapter {
   const adapter = new FastifyAdapter({ bodyLimit: BODY_LIMIT_BYTES });
   // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
   adapter.getInstance().removeContentTypeParser('text/plain');
+  // The transparency collector receives whole Fluent Bit chunks (internal, service token only).
+  adapter.getInstance().addHook('onRoute', (route) => {
+    if (route.url === `/${API_PREFIX}/${SUBJECT_ACCESS_PATH}`) {
+      route.bodyLimit = SUBJECT_ACCESS_BODY_LIMIT_BYTES;
+    }
+  });
   return adapter;
 }
 

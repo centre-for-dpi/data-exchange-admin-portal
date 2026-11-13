@@ -37,6 +37,7 @@ describe('APISIX reconciler (M1-08)', () => {
     audience: 'rid-gateway',
     opaUrl: 'http://opa:8181',
     accessLogUrl: 'http://fluent-bit:9880/',
+    transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
     // socioeconomico has no node on purpose: its versions cannot be served.
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     // A fake DNS the tests steer (an Error means the lookup fails).

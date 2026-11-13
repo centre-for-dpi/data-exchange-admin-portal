@@ -2,7 +2,7 @@ import { lookup } from 'node:dns/promises';
 import { Module } from '@nestjs/common';
 import { APISIX_ADMIN, HttpApisixAdmin } from './apisix/apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler } from './apisix/apisix.reconciler.js';
-import { type GatewaySettings, parseDevNodes } from './apisix/desired-state.js';
+import { type GatewaySettings, parseDevNodes, parseHostPort } from './apisix/desired-state.js';
 import { HttpKeycloakGatewayAdmin, KEYCLOAK_ADMIN } from './keycloak/keycloak-admin.js';
 import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
 
@@ -36,6 +36,9 @@ import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
         audience: 'rid-gateway',
         opaUrl: process.env.RID_GATEWAY_OPA_URL ?? 'http://opa:8181',
         accessLogUrl: process.env.RID_GATEWAY_ACCESS_LOG_URL ?? 'http://fluent-bit:9880/',
+        transparencyLog: parseHostPort(
+          process.env.RID_GATEWAY_TRANSPARENCY_LOG ?? 'fluent-bit-transparency:5170',
+        ),
         devNodes: parseDevNodes(process.env.RID_DEV_NODES),
         resolveHost: async (host) =>
           (await lookup(host, { all: true, verbatim: true })).map((a) => a.address),
