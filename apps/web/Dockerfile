@@ -16,5 +16,5 @@ USER node
 WORKDIR /repo/apps/web
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=5s --retries=30 --start-period=30s \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1
+  CMD wget -q -O /dev/null http://127.0.0.1:3000/api/auth/providers || exit 1
 CMD ["node_modules/.bin/next", "start", "--port", "3000"]
