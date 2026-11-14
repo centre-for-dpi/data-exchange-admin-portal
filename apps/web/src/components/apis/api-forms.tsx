@@ -6,6 +6,7 @@ import {
   createApiAction,
   createVersionAction,
   replaceOpenapiAction,
+  deprecateVersionAction,
   submitVersionAction,
 } from '../../lib/api-actions';
 import { type FormState, initialFormState } from '../../lib/forms';
@@ -297,7 +298,15 @@ export function CreateVersionForm({ apiId, purposes }: { apiId: string; purposes
   );
 }
 
-export function ReplaceOpenapiForm({ apiId, versionId }: { apiId: string; versionId: string }) {
+export function ReplaceOpenapiForm({
+  apiId,
+  versionId,
+  submitLabel,
+}: {
+  apiId: string;
+  versionId: string;
+  submitLabel?: string;
+}) {
   const t = useTranslations('version.detail');
   const [state, action, pending] = useActionState(
     replaceOpenapiAction.bind(null, apiId, versionId),
@@ -308,7 +317,44 @@ export function ReplaceOpenapiForm({ apiId, versionId }: { apiId: string; versio
       <ErrorSummary state={state} />
       <OpenapiInputs state={state} />
       <Button type="submit" variant="outline" disabled={pending}>
-        {t('replaceSubmit')}
+        {submitLabel ?? t('replaceSubmit')}
+      </Button>
+    </form>
+  );
+}
+
+/** Deprecates a published version with its retirement date (ADR-0019). */
+export function DeprecateVersionForm({
+  apiId,
+  versionId,
+  minDate,
+}: {
+  apiId: string;
+  versionId: string;
+  /** Earliest retirement date the country's notice period allows (YYYY-MM-DD). */
+  minDate: string;
+}) {
+  const t = useTranslations('version.lifecycle');
+  const [state, action, pending] = useActionState(
+    deprecateVersionAction.bind(null, apiId, versionId),
+    initialFormState,
+  );
+  return (
+    <form action={action} className="space-y-4" noValidate>
+      <ErrorSummary state={state} />
+      <Field
+        name="sunsetAt"
+        label={t('sunsetAt')}
+        hint={t('sunsetHint', { date: minDate })}
+        required
+        state={state}
+      >
+        {(p) => (
+          <input {...p} type="date" min={minDate} defaultValue={minDate} className={inputClass} />
+        )}
+      </Field>
+      <Button type="submit" variant="danger" disabled={pending}>
+        {t('deprecate')}
       </Button>
     </form>
   );

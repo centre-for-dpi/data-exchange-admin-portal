@@ -14,9 +14,13 @@ import { createApiSchema, createApiVersionSchema, upstreamSchema } from '@rid/co
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError, ValidationError } from '../common/errors.js';
+import { breakingChanges } from '../domain/api-version/compatibility.js';
 import { assertTransition, isEditable } from '../domain/api-version/state-machine.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
+import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
 import { lintOpenApi, listOperations } from './lint/openapi-lint.js';
 
@@ -24,6 +28,10 @@ type ApiRow = Prisma.ApiGetPayload<object>;
 export const VERSION_INCLUDE = {
   allowedPurposes: true,
   reviews: { orderBy: { createdAt: 'asc' } },
+  revisions: {
+    orderBy: { createdAt: 'asc' },
+    select: { version: true, openapiSha256: true, createdAt: true },
+  },
 } as const satisfies Prisma.ApiVersionInclude;
 export type VersionRow = Prisma.ApiVersionGetPayload<{ include: typeof VERSION_INCLUDE }>;
 
@@ -66,6 +74,7 @@ export class ApisService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   private actor(principal: Principal, entityId: string) {
@@ -180,6 +189,14 @@ export class ApisService {
       operations: listOperations(v.openapiSpec as Record<string, unknown>),
       submittedAt: v.submittedAt?.toISOString() ?? null,
       publishedAt: v.publishedAt?.toISOString() ?? null,
+      deprecatedAt: v.deprecatedAt?.toISOString() ?? null,
+      sunsetAt: v.sunsetAt?.toISOString() ?? null,
+      retiredAt: v.retiredAt?.toISOString() ?? null,
+      revisions: v.revisions.map((r) => ({
+        version: r.version,
+        openapiSha256: r.openapiSha256,
+        replacedAt: r.createdAt.toISOString(),
+      })),
       reviews: v.reviews.map((r) => ({
         decision: r.decision,
         reviewerRole: r.reviewerRole,
@@ -236,6 +253,17 @@ export class ApisService {
     }
 
     const [major = 0, minor = 0] = data.version.split('.').map(Number);
+    // One version per major until it is retired (ADR-0019): compatible changes are revisions of
+    // the published version; anything else is a new major.
+    const live = await this.prisma.apiVersion.findFirst({
+      where: { apiId: api.id, major, status: { not: 'retired' } },
+      select: { version: true, status: true },
+    });
+    if (live) {
+      throw new ConflictError(
+        `Major ${major} already has version ${live.version} (${live.status}); revise it or create major ${major + 1}`,
+      );
+    }
     const parsed = await this.lint(data.openapi, api.classification);
 
     try {
@@ -292,6 +320,9 @@ export class ApisService {
     requestId?: string,
   ): Promise<ApiVersionDetail> {
     const before = await this.findVersion(entityId, apiId, versionId);
+    if (before.status === 'published') {
+      return this.revise(entityId, apiId, before, principal, source, requestId);
+    }
     if (!isEditable(before.status)) {
       throw new ConflictError(`A version in status ${before.status} cannot be edited`);
     }
@@ -322,6 +353,171 @@ export class ApisService {
       return after;
     });
     return this.toVersionDetail(updated);
+  }
+
+  /**
+   * Compatible revision of a published version (ADR-0019): the RID lint and the compatibility
+   * check against the published document must pass. The same row moves to the next minor, so the
+   * route and every subscription stay; the previous document is kept in api_version_revision.
+   */
+  private async revise(
+    entityId: string,
+    apiId: string,
+    before: VersionRow,
+    principal: Principal,
+    source: string,
+    requestId?: string,
+  ): Promise<ApiVersionDetail> {
+    const api = await this.findApi(entityId, apiId);
+    const parsed = await this.lint(source, api.classification);
+    if (!parsed.report.valid) {
+      throw new ValidationError(
+        parsed.report.issues
+          .filter((i) => i.severity === 'error')
+          .map((issue) => ({
+            path: 'line' in issue && issue.line ? `openapi:${issue.line}` : 'openapi',
+            message: issue.message,
+          })),
+      );
+    }
+    if (parsed.sha256 === before.openapiSha256) {
+      throw new ConflictError('The document is the same as the published one');
+    }
+    const breaking = breakingChanges(before.openapiSpec, parsed.spec);
+    if (breaking.length > 0) {
+      throw new ValidationError(
+        breaking.map((message) => ({
+          path: 'openapi',
+          message: `Incompatible change (needs a new major version): ${message}`,
+        })),
+      );
+    }
+    const minor = before.minor + 1;
+    const version = `${before.major}.${minor}`;
+    try {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await tx.apiVersionRevision.create({
+          data: {
+            apiVersionId: before.id,
+            version: before.version,
+            openapiSpec: before.openapiSpec as Prisma.InputJsonObject,
+            openapiSha256: before.openapiSha256,
+            replacedBy: principal.userId,
+          },
+        });
+        const changed = await tx.apiVersion.updateMany({
+          where: { id: before.id, status: 'published', minor: before.minor },
+          data: {
+            minor,
+            version,
+            openapiSpec: parsed.spec as Prisma.InputJsonObject,
+            openapiSha256: parsed.sha256,
+            lintReport: parsed.report,
+          },
+        });
+        if (changed.count === 0)
+          throw new ConflictError('The version changed meanwhile; reload it');
+        const after = await tx.apiVersion.findUniqueOrThrow({
+          where: { id: before.id },
+          include: VERSION_INCLUDE,
+        });
+        await this.audit.record(tx, {
+          actor: this.actor(principal, entityId),
+          action: 'api_version.revised',
+          target: { type: 'api_version', id: before.id },
+          before: versionSnapshot(before),
+          after: versionSnapshot(after),
+          requestId,
+        });
+        // New operations change the route's methods and the operations OPA recognises.
+        for (const topic of [GATEWAY_SYNC_TOPIC, POLICY_SYNC_TOPIC]) {
+          await this.outbox.enqueue(tx, {
+            topic,
+            aggregate: `apiVersion:${before.id}`,
+            payload: { reason: 'revised' },
+          });
+        }
+        return after;
+      });
+      return this.toVersionDetail(updated);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictError(`Version ${version} already exists for this API`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * published -> deprecated with a retirement date that respects the country's notice period
+   * (lifecycle.apiRetirementNoticeDays, SPEC.md §4.2). The gateway announces it with Deprecation
+   * and Sunset headers; new access requests are refused; VersionLifecycleService retires it.
+   */
+  async deprecate(
+    entityId: string,
+    apiId: string,
+    versionId: string,
+    principal: Principal,
+    sunsetAt: Date,
+    requestId?: string,
+  ): Promise<ApiVersionDetail> {
+    const before = await this.findVersion(entityId, apiId, versionId);
+    assertTransition(before.status, 'deprecated');
+    const days = getCountryConfig().lifecycle.apiRetirementNoticeDays;
+    const now = new Date();
+    const earliest = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    if (sunsetAt < earliest) {
+      throw new ValidationError([
+        {
+          path: 'sunsetAt',
+          message: `The retirement date must give at least ${days} days of notice (from ${earliest.toISOString().slice(0, 10)})`,
+        },
+      ]);
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.apiVersion.updateMany({
+        where: { id: versionId, status: 'published' },
+        data: { status: 'deprecated', deprecatedAt: now, deprecatedBy: principal.userId, sunsetAt },
+      });
+      if (changed.count === 0) throw new ConflictError('The version changed meanwhile; reload it');
+      await this.refreshApiStatus(tx, before.apiId);
+      const after = await tx.apiVersion.findUniqueOrThrow({
+        where: { id: versionId },
+        include: VERSION_INCLUDE,
+      });
+      await this.audit.record(tx, {
+        actor: this.actor(principal, entityId),
+        action: 'api_version.deprecated',
+        target: { type: 'api_version', id: versionId },
+        before: { status: before.status },
+        after: { status: 'deprecated', sunsetAt: sunsetAt.toISOString() },
+        requestId,
+      });
+      await this.outbox.enqueue(tx, {
+        topic: GATEWAY_SYNC_TOPIC,
+        aggregate: `apiVersion:${versionId}`,
+        payload: { reason: 'deprecated' },
+      });
+      return after;
+    });
+    return this.toVersionDetail(updated);
+  }
+
+  /** Api.status is derived from its versions (SPEC.md §3). */
+  async refreshApiStatus(tx: Prisma.TransactionClient, apiId: string): Promise<void> {
+    const statuses = new Set(
+      (await tx.apiVersion.findMany({ where: { apiId }, select: { status: true } })).map(
+        (v) => v.status,
+      ),
+    );
+    const status = statuses.has('published')
+      ? 'published'
+      : statuses.has('deprecated')
+        ? 'deprecated'
+        : statuses.size > 0 && [...statuses].every((s) => s === 'retired')
+          ? 'retired'
+          : undefined;
+    if (status) await tx.api.update({ where: { id: apiId }, data: { status } });
   }
 
   /** draft | changes_requested -> in_review. Blocked while the OpenAPI lint has errors. */

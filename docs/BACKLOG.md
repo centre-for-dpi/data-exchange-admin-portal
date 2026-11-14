@@ -309,7 +309,15 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Separación de funciones.** El regulador no decide sobre algo que creó, envió, solicitó o ya decidió en un paso anterior, ni sobre algo de una entidad a la que pertenece. Cubre a la persona que tenga a la vez los roles de operador y de regulador.
     - **Web.** La vista del regulador muestra la bandeja. La ficha de revisión de la versión y la solicitud muestran los formularios de decisión.
     - **Pruebas.** 8 de integración. La e2e `regulator.spec.ts` publica una API sensible, aprueba la solicitud y la deja activándose, con axe. La matriz de autorización generada cubre las rutas nuevas.
-- [ ] **M2-05 — Ciclo de vida de versiones**: nueva versión mayor, cambios compatibles en versión publicada (lint de compatibilidad contra la anterior), `deprecated` con fecha de retiro, `retired` con revocación y aviso previo.
+- [x] **M2-05 — Ciclo de vida de versiones**: nueva versión mayor, cambios compatibles en versión publicada (lint de compatibilidad contra la anterior), `deprecated` con fecha de retiro, `retired` con revocación y aviso previo.
+  - _Notas de implementación (ADR-0019):_
+    - **Una versión por mayor.** Mientras una mayor no esté retirada, crear otra con la misma mayor da 409 y sugiere la mayor siguiente. La mayor nueva pasa por la revisión completa y convive en `/v{N+1}`.
+    - **Cambio compatible = revisión en sitio.** `PUT .../openapi` sobre una versión publicada pasa el lint RID y la comprobación de compatibilidad (`domain/api-version/compatibility.ts`). Sube la menor (1.0 → 1.1) con el mismo id, la misma ruta y las mismas suscripciones. El documento anterior queda en `api_version_revision`. Se encolan `gateway.sync` y `policy.sync`, y las operaciones nuevas no se conceden a las suscripciones existentes.
+    - **Cambio incompatible.** Responde 400 con cada motivo; uno igual al publicado, 409.
+    - **Deprecación.** `POST .../deprecate {sunsetAt}` respeta `lifecycle.apiRetirementNoticeDays` (90 días). El gateway responde con `Deprecation` (RFC 9745) y `Sunset` (RFC 8594) mediante `response-rewrite`, y se rechazan las solicitudes de acceso nuevas (409).
+    - **Retiro.** `VersionLifecycleService`, cada `RID_LIFECYCLE_INTERVAL_SECONDS` (300 s), retira las versiones cuya fecha pasó: la ruta sale del gateway, las suscripciones vivas se revocan y las pendientes se rechazan. Todo queda en la bitácora, y el estado de la API se recalcula. Es idempotente.
+    - **Pruebas.** 6 de compatibilidad y 6 de integración. La e2e `lifecycle.spec.ts` cubre revisión compatible, rechazo incompatible, deprecación y cabeceras reales del gateway, con axe.
+    - **Pendiente para M2-08.** Los avisos a los consumidores sobre la deprecación y el retiro próximo.
 - [ ] **M2-06 — Ciclo de vida de suscripciones**: pedir información, desistir, suspender/reactivar, expiración automática, aviso de renovación a 30 días, renovación prellenada.
 - [ ] **M2-07 — Documentos y acuerdos**: subir PDF del acuerdo (hash SHA-256, límite de tamaño), plantilla de acuerdo modelo descargable desde la config del país.
 - [ ] **M2-08 — Notificaciones**: en el portal y por correo (Mailpit en dev) para los eventos de `SPEC.md §7`; preferencias por usuario.

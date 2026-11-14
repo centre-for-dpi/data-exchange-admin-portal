@@ -189,6 +189,20 @@
       "none": "None",
       "reviews": "Reviews",
       "published": "The version is published."
+    },
+    "lifecycle": {
+      "deprecatedNotice": "Deprecated version: it is retired on {date}. Current consumers keep access until then; no new requests are accepted.",
+      "retiredNotice": "Version retired on {date}: it has no gateway route any more and its subscriptions were revoked.",
+      "revisions": "Revision history",
+      "replacedOn": "replaced on {date}",
+      "reviseTitle": "Revise the document (compatible change)",
+      "reviseHint": "You may improve descriptions or add optional operations. The version moves to the next minor, on the same route and subscriptions. An incompatible change needs a new major version.",
+      "reviseSubmit": "Publish revision",
+      "deprecateTitle": "Deprecate",
+      "deprecateHint": "Announce the retirement with at least {days} days of notice. On that date the gateway route is removed and the subscriptions are revoked.",
+      "sunsetAt": "Retirement date",
+      "sunsetHint": "From {date}.",
+      "deprecate": "Deprecate"
     }
   },
   "reviewDecision": {

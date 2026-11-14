@@ -185,6 +185,14 @@ export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
   operations: z.array(operationSchema),
   submittedAt: z.iso.datetime().nullable(),
   publishedAt: z.iso.datetime().nullable(),
+  /** Lifecycle (ADR-0019): deprecation, planned retirement and actual retirement. */
+  deprecatedAt: z.iso.datetime().nullable(),
+  sunsetAt: z.iso.datetime().nullable(),
+  retiredAt: z.iso.datetime().nullable(),
+  /** Earlier documents replaced by compatible revisions, oldest first. */
+  revisions: z.array(
+    z.object({ version: z.string(), openapiSha256: z.string(), replacedAt: z.iso.datetime() }),
+  ),
   reviews: z.array(versionReviewSchema),
 });
 export type ApiVersionDetail = z.infer<typeof apiVersionDetailSchema>;
@@ -255,3 +263,8 @@ export const requestChangesSchema = z.strictObject({
   comment: z.string().trim().min(10, 'explain what has to change (10+ characters)').max(2_000),
 });
 export const versionIdParamsSchema = z.strictObject({ versionId: z.uuid() });
+
+/** Deprecation of a published version (ADR-0019): the planned retirement date. */
+export const deprecateVersionSchema = z.strictObject({
+  sunsetAt: z.iso.datetime({ offset: true }),
+});

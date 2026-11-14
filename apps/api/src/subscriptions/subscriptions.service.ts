@@ -239,6 +239,10 @@ export class SubscriptionsService {
       include: { api: true, allowedPurposes: true },
     });
     // Drafts and versions under review do not exist for consumers.
+    if (version?.status === 'deprecated') {
+      // ADR-0019: a deprecated version keeps its consumers until retirement, but takes no new ones.
+      throw new ConflictError('The API version is deprecated and accepts no new access requests');
+    }
     if (!version || version.status !== 'published') throw new NotFoundError('API version');
 
     const errors: FieldError[] = [];

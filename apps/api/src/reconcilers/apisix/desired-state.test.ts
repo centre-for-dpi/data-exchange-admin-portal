@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deprecationHeaders,
   desiredGateway,
   type GatewaySettings,
   matches,
@@ -232,5 +233,28 @@ describe('parseDevNodes', () => {
       ['salud', 'mock-salud:8000'],
       ['socio', 'mock-socio:8001'],
     ]);
+  });
+});
+
+describe('deprecated versions (ADR-0019)', () => {
+  const deprecation = {
+    deprecatedAt: new Date('2026-11-13T12:00:00Z'),
+    sunsetAt: new Date('2027-03-01T00:00:00Z'),
+  };
+
+  it('announce Deprecation (RFC 9745) and Sunset (RFC 8594) on every response', () => {
+    expect(deprecationHeaders(deprecation)).toEqual({
+      Deprecation: '@1794571200',
+      Sunset: 'Mon, 01 Mar 2027 00:00:00 GMT',
+    });
+    const { route } = desiredGateway(version({ deprecation }), settings);
+    expect((route.plugins as Record<string, unknown>)['response-rewrite']).toEqual({
+      headers: { set: deprecationHeaders(deprecation) },
+    });
+  });
+
+  it('leave published versions without the headers', () => {
+    const { route } = desiredGateway(version(), settings);
+    expect(route.plugins).not.toHaveProperty('response-rewrite');
   });
 });

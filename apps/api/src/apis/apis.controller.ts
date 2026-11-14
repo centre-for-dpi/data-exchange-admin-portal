@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@nestjs/common';
 import {
+  deprecateVersionSchema,
   type ApiDetail,
   apiDetailSchema,
   apiPageSchema,
@@ -153,7 +154,11 @@ export class ApisController {
   @EntityAccess('api.write')
   @ApiOperation({
     operationId: 'replaceApiVersionOpenapi',
-    summary: 'Replace the OpenAPI document of an editable version',
+    summary: 'Replace the OpenAPI document of an editable version, or revise a published one',
+    description:
+      'On a draft: replaces and lints again. On a published version (ADR-0019): a compatible ' +
+      'revision that moves it to the next minor, on the same route and subscriptions; an ' +
+      'incompatible change is a 400 that asks for a new major version.',
     tags: ['apis'],
     params: apiVersionParamsSchema,
     body: replaceOpenapiSchema,
@@ -202,5 +207,39 @@ export class ApisController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.apis.submit(entity.entityId, apiId, versionId, principal, request.id);
+  }
+
+  @Post(':apiId/versions/:versionId/deprecate')
+  @HttpCode(200)
+  @EntityAccess('api.write')
+  @ApiOperation({
+    operationId: 'deprecateApiVersion',
+    summary: 'Deprecate a published version with its retirement date',
+    description:
+      'The date must respect lifecycle.apiRetirementNoticeDays of the country config. Until then ' +
+      'the gateway answers with Deprecation and Sunset headers and no new access requests are ' +
+      'accepted; on that date the version is retired and its subscriptions revoked (ADR-0019).',
+    tags: ['apis'],
+    params: apiVersionParamsSchema,
+    body: deprecateVersionSchema,
+    responses: { 200: { description: 'The version', schema: apiVersionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  deprecate(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('apiId', uuid) apiId: string,
+    @Param('versionId', uuid) versionId: string,
+    @Body(new ZodValidationPipe(deprecateVersionSchema)) body: { sunsetAt: string },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.apis.deprecate(
+      entity.entityId,
+      apiId,
+      versionId,
+      principal,
+      new Date(body.sunsetAt),
+      request.id,
+    );
   }
 }

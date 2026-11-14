@@ -62,6 +62,7 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | GET | `/api/v1/entities/:entityId/apis/:apiId` | entidad: `api.read` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions` | entidad: `api.write` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId` | entidad: `api.read` |
+| POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/deprecate` | entidad: `api.write` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.read` |
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.write` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/submit` | entidad: `api.write` |

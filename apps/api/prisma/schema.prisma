@@ -487,7 +487,10 @@ model ApiVersion {
   submittedAt      DateTime?        @map("submitted_at") @db.Timestamptz(3)
   publishedAt      DateTime?        @map("published_at") @db.Timestamptz(3)
   deprecatedAt     DateTime?        @map("deprecated_at") @db.Timestamptz(3)
+  /// User who deprecated it; the retirement acts on their decision (ADR-0019).
+  deprecatedBy     String?          @map("deprecated_by") @db.Uuid
   sunsetAt         DateTime?        @map("sunset_at") @db.Timestamptz(3)
+  retiredAt        DateTime?        @map("retired_at") @db.Timestamptz(3)
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
   createdBy        String           @map("created_by")
@@ -495,11 +498,29 @@ model ApiVersion {
   allowedPurposes ApiVersionPurpose[]
   reviews         ApiVersionReview[]
   subscriptions   Subscription[]
+  revisions       ApiVersionRevision[]
 
   @@unique([apiId, major, minor])
   @@unique([apiId, version])
   @@index([status])
   @@map("api_version")
+}
+
+/// Earlier OpenAPI documents of a published version, replaced by compatible revisions (ADR-0019).
+model ApiVersionRevision {
+  id            String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  apiVersionId  String     @map("api_version_id") @db.Uuid
+  apiVersion    ApiVersion @relation(fields: [apiVersionId], references: [id])
+  /// Version label the document had ("1.0" when the revision made it "1.1").
+  version       String
+  openapiSpec   Json       @map("openapi_spec") @db.Json
+  openapiSha256 String     @map("openapi_sha256")
+  /// User who replaced it.
+  replacedBy    String     @map("replaced_by") @db.Uuid
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([apiVersionId, createdAt])
+  @@map("api_version_revision")
 }
 
 /// Purposes a version lets consumers request (SPEC.md §3: allowedPurposes).

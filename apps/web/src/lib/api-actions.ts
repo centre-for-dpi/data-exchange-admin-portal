@@ -119,6 +119,28 @@ export async function replaceOpenapiAction(
   return {};
 }
 
+export async function deprecateVersionAction(
+  apiId: string,
+  versionId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const entityId = await activeEntityId();
+  if (!entityId) return fail(undefined);
+  const date = formData.get('sunsetAt');
+  const day = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
+  const result = await apiSend(
+    'POST',
+    `/entities/${entityId}/apis/${apiId}/versions/${versionId}/deprecate`,
+    // Retirement at the start of that day, UTC.
+    { sunsetAt: day ? `${day}T00:00:00.000Z` : '' },
+    apiVersionDetailSchema,
+  );
+  if (!result.ok) return fail(result.problem);
+  revalidatePath('/', 'layout');
+  return {};
+}
+
 export async function submitVersionAction(
   apiId: string,
   versionId: string,

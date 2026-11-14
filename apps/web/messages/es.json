@@ -189,6 +189,20 @@
       "none": "Ninguno",
       "reviews": "Revisiones",
       "published": "La versión está publicada."
+    },
+    "lifecycle": {
+      "deprecatedNotice": "Versión obsoleta: se retira el {date}. Los consumidores actuales siguen con acceso hasta entonces; no se aceptan solicitudes nuevas.",
+      "retiredNotice": "Versión retirada el {date}: ya no tiene ruta en el gateway y sus suscripciones se revocaron.",
+      "revisions": "Historial de revisiones",
+      "replacedOn": "reemplazada el {date}",
+      "reviseTitle": "Revisar el documento (cambio compatible)",
+      "reviseHint": "Puedes mejorar descripciones o agregar operaciones opcionales. La versión pasa a la siguiente menor, con la misma ruta y las mismas suscripciones. Un cambio incompatible exige una versión mayor nueva.",
+      "reviseSubmit": "Publicar revisión",
+      "deprecateTitle": "Marcar como obsoleta",
+      "deprecateHint": "Anuncia el retiro con al menos {days} días de aviso. Al llegar la fecha se quita la ruta del gateway y se revocan las suscripciones.",
+      "sunsetAt": "Fecha de retiro",
+      "sunsetHint": "Desde el {date}.",
+      "deprecate": "Marcar como obsoleta"
     }
   },
   "reviewDecision": {

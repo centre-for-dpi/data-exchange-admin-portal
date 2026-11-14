@@ -1,14 +1,26 @@
 import { apiDetailSchema, apiVersionDetailSchema, purposeListSchema } from '@rid/contracts';
+import { getCountryConfig } from '@rid/config';
 import type { Metadata } from 'next';
-import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { ReplaceOpenapiForm, SubmitVersionForm } from '../../../../../../components/apis/api-forms';
+import {
+  DeprecateVersionForm,
+  ReplaceOpenapiForm,
+  SubmitVersionForm,
+} from '../../../../../../components/apis/api-forms';
 import { VersionSheet } from '../../../../../../components/apis/version-sheet';
 import { Notice } from '../../../../../../components/ui/notice';
 import { Page, PageHeader, Section } from '../../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../../lib/api';
 import { localize } from '../../../../../../lib/localize';
 import { getViewer } from '../../../../../../lib/viewer';
+
+/** First retirement date (YYYY-MM-DD) the notice period allows, with a day of margin. */
+function earliestRetirementDate(noticeDays: number, now = new Date()): string {
+  return new Date(now.getTime() + (noticeDays + 1) * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
 
 interface PageProps {
   params: Promise<{ locale: string; apiId: string; versionId: string }>;
@@ -50,6 +62,12 @@ export default async function VersionPage({ params }: PageProps) {
   );
   const canWrite = entity.roles.includes('api_publisher');
   const editable = version.status === 'draft' || version.status === 'changes_requested';
+  const format = await getFormatter();
+  const day = (iso: string | null) =>
+    iso ? format.dateTime(new Date(iso), { dateStyle: 'long' }) : '';
+  // Earliest retirement date the notice period allows, plus a day of margin (ADR-0019).
+  const noticeDays = getCountryConfig().lifecycle.apiRetirementNoticeDays;
+  const minSunset = earliestRetirementDate(noticeDays);
 
   return (
     <Page>
@@ -69,7 +87,59 @@ export default async function VersionPage({ params }: PageProps) {
         </Notice>
       ) : null}
 
+      {version.status === 'deprecated' ? (
+        <Notice tone="warning" role="status">
+          {t('version.lifecycle.deprecatedNotice', { date: day(version.sunsetAt) })}
+        </Notice>
+      ) : null}
+      {version.status === 'retired' ? (
+        <Notice tone="info" role="status">
+          {t('version.lifecycle.retiredNotice', { date: day(version.retiredAt) })}
+        </Notice>
+      ) : null}
+
       <VersionSheet version={version} purposeNames={purposeNames} />
+
+      {version.revisions.length > 0 ? (
+        <Section title={t('version.lifecycle.revisions')}>
+          <ul className="space-y-2 text-sm">
+            {version.revisions.map((r) => (
+              <li key={r.replacedAt}>
+                <span className="font-mono">{r.version}</span>{' '}
+                <span className="text-muted-foreground">
+                  · {t('version.lifecycle.replacedOn', { date: day(r.replacedAt) })} ·{' '}
+                  <span className="font-mono break-all">{r.openapiSha256.slice(0, 16)}…</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
+      {canWrite && version.status === 'published' ? (
+        <>
+          <Section
+            title={t('version.lifecycle.reviseTitle')}
+            description={t('version.lifecycle.reviseHint')}
+          >
+            <div className="card max-w-3xl p-6 md:p-8">
+              <ReplaceOpenapiForm
+                apiId={api.id}
+                versionId={version.id}
+                submitLabel={t('version.lifecycle.reviseSubmit')}
+              />
+            </div>
+          </Section>
+          <Section
+            title={t('version.lifecycle.deprecateTitle')}
+            description={t('version.lifecycle.deprecateHint', { days: noticeDays })}
+          >
+            <div className="card max-w-3xl p-6 md:p-8">
+              <DeprecateVersionForm apiId={api.id} versionId={version.id} minDate={minSunset} />
+            </div>
+          </Section>
+        </>
+      ) : null}
 
       {canWrite && editable ? (
         <>

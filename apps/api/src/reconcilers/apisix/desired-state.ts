@@ -125,6 +125,21 @@ export interface VersionForGateway {
   entitySlug: string;
   apiName: string;
   version: string;
+  /** Set while the version is deprecated (ADR-0019): announced on every response. */
+  deprecation?: { deprecatedAt: Date; sunsetAt: Date };
+}
+
+/**
+ * Deprecation (RFC 9745, `@` + Unix seconds) and Sunset (RFC 8594, HTTP-date) response headers.
+ */
+export function deprecationHeaders(d: {
+  deprecatedAt: Date;
+  sunsetAt: Date;
+}): Record<string, string> {
+  return {
+    Deprecation: `@${Math.floor(d.deprecatedAt.getTime() / 1000)}`,
+    Sunset: d.sunsetAt.toUTCString(),
+  };
 }
 
 /** A version the gateway cannot serve yet; recorded as a sync error, never half-applied. */
@@ -222,6 +237,9 @@ export function desiredGateway(v: VersionForGateway, settings: GatewaySettings):
         send_headers_upstream: OPA_UPSTREAM_HEADERS,
       },
       prometheus: { prefer_name: false },
+      ...(v.deprecation
+        ? { 'response-rewrite': { headers: { set: deprecationHeaders(v.deprecation) } } }
+        : {}),
       'http-logger': {
         uri: settings.accessLogUrl,
         include_req_body: false,

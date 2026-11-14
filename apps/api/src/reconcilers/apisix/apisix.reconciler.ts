@@ -158,6 +158,9 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
           entitySlug: version.api.entity.slug,
           apiName: version.api.name,
           version: version.version,
+          ...(version.status === 'deprecated' && version.deprecatedAt && version.sunsetAt
+            ? { deprecation: { deprecatedAt: version.deprecatedAt, sunsetAt: version.sunsetAt } }
+            : {}),
         },
         this.settings,
       );

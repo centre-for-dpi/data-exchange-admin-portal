@@ -12,6 +12,7 @@ import { AuditQueryService } from './audit/audit-query.service.js';
 import { OpaController } from './opa/opa.controller.js';
 import { OpaService } from './opa/opa.service.js';
 import { ApisService } from './apis/apis.service.js';
+import { VersionLifecycleService } from './apis/version-lifecycle.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CatalogController } from './catalog/catalog.controller.js';
 import { CatalogService } from './catalog/catalog.service.js';
@@ -84,6 +85,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     MembersService,
     { provide: MAIL_TRANSPORT, useFactory: createSmtpTransport },
     ApisService,
+    VersionLifecycleService,
     ReviewsService,
     RegulatorService,
     CatalogService,
