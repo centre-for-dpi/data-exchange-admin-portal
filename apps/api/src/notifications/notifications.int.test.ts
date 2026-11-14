@@ -246,6 +246,32 @@ describe('notifications (M2-08)', () => {
     ).toBe(0);
   });
 
+  it('does not tell a requester who no longer belongs to the consumer entity', async () => {
+    const id = await requested();
+    const carlos = await userId('carlos.dev');
+    const membership = await prisma.membership.findFirstOrThrow({
+      where: { userId: carlos, entityId: programas },
+    });
+    await prisma.membership.update({ where: { id: membership.id }, data: { status: 'revoked' } });
+    try {
+      await call('POST', `/entities/${salud}/access-requests/${id}/request-info`, 'lucia.datos', {
+        comment: '¿Para qué programa son los datos?',
+      });
+      await dispatch(id, 'subscription.info_requested');
+      expect(
+        await prisma.notification.count({
+          where: {
+            userId: carlos,
+            kind: 'access_info_requested',
+            payload: { path: ['link'], equals: `/my-apps/requests/${id}` },
+          },
+        }),
+      ).toBe(0);
+    } finally {
+      await prisma.membership.update({ where: { id: membership.id }, data: { status: 'active' } });
+    }
+  });
+
   it('tells operator reviewers a version waits for review, not its publisher', async () => {
     const res = await call(
       'POST',

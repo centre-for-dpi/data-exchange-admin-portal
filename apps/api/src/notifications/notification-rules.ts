@@ -32,6 +32,19 @@ async function membersWith(prisma: PrismaService, entityId: string, roles: Entit
   return rows.map((r) => r.userId);
 }
 
+/**
+ * Keeps only users who still belong (active membership) to the entity: a former member of the
+ * consumer entity must not keep hearing about its requests.
+ */
+async function stillMembers(prisma: PrismaService, entityId: string, userIds: string[]) {
+  if (userIds.length === 0) return [];
+  const rows = await prisma.membership.findMany({
+    where: { entityId, status: 'active', userId: { in: userIds } },
+    select: { userId: true },
+  });
+  return rows.map((r) => r.userId);
+}
+
 async function platformUsers(prisma: PrismaService, roles: PlatformRole[]) {
   const rows = await prisma.userPlatformRole.findMany({
     where: { role: { in: roles } },
@@ -138,13 +151,17 @@ export async function resolveNotification(
       case 'api_version.deprecated': {
         const consumers = await prisma.subscription.findMany({
           where: { apiVersionId: v.id, status: { in: [...LIVE_GRANTED] } },
-          select: { requestedBy: true },
+          select: { requestedBy: true, application: { select: { entityId: true } } },
         });
         return {
           kind: 'api_deprecated',
           params: { ...params, date: v.sunsetAt?.toISOString() },
           link: `/catalog/${v.apiId}`,
-          recipients: consumers.map((c) => c.requestedBy),
+          recipients: (
+            await Promise.all(
+              consumers.map((c) => stillMembers(prisma, c.application.entityId, [c.requestedBy])),
+            )
+          ).flat(),
         };
       }
       default:
@@ -164,7 +181,7 @@ export async function resolveNotification(
     const providerLink = `/requests/${s.id}`;
     const consumerLink = `/my-apps/requests/${s.id}`;
     const stewards = () => membersWith(prisma, s.apiVersion.api.entityId, ['data_steward']);
-    const requester = [s.requestedBy];
+    const requester = await stillMembers(prisma, s.application.entityId, [s.requestedBy]);
     switch (event.action) {
       case 'subscription.requested':
       case 'subscription.renewal_requested':
