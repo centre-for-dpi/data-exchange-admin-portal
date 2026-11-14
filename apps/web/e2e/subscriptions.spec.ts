@@ -5,6 +5,8 @@ import { expectNoAccessibilityViolations } from './helpers';
 // M1-07: carlos asks for access with a purpose; lucia (data steward of the provider) decides.
 test.describe('access requests (M1-07)', () => {
   test('carlos requests access and lucia approves it for 6 months', async ({ browser, page }) => {
+    // Publishing an API (submit + review) alone takes most of the default 60 s.
+    test.setTimeout(180_000);
     const apiName = `Afiliación ${Date.now().toString(36)}`;
     await publishNewApi(browser, { name: apiName });
 
@@ -53,6 +55,8 @@ test.describe('access requests (M1-07)', () => {
   });
 
   test('lucia rejects with a reason that carlos reads', async ({ browser, page }) => {
+    // Publishing an API (submit + review) alone takes most of the default 60 s.
+    test.setTimeout(180_000);
     const apiName = `Afiliación ${Date.now().toString(36)}`;
     await publishNewApi(browser, { name: apiName });
     await signIn(page, 'carlos.dev', '/my-apps');
