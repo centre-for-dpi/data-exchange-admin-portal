@@ -435,6 +435,22 @@
       "seeRenewal": "See the renewal",
       "isRenewal": "This request renews a current subscription.",
       "seeRenewed": "See the subscription it renews"
+    },
+    "agreement": {
+      "title": "Exchange agreement",
+      "lead": "The agreement signed by the entities, or the reference to the agreement in force in the legal basis.",
+      "none": "No agreement attached.",
+      "file": "File",
+      "sha256": "SHA-256 fingerprint",
+      "template": "Download the model agreement",
+      "label": "Exchange agreement (PDF)",
+      "replace": "Replace the agreement (PDF)",
+      "hint": "PDF only, up to 10 MB. You can change it until the provider decides.",
+      "upload": "Attach agreement",
+      "required": "Choose a PDF file.",
+      "tooLarge": "The file is larger than 10 MB.",
+      "notPdf": "The file is not a PDF.",
+      "beforeRequest": "Once the request is sent you can attach the signed exchange agreement."
     }
   },
   "audit": {
@@ -514,7 +530,8 @@
         "renewal_requested": "Renewal requested",
         "renewal_notice_queued": "Renewal notice sent",
         "approved_regulator": "Approved by the regulator",
-        "rejected_regulator": "Rejected by the regulator"
+        "rejected_regulator": "Rejected by the regulator",
+        "agreement_attached": "Exchange agreement attached"
       }
     }
   },

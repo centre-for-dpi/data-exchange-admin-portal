@@ -2,6 +2,7 @@ import { subscriptionDetailSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { AgreementSection } from '../../../../../components/subscriptions/agreement-section';
 import { LifecycleForm } from '../../../../../components/subscriptions/subscription-forms';
 import { SubscriptionFacts } from '../../../../../components/subscriptions/subscription-view';
 import { AutoRefresh } from '../../../../../components/auto-refresh';
@@ -92,6 +93,12 @@ export default async function ConsumerSubscriptionPage({ params }: PageProps) {
         <SubscriptionFacts detail={detail} side="consumer" />
         <AuditTimeline items={timeline} />
       </div>
+      <AgreementSection
+        detail={detail}
+        entityId={detail.application.entity.id}
+        collection="subscriptions"
+        canUpload={developer && ['pending_provider', 'info_requested'].includes(detail.status)}
+      />
       {developer && detail.status === 'info_requested' ? (
         <Section title={t('lifecycle.answer')}>
           <div className="card max-w-3xl p-6 md:p-8">

@@ -36,6 +36,7 @@ import {
 import { requiresRegulator } from '../domain/approval.js';
 import { assertTransition, LIVE_STATUSES } from '../domain/subscription/state-machine.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { DocumentsService } from '../documents/documents.service.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
@@ -50,6 +51,7 @@ const INCLUDE = {
   apiVersion: { include: { api: { include: { entity: true } } } },
   purpose: true,
   decisions: { orderBy: { createdAt: 'asc' } },
+  agreementDocument: true,
   renewals: {
     where: { status: { in: [...LIVE_STATUSES] } },
     select: { id: true, status: true },
@@ -138,6 +140,7 @@ export class SubscriptionsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly documents: DocumentsService,
   ) {}
 
   private summary(s: Row): SubscriptionSummary {
@@ -203,6 +206,16 @@ export class SubscriptionsService {
       })),
       renewsSubscriptionId: s.renewsSubscriptionId,
       renewal: s.renewals[0] ?? null,
+      agreementDocument: s.agreementDocument
+        ? {
+            id: s.agreementDocument.id,
+            fileName: s.agreementDocument.fileName,
+            mimeType: s.agreementDocument.mimeType,
+            size: s.agreementDocument.size,
+            sha256: s.agreementDocument.sha256,
+            uploadedAt: s.agreementDocument.createdAt.toISOString(),
+          }
+        : null,
     };
   }
 
@@ -705,6 +718,66 @@ export class SubscriptionsService {
       // Renewals of this renewal go too, whatever its own status.
       await this.closeRenewals(tx, id, principal, acting, why, requestId, seen);
     }
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Exchange agreement (SPEC.md §4.4 step 1, M2-07)
+  // -------------------------------------------------------------------------------------------
+
+  /**
+   * The requesting entity attaches (or replaces) the agreement PDF while the provider has not
+   * decided. The document belongs to the consumer entity; the provider can read it.
+   */
+  async attachAgreement(
+    entityId: string,
+    subscriptionId: string,
+    principal: Principal,
+    file: { fileName: string; bytes: Buffer },
+    requestId?: string,
+  ): Promise<SubscriptionDetail> {
+    const before = await this.loadForConsumer(entityId, subscriptionId);
+    const editable: SubscriptionStatus[] = ['pending_provider', 'info_requested'];
+    if (!editable.includes(before.status)) {
+      throw new ConflictError('The agreement can only change before the provider decides');
+    }
+    await this.prisma.$transaction(async (tx) => {
+      const document = await this.documents.storePdf(tx, {
+        ownerEntityId: entityId,
+        kind: 'agreement',
+        fileName: file.fileName,
+        bytes: file.bytes,
+        createdBy: principal.userId,
+      });
+      const changed = await tx.subscription.updateMany({
+        where: { id: subscriptionId, status: before.status },
+        data: { agreementDocumentId: document.id },
+      });
+      if (changed.count === 0) throw new ConflictError('The request changed meanwhile; reload it');
+      await this.audit.record(tx, {
+        actor: { type: 'user', id: principal.keycloakSub, entityId },
+        action: 'subscription.agreement_attached',
+        target: { type: 'subscription', id: subscriptionId },
+        before: { agreementDocumentId: before.agreementDocumentId },
+        after: {
+          agreementDocumentId: document.id,
+          fileName: document.fileName,
+          size: document.size,
+          sha256: document.sha256,
+        },
+        requestId,
+      });
+    });
+    return this.getForConsumer(entityId, subscriptionId);
+  }
+
+  /** The agreement, for the requesting entity or for the provider (and platform roles). */
+  async agreement(entityId: string, subscriptionId: string, side: 'consumer' | 'provider') {
+    const s =
+      side === 'consumer'
+        ? await this.loadForConsumer(entityId, subscriptionId)
+        : await this.loadForProvider(entityId, subscriptionId);
+    if (!s.agreementDocumentId) throw new NotFoundError('Agreement');
+    return this.documents.read(s.agreementDocumentId);
   }
 
   // -------------------------------------------------------------------------------------------

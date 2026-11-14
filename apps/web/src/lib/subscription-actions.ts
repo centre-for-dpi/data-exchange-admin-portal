@@ -4,7 +4,7 @@ import { subscriptionDetailSchema } from '@rid/contracts';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from '../i18n/navigation';
-import { apiSend } from './api';
+import { apiPutBytes, apiSend } from './api';
 import { type FormState, problemToFormState } from './forms';
 import { getViewer } from './viewer';
 
@@ -142,4 +142,32 @@ export async function subscriptionStepAction(
   if (!result.ok) return problemToFormState(result.problem, t('unexpected'));
   revalidatePath('/', 'layout');
   return {};
+}
+
+/** The requesting entity attaches the exchange agreement (PDF) to a pending request (M2-07). */
+export async function uploadAgreementAction(
+  subscriptionId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const t = await getTranslations('subscriptions.agreement');
+  const entityId = await activeEntityId();
+  const file = formData.get('document');
+  if (!entityId || !(file instanceof File) || file.size === 0) {
+    return { fieldErrors: { document: [t('required')] } };
+  }
+  const name = encodeURIComponent(file.name.replace(/[/\\]/g, '_').slice(0, 200) || 'acuerdo.pdf');
+  const result = await apiPutBytes(
+    `/entities/${entityId}/subscriptions/${subscriptionId}/agreement?fileName=${name}`,
+    await file.arrayBuffer(),
+    'application/pdf',
+    subscriptionDetailSchema,
+  );
+  if (!result.ok) {
+    if (result.status === 413) return { fieldErrors: { document: [t('tooLarge')] } };
+    if (result.status === 415) return { fieldErrors: { document: [t('notPdf')] } };
+    return problemToFormState(result.problem, (await getTranslations('forms'))('unexpected'));
+  }
+  revalidatePath('/', 'layout');
+  return { done: true };
 }

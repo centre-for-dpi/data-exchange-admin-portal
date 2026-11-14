@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service.js';
+import type { Principal } from '../auth/principal.service.js';
 import {
+  ConflictError,
+  GoneError,
+  NotFoundError,
   PayloadTooLargeError,
   UnsupportedMediaTypeError,
   ValidationError,
@@ -36,6 +41,7 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -89,10 +95,41 @@ export class DocumentsService {
   /** Reads a document's bytes; fails if they no longer match the stored hash. */
   async read(documentId: string): Promise<{ document: StoredDocument; bytes: Buffer }> {
     const document = await this.prisma.document.findUniqueOrThrow({ where: { id: documentId } });
+    if (document.purgedAt) throw new GoneError('The document was deleted by legal order');
     const bytes = await this.storage.get(document.storageKey);
     if (createHash('sha256').update(bytes).digest('hex') !== document.sha256) {
       throw new Error(`Document ${documentId} does not match its stored hash`);
     }
     return { document, bytes };
+  }
+
+  /**
+   * Deletion by legal order, the only physical deletion in the domain (SPEC.md §5). The bytes
+   * go; the row, its SHA-256 and the order stay, and the event is audited. Downloads answer 410.
+   */
+  async purge(documentId: string, principal: Principal, order: string, requestId?: string) {
+    const document = await this.prisma.document.findUnique({ where: { id: documentId } });
+    if (!document) throw new NotFoundError('Document');
+    if (document.purgedAt) throw new ConflictError('The document was already deleted');
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.document.updateMany({
+        where: { id: documentId, purgedAt: null },
+        data: { purgedAt: now, purgedBy: principal.userId, purgeOrder: order },
+      });
+      if (changed.count === 0) throw new ConflictError('The document changed meanwhile');
+      await this.audit.record(tx, {
+        actor: { type: 'user', id: principal.keycloakSub },
+        action: 'document.purged',
+        target: { type: 'document', id: documentId },
+        before: { sha256: document.sha256, size: document.size, kind: document.kind },
+        after: { purgedAt: now.toISOString(), order },
+        requestId,
+      });
+    });
+    // After the commit: if this fails the row already says purged and nothing serves the bytes;
+    // the deletion can be retried by an operator from the audit trail.
+    await this.storage.delete(document.storageKey);
+    return { id: documentId, purgedAt: now.toISOString() };
   }
 }

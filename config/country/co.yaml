@@ -103,6 +103,10 @@ retention:
   # Who consulted whose data (ADR-0015), aligned with the audit trail.
   subjectAccessMonths: 60
 
+documents:
+  # Starting point for the exchange agreement attached to access requests (M2-07).
+  agreementTemplate: ./templates/co/acuerdo-intercambio.md
+
 branding:
   productName: Red de Intercambio de Datos
   # Placeholder mark; replace with the official logo provided by the operator.

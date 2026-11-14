@@ -13,11 +13,11 @@ import type { Principal } from '../auth/principal.service.js';
 import { UnsupportedMediaTypeError } from '../common/errors.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { PDF_MIME } from '../documents/documents.service.js';
+import { sendPdf } from '../documents/pdf-reply.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
 import { EntityRequestsService } from './entity-requests.service.js';
 
 const uuid = new ZodValidationPipe(z.uuid());
-export const DESIGNATION_DOCUMENT_PATH = 'entity-requests/:requestId/designation-document';
 
 /**
  * Onboarding requests, from the applicant's side (SPEC.md §4.1). Any signed-in user may file one
@@ -141,18 +141,7 @@ export class EntityRequestsController {
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const { document, bytes } = await this.requests.designationDocument(requestId, principal);
-    await reply
-      .status(200)
-      .header('content-type', PDF_MIME)
-      .header(
-        'content-disposition',
-        `attachment; filename="document.pdf"; filename*=UTF-8''${encodeURIComponent(document.fileName)}`,
-      )
-      .header('x-content-type-options', 'nosniff')
-      .header('content-security-policy', "default-src 'none'; sandbox")
-      .header('cache-control', 'no-store')
-      .header('digest', `sha-256=${Buffer.from(document.sha256, 'hex').toString('base64')}`)
-      .send(bytes);
+    await sendPdf(reply, document, bytes);
   }
 
   @Post(':requestId/submit')

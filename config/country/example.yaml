@@ -79,6 +79,10 @@ retention:
   # Consultations per data subject (transparency register, ADR-0015).
   subjectAccessMonths: 60
 
+documents:
+  # Model agreement users can download (optional; relative to this file).
+  agreementTemplate: ./templates/example/data-exchange-agreement.md
+
 branding:
   productName: Data Exchange Network
   logo: ./branding/example/logo.svg # Relative to this file.

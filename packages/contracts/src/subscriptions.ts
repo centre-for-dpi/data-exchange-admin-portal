@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { classificationSchema, operationSchema } from './apis.js';
 import { catalogPurposeSchema } from './catalog.js';
+import { documentSummarySchema } from './entities.js';
 import { pageOf } from './session.js';
 
 /** Subscription lifecycle (SPEC.md §4.4). */
@@ -141,6 +142,8 @@ export const subscriptionDetailSchema = subscriptionSummarySchema.extend({
   decisions: z.array(subscriptionDecisionSchema),
   /** The subscription this request renews, if it is a renewal. */
   renewsSubscriptionId: z.uuid().nullable(),
+  /** Exchange agreement (PDF) attached by the requester (M2-07). */
+  agreementDocument: documentSummarySchema.nullable(),
   /** The live renewal of this subscription, if one was requested. */
   renewal: z.object({ id: z.uuid(), status: subscriptionStatusSchema }).nullable(),
 });
@@ -216,3 +219,10 @@ export const suspendSubscriptionSchema = z.strictObject({ comment: reason('expla
 export const reactivateSubscriptionSchema = z.strictObject({
   comment: z.string().trim().max(2_000).optional(),
 });
+
+/** Deletion of a document's bytes by legal order (SPEC.md §5, M2-07). */
+export const purgeDocumentSchema = z.strictObject({
+  order: z.string().trim().min(5, 'reference the legal order').max(500),
+});
+export const documentIdParamsSchema = z.strictObject({ documentId: z.uuid() });
+export const purgedDocumentSchema = z.object({ id: z.uuid(), purgedAt: z.iso.datetime() });

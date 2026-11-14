@@ -103,6 +103,8 @@ export const PLATFORM_PERMISSIONS = {
   'regulator.read': ['regulator'],
   /** Approve, or send back / reject, what features.approval.regulatorForSensitive routes to it. */
   'regulator.decide': ['regulator'],
+  /** Delete a document's bytes by legal order, the only physical deletion (SPEC.md §5). */
+  'document.purge': ['platform_admin'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;

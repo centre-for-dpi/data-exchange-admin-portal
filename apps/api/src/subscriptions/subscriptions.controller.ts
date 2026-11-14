@@ -1,5 +1,6 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
 import {
+  documentFileNameQuerySchema,
   type ApproveSubscriptionInput,
   approveSubscriptionSchema,
   type CreateSubscriptionInput,
@@ -20,6 +21,7 @@ import {
   subscriptionPageSchema,
   subscriptionParamsSchema,
 } from '@rid/contracts';
+import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
   type AuthenticatedRequest,
@@ -30,6 +32,9 @@ import {
 } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { UnsupportedMediaTypeError } from '../common/errors.js';
+import { PDF_MIME } from '../documents/documents.service.js';
+import { sendPdf } from '../documents/pdf-reply.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 
@@ -139,6 +144,59 @@ export class SubscriptionsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.subscriptions.withdraw(entity.entityId, id, principal, body, request.id);
+  }
+
+  @Put(':subscriptionId/agreement')
+  @EntityAccess('subscription.write')
+  @ApiOperation({
+    operationId: 'putSubscriptionAgreement',
+    summary: 'Attach the exchange agreement (PDF) to a pending request',
+    description:
+      'The body is the PDF itself (`Content-Type: application/pdf`), up to RID_DOCUMENT_MAX_BYTES. ' +
+      'Only while the provider has not decided; replaces any previous agreement.',
+    tags: ['subscriptions'],
+    params: subscriptionParamsSchema,
+    query: documentFileNameQuerySchema,
+    binaryBody: PDF_MIME,
+    responses: { 200: { description: 'The request', schema: subscriptionDetailSchema } },
+    errors: [400, 401, 403, 404, 409, 413, 415],
+  })
+  attachAgreement(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Query(new ZodValidationPipe(documentFileNameQuerySchema)) query: { fileName: string },
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!Buffer.isBuffer(body))
+      throw new UnsupportedMediaTypeError('Send the PDF as application/pdf');
+    return this.subscriptions.attachAgreement(
+      entity.entityId,
+      id,
+      principal,
+      { fileName: query.fileName, bytes: body },
+      request.id,
+    );
+  }
+
+  @Get(':subscriptionId/agreement')
+  @EntityAccess('subscription.read')
+  @ApiOperation({
+    operationId: 'getSubscriptionAgreement',
+    summary: 'Download the exchange agreement of one of the entity’s requests',
+    tags: ['subscriptions'],
+    params: subscriptionParamsSchema,
+    responses: { 200: { description: 'The PDF', binary: PDF_MIME } },
+    errors: [401, 403, 404, 410],
+  })
+  async agreement(
+    @CurrentEntity() entity: EntityContext,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const { document, bytes } = await this.subscriptions.agreement(entity.entityId, id, 'consumer');
+    await sendPdf(reply, document, bytes);
   }
 }
 
@@ -320,5 +378,24 @@ export class AccessRequestsController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.subscriptions.reactivate(entity, id, principal, body, request.id);
+  }
+
+  @Get(':subscriptionId/agreement')
+  @EntityAccess('access_request.read')
+  @ApiOperation({
+    operationId: 'getAccessRequestAgreement',
+    summary: 'Download the exchange agreement of a request to one of the entity’s APIs',
+    tags: ['access-requests'],
+    params: subscriptionParamsSchema,
+    responses: { 200: { description: 'The PDF', binary: PDF_MIME } },
+    errors: [401, 403, 404, 410],
+  })
+  async agreement(
+    @CurrentEntity() entity: EntityContext,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const { document, bytes } = await this.subscriptions.agreement(entity.entityId, id, 'provider');
+    await sendPdf(reply, document, bytes);
   }
 }

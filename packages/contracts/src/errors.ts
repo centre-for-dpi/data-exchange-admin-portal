@@ -14,6 +14,8 @@ export const ErrorCode = {
   Forbidden: 'forbidden',
   NotFound: 'not_found',
   Conflict: 'conflict',
+  /** The resource existed and was removed for good (a document deleted by legal order). */
+  Gone: 'gone',
   InvalidTransition: 'invalid_transition',
   PayloadTooLarge: 'payload_too_large',
   UnsupportedMediaType: 'unsupported_media_type',
@@ -30,6 +32,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  gone: 410,
   invalid_transition: 409,
   payload_too_large: 413,
   unsupported_media_type: 415,

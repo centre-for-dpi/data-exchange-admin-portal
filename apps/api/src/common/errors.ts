@@ -63,3 +63,9 @@ export class PayloadTooLargeError extends DomainError {
     super(ErrorCode.PayloadTooLarge, message);
   }
 }
+
+export class GoneError extends DomainError {
+  constructor(message: string) {
+    super(ErrorCode.Gone, message);
+  }
+}

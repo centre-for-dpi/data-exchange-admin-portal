@@ -330,7 +330,14 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Renovación y suspensión.** Suspender o revocar una suscripción cierra sus renovaciones vivas en la misma transacción: las pendientes se rechazan (o se retiran si esperaban respuesta) y las ya concedidas se revocan. Además, una renovación solo se aprueba, por el proveedor o el regulador, si la suscripción que renueva sigue activa. Así una renovación no devuelve un acceso suspendido o revocado (revisión de seguridad).
     - **Pruebas.** 12 de integración, más la matriz de autorización generada. La e2e `subscription-lifecycle.spec.ts` cubre pregunta y respuesta, aprobación, suspensión, reactivación y renovación, con axe.
     - **Pendiente para M2-08.** Llevar los avisos al portal y a las preferencias del usuario.
-- [ ] **M2-07 — Documentos y acuerdos**: subir PDF del acuerdo (hash SHA-256, límite de tamaño), plantilla de acuerdo modelo descargable desde la config del país.
+- [x] **M2-07 — Documentos y acuerdos**: subir PDF del acuerdo (hash SHA-256, límite de tamaño), plantilla de acuerdo modelo descargable desde la config del país.
+  - _Notas de implementación:_
+    - **Acuerdo.** `PUT /entities/:e/subscriptions/:id/agreement` recibe el PDF, mientras el proveedor no haya decidido. Usa el mismo `StorageService` y las mismas reglas que el documento de designación: SHA-256, firma `%PDF-`, 10 MiB y token antes de leer el cuerpo. El documento pertenece a la entidad consumidora.
+    - **Descarga.** Es para la consumidora y para la proveedora, y por esta última también el operador y el regulador. Va siempre como adjunto, con `Digest`, sin caché y con CSP `sandbox`.
+    - **Plantilla.** `documents.agreementTemplate` de la config del país (ruta relativa al YAML, validada al cargar). Para Colombia hay un acuerdo modelo en Markdown editable. La web la sirve en `/files/agreement-template`.
+    - **Eliminación por orden judicial** (SPEC §5). `POST /documents/:id/purge {order}`, solo `platform_admin`. Borra los bytes y deja la fila, su SHA-256, la orden y el evento `document.purged`; las descargas responden 410 (código `gone`).
+    - **Pruebas.** 3 de integración y 1 de configuración. La e2e `agreements.spec.ts` cubre adjuntar, descargar desde ambos lados y la plantilla, con axe.
+    - **Pendiente.** La pantalla del operador para la eliminación por orden judicial; por ahora solo existe el API.
 - [ ] **M2-08 — Notificaciones**: en el portal y por correo (Mailpit en dev) para los eventos de `SPEC.md §7`; preferencias por usuario.
 - [ ] **M2-09 — Auditoría completa**: todos los eventos del dominio, filtros, exportación CSV/JSON con hash del archivo, anclaje diario, permisos sin `UPDATE`/`DELETE` en la tabla verificados por test.
 - [ ] **M2-10 — Catálogo de finalidades**: administración por el operador; las APIs eligen finalidades permitidas del catálogo.

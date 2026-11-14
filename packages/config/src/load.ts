@@ -111,6 +111,15 @@ export function parseCountryConfigFile(file: string): CountryConfig {
   if (!existsSync(logo)) {
     issues.push(`branding.logo: file not found (${logo})`);
   }
+  const template = config.documents.agreementTemplate;
+  const agreementTemplate = template
+    ? isAbsolute(template)
+      ? template
+      : resolve(dirname(file), template)
+    : undefined;
+  if (agreementTemplate && !existsSync(agreementTemplate)) {
+    issues.push(`documents.agreementTemplate: file not found (${agreementTemplate})`);
+  }
   if (config.lifecycle.certificateExpiryWarningDays >= config.lifecycle.certificateValidityDays) {
     issues.push(
       'lifecycle.certificateExpiryWarningDays: must be lower than certificateValidityDays',
@@ -120,7 +129,11 @@ export function parseCountryConfigFile(file: string): CountryConfig {
     throw new CountryConfigError(`Invalid country configuration ${file}`, file, issues);
   }
 
-  return { ...config, branding: { ...config.branding, logo } };
+  return {
+    ...config,
+    branding: { ...config.branding, logo },
+    documents: { ...config.documents, ...(agreementTemplate ? { agreementTemplate } : {}) },
+  };
 }
 
 export interface LoadOptions {

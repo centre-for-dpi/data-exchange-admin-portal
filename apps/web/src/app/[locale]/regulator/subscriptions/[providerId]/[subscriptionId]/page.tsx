@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { RegulatorDecisionForms } from '../../../../../../components/regulator/decision-forms';
+import { AgreementSection } from '../../../../../../components/subscriptions/agreement-section';
 import { SubscriptionFacts } from '../../../../../../components/subscriptions/subscription-view';
 import { EmptyState, Page, PageHeader, Section } from '../../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../../lib/api';
@@ -44,6 +45,12 @@ export default async function RegulatorSubscriptionPage({ params }: PageProps) {
         title={t('subscriptions.detailTitle', { api: detail.api.name })}
       />
       <SubscriptionFacts detail={detail} side="provider" />
+      <AgreementSection
+        detail={detail}
+        entityId={providerId}
+        collection="access-requests"
+        canUpload={false}
+      />
       <Section title={t('regulator.decision.title')}>
         {detail.status === 'pending_regulator' ? (
           <div className="card p-6 md:p-8">

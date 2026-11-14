@@ -223,6 +223,13 @@ model Document {
   createdBy     String       @map("created_by")
 
   designationOf Entity? @relation("EntityDesignation")
+  agreementOf   Subscription[] @relation("SubscriptionAgreement")
+
+  /// Bytes deleted by legal order (SPEC.md §5): the row and its hash stay as evidence.
+  purgedAt      DateTime?    @map("purged_at") @db.Timestamptz(3)
+  purgedBy      String?      @map("purged_by") @db.Uuid
+  /// Reference to the legal order (court, authority, file number).
+  purgeOrder    String?      @map("purge_order")
 
   @@index([ownerEntityId])
   @@map("document")
@@ -649,8 +656,9 @@ model Subscription {
   purposeDetail                 String             @map("purpose_detail")
   legalBasisText                String             @map("legal_basis_text")
   legalReference                String?            @map("legal_reference")
-  /// Agreement document (the Document model arrives in M2-07).
+  /// Exchange agreement (PDF) the requester attached (SPEC.md §4.4 step 1, M2-07).
   agreementDocumentId           String?            @map("agreement_document_id") @db.Uuid
+  agreementDocument             Document?          @relation("SubscriptionAgreement", fields: [agreementDocumentId], references: [id])
   /// operationIds requested; empty = every read-only operation (SPEC.md §3).
   requestedOperations           String[]           @map("requested_operations")
   /// operationIds granted by the data steward (may be fewer than requested).

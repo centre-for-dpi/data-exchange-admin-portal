@@ -307,7 +307,7 @@ describe('citizen API: who consulted my data (MT-05)', () => {
         jwks: (await call('GET', '/transparency/jwks')).json(),
         tsaRoots: await app.get(TsaClient).certificates(),
       });
-      expect(result).toMatchObject({ valid: true });
+      expect(result, JSON.stringify(result)).toMatchObject({ valid: true });
       expect(
         subjectAccessPageSchema.parse(
           (await asCitizen('/data-subjects/me/accesses?limit=1', token)).json(),

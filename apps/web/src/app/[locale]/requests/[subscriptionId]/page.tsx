@@ -7,6 +7,7 @@ import {
   RequestDecisionForms,
   RevokeForm,
 } from '../../../../components/subscriptions/subscription-forms';
+import { AgreementSection } from '../../../../components/subscriptions/agreement-section';
 import { SubscriptionFacts } from '../../../../components/subscriptions/subscription-view';
 import { AutoRefresh } from '../../../../components/auto-refresh';
 import { AuditTimeline } from '../../../../components/audit/audit-views';
@@ -72,6 +73,12 @@ export default async function AccessRequestPage({ params }: PageProps) {
         <SubscriptionFacts detail={detail} side="provider" />
         <AuditTimeline items={timeline} />
       </div>
+      <AgreementSection
+        detail={detail}
+        entityId={entity.entity.id}
+        collection="access-requests"
+        canUpload={false}
+      />
       {canDecide ? (
         <div className="space-y-4">
           {detail.requiresRegulator ? <Notice tone="warning">{t('regulatorNote')}</Notice> : null}

@@ -19,11 +19,16 @@ const coFile = join(repoConfigDir, 'co.yaml');
 type Json = Record<string, unknown>;
 const coRaw = (): Json => parse(readFileSync(coFile, 'utf8')) as Json;
 
-/** Writes a config object as <code>.yaml in a fresh temp dir (with the logo it references). */
+/** Writes a config object as <code>.yaml in a fresh temp dir (with the files it references). */
 function writeConfig(config: Json | string, code = 'co'): string {
   const dir = mkdtempSync(join(tmpdir(), 'rid-config-'));
   mkdirSync(join(dir, 'branding', 'co'), { recursive: true });
   copyFileSync(join(repoConfigDir, 'branding/co/logo.svg'), join(dir, 'branding/co/logo.svg'));
+  mkdirSync(join(dir, 'templates', 'co'), { recursive: true });
+  copyFileSync(
+    join(repoConfigDir, 'templates/co/acuerdo-intercambio.md'),
+    join(dir, 'templates/co/acuerdo-intercambio.md'),
+  );
   const file = join(dir, `${code}.yaml`);
   writeFileSync(file, typeof config === 'string' ? config : stringify(config));
   return file;
@@ -129,6 +134,19 @@ describe('validation', () => {
       set('branding.logo', './branding/co/missing.svg'),
       /branding\.logo: file not found/,
     );
+  });
+
+  it('resolves the agreement template next to the file and rejects a missing one (M2-07)', () => {
+    const config = parseCountryConfigFile(coFile);
+    expect(config.documents.agreementTemplate).toBe(
+      join(repoConfigDir, 'templates/co/acuerdo-intercambio.md'),
+    );
+    expectInvalid(
+      set('documents.agreementTemplate', './templates/co/missing.md'),
+      /documents\.agreementTemplate: file not found/,
+    );
+    const without = parseCountryConfigFile(writeConfig(set('documents', undefined)));
+    expect(without.documents.agreementTemplate).toBeUndefined();
   });
 
   it('rejects out-of-range validity periods', () => {

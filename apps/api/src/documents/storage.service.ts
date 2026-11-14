@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { Injectable } from '@nestjs/common';
 
@@ -26,6 +26,11 @@ export class StorageService {
 
   get(key: string): Promise<Buffer> {
     return readFile(this.path(key));
+  }
+
+  /** Deletes the bytes for good (legal order); a missing file is not an error. */
+  async delete(key: string): Promise<void> {
+    await rm(this.path(key), { force: true });
   }
 
   private path(key: string): string {

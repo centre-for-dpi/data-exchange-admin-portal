@@ -10,6 +10,7 @@ import {
   revokeSubscriptionAction,
   type SubscriptionStep,
   subscriptionStepAction,
+  uploadAgreementAction,
 } from '../../lib/subscription-actions';
 import { ErrorSummary, Field, checkClass, errorTextClass, inputClass } from '../form/field';
 import { Button } from '../ui/button';
@@ -384,6 +385,38 @@ export function LifecycleForm({
       ) : null}
       <Button type="submit" variant={variant} disabled={pending}>
         {label}
+      </Button>
+    </form>
+  );
+}
+
+/** The requester attaches the exchange agreement (PDF) to a pending request (M2-07). */
+export function AgreementUploadForm({
+  subscriptionId,
+  hasAgreement,
+}: {
+  subscriptionId: string;
+  hasAgreement: boolean;
+}) {
+  const t = useTranslations('subscriptions.agreement');
+  const [state, action, pending] = useActionState(
+    uploadAgreementAction.bind(null, subscriptionId),
+    initialFormState,
+  );
+  return (
+    <form action={action} className="space-y-4" noValidate>
+      <ErrorSummary state={state} />
+      <Field
+        name="document"
+        label={hasAgreement ? t('replace') : t('label')}
+        hint={t('hint')}
+        required
+        state={state}
+      >
+        {(p) => <input {...p} type="file" accept="application/pdf,.pdf" className={inputClass} />}
+      </Field>
+      <Button type="submit" variant="outline" disabled={pending}>
+        {t('upload')}
       </Button>
     </form>
   );

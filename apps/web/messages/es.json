@@ -435,6 +435,22 @@
       "seeRenewal": "Ver la renovación",
       "isRenewal": "Esta solicitud renueva una suscripción vigente.",
       "seeRenewed": "Ver la suscripción que renueva"
+    },
+    "agreement": {
+      "title": "Acuerdo de intercambio",
+      "lead": "El acuerdo firmado entre las entidades, o la referencia al convenio vigente en la base legal.",
+      "none": "No se ha adjuntado un acuerdo.",
+      "file": "Archivo",
+      "sha256": "Huella SHA-256",
+      "template": "Descargar el acuerdo modelo",
+      "label": "Acuerdo de intercambio (PDF)",
+      "replace": "Reemplazar el acuerdo (PDF)",
+      "hint": "Solo PDF, hasta 10 MB. Puedes cambiarlo mientras el proveedor no haya decidido.",
+      "upload": "Adjuntar acuerdo",
+      "required": "Elige un archivo PDF.",
+      "tooLarge": "El archivo supera los 10 MB.",
+      "notPdf": "El archivo no es un PDF.",
+      "beforeRequest": "Después de enviar la solicitud podrás adjuntar el acuerdo de intercambio firmado."
     }
   },
   "audit": {
@@ -514,7 +530,8 @@
         "renewal_requested": "Renovación solicitada",
         "renewal_notice_queued": "Aviso de renovación enviado",
         "approved_regulator": "Aprobada por el regulador",
-        "rejected_regulator": "Rechazada por el regulador"
+        "rejected_regulator": "Rechazada por el regulador",
+        "agreement_attached": "Acuerdo de intercambio adjuntado"
       }
     }
   },

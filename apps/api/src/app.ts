@@ -5,7 +5,7 @@ import { AppModule } from './app.module.js';
 import { PROBLEM_CONTENT_TYPE, toProblem } from './common/problem.js';
 import { instancePath, ProblemDetailsFilter } from './common/problem.filter.js';
 import { documentMaxBytes, PDF_MIME } from './documents/documents.service.js';
-import { DESIGNATION_DOCUMENT_PATH } from './entities/entity-requests.controller.js';
+import { PDF_UPLOAD_PATHS } from './documents/pdf-reply.js';
 import { registerApiDocs } from './openapi/docs.js';
 import {
   ingestTokenMatches,
@@ -32,9 +32,10 @@ export function createAdapter(): FastifyAdapter {
   // Its larger body limit applies only once the token is checked: onRequest runs before the body
   // is read, so an unauthenticated caller gets 401 without the API buffering anything.
   adapter.getInstance().addHook('onRoute', (route) => {
-    // Upload of a designation document: a larger limit, but only for callers that present a
-    // token; the guard verifies it after the body is read.
-    if (route.url === `/${API_PREFIX}/${DESIGNATION_DOCUMENT_PATH}` && route.method === 'PUT') {
+    // Document uploads (PDF): a larger limit, but only for callers that present a token; the
+    // guard verifies it after the body is read.
+    const upload = PDF_UPLOAD_PATHS.some((path) => route.url === `/${API_PREFIX}/${path}`);
+    if (upload && route.method === 'PUT') {
       route.bodyLimit = documentMaxBytes();
       const existing = route.onRequest ? [route.onRequest].flat() : [];
       route.onRequest = [

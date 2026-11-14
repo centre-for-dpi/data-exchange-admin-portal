@@ -89,7 +89,15 @@ export default async function RequestAccessPage({ params, searchParams }: PagePr
           {t('form.noApplications')}
         </EmptyState>
       ) : (
-        <div className="card max-w-3xl p-6 md:p-8">
+        <div className="card max-w-3xl space-y-5 p-6 md:p-8">
+          {getCountryConfig().documents.agreementTemplate ? (
+            <p className="text-sm text-muted-foreground">
+              {t('agreement.beforeRequest')}{' '}
+              <a href="/files/agreement-template" className="link" download>
+                {t('agreement.template')}
+              </a>
+            </p>
+          ) : null}
           <RequestAccessForm
             apiVersionId={version.id}
             applications={active.map((a) => ({ id: a.id, name: a.name }))}

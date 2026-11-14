@@ -18,6 +18,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { CatalogController } from './catalog/catalog.controller.js';
 import { CatalogService } from './catalog/catalog.service.js';
 import { CoreModule } from './core.module.js';
+import { DocumentsController } from './documents/documents.controller.js';
 import { DocumentsService } from './documents/documents.service.js';
 import { StorageService } from './documents/storage.service.js';
 import { EntitiesController } from './entities/entities.controller.js';
@@ -62,6 +63,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     EntitiesController,
     EntityMembersController,
     EntityRequestsController,
+    DocumentsController,
     EntityReviewsController,
     PurposesController,
     ApisController,

@@ -141,6 +141,13 @@ export const countryConfigSchema = z.strictObject({
       subjectAccessMonths: z.number().int().min(1).default(60),
     })
     .default({ auditYears: 5, accessLogMonths: 12, subjectAccessMonths: 60 }),
+  /** Documents offered to users (SPEC.md §4.4, M2-07). Paths are relative to the YAML file. */
+  documents: z
+    .strictObject({
+      /** Model data exchange agreement that consumers and providers can start from. */
+      agreementTemplate: nonEmpty.optional(),
+    })
+    .default({}),
   branding: z.strictObject({
     productName: nonEmpty,
     /** Path relative to the country YAML file. */
