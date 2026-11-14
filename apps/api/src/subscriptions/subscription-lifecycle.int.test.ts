@@ -329,6 +329,53 @@ describe('subscription lifecycle (M2-06)', () => {
       expect(await actions(renewal.id)).toContain('subscription.renewal_requested');
     });
 
+    const renew = async (id: string, applicationId: string) => {
+      const res = await call(
+        'POST',
+        `/entities/${programas}/subscriptions`,
+        'carlos.dev',
+        body(applicationId, { renewsSubscriptionId: id }),
+      );
+      expect(res.statusCode, res.body).toBe(201);
+      return subscriptionDetailSchema.parse(res.json()).id;
+    };
+
+    it('suspending the subscription closes its pending renewal', async () => {
+      const { id, applicationId } = await active();
+      const renewal = await renew(id, applicationId);
+      const res = await call('POST', provider(id, '/suspend'), 'marta.regulador', {
+        comment: 'Investigación en curso.',
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await statusOf(renewal)).toBe('rejected');
+      const closed = await prisma.auditEvent.findFirstOrThrow({
+        where: { targetId: renewal, action: 'subscription.rejected' },
+      });
+      expect(closed.after).toMatchObject({ reason: 'renewed_subscription_suspended' });
+    });
+
+    it('revoking the subscription revokes an already granted renewal', async () => {
+      const { id, applicationId } = await active();
+      const renewal = await renew(id, applicationId);
+      expect(
+        (await call('POST', provider(renewal, '/approve'), 'lucia.datos', {})).statusCode,
+      ).toBe(200);
+      const res = await call('POST', provider(id, '/revoke'), 'pablo.plataforma', {
+        comment: 'Incumplimiento del acuerdo.',
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await statusOf(renewal)).toBe('revoked');
+    });
+
+    it('a renewal cannot be approved while the subscription it renews is not active', async () => {
+      const { id, applicationId } = await active();
+      const renewal = await renew(id, applicationId);
+      await prisma.subscription.update({ where: { id }, data: { status: 'suspended' } });
+      const res = await call('POST', provider(renewal, '/approve'), 'lucia.datos', {});
+      expect(res.statusCode).toBe(409);
+      expect(await statusOf(renewal)).toBe('pending_provider');
+    });
+
     it('keeps the application, version and purpose, and only renews active subscriptions', async () => {
       const { id, applicationId } = await active();
       const other = await call(

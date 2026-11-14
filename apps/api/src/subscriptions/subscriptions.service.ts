@@ -455,6 +455,7 @@ export class SubscriptionsService {
   ): Promise<SubscriptionDetail> {
     const data = approveSubscriptionSchema.parse(input);
     const before = await this.loadForProvider(entityId, subscriptionId);
+    await this.assertRenewedStillActive(before);
     const { api } = before.apiVersion;
     const next: SubscriptionStatus = requiresRegulator(
       api.classification,
@@ -607,6 +608,7 @@ export class SubscriptionsService {
         after: { status: 'revoked', comment },
         requestId,
       });
+      await this.closeRenewals(tx, subscriptionId, principal, acting, 'revoked', requestId);
       await this.outbox.enqueue(tx, {
         topic: POLICY_SYNC_TOPIC,
         aggregate: `subscription:${subscriptionId}`,
@@ -614,6 +616,79 @@ export class SubscriptionsService {
       });
     });
     return this.getForProvider(entityId, subscriptionId);
+  }
+
+  /**
+   * A renewal may only be granted while the subscription it renews is active: a suspended or
+   * revoked subscription must not come back through its renewal.
+   */
+  async assertRenewedStillActive(s: { renewsSubscriptionId: string | null }): Promise<void> {
+    if (!s.renewsSubscriptionId) return;
+    const original = await this.prisma.subscription.findUnique({
+      where: { id: s.renewsSubscriptionId },
+      select: { status: true },
+    });
+    if (original?.status !== 'active') {
+      throw new ConflictError('The subscription this request renews is not active');
+    }
+  }
+
+  /**
+   * Closes every live renewal of a subscription that is being suspended or revoked, in the same
+   * transaction: pending ones are rejected (withdrawn while waiting for an answer), granted ones
+   * revoked. Otherwise a renewal would bring the access back.
+   */
+  async closeRenewals(
+    tx: Tx,
+    originalId: string,
+    principal: Principal,
+    acting: ActingAs,
+    why: 'suspended' | 'revoked',
+    requestId?: string,
+  ): Promise<void> {
+    const renewals = await tx.subscription.findMany({
+      where: { renewsSubscriptionId: originalId, status: { in: [...LIVE_STATUSES] } },
+      select: { id: true, status: true },
+    });
+    for (const r of renewals) {
+      const to: SubscriptionStatus =
+        r.status === 'info_requested'
+          ? 'withdrawn'
+          : r.status === 'pending_provider' || r.status === 'pending_regulator'
+            ? 'rejected'
+            : 'revoked';
+      assertTransition(r.status, to);
+      const changed = await tx.subscription.updateMany({
+        where: { id: r.id, status: r.status },
+        data: { status: to },
+      });
+      if (changed.count === 0) continue;
+      const comment = `The subscription it renews was ${why}`;
+      await tx.subscriptionDecision.create({
+        data: {
+          subscriptionId: r.id,
+          decision: to,
+          decidedBy: principal.userId,
+          decidedByEntityId: acting.via === 'membership' ? acting.entityId : null,
+          comment,
+        },
+      });
+      await this.audit.record(tx, {
+        actor: { type: 'user', id: principal.keycloakSub, entityId: acting.entityId },
+        action: `subscription.${to}`,
+        target: { type: 'subscription', id: r.id },
+        before: { status: r.status },
+        after: { status: to, reason: `renewed_subscription_${why}`, renews: originalId },
+        requestId,
+      });
+      if (to === 'revoked') {
+        await this.outbox.enqueue(tx, {
+          topic: POLICY_SYNC_TOPIC,
+          aggregate: `subscription:${r.id}`,
+          payload: { reason: 'revoked' },
+        });
+      }
+    }
   }
 
   // -------------------------------------------------------------------------------------------
@@ -774,6 +849,7 @@ export class SubscriptionsService {
         requestId,
         actorEntityId: acting.entityId,
       });
+      await this.closeRenewals(tx, subscriptionId, principal, acting, 'suspended', requestId);
       await this.outbox.enqueue(tx, {
         topic: POLICY_SYNC_TOPIC,
         aggregate: `subscription:${subscriptionId}`,

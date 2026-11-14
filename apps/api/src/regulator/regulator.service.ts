@@ -277,6 +277,7 @@ export class RegulatorService {
     }
     assertSubscriptionTransition(before.status, 'approved');
     RegulatorService.assertImpartialOnSubscription(principal, before);
+    await this.subscriptions.assertRenewedStillActive(before);
 
     // Validity counts from the final decision: keep the length the data steward granted.
     const now = new Date();
