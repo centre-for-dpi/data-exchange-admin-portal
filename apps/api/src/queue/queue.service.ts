@@ -10,6 +10,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export const PGBOSS_SCHEMA = 'pgboss';
 const RELAY_INTERVAL_MS = 1_000;
 const RELAY_BATCH = 100;
+/** Time a relay batch may take (Prisma's interactive transactions default to 5 s). */
+const RELAY_TX_TIMEOUT_MS = 60_000;
 
 /**
  * Queues that are not reconcilers. Reconciliation queues coalesce by aggregate (`stately`);
@@ -155,39 +157,44 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
     if (this.relaying || !this.boss) return 0;
     this.relaying = true;
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const pending = await tx.$queryRaw<PendingMessage[]>`
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const pending = await tx.$queryRaw<PendingMessage[]>`
           SELECT id, topic, aggregate, payload
           FROM outbox
           WHERE published_at IS NULL
           ORDER BY created_at
           LIMIT ${limit}
           FOR UPDATE SKIP LOCKED`;
-        for (const message of pending) {
-          try {
-            await this.ensureQueue(message.topic);
-            // null means a job for this aggregate is already queued: it will see the latest state.
-            await this.instance.send(
-              message.topic,
-              { ...message.payload, aggregate: message.aggregate, outboxId: message.id },
-              { singletonKey: message.aggregate },
-            );
-            await tx.outboxMessage.update({
-              where: { id: message.id },
-              data: { publishedAt: new Date(), attempts: { increment: 1 }, lastError: null },
-            });
-          } catch (error) {
-            await tx.outboxMessage.update({
-              where: { id: message.id },
-              data: {
-                attempts: { increment: 1 },
-                lastError: error instanceof Error ? error.message.slice(0, 1000) : String(error),
-              },
-            });
+          for (const message of pending) {
+            try {
+              await this.ensureQueue(message.topic);
+              // null means a job for this aggregate is already queued: it will see the latest state.
+              await this.instance.send(
+                message.topic,
+                { ...message.payload, aggregate: message.aggregate, outboxId: message.id },
+                { singletonKey: message.aggregate },
+              );
+              await tx.outboxMessage.update({
+                where: { id: message.id },
+                data: { publishedAt: new Date(), attempts: { increment: 1 }, lastError: null },
+              });
+            } catch (error) {
+              await tx.outboxMessage.update({
+                where: { id: message.id },
+                data: {
+                  attempts: { increment: 1 },
+                  lastError: error instanceof Error ? error.message.slice(0, 1000) : String(error),
+                },
+              });
+            }
           }
-        }
-        return pending.length;
-      });
+          return pending.length;
+          // Each message is a pg-boss send: a full batch on a loaded database can take more than
+          // Prisma's default 5 s, and an expired transaction would relay nothing, ever again.
+        },
+        { timeout: RELAY_TX_TIMEOUT_MS, maxWait: RELAY_TX_TIMEOUT_MS },
+      );
     } catch (error) {
       this.logger.error(error);
       return 0;
