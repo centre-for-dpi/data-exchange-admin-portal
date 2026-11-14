@@ -455,7 +455,6 @@ export class SubscriptionsService {
   ): Promise<SubscriptionDetail> {
     const data = approveSubscriptionSchema.parse(input);
     const before = await this.loadForProvider(entityId, subscriptionId);
-    await this.assertRenewedStillActive(before);
     const { api } = before.apiVersion;
     const next: SubscriptionStatus = requiresRegulator(
       api.classification,
@@ -500,6 +499,7 @@ export class SubscriptionsService {
       rateLimitPerMinute: rateLimit,
     };
     await this.prisma.$transaction(async (tx) => {
+      await this.lockRenewedStillActive(tx, before);
       await this.move(tx, before, next, principal, changes);
       await tx.subscriptionDecision.create({
         data: {
@@ -620,23 +620,27 @@ export class SubscriptionsService {
 
   /**
    * A renewal may only be granted while the subscription it renews is active: a suspended or
-   * revoked subscription must not come back through its renewal.
+   * revoked subscription must not come back through its renewal. Runs inside the granting
+   * transaction and locks the original row, the same row suspension and revocation update, so
+   * the two serialize: whichever commits second sees the other's result.
    */
-  async assertRenewedStillActive(s: { renewsSubscriptionId: string | null }): Promise<void> {
+  async lockRenewedStillActive(tx: Tx, s: { renewsSubscriptionId: string | null }): Promise<void> {
     if (!s.renewsSubscriptionId) return;
-    const original = await this.prisma.subscription.findUnique({
-      where: { id: s.renewsSubscriptionId },
-      select: { status: true },
-    });
+    const [original] = await tx.$queryRaw<Array<{ status: string }>>`
+      SELECT status::text AS status FROM subscription
+      WHERE id = ${s.renewsSubscriptionId}::uuid
+      FOR UPDATE`;
     if (original?.status !== 'active') {
       throw new ConflictError('The subscription this request renews is not active');
     }
   }
 
   /**
-   * Closes every live renewal of a subscription that is being suspended or revoked, in the same
-   * transaction: pending ones are rejected (withdrawn while waiting for an answer), granted ones
-   * revoked. Otherwise a renewal would bring the access back.
+   * Closes every live renewal of a subscription being suspended or revoked, in the same
+   * transaction and down the whole chain (a renewal of a renewal too): pending ones are rejected
+   * (withdrawn while waiting for an answer), granted ones revoked. The caller has already
+   * updated, and so locked, the original row. A renewal that changes meanwhile is re-read and
+   * closed from its new status.
    */
   async closeRenewals(
     tx: Tx,
@@ -645,49 +649,61 @@ export class SubscriptionsService {
     acting: ActingAs,
     why: 'suspended' | 'revoked',
     requestId?: string,
+    seen = new Set<string>(),
   ): Promise<void> {
+    if (seen.has(originalId)) return;
+    seen.add(originalId);
     const renewals = await tx.subscription.findMany({
-      where: { renewsSubscriptionId: originalId, status: { in: [...LIVE_STATUSES] } },
-      select: { id: true, status: true },
+      where: { renewsSubscriptionId: originalId },
+      select: { id: true },
     });
-    for (const r of renewals) {
-      const to: SubscriptionStatus =
-        r.status === 'info_requested'
-          ? 'withdrawn'
-          : r.status === 'pending_provider' || r.status === 'pending_regulator'
-            ? 'rejected'
-            : 'revoked';
-      assertTransition(r.status, to);
-      const changed = await tx.subscription.updateMany({
-        where: { id: r.id, status: r.status },
-        data: { status: to },
-      });
-      if (changed.count === 0) continue;
-      const comment = `The subscription it renews was ${why}`;
-      await tx.subscriptionDecision.create({
-        data: {
-          subscriptionId: r.id,
-          decision: to,
-          decidedBy: principal.userId,
-          decidedByEntityId: acting.via === 'membership' ? acting.entityId : null,
-          comment,
-        },
-      });
-      await this.audit.record(tx, {
-        actor: { type: 'user', id: principal.keycloakSub, entityId: acting.entityId },
-        action: `subscription.${to}`,
-        target: { type: 'subscription', id: r.id },
-        before: { status: r.status },
-        after: { status: to, reason: `renewed_subscription_${why}`, renews: originalId },
-        requestId,
-      });
-      if (to === 'revoked') {
-        await this.outbox.enqueue(tx, {
-          topic: POLICY_SYNC_TOPIC,
-          aggregate: `subscription:${r.id}`,
-          payload: { reason: 'revoked' },
+    for (const { id } of renewals) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const current = await tx.subscription.findUnique({
+          where: { id },
+          select: { status: true },
         });
+        if (!current || !LIVE_STATUSES.includes(current.status)) break;
+        const to: SubscriptionStatus =
+          current.status === 'info_requested'
+            ? 'withdrawn'
+            : current.status === 'pending_provider' || current.status === 'pending_regulator'
+              ? 'rejected'
+              : 'revoked';
+        assertTransition(current.status, to);
+        const changed = await tx.subscription.updateMany({
+          where: { id, status: current.status },
+          data: { status: to },
+        });
+        if (changed.count === 0) continue;
+        await tx.subscriptionDecision.create({
+          data: {
+            subscriptionId: id,
+            decision: to,
+            decidedBy: principal.userId,
+            decidedByEntityId: acting.via === 'membership' ? acting.entityId : null,
+            comment: `The subscription it renews was ${why}`,
+          },
+        });
+        await this.audit.record(tx, {
+          actor: { type: 'user', id: principal.keycloakSub, entityId: acting.entityId },
+          action: `subscription.${to}`,
+          target: { type: 'subscription', id },
+          before: { status: current.status },
+          after: { status: to, reason: `renewed_subscription_${why}`, renews: originalId },
+          requestId,
+        });
+        if (to === 'revoked') {
+          await this.outbox.enqueue(tx, {
+            topic: POLICY_SYNC_TOPIC,
+            aggregate: `subscription:${id}`,
+            payload: { reason: 'revoked' },
+          });
+        }
+        break;
       }
+      // Renewals of this renewal go too, whatever its own status.
+      await this.closeRenewals(tx, id, principal, acting, why, requestId, seen);
     }
   }
 

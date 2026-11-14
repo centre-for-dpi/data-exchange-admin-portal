@@ -277,7 +277,6 @@ export class RegulatorService {
     }
     assertSubscriptionTransition(before.status, 'approved');
     RegulatorService.assertImpartialOnSubscription(principal, before);
-    await this.subscriptions.assertRenewedStillActive(before);
 
     // Validity counts from the final decision: keep the length the data steward granted.
     const now = new Date();
@@ -285,6 +284,7 @@ export class RegulatorService {
       now.getTime() + (before.validUntil.getTime() - before.validFrom.getTime()),
     );
     await this.prisma.$transaction(async (tx) => {
+      await this.subscriptions.lockRenewedStillActive(tx, before);
       const changed = await tx.subscription.updateMany({
         where: { id: subscriptionId, status: 'pending_regulator' },
         data: { status: 'approved', validFrom: now, validUntil },

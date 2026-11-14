@@ -367,6 +367,22 @@ describe('subscription lifecycle (M2-06)', () => {
       expect(await statusOf(renewal)).toBe('revoked');
     });
 
+    it('closes the whole chain: a renewal of a renewal goes too', async () => {
+      const { id, applicationId } = await active();
+      const first = await renew(id, applicationId);
+      expect((await call('POST', provider(first, '/approve'), 'lucia.datos', {})).statusCode).toBe(
+        200,
+      );
+      await prisma.subscription.update({ where: { id: first }, data: { status: 'active' } });
+      const second = await renew(first, applicationId);
+      const res = await call('POST', provider(id, '/suspend'), 'marta.regulador', {
+        comment: 'Investigación en curso.',
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await statusOf(first)).toBe('revoked');
+      expect(await statusOf(second)).toBe('rejected');
+    });
+
     it('a renewal cannot be approved while the subscription it renews is not active', async () => {
       const { id, applicationId } = await active();
       const renewal = await renew(id, applicationId);
