@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 import { EntityStatusActions } from '../../../../components/entity-admin/forms';
 import { StatusBadge } from '../../../../components/ui/badge';
 import { EmptyState, Page, PageHeader } from '../../../../components/ui/page';
+import { Button } from '../../../../components/ui/button';
+import { Link } from '../../../../i18n/navigation';
 import { apiGet } from '../../../../lib/api';
 import { getViewer } from '../../../../lib/viewer';
 
@@ -32,7 +34,17 @@ export default async function EntitiesAdminPage({ params }: PageProps) {
 
   return (
     <Page>
-      <PageHeader title={t('entityAdmin.title')} description={t('entityAdmin.lead')} />
+      <PageHeader
+        title={t('entityAdmin.title')}
+        description={t('entityAdmin.lead')}
+        actions={
+          canDecide ? (
+            <Button asChild>
+              <Link href="/operator/entities/new">{t('entityAdmin.create.title')}</Link>
+            </Button>
+          ) : null
+        }
+      />
       {entities.items.length === 0 ? (
         <EmptyState>{t('entityAdmin.empty')}</EmptyState>
       ) : (

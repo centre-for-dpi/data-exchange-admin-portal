@@ -920,7 +920,17 @@
     "offboard": "Dar de baja",
     "suspendFor": "Suspender {name}",
     "reactivateFor": "Reactivar {name}",
-    "offboardFor": "Dar de baja {name}"
+    "offboardFor": "Dar de baja {name}",
+    "create": {
+      "title": "Registrar entidad",
+      "lead": "Alta directa, sin solicitud: la entidad queda activa de inmediato y su administrador y responsables reciben una invitación por correo. Úsala cuando un acto o una decisión ya incorporó a la entidad a la red.",
+      "admin": "Administrador de la entidad",
+      "adminHint": "Recibe una invitación con el rol de administrador. Debe ser una persona de la entidad, no del operador.",
+      "basisTitle": "Fundamento",
+      "basis": "Acto o decisión que fundamenta el alta",
+      "basisHint": "Por ejemplo, el decreto, la resolución o el acta que incorporó a la entidad. Queda en la bitácora.",
+      "submit": "Registrar entidad"
+    }
   },
   "documentsAdmin": {
     "title": "Documentos adjuntos",

@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { getCountryConfig } from '@rid/config';
 import {
+  type createEntitySchema,
   DESIGNEE_ENTITY_ROLES,
   DESIGNEE_ROLES,
+  type DesigneeRole,
   type EntityRequest,
   type EntityRequestList,
   type EntityRole,
@@ -22,6 +24,7 @@ import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { InvitationsService } from './invitations.service.js';
 
 type RequestInput = z.output<typeof entityRequestInputSchema>;
+type CreateInput = z.output<typeof createEntitySchema>;
 
 /** Open requests one person may have at a time (ADR-0018: accounts are self-registered). */
 export const MAX_OPEN_REQUESTS = 3;
@@ -552,12 +555,7 @@ export class EntityRequestsService {
     const applicant = await tx.user.findUniqueOrThrow({ where: { id: applicantId } });
     const applicantEmail = applicant.email.toLowerCase();
 
-    const byEmail = new Map<string, { fullName: string; roles: Set<EntityRole> }>();
-    for (const d of entity.designees) {
-      const entry = byEmail.get(d.email) ?? { fullName: d.fullName, roles: new Set<EntityRole>() };
-      for (const r of DESIGNEE_ENTITY_ROLES[d.role]) entry.roles.add(r);
-      byEmail.set(d.email, entry);
-    }
+    const byEmail = EntityRequestsService.rolesByEmail(entity.designees);
 
     const adminRoles = new Set<EntityRole>([
       'entity_admin',
@@ -587,9 +585,32 @@ export class EntityRequestsService {
       requestId,
     });
 
+    await this.inviteAll(tx, entity.id, byEmail, principal, requestId);
+  }
+
+  /** Designees grouped by address: two responsibilities on one address make one invitation. */
+  private static rolesByEmail(
+    designees: Array<{ role: DesigneeRole; fullName: string; email: string }>,
+  ) {
+    const byEmail = new Map<string, { fullName: string; roles: Set<EntityRole> }>();
+    for (const d of designees) {
+      const entry = byEmail.get(d.email) ?? { fullName: d.fullName, roles: new Set<EntityRole>() };
+      for (const r of DESIGNEE_ENTITY_ROLES[d.role]) entry.roles.add(r);
+      byEmail.set(d.email, entry);
+    }
+    return byEmail;
+  }
+
+  private async inviteAll(
+    tx: Tx,
+    entityId: string,
+    byEmail: Map<string, { fullName: string; roles: Set<EntityRole> }>,
+    principal: Principal,
+    requestId: string | undefined,
+  ): Promise<void> {
     for (const [email, designee] of byEmail) {
       await this.invitations.createInTx(tx, {
-        entityId: entity.id,
+        entityId,
         email,
         fullName: designee.fullName,
         roles: [...designee.roles],
@@ -599,6 +620,59 @@ export class EntityRequestsService {
         requestId,
       });
     }
+  }
+
+  /**
+   * Direct registration by the operator (SPEC.md §4.1 step 1): the entity is active at once, no
+   * request to review. Its administrator and designees are invited by e-mail (ADR-0018); the
+   * operator cannot name themselves, so platform and entity duties stay apart.
+   */
+  async createDirect(
+    input: CreateInput,
+    principal: Principal,
+    requestId?: string,
+  ): Promise<string> {
+    EntityRequestsService.checkAgainstConfig(input);
+    if (input.admin.email === principal.email.toLowerCase()) {
+      throw new ValidationError([
+        {
+          path: 'admin.email',
+          message: 'Designate someone else: operators do not administer entities',
+        },
+      ]);
+    }
+    await this.assertUnclaimed(input);
+    return EntityRequestsService.uniquely(() =>
+      this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const created = await tx.entity.create({
+          data: {
+            ...EntityRequestsService.entityData(input),
+            status: 'active',
+            submittedAt: now,
+            decidedAt: now,
+            createdBy: principal.userId,
+            designees: { create: EntityRequestsService.designees(input) },
+          },
+          include: INCLUDE,
+        });
+        await this.audit.record(tx, {
+          actor: userActor(principal),
+          action: 'entity.created',
+          target: { type: 'entity', id: created.id },
+          after: { ...snapshot(created), via: 'operator', basis: input.basis },
+          requestId,
+        });
+        const byEmail = EntityRequestsService.rolesByEmail(created.designees);
+        const admin = byEmail.get(input.admin.email);
+        byEmail.set(input.admin.email, {
+          fullName: input.admin.fullName,
+          roles: new Set<EntityRole>(['entity_admin', ...(admin?.roles ?? [])]),
+        });
+        await this.inviteAll(tx, created.id, byEmail, principal, requestId);
+        return created.id;
+      }),
+    );
   }
 
   approve(requestId: string, principal: Principal, comment?: string, requestIdHeader?: string) {

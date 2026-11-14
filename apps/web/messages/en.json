@@ -920,7 +920,17 @@
     "offboard": "Offboard",
     "suspendFor": "Suspend {name}",
     "reactivateFor": "Reactivate {name}",
-    "offboardFor": "Offboard {name}"
+    "offboardFor": "Offboard {name}",
+    "create": {
+      "title": "Register entity",
+      "lead": "Direct registration, without a request: the entity is active at once and its administrator and designees get an invitation by e-mail. Use it when an act or decision has already brought the entity into the network.",
+      "admin": "Entity administrator",
+      "adminHint": "Gets an invitation with the administrator role. Must be someone from the entity, not from the operator.",
+      "basisTitle": "Grounds",
+      "basis": "Act or decision that grounds the registration",
+      "basisHint": "For example the decree, resolution or minutes that brought the entity in. It is recorded in the audit trail.",
+      "submit": "Register entity"
+    }
   },
   "documentsAdmin": {
     "title": "Attached documents",

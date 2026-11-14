@@ -75,6 +75,12 @@ export class EntityStatusService {
     };
   }
 
+  async one(entityId: string) {
+    const item = (await this.list()).items.find((e) => e.id === entityId);
+    if (!item) throw new NotFoundError('Network entity');
+    return item;
+  }
+
   private async load(entityId: string) {
     const entity = await this.prisma.entity.findUnique({ where: { id: entityId } });
     // Distinct from the guard's "Entity not found": here the caller may act, the id is unknown.

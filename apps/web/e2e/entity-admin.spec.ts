@@ -40,4 +40,44 @@ test.describe('suspension of entities (M2-11)', () => {
       .click();
     await expect(row.getByText('Activa', { exact: true })).toBeVisible();
   });
+
+  test('pablo registers an entity directly, without a request', async ({ browser }) => {
+    test.setTimeout(180_000);
+    const id = Date.now().toString(36);
+    const page = await (await browser.newContext()).newPage();
+    await signIn(page, 'pablo.plataforma', '/operator/entities');
+    await page.getByRole('link', { name: 'Registrar entidad' }).click();
+    await page.waitForURL(/\/operator\/entities\/new$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Registrar entidad' })).toBeVisible();
+
+    const legalName = `Instituto Directo ${id}`;
+    await page.getByLabel('Nombre legal').fill(legalName);
+    await page.getByLabel('Nombre corto').fill(`Directo ${id}`);
+    // An identifier another entity already holds: the error keeps what was typed.
+    await page.locator('[name="slug"]').fill('salud');
+    await page.getByLabel('Número de identificación').fill(`901${id}`);
+    await page.getByLabel('Correo de contacto de la entidad').fill(`contacto.${id}@example.org`);
+    await page.locator('[name="dpoName"]').fill('Dora Protección');
+    await page.locator('[name="dpoEmail"]').fill(`dpo.${id}@example.org`);
+    for (const role of ['data_steward', 'technical_lead']) {
+      await page.locator(`[name="designees.${role}.fullName"]`).fill(`Persona ${role}`);
+      await page.locator(`[name="designees.${role}.email"]`).fill(`${role}.${id}@example.org`);
+    }
+    await page.locator('[name="admin.fullName"]').fill('Andrea Administradora');
+    await page.locator('[name="admin.email"]').fill(`admin.${id}@example.org`);
+    await page
+      .getByLabel(/^Acto o decisión que fundamenta el alta/)
+      .fill('Decreto 123 de 2026, artículo 4.');
+    await expectNoAccessibilityViolations(page);
+    await page.getByRole('button', { name: 'Registrar entidad' }).click();
+    await expect(page.getByText('Another entity already uses this identifier')).toBeVisible();
+    await expect(page.getByLabel('Nombre legal')).toHaveValue(legalName);
+    await expect(page.locator('[name="admin.email"]')).toHaveValue(`admin.${id}@example.org`);
+
+    await page.locator('[name="slug"]').fill(`directo-${id}`);
+    await page.getByRole('button', { name: 'Registrar entidad' }).click();
+    await page.waitForURL(/\/operator\/entities$/, { timeout: 30_000 });
+    const row = page.getByRole('row', { name: new RegExp(`directo-${id}`) });
+    await expect(row.getByText('Activa', { exact: true })).toBeVisible();
+  });
 });

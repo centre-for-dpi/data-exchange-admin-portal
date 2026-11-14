@@ -288,5 +288,16 @@ export const reactivateEntitySchema = z.strictObject({
 export const offboardEntitySchema = z.strictObject({
   comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
 });
+/**
+ * Direct registration by the operator (SPEC.md §4.1 step 1): the same data as a request, plus
+ * the person who will administer the entity and the act or decision that grounds it, which
+ * stands in for the designation document.
+ */
+export const createEntitySchema = entityRequestInputSchema.extend({
+  admin: designeeInputSchema,
+  basis: z.string().trim().min(10, 'reference the act or decision (10+ characters)').max(500),
+});
+export type CreateEntityInput = z.input<typeof createEntitySchema>;
+
 /** Platform routes name the entity `:id`: `:entityId` is for routes scoped by membership. */
 export const adminEntityParamsSchema = z.strictObject({ id: z.uuid() });

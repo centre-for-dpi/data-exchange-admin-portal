@@ -1,6 +1,11 @@
 'use server';
 
-import { DESIGNEE_ROLES, entityRequestSchema, membershipSummarySchema } from '@rid/contracts';
+import {
+  adminEntitySchema,
+  DESIGNEE_ROLES,
+  entityRequestSchema,
+  membershipSummarySchema,
+} from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
@@ -42,9 +47,17 @@ function requestBody(formData: FormData) {
   };
 }
 
-async function failed(problem: Parameters<typeof problemToFormState>[0]): Promise<FormState> {
+/** The typed values go back with the errors: React resets the form after each action. */
+async function failed(
+  problem: Parameters<typeof problemToFormState>[0],
+  formData?: FormData,
+): Promise<FormState> {
   const t = await getTranslations('forms');
-  return problemToFormState(problem, t('unexpected'), { fullPath: true });
+  const values: Record<string, string> = {};
+  for (const [key, value] of formData ?? []) {
+    if (typeof value === 'string' && !key.startsWith('$')) values[key] = value;
+  }
+  return { ...problemToFormState(problem, t('unexpected'), { fullPath: true }), values };
 }
 
 export async function createEntityRequestAction(
@@ -58,9 +71,31 @@ export async function createEntityRequestAction(
     requestBody(formData),
     entityRequestSchema,
   );
-  if (!result.ok) return failed(result.problem);
+  if (!result.ok) return failed(result.problem, formData);
   revalidatePath('/', 'layout');
   redirect({ href: `/entity-requests/${result.data.id}`, locale });
+  return {};
+}
+
+/** Operator: registers an entity directly, without an onboarding request (SPEC.md §4.1). */
+export async function createEntityDirectAction(
+  locale: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const result = await apiSend(
+    'POST',
+    '/admin/entities',
+    {
+      ...requestBody(formData),
+      admin: { fullName: text(formData, 'admin.fullName'), email: text(formData, 'admin.email') },
+      basis: text(formData, 'basis'),
+    },
+    adminEntitySchema,
+  );
+  if (!result.ok) return failed(result.problem, formData);
+  revalidatePath('/', 'layout');
+  redirect({ href: '/operator/entities', locale });
   return {};
 }
 
@@ -76,7 +111,7 @@ export async function updateEntityRequestAction(
     requestBody(formData),
     entityRequestSchema,
   );
-  if (!result.ok) return failed(result.problem);
+  if (!result.ok) return failed(result.problem, formData);
   revalidatePath('/', 'layout');
   redirect({ href: `/entity-requests/${requestId}`, locale });
   return {};
@@ -103,7 +138,7 @@ export async function uploadDesignationAction(
     const t = await getTranslations('entityRequests.document');
     if (result.status === 413) return { fieldErrors: { document: [t('tooLarge')] } };
     if (result.status === 415) return { fieldErrors: { document: [t('notPdf')] } };
-    return failed(result.problem);
+    return failed(result.problem, formData);
   }
   revalidatePath('/', 'layout');
   return {};
@@ -137,7 +172,7 @@ export async function decideEntityRequestAction(
     comment || decision !== 'approve' ? { comment } : {},
     entityRequestSchema,
   );
-  if (!result.ok) return failed(result.problem);
+  if (!result.ok) return failed(result.problem, formData);
   revalidatePath('/', 'layout');
   return {};
 }

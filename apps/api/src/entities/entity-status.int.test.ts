@@ -320,4 +320,70 @@ describe('suspension and offboarding of entities (M2-11)', () => {
     );
     expect((await call('GET', '/admin/entities', 'lucia.datos')).statusCode).toBe(403);
   });
+
+  it('the platform admin registers an entity directly: active, its admin and designees invited', async () => {
+    const id = randomUUID().slice(0, 8);
+    const adminEmail = `admin.${id}@example.org`;
+    const stewardEmail = `datos.${id}@example.org`;
+    const body = {
+      legalName: `Instituto Directo ${id}`,
+      shortName: `Directo ${id}`,
+      slug: `directo-${id}`,
+      taxIdType: 'NIT',
+      taxId: `7${id}`,
+      kind: 'national',
+      sector: 'salud',
+      contactEmail: `contacto.${id}@example.org`,
+      dpoName: 'Diana Datos',
+      dpoEmail: `dpo.${id}@example.org`,
+      designees: {
+        data_steward: { fullName: 'Lina Datos', email: stewardEmail },
+        // The technical lead is the admin too: one invitation with both sets of roles.
+        technical_lead: { fullName: 'Tomás Técnico', email: adminEmail },
+      },
+      admin: { fullName: 'Andrea Admin', email: adminEmail },
+      basis: 'Decreto 123 de 2026, artículo 4: incorporación a la red.',
+    };
+    for (const who of ['ana.operadora', 'marta.regulador', 'lucia.datos']) {
+      expect((await call('POST', '/admin/entities', who, body)).statusCode).toBe(403);
+    }
+    const res = await call('POST', '/admin/entities', 'pablo.plataforma', body);
+    expect(res.statusCode, res.body).toBe(201);
+    const created = res.json<{ id: string; status: string }>();
+    expect(created.status).toBe('active');
+
+    const invitations = await prisma.invitation.findMany({
+      where: { entityId: created.id },
+      orderBy: { email: 'asc' },
+    });
+    expect(invitations.map((i) => [i.email, [...i.roles].sort()])).toEqual([
+      [adminEmail, ['api_publisher', 'app_developer', 'entity_admin']],
+      [stewardEmail, ['data_steward']],
+    ]);
+    const audit = await prisma.auditEvent.findFirstOrThrow({
+      where: { targetId: created.id, action: 'entity.created' },
+    });
+    expect(audit.after).toMatchObject({ via: 'operator', basis: body.basis, status: 'active' });
+
+    // The invited admin accepts and administers it.
+    const admin = { sub: randomUUID(), email: adminEmail };
+    const invitation = invitations.find((i) => i.email === adminEmail);
+    const accept = await call('POST', `/me/invitations/${invitation?.id ?? ''}/accept`, admin);
+    expect(accept.statusCode, accept.body).toBe(200);
+    expect((await call('GET', `/entities/${created.id}/members`, admin)).statusCode).toBe(200);
+
+    // The identifier and tax id are now taken; the operator cannot name themselves.
+    const again = await call('POST', '/admin/entities', 'pablo.plataforma', body);
+    expect(again.statusCode).toBe(400);
+    expect(JSON.stringify(again.json())).toContain('slug');
+    const pablo = realmUsers.find((u) => u.username === 'pablo.plataforma');
+    const self = await call('POST', '/admin/entities', 'pablo.plataforma', {
+      ...body,
+      slug: `otro-${id}`,
+      taxId: `8${id}`,
+      admin: { fullName: 'Pablo', email: pablo?.email ?? '' },
+    });
+    expect(self.statusCode).toBe(400);
+    expect(JSON.stringify(self.json())).toContain('admin.email');
+  });
 });

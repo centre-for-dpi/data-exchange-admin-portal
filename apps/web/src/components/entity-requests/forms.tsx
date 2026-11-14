@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import {
   acceptInvitationAction,
+  createEntityDirectAction,
   createEntityRequestAction,
   decideEntityRequestAction,
   declineInvitationAction,
@@ -46,7 +47,7 @@ function TextField({
         <input
           {...p}
           type={type}
-          defaultValue={defaultValue ?? ''}
+          defaultValue={state.values?.[name] ?? defaultValue ?? ''}
           autoComplete={autoComplete ?? 'off'}
           className={inputClass}
         />
@@ -71,7 +72,11 @@ function SelectField({
   return (
     <Field name={name} label={label} required state={state}>
       {(p) => (
-        <select {...p} defaultValue={defaultValue ?? options[0]?.value} className={inputClass}>
+        <select
+          {...p}
+          defaultValue={state.values?.[name] ?? defaultValue ?? options[0]?.value}
+          className={inputClass}
+        >
           {options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -85,24 +90,31 @@ function SelectField({
 
 /**
  * The onboarding request (SPEC.md §4.1): entity data, data protection officer and the two
- * responsibilities that will be invited on approval. Used to create and to correct a request.
+ * responsibilities that will be invited on approval. Used to create and to correct a request,
+ * and (`direct`) by the operator to register an entity at once, with its administrator and
+ * the act that grounds it.
  */
 export function EntityRequestForm({
   locale,
   sectors,
   taxIdTypes,
   request,
+  direct = false,
 }: {
   locale: string;
   sectors: Option[];
   taxIdTypes: string[];
   request?: EntityRequest;
+  direct?: boolean;
 }) {
   const t = useTranslations('entityRequests.form');
   const tk = useTranslations('entityKind');
-  const action = request
-    ? updateEntityRequestAction.bind(null, request.id, locale)
-    : createEntityRequestAction.bind(null, locale);
+  const td = useTranslations('entityAdmin.create');
+  const action = direct
+    ? createEntityDirectAction.bind(null, locale)
+    : request
+      ? updateEntityRequestAction.bind(null, request.id, locale)
+      : createEntityRequestAction.bind(null, locale);
   const [state, formAction, pending] = useActionState(action, initialFormState);
   const designee = (role: (typeof DESIGNEE_ROLES)[number]) =>
     request?.designees.find((d) => d.role === role);
@@ -222,8 +234,34 @@ export function EntityRequestForm({
         </fieldset>
       ))}
 
+      {direct ? (
+        <>
+          <fieldset className="space-y-5">
+            <legend className="text-xl font-bold">{td('admin')}</legend>
+            <p className="text-sm text-muted-foreground">{td('adminHint')}</p>
+            <div className="grid gap-5 md:grid-cols-2">
+              <TextField name="admin.fullName" label={t('fullName')} state={state} />
+              <TextField name="admin.email" type="email" label={t('email')} state={state} />
+            </div>
+          </fieldset>
+          <fieldset className="space-y-5">
+            <legend className="text-xl font-bold">{td('basisTitle')}</legend>
+            <Field name="basis" label={td('basis')} hint={td('basisHint')} required state={state}>
+              {(p) => (
+                <textarea
+                  {...p}
+                  rows={3}
+                  defaultValue={state.values?.basis ?? ''}
+                  className={inputClass}
+                />
+              )}
+            </Field>
+          </fieldset>
+        </>
+      ) : null}
+
       <Button type="submit" disabled={pending}>
-        {request ? t('save') : t('create')}
+        {direct ? td('submit') : request ? t('save') : t('create')}
       </Button>
     </form>
   );
