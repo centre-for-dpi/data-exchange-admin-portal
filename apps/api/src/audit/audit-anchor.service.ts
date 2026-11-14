@@ -19,6 +19,20 @@ export const ANCHOR_EMAIL_TOPIC = 'audit.anchor_email';
 /** Advisory lock: only one API instance anchors at a time. */
 const ANCHOR_LOCK = 4_242_009;
 const MAX_DAYS_PER_RUN = 62;
+/**
+ * Where an anchoring run starts: the day of the next chained event, but never a day already
+ * anchored. Jumping to that event (instead of stepping day by day from the last anchor) means a
+ * long period without events cannot exhaust a run and stall the anchoring.
+ */
+export function firstDayToAnchor(
+  lastAnchoredDay: string | undefined,
+  nextEventDay: string,
+): string {
+  if (!lastAnchoredDay) return nextEventDay;
+  const after = nextDay(lastAnchoredDay);
+  return after > nextEventDay ? after : nextEventDay;
+}
+
 const jobSchema = z.object({ day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 
 const TEXT = {
@@ -94,18 +108,15 @@ export class AuditAnchorService implements OnApplicationBootstrap, OnApplication
     const timeZone = getCountryConfig().country.timezone;
     const today = localDay(now, timeZone);
     const last = await this.prisma.auditAnchor.findFirst({ orderBy: { day: 'desc' } });
-    let day: string;
-    if (last) {
-      day = nextDay(last.day);
-    } else {
-      const first = await this.prisma.auditEvent.findFirst({
-        where: { hash: { not: null } },
-        orderBy: { seq: 'asc' },
-        select: { occurredAt: true },
-      });
-      if (!first) return [];
-      day = localDay(first.occurredAt, timeZone);
-    }
+    // Start at the day of the first chained event after the last anchor, so that days (or months)
+    // without events never stall the anchoring.
+    const next = await this.prisma.auditEvent.findFirst({
+      where: { hash: { not: null }, ...(last ? { seq: { gt: last.lastSeq } } : {}) },
+      orderBy: { seq: 'asc' },
+      select: { occurredAt: true },
+    });
+    if (!next) return [];
+    let day = firstDayToAnchor(last?.day, localDay(next.occurredAt, timeZone));
     const anchored: string[] = [];
     for (let i = 0; i < MAX_DAYS_PER_RUN && day < today; i++, day = nextDay(day)) {
       if (await this.anchorDay(day, timeZone, last?.lastSeq)) anchored.push(day);
