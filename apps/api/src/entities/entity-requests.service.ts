@@ -633,13 +633,21 @@ export class EntityRequestsService {
     requestId?: string,
   ): Promise<string> {
     EntityRequestsService.checkAgainstConfig(input);
-    if (input.admin.email === principal.email.toLowerCase()) {
-      throw new ValidationError([
-        {
-          path: 'admin.email',
-          message: 'Designate someone else: operators do not administer entities',
-        },
-      ]);
+    // No role of the new entity for the operator who registers it: not admin, not a designee.
+    const own = principal.email.toLowerCase();
+    const self = [
+      ...(input.admin.email === own ? ['admin.email'] : []),
+      ...DESIGNEE_ROLES.filter((r) => input.designees[r].email === own).map(
+        (r) => `designees.${r}.email`,
+      ),
+    ];
+    if (self.length > 0) {
+      throw new ValidationError(
+        self.map((path) => ({
+          path,
+          message: 'Designate someone else: operators hold no role in the entities they register',
+        })),
+      );
     }
     await this.assertUnclaimed(input);
     return EntityRequestsService.uniquely(() =>

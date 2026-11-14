@@ -385,5 +385,17 @@ describe('suspension and offboarding of entities (M2-11)', () => {
     });
     expect(self.statusCode).toBe(400);
     expect(JSON.stringify(self.json())).toContain('admin.email');
+    // Nor as a designee: that would also give them roles in the entity.
+    const designee = await call('POST', '/admin/entities', 'pablo.plataforma', {
+      ...body,
+      slug: `otro-${id}`,
+      taxId: `8${id}`,
+      designees: {
+        ...body.designees,
+        data_steward: { fullName: 'Pablo', email: pablo?.email ?? '' },
+      },
+    });
+    expect(designee.statusCode).toBe(400);
+    expect(JSON.stringify(designee.json())).toContain('designees.data_steward.email');
   });
 });
