@@ -37,6 +37,26 @@ export const auditEventPageSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+/** Filters of the network audit trail and of its export (M2-09). All optional, combined with AND. */
+export const auditFiltersShape = {
+  /** Exact action (`subscription.approved`) or a whole area (`subscription`). */
+  action: z
+    .string()
+    .regex(/^[a-z_]+(\.[a-z_]+)?$/)
+    .optional(),
+  targetType: z
+    .string()
+    .regex(/^[a-z_]+$/)
+    .optional(),
+  targetId: z.string().min(1).max(100).optional(),
+  /** Entity on whose behalf the actor acted. */
+  entityId: z.uuid().optional(),
+  /** Keycloak sub of a person, application id or system component. */
+  actorId: z.string().min(1).max(200).optional(),
+  from: z.iso.datetime({ offset: true }).optional(),
+  to: z.iso.datetime({ offset: true }).optional(),
+};
+
 export const auditEventsQuerySchema = z.strictObject({
   /** seq of the last item of the previous page (events are listed newest first). */
   cursor: z
@@ -44,7 +64,18 @@ export const auditEventsQuerySchema = z.strictObject({
     .regex(/^\d{1,19}$/)
     .optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  ...auditFiltersShape,
 });
+export type AuditFilters = {
+  [K in keyof typeof auditFiltersShape]?: string;
+};
+
+/** Signed export of the audit trail (SPEC.md §6, M2-09). */
+export const auditExportQuerySchema = z.strictObject({
+  format: z.enum(['csv', 'json']).default('csv'),
+  ...auditFiltersShape,
+});
+export type AuditExportQuery = z.infer<typeof auditExportQuerySchema>;
 export type AuditEventsQuery = z.infer<typeof auditEventsQuerySchema>;
 
 export const timelineParamsSchema = z.strictObject({ kind: timelineKindSchema, id: z.uuid() });
@@ -65,6 +96,17 @@ export const chainCheckSchema = z.object({
       reason: z.enum(['gap', 'prev_hash_mismatch', 'hash_mismatch', 'missing_hash']),
     })
     .optional(),
+  /**
+   * Daily anchors (M2-09): each must still find its last event with the same hash, so that
+   * deleting the tail of the chain is detected.
+   */
+  anchors: z.object({
+    checked: z.number().int(),
+    lastDay: z.string().nullable(),
+    problems: z.array(
+      z.object({ day: z.string(), reason: z.enum(['event_missing', 'hash_mismatch']) }),
+    ),
+  }),
   checkedAt: z.iso.datetime(),
 });
 export type ChainCheckResult = z.infer<typeof chainCheckSchema>;

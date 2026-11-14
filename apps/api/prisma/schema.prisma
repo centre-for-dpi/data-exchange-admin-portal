@@ -975,3 +975,19 @@ model NotificationPreference {
   @@id([userId, kind])
   @@map("notification_preference")
 }
+
+/// Daily anchor of the audit chain (M2-09): the last event of each day (country time zone), its
+/// hash and an RFC 3161 time-stamp over it. Insert-only for everyone; e-mailed to the regulator.
+/// Deleting the tail of the chain leaves an anchor without its event, which verification reports.
+model AuditAnchor {
+  /// YYYY-MM-DD in the country's time zone.
+  day          String   @id
+  lastSeq      BigInt   @map("last_seq")
+  lastHash     String   @map("last_hash")
+  /// DER time-stamp token (RFC 3161) over the bytes of lastHash.
+  tsaToken     Bytes    @map("tsa_token")
+  tsaGenTime   DateTime @map("tsa_gen_time") @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("audit_anchor")
+}

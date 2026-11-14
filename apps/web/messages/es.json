@@ -470,7 +470,9 @@
         "prev_hash_mismatch": "no enlaza con el evento anterior",
         "hash_mismatch": "su contenido fue modificado",
         "missing_hash": "se insertó fuera de la cadena"
-      }
+      },
+      "anchors": "{count, plural, =0 {Aún no hay anclajes diarios.} one {Un anclaje diario verificado; el último, {day}.} other {# anclajes diarios verificados; el último, {day}.}}",
+      "anchorsBroken": "Anclajes sin su evento en la bitácora: {days}. Se borró o cambió el final de la cadena."
     },
     "recent": "Eventos recientes",
     "older": "Eventos anteriores",
@@ -507,7 +509,8 @@
         "approved_regulator": "Versión aprobada por el regulador",
         "revised": "Versión revisada (cambio compatible)",
         "deprecated": "Versión marcada como obsoleta",
-        "retired": "Versión retirada"
+        "retired": "Versión retirada",
+        "openapi_replaced": "Documento OpenAPI reemplazado"
       },
       "application": {
         "created": "Aplicación creada"
@@ -532,7 +535,75 @@
         "approved_regulator": "Aprobada por el regulador",
         "rejected_regulator": "Rechazada por el regulador",
         "agreement_attached": "Acuerdo de intercambio adjuntado"
+      },
+      "user": {
+        "registered": "Cuenta registrada",
+        "created": "Usuario creado"
+      },
+      "platform_role": {
+        "granted": "Rol de plataforma asignado"
+      },
+      "notification_preference": {
+        "updated": "Preferencias de avisos cambiadas"
+      },
+      "entity": {
+        "created": "Entidad creada",
+        "requested": "Alta solicitada",
+        "request_updated": "Solicitud de alta corregida",
+        "submitted": "Alta enviada a revisión",
+        "approved": "Alta aprobada",
+        "changes_requested": "Correcciones pedidas al alta",
+        "rejected": "Alta rechazada"
+      },
+      "membership": {
+        "created": "Miembro agregado",
+        "updated": "Membresía actualizada",
+        "roles_changed": "Roles cambiados",
+        "revoked": "Membresía revocada"
+      },
+      "invitation": {
+        "created": "Invitación enviada",
+        "accepted": "Invitación aceptada",
+        "declined": "Invitación rechazada",
+        "revoked": "Invitación retirada",
+        "expired": "Invitación vencida"
+      },
+      "document": {
+        "uploaded": "Documento subido",
+        "purged": "Documento eliminado por orden judicial"
+      },
+      "purpose": {
+        "created": "Finalidad creada",
+        "updated": "Finalidad actualizada"
+      },
+      "subject_access": {
+        "purged": "Registros de consultas purgados por retención"
+      },
+      "subject_alert": {
+        "updated": "Avisos del titular actualizados"
+      },
+      "transparency": {
+        "checkpoint": "Lote de transparencia sellado"
+      },
+      "audit": {
+        "anchored": "Anclaje diario de la bitácora",
+        "exported": "Bitácora exportada"
       }
+    },
+    "filters": {
+      "title": "Filtrar la bitácora",
+      "action": "Acción o área (p. ej. subscription)",
+      "targetType": "Tipo de objeto",
+      "targetId": "Identificador del objeto",
+      "from": "Desde",
+      "to": "Hasta",
+      "apply": "Filtrar",
+      "clear": "Quitar filtros"
+    },
+    "export": {
+      "lead": "Exportar lo filtrado, con su huella SHA-256 firmada:",
+      "csv": "CSV",
+      "json": "JSON"
     }
   },
   "dataSubject": {

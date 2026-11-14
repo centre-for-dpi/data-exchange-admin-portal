@@ -43,6 +43,7 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | Método | Ruta | Acceso |
 | :-- | :-- | :-- |
 | GET | `/api/v1/audit/events` | plataforma: `audit.read` |
+| GET | `/api/v1/audit/export` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/timeline/:kind/:id` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/verify` | plataforma: `audit.read` |
 | GET | `/api/v1/catalog/apis` | sesión opcional (catálogo público según la config del país) |

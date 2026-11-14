@@ -1,5 +1,8 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import {
+  type AuditExportQuery,
+  auditExportQuerySchema,
   auditEventPageSchema,
   type AuditEventsQuery,
   auditEventsQuerySchema,
@@ -12,13 +15,17 @@ import {
 } from '@rid/contracts';
 import { z } from 'zod';
 import {
+  type AuthenticatedRequest,
   CurrentEntity,
+  CurrentPrincipal,
   EntityAccess,
   type EntityContext,
   PlatformAccess,
 } from '../auth/decorators.js';
+import type { Principal } from '../auth/principal.service.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
+import { AuditExportService } from './audit-export.service.js';
 import { AuditQueryService } from './audit-query.service.js';
 
 const kindPipe = () => new ZodValidationPipe(timelineKindSchema);
@@ -27,7 +34,45 @@ const idPipe = () => new ZodValidationPipe(z.uuid());
 /** Network-wide audit trail for the operator, the regulator and auditors (SPEC.md §6). */
 @Controller('audit')
 export class AuditController {
-  constructor(private readonly audit: AuditQueryService) {}
+  constructor(
+    private readonly audit: AuditQueryService,
+    private readonly exports: AuditExportService,
+  ) {}
+
+  @Get('export')
+  @PlatformAccess('audit.read')
+  @ApiOperation({
+    operationId: 'exportAuditTrail',
+    summary: 'Signed export of the audit trail (CSV or JSON), with the same filters as the list',
+    description:
+      'Every field of each event, hashes included. Headers: `X-RID-Export-SHA256` (hex), ' +
+      '`Digest` and `X-RID-Export-Signature`, a compact JWS (EdDSA) over the manifest ' +
+      '{sha256, format, count, filters, exportedAt, firstSeq, lastSeq}, verifiable with ' +
+      '/transparency/jwks. At most 50 000 events per export; each export is audited.',
+    tags: ['audit'],
+    query: auditExportQuerySchema,
+    responses: { 200: { description: 'The file', binary: 'text/csv' } },
+    errors: [400, 401, 403],
+  })
+  async export(
+    @Query(new ZodValidationPipe(auditExportQuerySchema)) query: AuditExportQuery,
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: AuthenticatedRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const file = await this.exports.export(query, principal, request.id);
+    void reply
+      .status(200)
+      .header('content-type', file.contentType)
+      .header('content-disposition', `attachment; filename="${file.fileName}"`)
+      .header('x-content-type-options', 'nosniff')
+      .header('cache-control', 'no-store')
+      .header('x-rid-export-sha256', file.sha256)
+      .header('x-rid-export-count', String(file.count))
+      .header('digest', `sha-256=${Buffer.from(file.sha256, 'hex').toString('base64')}`);
+    if (file.signature) void reply.header('x-rid-export-signature', file.signature);
+    await reply.send(file.body);
+  }
 
   @Get('verify')
   @PlatformAccess('audit.read')

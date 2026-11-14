@@ -349,7 +349,18 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Cambio en M2-06.** El aviso de renovación pasa a este mecanismo, así no hay correos dobles.
     - **Pruebas.** 5 de integración. La e2e `notifications.spec.ts` usa el worker real y Mailpit, con axe.
     - **Pendiente para M3 y M4.** Los avisos de certificado por vencer y de nodo fuera de línea.
-- [ ] **M2-09 — Auditoría completa**: todos los eventos del dominio, filtros, exportación CSV/JSON con hash del archivo, anclaje diario, permisos sin `UPDATE`/`DELETE` en la tabla verificados por test.
+- [x] **M2-09 — Auditoría completa**: todos los eventos del dominio, filtros, exportación CSV/JSON con hash del archivo, anclaje diario, permisos sin `UPDATE`/`DELETE` en la tabla verificados por test.
+  - _Notas de implementación:_
+    - **Todos los eventos.** El catálogo `audit/actions.ts` lista las 62 acciones del dominio. `actions.test.ts` falla si el código registra una acción que no está en el catálogo, si una acción dinámica no tiene sus variantes declaradas o si falta su etiqueta en es o en. Agregué las etiquetas que faltaban.
+    - **Filtros.** `GET /audit/events`: acción exacta o área, tipo y id del objeto, entidad, actor y rango de fechas. En la web van en la URL, que se puede compartir.
+    - **Exportación.** `GET /audit/export?format=csv|json` con los mismos filtros y todos los campos, hashes incluidos, hasta 50 000 eventos por exportación.
+      - Lleva su huella en `X-RID-Export-SHA256` y `Digest`, y una firma JWS EdDSA (`X-RID-Export-Signature`) sobre el manifiesto `{sha256, format, count, filters, exportedAt, firstSeq, lastSeq}`, verificable con `/transparency/jwks`.
+      - El CSV neutraliza fórmulas, y cada exportación queda en la bitácora (`audit.exported`).
+    - **Anclaje diario.** `AuditAnchorService`, cada hora, ancla cada día cerrado de la zona horaria del país: el hash del último evento encadenado, con sello de tiempo RFC 3161 de la TSA.
+      - Queda en `audit_anchor`, de solo inserción también para el dueño del esquema, se registra como `audit.anchored` y se envía por correo a los reguladores.
+      - `GET /audit/verify` comprueba que cada anclaje encuentre su evento con el mismo hash. Así se detecta el corte de la cola, que quedó pendiente desde M1-11.
+    - **Permisos verificados por test.** Ni `rid_app` ni el dueño del esquema pueden hacer UPDATE, DELETE ni TRUNCATE en `audit_event` ni en `audit_anchor`.
+    - **Pruebas.** 8 de integración, 3 del catálogo y 3 de días locales. La e2e `audit-export.spec.ts` cubre filtrar, exportar firmado y verificar con anclajes, con axe.
 - [ ] **M2-10 — Catálogo de finalidades**: administración por el operador; las APIs eligen finalidades permitidas del catálogo.
 - [ ] **M2-11 — Suspensión y baja de entidades**: `active ⇄ suspended`, `active → offboarded` (SPEC.md §4.1 punto 4): la suspensión bloquea publicaciones nuevas y suspende en el gateway las suscripciones de la entidad como consumidora.
 

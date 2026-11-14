@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {
   AuditEventsQuery,
+  AuditFilters,
   AuditItem,
   ChainCheckResult,
   Timeline,
@@ -44,13 +45,74 @@ export class AuditQueryService {
       if (batch.length < VERIFY_BATCH || verifier.done) break;
       after = batch.at(-1)?.seq;
     }
-    return { ...verifier.check(), checkedAt: new Date().toISOString() };
+    const chain = verifier.check();
+    const anchors = await this.verifyAnchors();
+    return {
+      ...chain,
+      valid: chain.valid && anchors.problems.length === 0,
+      anchors,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Each daily anchor (M2-09) must still find its event with the same hash: an anchor without
+   * its event means the chain lost its tail (or more) after the anchor was taken.
+   */
+  private async verifyAnchors(): Promise<ChainCheckResult['anchors']> {
+    const anchors = await this.prisma.auditAnchor.findMany({
+      orderBy: { day: 'asc' },
+      select: { day: true, lastSeq: true, lastHash: true },
+    });
+    const events = new Map(
+      (
+        await this.prisma.auditEvent.findMany({
+          where: { seq: { in: anchors.map((a) => a.lastSeq) } },
+          select: { seq: true, hash: true },
+        })
+      ).map((e) => [e.seq, e.hash]),
+    );
+    const problems: ChainCheckResult['anchors']['problems'] = [];
+    for (const anchor of anchors) {
+      const hash = events.get(anchor.lastSeq);
+      if (hash === undefined) problems.push({ day: anchor.day, reason: 'event_missing' });
+      else if (hash !== anchor.lastHash)
+        problems.push({ day: anchor.day, reason: 'hash_mismatch' });
+    }
+    return { checked: anchors.length, lastDay: anchors.at(-1)?.day ?? null, problems };
+  }
+
+  /** The WHERE of the network trail for a set of filters (list and export). */
+  static where(filters: AuditFilters): Prisma.AuditEventWhereInput {
+    const action = filters.action;
+    return {
+      ...(action
+        ? action.includes('.')
+          ? { action }
+          : { action: { startsWith: `${action}.` } }
+        : {}),
+      ...(filters.targetType ? { targetType: filters.targetType } : {}),
+      ...(filters.targetId ? { targetId: filters.targetId } : {}),
+      ...(filters.entityId ? { actorEntityId: filters.entityId } : {}),
+      ...(filters.actorId ? { actorId: filters.actorId } : {}),
+      ...(filters.from || filters.to
+        ? {
+            occurredAt: {
+              ...(filters.from ? { gte: new Date(filters.from) } : {}),
+              ...(filters.to ? { lte: new Date(filters.to) } : {}),
+            },
+          }
+        : {}),
+    };
   }
 
   /** Newest first, across the network (platform view). */
   async recent(query: AuditEventsQuery) {
     const rows = await this.prisma.auditEvent.findMany({
-      where: query.cursor ? { seq: { lt: BigInt(query.cursor) } } : {},
+      where: {
+        ...AuditQueryService.where(query),
+        ...(query.cursor ? { seq: { lt: BigInt(query.cursor) } } : {}),
+      },
       orderBy: { seq: 'desc' },
       take: query.limit + 1,
     });

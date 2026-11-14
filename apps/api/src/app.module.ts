@@ -9,6 +9,8 @@ import {
 import { SubscriptionLifecycleService } from './subscriptions/subscription-lifecycle.service.js';
 import { SubscriptionsService } from './subscriptions/subscriptions.service.js';
 import { AuditController, EntityAuditController } from './audit/audit.controller.js';
+import { AuditAnchorService } from './audit/audit-anchor.service.js';
+import { AuditExportService } from './audit/audit-export.service.js';
 import { AuditQueryService } from './audit/audit-query.service.js';
 import { OpaController } from './opa/opa.controller.js';
 import { OpaService } from './opa/opa.service.js';
@@ -101,6 +103,8 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     SubscriptionLifecycleService,
     OpaService,
     AuditQueryService,
+    AuditExportService,
+    AuditAnchorService,
     SubjectAccessService,
     TransparencyEvidenceService,
     TransparencySigningKey,

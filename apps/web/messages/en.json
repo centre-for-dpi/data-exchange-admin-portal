@@ -470,7 +470,9 @@
         "prev_hash_mismatch": "it does not link to the previous event",
         "hash_mismatch": "its content was modified",
         "missing_hash": "it was inserted outside the chain"
-      }
+      },
+      "anchors": "{count, plural, =0 {No daily anchors yet.} one {One daily anchor verified; the last, {day}.} other {# daily anchors verified; the last, {day}.}}",
+      "anchorsBroken": "Anchors without their event in the trail: {days}. The end of the chain was deleted or changed."
     },
     "recent": "Recent events",
     "older": "Older events",
@@ -507,7 +509,8 @@
         "approved_regulator": "Version approved by the regulator",
         "revised": "Version revised (compatible change)",
         "deprecated": "Version deprecated",
-        "retired": "Version retired"
+        "retired": "Version retired",
+        "openapi_replaced": "OpenAPI document replaced"
       },
       "application": {
         "created": "Application created"
@@ -532,7 +535,75 @@
         "approved_regulator": "Approved by the regulator",
         "rejected_regulator": "Rejected by the regulator",
         "agreement_attached": "Exchange agreement attached"
+      },
+      "user": {
+        "registered": "Account registered",
+        "created": "User created"
+      },
+      "platform_role": {
+        "granted": "Platform role granted"
+      },
+      "notification_preference": {
+        "updated": "Notice preferences changed"
+      },
+      "entity": {
+        "created": "Entity created",
+        "requested": "Onboarding requested",
+        "request_updated": "Onboarding request corrected",
+        "submitted": "Onboarding sent for review",
+        "approved": "Onboarding approved",
+        "changes_requested": "Onboarding sent back for corrections",
+        "rejected": "Onboarding rejected"
+      },
+      "membership": {
+        "created": "Member added",
+        "updated": "Membership updated",
+        "roles_changed": "Roles changed",
+        "revoked": "Membership revoked"
+      },
+      "invitation": {
+        "created": "Invitation sent",
+        "accepted": "Invitation accepted",
+        "declined": "Invitation declined",
+        "revoked": "Invitation withdrawn",
+        "expired": "Invitation expired"
+      },
+      "document": {
+        "uploaded": "Document uploaded",
+        "purged": "Document deleted by legal order"
+      },
+      "purpose": {
+        "created": "Purpose created",
+        "updated": "Purpose updated"
+      },
+      "subject_access": {
+        "purged": "Consultation records purged by retention"
+      },
+      "subject_alert": {
+        "updated": "Data subject notices updated"
+      },
+      "transparency": {
+        "checkpoint": "Transparency batch sealed"
+      },
+      "audit": {
+        "anchored": "Daily anchor of the audit trail",
+        "exported": "Audit trail exported"
       }
+    },
+    "filters": {
+      "title": "Filter the audit trail",
+      "action": "Action or area (e.g. subscription)",
+      "targetType": "Object type",
+      "targetId": "Object identifier",
+      "from": "From",
+      "to": "To",
+      "apply": "Filter",
+      "clear": "Clear filters"
+    },
+    "export": {
+      "lead": "Export what is filtered, with its signed SHA-256 fingerprint:",
+      "csv": "CSV",
+      "json": "JSON"
     }
   },
   "dataSubject": {
