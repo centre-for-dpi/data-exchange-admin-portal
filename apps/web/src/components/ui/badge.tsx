@@ -60,6 +60,7 @@ export function statusTone(status: string): Tone {
     case 'approved_regulator':
       return 'success';
     case 'in_review':
+    case 'under_review':
     case 'pending':
     case 'pending_provider':
     case 'pending_regulator':
@@ -73,6 +74,7 @@ export function statusTone(status: string): Tone {
     case 'deleted':
       return 'danger';
     case 'draft':
+    case 'requested':
       return 'info';
     default:
       return 'neutral';

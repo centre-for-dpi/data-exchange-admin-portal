@@ -20,7 +20,13 @@ export interface TestIssuer {
   /** Signs an access token like Keycloak would (RS256, issuer, audience, expiry). */
   token(
     sub: string,
-    options?: { email?: string; name?: string; audience?: string; expiresIn?: string | number },
+    options?: {
+      email?: string;
+      emailVerified?: boolean;
+      name?: string;
+      audience?: string;
+      expiresIn?: string | number;
+    },
   ): Promise<string>;
   /** A token signed with a key the API does not trust. */
   foreignToken(sub: string): Promise<string>;
@@ -39,10 +45,17 @@ export async function createTestIssuer(): Promise<TestIssuer> {
   const sign = (
     key: Parameters<SignJWT['sign']>[0],
     sub: string,
-    options: { email?: string; name?: string; audience?: string; expiresIn?: string | number } = {},
+    options: {
+      email?: string;
+      emailVerified?: boolean;
+      name?: string;
+      audience?: string;
+      expiresIn?: string | number;
+    } = {},
   ) =>
     new SignJWT({
       ...(options.email ? { email: options.email } : {}),
+      ...(options.emailVerified === undefined ? {} : { email_verified: options.emailVerified }),
       ...(options.name ? { name: options.name } : {}),
     })
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })

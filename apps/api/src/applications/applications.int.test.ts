@@ -60,7 +60,7 @@ describe('applications and OAuth2 credentials (M1-06)', () => {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers,
     });
-    programas = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'programas-sociales' } }))
+    programas = (await prisma.entity.findFirstOrThrow({ where: { slug: 'programas-sociales' } }))
       .id;
     issuer = await createTestIssuer();
     app = await createTestApp(issuer, [{ token: KEYCLOAK_ADMIN, value: keycloak }]);

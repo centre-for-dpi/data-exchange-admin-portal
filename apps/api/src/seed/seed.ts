@@ -95,7 +95,9 @@ export async function runSeed(
     const taxIdType = input.config.identifiers.organization[0] ?? 'TAX_ID';
     const entityIds = new Map<string, string>();
     for (const seed of entities) {
-      const existing = await tx.entity.findUnique({ where: { slug: seed.slug } });
+      const existing = await tx.entity.findFirst({
+        where: { slug: seed.slug, status: { not: 'rejected' } },
+      });
       if (existing) {
         entityIds.set(seed.slug, existing.id);
         continue;

@@ -21,7 +21,9 @@
     "requests": "Solicitudes",
     "operator": "Consola del operador",
     "regulator": "Vista del regulador",
-    "audit": "Auditoría"
+    "audit": "Auditoría",
+    "invitations": "Invitaciones",
+    "entityRequests": "Alta de entidades"
   },
   "navHint": {
     "home": "Resumen y accesos rápidos",
@@ -32,7 +34,9 @@
     "requests": "Solicitudes de acceso por decidir",
     "operator": "Versiones pendientes de revisión",
     "regulator": "Supervisión de la red",
-    "audit": "Bitácora y verificación de integridad"
+    "audit": "Bitácora y verificación de integridad",
+    "invitations": "Invitaciones para unirte a una entidad",
+    "entityRequests": "Pide que tu entidad se una a la red"
   },
   "auth": {
     "signIn": "Iniciar sesión",
@@ -44,7 +48,7 @@
     "anonymousCta": "Inicia sesión para ver el catálogo, tus aplicaciones y tus pendientes.",
     "welcome": "Hola, {name}",
     "quickAccess": "Accesos rápidos",
-    "noRoles": "Aún no tienes roles asignados en una entidad. Pide al administrador de tu entidad que te invite.",
+    "noRoles": "Aún no tienes roles en una entidad. Si tu entidad ya está en la red, pide a su administrador que te invite; si no, solicita su alta.",
     "apiUnavailable": "No pudimos cargar tus permisos en este momento. Intenta de nuevo en unos minutos.",
     "eyebrow": "Intercambio de datos entre entidades públicas",
     "howTitle": "Cómo funciona",
@@ -61,7 +65,9 @@
         "title": "Traza cada consulta",
         "body": "Cada cambio queda en una bitácora encadenada y el gateway solo guarda metadatos, nunca el contenido."
       }
-    }
+    },
+    "invitations": "{count, plural, one {Tienes una invitación pendiente.} other {Tienes # invitaciones pendientes.}}",
+    "seeInvitations": "Ver invitaciones"
   },
   "footer": {
     "operatedBy": "Operado por {operator}",
@@ -213,7 +219,9 @@
       "changesComment": "Qué debe cambiar",
       "requestChanges": "Pedir cambios",
       "decided": "Esta versión ya no está en revisión."
-    }
+    },
+    "entitiesTitle": "Altas de entidades por revisar",
+    "entitiesEmpty": "No hay solicitudes de alta por revisar."
   },
   "catalog": {
     "lead": "APIs publicadas por las entidades de la red. Cada una indica qué datos personales expone y con qué finalidades se puede solicitar acceso.",
@@ -469,5 +477,135 @@
     "note": "El gateway registra de quién son los datos de cada consulta, como seudónimo, para que el ciudadano vea quién los consultó. Si el titular va en el cuerpo, el gateway lo lee de ahí: no hace falta enviarlo aparte.",
     "body": "Cuerpo: {pointer}",
     "bodyWithType": "Cuerpo: {pointer} ({type})"
+  },
+  "entityStatus": {
+    "requested": "Con el solicitante",
+    "under_review": "En revisión",
+    "active": "Activa",
+    "rejected": "Rechazada",
+    "suspended": "Suspendida",
+    "offboarded": "Dada de baja"
+  },
+  "entityKind": {
+    "national": "Entidad del orden nacional",
+    "territorial": "Entidad territorial",
+    "autonomous": "Entidad autónoma",
+    "private_authorized": "Particular autorizado"
+  },
+  "roles": {
+    "entity_admin": "Administración de la entidad",
+    "api_publisher": "Publicación de APIs",
+    "data_steward": "Responsable de datos",
+    "app_developer": "Desarrollo de aplicaciones",
+    "entity_viewer": "Consulta"
+  },
+  "entityRequests": {
+    "title": "Alta de entidades",
+    "lead": "Pide que una entidad se una a la red. El operador revisa la solicitud y el documento de designación; al aprobarla quedas como administrador de la entidad y los responsables designados reciben una invitación.",
+    "mine": "Mis solicitudes",
+    "new": "Solicitar el alta de una entidad",
+    "newLead": "Llena los datos de la entidad y de sus responsables. Después adjuntas el documento de designación y envías la solicitud a {operator}.",
+    "edit": "Corregir la solicitud",
+    "empty": "Todavía no has pedido el alta de ninguna entidad.",
+    "entity": "Entidad",
+    "status": "Estado",
+    "createdAt": "Creada",
+    "eyebrow": "Solicitud de alta",
+    "applicant": "Solicitante",
+    "designees": "Responsables designados",
+    "designeesHint": "Al aprobar el alta, cada responsable recibe una invitación en su correo.",
+    "history": "Historial de decisiones",
+    "next": {
+      "requested": "La solicitud está contigo: revisa los datos, adjunta el documento de designación y envíala a revisión.",
+      "under_review": "El operador está revisando la solicitud. Te avisaremos aquí cuando decida.",
+      "active": "La entidad fue aprobada. Ya eres su administrador y los responsables designados recibieron su invitación.",
+      "rejected": "La solicitud fue rechazada. Puedes presentar una nueva si se corrige el motivo.",
+      "suspended": "La entidad está suspendida.",
+      "offboarded": "La entidad fue dada de baja."
+    },
+    "decision": {
+      "approved": "Aprobada",
+      "changes_requested": "Se pidieron correcciones",
+      "rejected": "Rechazada"
+    },
+    "reviewerRole": {
+      "platform_admin": "Administración de la plataforma",
+      "platform_reviewer": "Revisión del operador",
+      "regulator": "Regulador",
+      "auditor": "Auditoría"
+    },
+    "form": {
+      "entity": "Datos de la entidad",
+      "legalName": "Nombre legal",
+      "shortName": "Nombre corto",
+      "shortNameHint": "Sigla o nombre con el que se conoce, por ejemplo en el catálogo.",
+      "slug": "Identificador",
+      "slugHint": "Letras minúsculas, números y guiones. Es el primer segmento de las rutas en el gateway.",
+      "taxIdType": "Tipo de identificación",
+      "taxId": "Número de identificación",
+      "kind": "Naturaleza",
+      "sector": "Sector",
+      "contactEmail": "Correo de contacto de la entidad",
+      "website": "Sitio web",
+      "websiteHint": "Debe empezar por https://",
+      "dpo": "Oficial de protección de datos",
+      "dpoHint": "Persona a cargo de la protección de datos personales en la entidad.",
+      "fullName": "Nombre completo",
+      "email": "Correo electrónico",
+      "designee": {
+        "data_steward": {
+          "title": "Responsable de datos",
+          "hint": "Decide quién accede a las APIs de la entidad y para qué."
+        },
+        "technical_lead": {
+          "title": "Responsable técnico",
+          "hint": "Registra las APIs de la entidad y sus aplicaciones consumidoras."
+        }
+      },
+      "save": "Guardar cambios",
+      "create": "Crear la solicitud"
+    },
+    "document": {
+      "title": "Documento de designación",
+      "label": "Documento de designación (PDF)",
+      "replace": "Reemplazar el documento (PDF)",
+      "hint": "Acto administrativo o carta que designa a los responsables. Solo PDF, hasta 10 MB.",
+      "upload": "Subir documento",
+      "required": "Elige un archivo PDF.",
+      "tooLarge": "El archivo supera los 10 MB.",
+      "notPdf": "El archivo no es un PDF.",
+      "file": "Archivo",
+      "sha256": "Huella SHA-256",
+      "uploadedAt": "Subido",
+      "none": "Todavía no hay documento."
+    },
+    "detail": {
+      "submitTitle": "Enviar a revisión",
+      "submitHint": "Cuando envíes la solicitud ya no podrás cambiarla, salvo que el operador te pida correcciones.",
+      "submit": "Enviar a revisión",
+      "documentMissing": "Adjunta el documento de designación antes de enviar."
+    },
+    "review": {
+      "title": "Decisión del operador",
+      "approve": "Aprobar el alta",
+      "approveComment": "Comentario (opcional)",
+      "requestChanges": "Pedir correcciones",
+      "changesComment": "Qué debe corregir el solicitante",
+      "reject": "Rechazar",
+      "rejectComment": "Motivo del rechazo",
+      "notPending": "Esta solicitud no está esperando una decisión.",
+      "readOnly": "Puedes ver la solicitud, pero no decidir sobre ella."
+    }
+  },
+  "invitations": {
+    "title": "Invitaciones",
+    "lead": "Invitaciones para unirte a una entidad, enviadas a tu correo verificado.",
+    "empty": "No tienes invitaciones pendientes.",
+    "roles": "Roles: {roles}",
+    "expires": "Vence el {date}",
+    "accept": "Aceptar",
+    "decline": "Rechazar",
+    "acceptFor": "Aceptar la invitación de {entity}",
+    "declineFor": "Rechazar la invitación de {entity}"
   }
 }

@@ -13,6 +13,8 @@ export const ACTIVE_ENTITY_COOKIE = 'rid-active-entity';
 
 export interface Viewer {
   authenticated: boolean;
+  /** Portal user id (from /me); absent for anonymous visitors or when the API is unavailable. */
+  userId?: string;
   name?: string;
   platformRoles: PlatformRole[];
   memberships: MembershipSummary[];
@@ -54,6 +56,7 @@ export const getViewer = cache(async (): Promise<Viewer> => {
     const activeEntity = chooseActiveEntity(me.memberships, requested);
     return {
       authenticated: true,
+      userId: me.user.id,
       name: me.user.fullName,
       platformRoles: me.platformRoles,
       memberships: me.memberships,

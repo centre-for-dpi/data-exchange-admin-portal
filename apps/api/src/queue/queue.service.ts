@@ -24,6 +24,14 @@ const QUEUE_OPTIONS: Record<string, Parameters<PgBoss['createQueue']>[1]> = {
     retryBackoff: true,
     retryDelayMax: 3600,
   },
+  // Invitation e-mails (M2-01): every message is delivered; SMTP outages are retried for hours.
+  'invitation.email': {
+    policy: 'standard',
+    retryLimit: 20,
+    retryDelay: 30,
+    retryBackoff: true,
+    retryDelayMax: 3600,
+  },
 };
 
 interface PendingMessage {

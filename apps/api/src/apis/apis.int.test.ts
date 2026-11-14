@@ -31,8 +31,8 @@ describe('API registration (M1-03)', () => {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers,
     });
-    salud = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'salud' } })).id;
-    programas = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'programas-sociales' } }))
+    salud = (await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } })).id;
+    programas = (await prisma.entity.findFirstOrThrow({ where: { slug: 'programas-sociales' } }))
       .id;
     issuer = await createTestIssuer();
     app = await createTestApp(issuer);
@@ -355,7 +355,7 @@ describe('API registration (M1-03)', () => {
 
     it('does not reach an API through another entity the caller belongs to', async () => {
       // pedro publishes for salud and socioeconomico: the API of salud is not under socioeconomico.
-      const socio = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'socioeconomico' } }))
+      const socio = (await prisma.entity.findFirstOrThrow({ where: { slug: 'socioeconomico' } }))
         .id;
       expect(
         (await request('GET', `/api/v1/entities/${socio}/apis/${apiId}`, 'pedro.publicador'))

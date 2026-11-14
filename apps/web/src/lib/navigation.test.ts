@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ITEMS, visibleNavItems, type Viewer } from './navigation';
+import {
+  HOME_ONLY_ITEMS,
+  homeQuickLinks,
+  NAV_ITEMS,
+  visibleNavItems,
+  type Viewer,
+} from './navigation';
 
 const keys = (viewer: Viewer, publicCatalog = false) =>
   visibleNavItems(viewer, { publicCatalog }).map((i) => i.key);
@@ -41,7 +47,22 @@ describe('role-based navigation', () => {
     ]);
   });
 
+  it('offers invitations and entity onboarding on the home page only, to anyone signed in', () => {
+    const viewer = { authenticated: true, roles: [] };
+    expect(homeQuickLinks(viewer, { publicCatalog: false }).map((i) => i.key)).toEqual([
+      'catalog',
+      'invitations',
+      'entityRequests',
+    ]);
+    expect(keys(viewer)).not.toContain('invitations');
+    expect(homeQuickLinks({ authenticated: false, roles: [] }, { publicCatalog: false })).toEqual(
+      [],
+    );
+  });
+
   it('uses unique keys and hrefs', () => {
+    const all = [...NAV_ITEMS, ...HOME_ONLY_ITEMS];
+    expect(new Set(all.map((i) => i.key)).size).toBe(all.length);
     expect(new Set(NAV_ITEMS.map((i) => i.key)).size).toBe(NAV_ITEMS.length);
     expect(new Set(NAV_ITEMS.map((i) => i.href)).size).toBe(NAV_ITEMS.length);
   });

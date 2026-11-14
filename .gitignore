@@ -38,6 +38,8 @@ Thumbs.db
 
 # Local infra data
 infra/**/data/
+# Uploaded documents in development (RID_DOCUMENTS_DIR)
+apps/api/data/
 infra/**/.volumes/
 next-env.d.ts
 

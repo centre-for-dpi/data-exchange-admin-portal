@@ -149,8 +149,8 @@ describe('access requests and approval (M1-07)', () => {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers,
     });
-    salud = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'salud' } })).id;
-    programas = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'programas-sociales' } }))
+    salud = (await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } })).id;
+    programas = (await prisma.entity.findFirstOrThrow({ where: { slug: 'programas-sociales' } }))
       .id;
     issuer = await createTestIssuer();
     app = await createTestApp(issuer);

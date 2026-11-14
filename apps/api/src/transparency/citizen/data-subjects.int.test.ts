@@ -101,9 +101,9 @@ describe('citizen API: who consulted my data (MT-05)', () => {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers,
     });
-    const salud = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'salud' } })).id;
+    const salud = (await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } })).id;
     const programas = (
-      await prisma.entity.findUniqueOrThrow({ where: { slug: 'programas-sociales' } })
+      await prisma.entity.findFirstOrThrow({ where: { slug: 'programas-sociales' } })
     ).id;
     issuer = await createTestIssuer();
     citizens = await createTestCitizenIssuer();

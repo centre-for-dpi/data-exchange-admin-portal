@@ -59,3 +59,17 @@ export function canSee(item: NavItem, viewer: Viewer, options: NavOptions): bool
 
 export const visibleNavItems = (viewer: Viewer, options: NavOptions): NavItem[] =>
   NAV_ITEMS.filter((item) => canSee(item, viewer, options));
+
+/**
+ * Quick links only on the home page, not in the header: anyone signed in can see their
+ * invitations and ask for an entity to join (ADR-0018).
+ */
+export const HOME_ONLY_ITEMS: readonly NavItem[] = [
+  { key: 'invitations', href: '/invitations', audience: 'authenticated' },
+  { key: 'entityRequests', href: '/entity-requests', audience: 'authenticated' },
+];
+
+export const homeQuickLinks = (viewer: Viewer, options: NavOptions): NavItem[] => [
+  ...visibleNavItems(viewer, options).filter((item) => item.key !== 'home'),
+  ...HOME_ONLY_ITEMS.filter((item) => canSee(item, viewer, options)),
+];

@@ -1,8 +1,8 @@
-import { reviewQueueSchema } from '@rid/contracts';
+import { entityRequestListSchema, reviewQueueSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { Badge, classificationTone } from '../../../components/ui/badge';
+import { Badge, classificationTone, StatusBadge } from '../../../components/ui/badge';
 import { EmptyState, Page, PageHeader, Section } from '../../../components/ui/page';
 import { Link } from '../../../i18n/navigation';
 import { apiGet } from '../../../lib/api';
@@ -28,11 +28,55 @@ export default async function OperatorPage({ params }: PageProps) {
   const viewer = await getViewer();
   if (!viewer.platformRoles.some((r) => REVIEW_ROLES.includes(r))) notFound();
 
-  const queue = await apiGet('/review/api-versions', reviewQueueSchema);
+  const [queue, onboarding] = await Promise.all([
+    apiGet('/review/api-versions', reviewQueueSchema),
+    apiGet('/review/entities', entityRequestListSchema),
+  ]);
 
   return (
     <Page>
       <PageHeader title={t('nav.operator')} />
+      <Section title={t('operator.entitiesTitle')}>
+        {onboarding.items.length === 0 ? (
+          <EmptyState>{t('operator.entitiesEmpty')}</EmptyState>
+        ) : (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('operator.entity')}</th>
+                  <th scope="col">{t('entityRequests.status')}</th>
+                  <th scope="col">{t('operator.submittedAt')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {onboarding.items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <Link href={`/entity-requests/${item.id}`} className="link">
+                        {item.legalName}
+                      </Link>
+                    </td>
+                    <td>
+                      <StatusBadge status={item.status}>
+                        {t(`entityStatus.${item.status}`)}
+                      </StatusBadge>
+                    </td>
+                    <td className="whitespace-nowrap text-muted-foreground">
+                      {item.submittedAt
+                        ? format.dateTime(new Date(item.submittedAt), {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })
+                        : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
       <Section title={t('operator.queueTitle')}>
         {queue.items.length === 0 ? (
           <EmptyState>{t('operator.empty')}</EmptyState>

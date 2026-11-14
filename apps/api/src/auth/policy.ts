@@ -82,6 +82,10 @@ export const PLATFORM_PERMISSIONS = {
   'review.read': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Approve or request changes on a version (operator). The regulator step is M2-04. */
   'review.decide': ['platform_admin', 'platform_reviewer'],
+  /** See onboarding requests of entities and their designation documents (SPEC.md §4.1). */
+  'entity_review.read': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** Approve, send back or reject an onboarding request (operator). */
+  'entity_review.decide': ['platform_admin', 'platform_reviewer'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;

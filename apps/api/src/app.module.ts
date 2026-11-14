@@ -16,7 +16,15 @@ import { AuthModule } from './auth/auth.module.js';
 import { CatalogController } from './catalog/catalog.controller.js';
 import { CatalogService } from './catalog/catalog.service.js';
 import { CoreModule } from './core.module.js';
+import { DocumentsService } from './documents/documents.service.js';
+import { StorageService } from './documents/storage.service.js';
 import { EntitiesController } from './entities/entities.controller.js';
+import { EntityRequestsController } from './entities/entity-requests.controller.js';
+import { EntityRequestsService } from './entities/entity-requests.service.js';
+import { EntityReviewsController } from './entities/entity-reviews.controller.js';
+import { InvitationsController } from './entities/invitations.controller.js';
+import { InvitationsService } from './entities/invitations.service.js';
+import { createSmtpTransport, MAIL_TRANSPORT } from './mail/mail.service.js';
 import { HealthController } from './health/health.controller.js';
 import { MeController } from './me/me.controller.js';
 import { PurposesController } from './purposes/purposes.controller.js';
@@ -44,7 +52,10 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
   controllers: [
     HealthController,
     MeController,
+    InvitationsController,
     EntitiesController,
+    EntityRequestsController,
+    EntityReviewsController,
     PurposesController,
     ApisController,
     ReviewsController,
@@ -60,6 +71,11 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     DataSubjectsController,
   ],
   providers: [
+    StorageService,
+    DocumentsService,
+    EntityRequestsService,
+    InvitationsService,
+    { provide: MAIL_TRANSPORT, useFactory: createSmtpTransport },
     ApisService,
     ReviewsService,
     CatalogService,

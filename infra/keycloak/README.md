@@ -7,7 +7,8 @@ Keycloak importa al arrancar (`--import-realm`) los archivos `*-realm.json` de e
 ## Realm `rid-portal` (personas)
 
 - Cliente `rid-portal-web`: confidencial, Authorization Code + PKCE S256, sin password grant. El access token lleva `aud = rid-portal-api` y dura 5 minutos.
-- Sin autorregistro; protección contra fuerza bruta; correo de recuperación vía Mailpit.
+- Autorregistro con verificación de correo obligatoria (ADR-0018): no se puede entrar sin confirmar el correo. Una cuenta nueva no tiene roles; solo puede pedir el alta de una entidad y aceptar invitaciones dirigidas a su correo. Protección contra fuerza bruta; correos de verificación y de recuperación vía Mailpit.
+  - En un Keycloak que ya importó el realm, aplica el cambio sin borrar datos: `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh update realms/rid-portal -s registrationAllowed=true -s verifyEmail=true` (después de `kcadm.sh config credentials`).
 - Usuarios semilla con IDs fijos (el seed de la base los asocia por `keycloakSub`). Contraseña: `RID_DEMO_USER_PASSWORD` (por defecto `demo`, solo en desarrollo). **Los roles no viven aquí**: los asigna el seed en PostgreSQL (ADR-0004).
 
 | Usuario | ID (`sub`) | Rol previsto en el seed |

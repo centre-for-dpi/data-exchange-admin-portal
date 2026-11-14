@@ -11,10 +11,17 @@ export interface FormState {
 export const initialFormState: FormState = {};
 
 /** Maps an RFC 9457 problem from the API to form errors. */
-export function problemToFormState(problem: Problem | undefined, fallback: string): FormState {
+export function problemToFormState(
+  problem: Problem | undefined,
+  fallback: string,
+  options: { fullPath?: boolean } = {},
+): FormState {
   const fieldErrors: Record<string, string[]> = {};
   for (const error of problem?.errors ?? []) {
-    const field = error.path.split(/[.:]/)[0] || '_form';
+    // fullPath keys nested fields as `a.b.c` (forms with grouped inputs, e.g. designees).
+    const field =
+      (options.fullPath ? error.path.split(/[.:]/).join('.') : error.path.split(/[.:]/)[0]) ||
+      '_form';
     (fieldErrors[field] ??= []).push(error.message);
   }
   const formError =

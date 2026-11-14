@@ -5,7 +5,9 @@ import { Button } from '../../components/ui/button';
 import { Notice } from '../../components/ui/notice';
 import { Link } from '../../i18n/navigation';
 import { signInAction } from '../../lib/auth-actions';
-import { visibleNavItems } from '../../lib/navigation';
+import { invitationListSchema } from '@rid/contracts';
+import { apiGet } from '../../lib/api';
+import { homeQuickLinks } from '../../lib/navigation';
 import { getSite } from '../../lib/site';
 import { getViewer } from '../../lib/viewer';
 
@@ -19,9 +21,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const t = await getTranslations();
 
   const viewer = await getViewer();
-  const quickLinks = visibleNavItems(viewer, { publicCatalog: site.publicCatalog }).filter(
-    (item) => item.key !== 'home',
-  );
+  const quickLinks = homeQuickLinks(viewer, { publicCatalog: site.publicCatalog });
+  // Pending invitations are announced on the home page (ADR-0018); a failure only hides them.
+  const invitations =
+    viewer.authenticated && !viewer.apiUnavailable
+      ? await apiGet('/me/invitations', invitationListSchema).catch(() => ({ items: [] }))
+      : { items: [] };
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-12 px-4 py-10 sm:px-6 md:py-12">
@@ -60,8 +65,16 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <Notice tone="warning" role="status">
               {t('home.apiUnavailable')}
             </Notice>
-          ) : viewer.roles.length === 0 ? (
+          ) : viewer.roles.length === 0 && invitations.items.length === 0 ? (
             <Notice tone="info">{t('home.noRoles')}</Notice>
+          ) : null}
+          {invitations.items.length > 0 ? (
+            <Notice tone="info" role="status">
+              {t('home.invitations', { count: invitations.items.length })}{' '}
+              <Link href="/invitations" className="link font-semibold">
+                {t('home.seeInvitations')}
+              </Link>
+            </Notice>
           ) : null}
           <h3 className="eyebrow font-sans">{t('home.quickAccess')}</h3>
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

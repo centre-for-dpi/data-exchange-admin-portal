@@ -4,6 +4,8 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import { AppModule } from './app.module.js';
 import { PROBLEM_CONTENT_TYPE, toProblem } from './common/problem.js';
 import { instancePath, ProblemDetailsFilter } from './common/problem.filter.js';
+import { documentMaxBytes, PDF_MIME } from './documents/documents.service.js';
+import { DESIGNATION_DOCUMENT_PATH } from './entities/entity-requests.controller.js';
 import { registerApiDocs } from './openapi/docs.js';
 import {
   ingestTokenMatches,
@@ -19,10 +21,32 @@ export function createAdapter(): FastifyAdapter {
   const adapter = new FastifyAdapter({ bodyLimit: BODY_LIMIT_BYTES });
   // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
   adapter.getInstance().removeContentTypeParser('text/plain');
+  // Documents (SPEC.md §3: PDF only) arrive as the raw body. Other routes get a Buffer that their
+  // zod validation rejects, within the default 1 MiB limit.
+  adapter
+    .getInstance()
+    .addContentTypeParser(PDF_MIME, { parseAs: 'buffer' }, (_request, body, done) => {
+      done(null, body);
+    });
   // The transparency collector receives whole Fluent Bit chunks (internal, service token only).
   // Its larger body limit applies only once the token is checked: onRequest runs before the body
   // is read, so an unauthenticated caller gets 401 without the API buffering anything.
   adapter.getInstance().addHook('onRoute', (route) => {
+    // Upload of a designation document: a larger limit, but only for callers that present a
+    // token; the guard verifies it after the body is read.
+    if (route.url === `/${API_PREFIX}/${DESIGNATION_DOCUMENT_PATH}` && route.method === 'PUT') {
+      route.bodyLimit = documentMaxBytes();
+      const existing = route.onRequest ? [route.onRequest].flat() : [];
+      route.onRequest = [
+        ...existing,
+        async (request, reply) => {
+          if (/^Bearer \S+$/.test(request.headers.authorization ?? '')) return;
+          const problem = toProblem({ statusCode: 401 }, instancePath(request.url));
+          await reply.code(401).type(PROBLEM_CONTENT_TYPE).send(problem);
+        },
+      ];
+      return;
+    }
     if (route.url !== `/${API_PREFIX}/${SUBJECT_ACCESS_PATH}`) return;
     route.bodyLimit = SUBJECT_ACCESS_BODY_LIMIT_BYTES;
     const existing = route.onRequest ? [route.onRequest].flat() : [];

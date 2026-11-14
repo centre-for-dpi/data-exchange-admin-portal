@@ -111,6 +111,9 @@ services:
     env_file: ../../.env
     environment:
       RID_ALLOW_SEED: 'true'
+      RID_SMTP_URL: smtp://mailpit:1025
+    volumes:
+      - api-documents:/var/lib/rid/documents
     depends_on:
       postgres:
         condition: service_healthy
@@ -169,6 +172,7 @@ services:
 
 volumes:
   carpeta-data:
+  api-documents:
 
 networks:
   edge:

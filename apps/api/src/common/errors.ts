@@ -51,3 +51,15 @@ export class InvalidTransitionError extends DomainError {
     super(ErrorCode.InvalidTransition, `${entity} cannot go from ${from} to ${to}`);
   }
 }
+
+export class UnsupportedMediaTypeError extends DomainError {
+  constructor(message: string) {
+    super(ErrorCode.UnsupportedMediaType, message);
+  }
+}
+
+export class PayloadTooLargeError extends DomainError {
+  constructor(message: string) {
+    super(ErrorCode.PayloadTooLarge, message);
+  }
+}

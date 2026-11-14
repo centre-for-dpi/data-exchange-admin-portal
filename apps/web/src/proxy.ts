@@ -31,6 +31,7 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
 }
 
 export const config = {
-  // Everything except Auth.js, the branding route, Next internals and files with an extension.
-  matcher: ['/((?!api|branding|_next|_vercel|.*\\..*).*)'],
+  // Everything except Auth.js, the branding route, document downloads (/files), Next internals
+  // and files with an extension.
+  matcher: ['/((?!api|branding|files|_next|_vercel|.*\\..*).*)'],
 };

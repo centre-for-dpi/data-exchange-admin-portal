@@ -17,6 +17,11 @@ export interface Principal {
   userId: string;
   keycloakSub: string;
   email: string;
+  /**
+   * The token proves this very e-mail is verified (email_verified and the same address the user
+   * registered with). Invitations are only accepted with a verified e-mail (ADR-0018).
+   */
+  emailVerified: boolean;
   fullName: string;
   platformRoles: PlatformRole[];
   /** Active memberships only: a revoked membership loses access on the next request. */
@@ -55,6 +60,8 @@ export class PrincipalService {
       userId: user.id,
       keycloakSub: user.keycloakSub,
       email: user.email,
+      emailVerified:
+        identity.emailVerified && identity.email?.toLowerCase() === user.email.toLowerCase(),
       fullName: user.fullName,
       platformRoles: user.platformRoles.map((r) => r.role),
       memberships: user.memberships.map((m) => ({

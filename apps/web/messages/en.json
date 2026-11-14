@@ -21,7 +21,9 @@
     "requests": "Requests",
     "operator": "Operator console",
     "regulator": "Regulator view",
-    "audit": "Audit"
+    "audit": "Audit",
+    "invitations": "Invitations",
+    "entityRequests": "Entity onboarding"
   },
   "navHint": {
     "home": "Overview and shortcuts",
@@ -32,7 +34,9 @@
     "requests": "Access requests awaiting a decision",
     "operator": "Versions waiting for review",
     "regulator": "Network oversight",
-    "audit": "Audit log and integrity check"
+    "audit": "Audit log and integrity check",
+    "invitations": "Invitations to join an entity",
+    "entityRequests": "Ask for your entity to join the network"
   },
   "auth": {
     "signIn": "Sign in",
@@ -44,7 +48,7 @@
     "anonymousCta": "Sign in to see the catalogue, your applications and your pending tasks.",
     "welcome": "Hello, {name}",
     "quickAccess": "Quick access",
-    "noRoles": "You have no roles in any entity yet. Ask your entity administrator to invite you.",
+    "noRoles": "You have no roles in an entity yet. If your entity is already on the network, ask its administrator to invite you; otherwise, request its onboarding.",
     "apiUnavailable": "We could not load your permissions right now. Please try again in a few minutes.",
     "eyebrow": "Data exchange between public entities",
     "howTitle": "How it works",
@@ -61,7 +65,9 @@
         "title": "Trace every call",
         "body": "Every change goes into a hash-chained log and the gateway keeps metadata only, never the content."
       }
-    }
+    },
+    "invitations": "{count, plural, one {You have one pending invitation.} other {You have # pending invitations.}}",
+    "seeInvitations": "See invitations"
   },
   "footer": {
     "operatedBy": "Operated by {operator}",
@@ -213,7 +219,9 @@
       "changesComment": "What must change",
       "requestChanges": "Request changes",
       "decided": "This version is no longer in review."
-    }
+    },
+    "entitiesTitle": "Entity onboarding to review",
+    "entitiesEmpty": "There are no onboarding requests to review."
   },
   "catalog": {
     "lead": "APIs published by the network entities. Each one shows the personal data it exposes and the purposes for which access can be requested.",
@@ -469,5 +477,135 @@
     "note": "The gateway records whose data each call concerns, as a pseudonym, so citizens can see who consulted it. When the data subject is in the body, the gateway reads it there: nothing else to send.",
     "body": "Body: {pointer}",
     "bodyWithType": "Body: {pointer} ({type})"
+  },
+  "entityStatus": {
+    "requested": "With the applicant",
+    "under_review": "Under review",
+    "active": "Active",
+    "rejected": "Rejected",
+    "suspended": "Suspended",
+    "offboarded": "Offboarded"
+  },
+  "entityKind": {
+    "national": "National entity",
+    "territorial": "Territorial entity",
+    "autonomous": "Autonomous entity",
+    "private_authorized": "Authorized private party"
+  },
+  "roles": {
+    "entity_admin": "Entity administration",
+    "api_publisher": "API publishing",
+    "data_steward": "Data steward",
+    "app_developer": "Application development",
+    "entity_viewer": "Read-only access"
+  },
+  "entityRequests": {
+    "title": "Entity onboarding",
+    "lead": "Ask for an entity to join the network. The operator reviews the request and the designation document; once approved you become the entity’s administrator and the designated people receive an invitation.",
+    "mine": "My requests",
+    "new": "Request an entity’s onboarding",
+    "newLead": "Fill in the entity and its responsible people. Then attach the designation document and send the request to {operator}.",
+    "edit": "Correct the request",
+    "empty": "You have not requested any entity’s onboarding yet.",
+    "entity": "Entity",
+    "status": "Status",
+    "createdAt": "Created",
+    "eyebrow": "Onboarding request",
+    "applicant": "Applicant",
+    "designees": "Designated people",
+    "designeesHint": "When the onboarding is approved, each of them receives an invitation by e-mail.",
+    "history": "Decision history",
+    "next": {
+      "requested": "The request is with you: check the data, attach the designation document and send it for review.",
+      "under_review": "The operator is reviewing the request. The decision will show up here.",
+      "active": "The entity was approved. You are its administrator and the designated people received their invitation.",
+      "rejected": "The request was rejected. You can file a new one once the reason is fixed.",
+      "suspended": "The entity is suspended.",
+      "offboarded": "The entity was offboarded."
+    },
+    "decision": {
+      "approved": "Approved",
+      "changes_requested": "Corrections requested",
+      "rejected": "Rejected"
+    },
+    "reviewerRole": {
+      "platform_admin": "Platform administration",
+      "platform_reviewer": "Operator review",
+      "regulator": "Regulator",
+      "auditor": "Audit"
+    },
+    "form": {
+      "entity": "Entity",
+      "legalName": "Legal name",
+      "shortName": "Short name",
+      "shortNameHint": "Acronym or common name, as shown in the catalogue.",
+      "slug": "Identifier",
+      "slugHint": "Lower-case letters, digits and hyphens. It is the first segment of gateway paths.",
+      "taxIdType": "Identifier type",
+      "taxId": "Identifier number",
+      "kind": "Kind",
+      "sector": "Sector",
+      "contactEmail": "Entity contact e-mail",
+      "website": "Website",
+      "websiteHint": "Must start with https://",
+      "dpo": "Data protection officer",
+      "dpoHint": "Person in charge of personal data protection at the entity.",
+      "fullName": "Full name",
+      "email": "E-mail",
+      "designee": {
+        "data_steward": {
+          "title": "Data steward",
+          "hint": "Decides who may use the entity’s APIs and for what purpose."
+        },
+        "technical_lead": {
+          "title": "Technical lead",
+          "hint": "Registers the entity’s APIs and its consumer applications."
+        }
+      },
+      "save": "Save changes",
+      "create": "Create the request"
+    },
+    "document": {
+      "title": "Designation document",
+      "label": "Designation document (PDF)",
+      "replace": "Replace the document (PDF)",
+      "hint": "Administrative act or letter designating the responsible people. PDF only, up to 10 MB.",
+      "upload": "Upload document",
+      "required": "Choose a PDF file.",
+      "tooLarge": "The file is larger than 10 MB.",
+      "notPdf": "The file is not a PDF.",
+      "file": "File",
+      "sha256": "SHA-256 fingerprint",
+      "uploadedAt": "Uploaded",
+      "none": "No document yet."
+    },
+    "detail": {
+      "submitTitle": "Send for review",
+      "submitHint": "Once sent, you cannot change the request unless the operator asks for corrections.",
+      "submit": "Send for review",
+      "documentMissing": "Attach the designation document before sending."
+    },
+    "review": {
+      "title": "Operator decision",
+      "approve": "Approve the onboarding",
+      "approveComment": "Comment (optional)",
+      "requestChanges": "Request corrections",
+      "changesComment": "What the applicant must correct",
+      "reject": "Reject",
+      "rejectComment": "Reason for rejection",
+      "notPending": "This request is not waiting for a decision.",
+      "readOnly": "You can see the request but not decide on it."
+    }
+  },
+  "invitations": {
+    "title": "Invitations",
+    "lead": "Invitations to join an entity, sent to your verified e-mail.",
+    "empty": "You have no pending invitations.",
+    "roles": "Roles: {roles}",
+    "expires": "Expires on {date}",
+    "accept": "Accept",
+    "decline": "Decline",
+    "acceptFor": "Accept the invitation of {entity}",
+    "declineFor": "Decline the invitation of {entity}"
   }
 }

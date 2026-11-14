@@ -5,6 +5,7 @@ import { fromRoot } from './paths.js';
 interface RealmFile {
   realm: string;
   registrationAllowed?: boolean;
+  verifyEmail?: boolean;
   clients?: Array<{
     clientId: string;
     secret?: string;
@@ -64,8 +65,9 @@ describe('realm rid-portal', () => {
     expect(web?.attributes?.['pkce.code.challenge.method']).toBe('S256');
   });
 
-  it('does not allow self-registration', () => {
-    expect(realm.registrationAllowed).toBe(false);
+  it('allows self-registration only with a verified e-mail (ADR-0018)', () => {
+    expect(realm.registrationAllowed).toBe(true);
+    expect(realm.verifyEmail).toBe(true);
   });
 });
 

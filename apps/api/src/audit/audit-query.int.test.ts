@@ -55,7 +55,7 @@ describe('audit trail: verification and timelines (M1-11)', () => {
       realmUsers,
     });
     const id = async (slug: string) =>
-      (await prisma.entity.findUniqueOrThrow({ where: { slug } })).id;
+      (await prisma.entity.findFirstOrThrow({ where: { slug } })).id;
     salud = await id('salud');
     programas = await id('programas-sociales');
     socioeconomico = await id('socioeconomico');

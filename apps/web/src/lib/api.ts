@@ -109,5 +109,41 @@ export async function apiSend<S extends z.ZodType>(
       problem: (await res.json().catch(() => undefined)) as Problem,
     };
   }
+  // 204 No Content: pass `z.undefined()` as the schema.
+  return { ok: true, data: schema.parse(res.status === 204 ? undefined : await res.json()) };
+}
+
+/** Sends a binary body (a PDF document) with PUT; same error handling as apiSend. */
+export async function apiPutBytes<S extends z.ZodType>(
+  path: string,
+  bytes: ArrayBuffer,
+  contentType: string,
+  schema: S,
+): Promise<ApiResult<z.output<S>>> {
+  const res = await fetch(`${apiUrl()}/api/v1${path}`, {
+    method: 'PUT',
+    headers: {
+      authorization: `Bearer ${await accessToken()}`,
+      accept: 'application/json',
+      'content-type': contentType,
+    },
+    body: bytes,
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      status: res.status,
+      problem: (await res.json().catch(() => undefined)) as Problem,
+    };
+  }
   return { ok: true, data: schema.parse(await res.json()) };
+}
+
+/** GET returning the raw response (downloads), with the user's token. */
+export async function apiGetRaw(path: string): Promise<Response> {
+  return fetch(`${apiUrl()}/api/v1${path}`, {
+    headers: { authorization: `Bearer ${await accessToken()}` },
+    cache: 'no-store',
+  });
 }

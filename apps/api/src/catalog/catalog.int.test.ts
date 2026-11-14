@@ -32,7 +32,7 @@ describe('catalogue (M1-05)', () => {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers,
     });
-    salud = (await prisma.entity.findUniqueOrThrow({ where: { slug: 'salud' } })).id;
+    salud = (await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } })).id;
     issuer = await createTestIssuer();
     app = await createTestApp(issuer);
 

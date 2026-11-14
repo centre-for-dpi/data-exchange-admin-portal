@@ -98,7 +98,8 @@ model Entity {
   legalName      String       @map("legal_name")
   shortName      String       @map("short_name")
   /// URL-safe identifier; first segment of every gateway path: /{entitySlug}/{apiSlug}/v{major}
-  slug           String       @unique
+  /// Unique among entities that are not rejected (a rejected request frees its slug).
+  slug           String
   /// Organization identifier type from the country config (identifiers.organization).
   taxIdType      String       @map("tax_id_type")
   taxId          String       @map("tax_id")
@@ -118,13 +119,149 @@ model Entity {
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   createdBy      String       @map("created_by")
 
+  /// User who filed the onboarding request (SPEC.md §4.1); null for entities created by the seed.
+  applicantId           String?   @map("applicant_id") @db.Uuid
+  /// Designation document (PDF) attached to the onboarding request.
+  designationDocumentId String?   @unique @map("designation_document_id") @db.Uuid
+  designationDocument   Document? @relation("EntityDesignation", fields: [designationDocumentId], references: [id])
+  submittedAt           DateTime? @map("submitted_at") @db.Timestamptz(3)
+  decidedAt             DateTime? @map("decided_at") @db.Timestamptz(3)
+
   memberships  Membership[]
   apis         Api[]
   applications Application[]
+  designees    EntityDesignee[]
+  reviews      EntityReview[]
+  documents    Document[]       @relation("EntityDocuments")
+  invitations  Invitation[]
 
-  @@unique([taxIdType, taxId])
+  /// A rejected request frees its slug and tax id, so a squatted request cannot block the real
+  /// entity forever. Predicates are written as PostgreSQL normalizes them, so Prisma sees no drift.
+  @@unique([slug], map: "entity_slug_live", where: raw("(status <> 'rejected'::entity_status)"))
+  @@unique([taxIdType, taxId], map: "entity_tax_id_live", where: raw("(status <> 'rejected'::entity_status)"))
   @@index([status])
+  @@index([applicantId])
   @@map("entity")
+}
+
+/// Responsibilities the onboarding request designates (SPEC.md §4.1).
+enum DesigneeRole {
+  /// Responsable de datos: decides access requests (entity role data_steward).
+  data_steward
+  /// Responsable técnico: registers APIs and applications (api_publisher + app_developer).
+  technical_lead
+
+  @@map("designee_role")
+}
+
+/// People designated in an onboarding request. On approval each one is invited by e-mail.
+model EntityDesignee {
+  id        String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  entityId  String       @map("entity_id") @db.Uuid
+  entity    Entity       @relation(fields: [entityId], references: [id])
+  role      DesigneeRole
+  fullName  String       @map("full_name")
+  /// Lower-case.
+  email     String
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([entityId, role])
+  @@map("entity_designee")
+}
+
+enum EntityReviewDecision {
+  approved
+  changes_requested
+  rejected
+
+  @@map("entity_review_decision")
+}
+
+/// Operator decisions on an onboarding request, with their comment (SPEC.md §4.1).
+model EntityReview {
+  id           String               @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  entityId     String               @map("entity_id") @db.Uuid
+  entity       Entity               @relation(fields: [entityId], references: [id])
+  decision     EntityReviewDecision
+  reviewerRole PlatformRole         @map("reviewer_role")
+  reviewerId   String               @map("reviewer_id") @db.Uuid
+  comment      String?
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([entityId, createdAt])
+  @@map("entity_review")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Documents (SPEC.md §3). Bytes live behind StorageService (local volume); the row keeps the hash.
+// ---------------------------------------------------------------------------------------------
+
+enum DocumentKind {
+  designation
+  agreement
+  annex
+  other
+
+  @@map("document_kind")
+}
+
+model Document {
+  id            String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  ownerEntityId String       @map("owner_entity_id") @db.Uuid
+  ownerEntity   Entity       @relation("EntityDocuments", fields: [ownerEntityId], references: [id])
+  kind          DocumentKind
+  /// Name given by the uploader, for display only (never used as a path).
+  fileName      String       @map("file_name")
+  mimeType      String       @map("mime_type")
+  size          Int
+  /// Hex SHA-256 of the bytes; checked again on every download.
+  sha256        String
+  storageKey    String       @unique @map("storage_key")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdBy     String       @map("created_by")
+
+  designationOf Entity? @relation("EntityDesignation")
+
+  @@index([ownerEntityId])
+  @@map("document")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Invitations (ADR-0018): addressed to an e-mail; accepted by a user whose verified e-mail matches.
+// ---------------------------------------------------------------------------------------------
+
+enum InvitationStatus {
+  pending
+  accepted
+  declined
+  revoked
+
+  @@map("invitation_status")
+}
+
+model Invitation {
+  id          String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  entityId    String           @map("entity_id") @db.Uuid
+  entity      Entity           @relation(fields: [entityId], references: [id])
+  /// Lower-case.
+  email       String
+  fullName    String?          @map("full_name")
+  roles       EntityRole[]
+  status      InvitationStatus @default(pending)
+  /// A pending invitation past this instant can no longer be accepted.
+  expiresAt   DateTime         @map("expires_at") @db.Timestamptz(3)
+  invitedBy   String           @map("invited_by")
+  respondedAt DateTime?        @map("responded_at") @db.Timestamptz(3)
+  /// User who accepted or declined.
+  respondedBy String?          @map("responded_by") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy   String           @map("created_by")
+
+  @@unique([entityId, email], map: "invitation_one_pending", where: raw("(status = 'pending'::invitation_status)"))
+  @@index([email, status])
+  @@map("invitation")
 }
 
 enum UserStatus {

@@ -59,7 +59,7 @@ describe('APISIX reconciler (M1-08)', () => {
 
   /** pedro registers and submits a version; ana approves it (published, gateway.sync queued). */
   async function publish(entitySlug: string, slug: string): Promise<string> {
-    const entity = await prisma.entity.findUniqueOrThrow({ where: { slug: entitySlug } });
+    const entity = await prisma.entity.findFirstOrThrow({ where: { slug: entitySlug } });
     const api = await call(`/entities/${entity.id}/apis`, 'pedro.publicador', {
       slug,
       name: `Gateway ${slug}`,

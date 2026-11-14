@@ -52,6 +52,9 @@ function operation(route: RouteDoc): JsonSchema {
       ...(response.schema
         ? { content: { 'application/json': { schema: toSchema(response.schema) } } }
         : {}),
+      ...(response.binary
+        ? { content: { [response.binary]: { schema: { type: 'string', format: 'binary' } } } }
+        : {}),
     };
   }
   for (const status of spec.errors ?? []) {
@@ -77,6 +80,14 @@ function operation(route: RouteDoc): JsonSchema {
           requestBody: {
             required: true,
             content: { 'application/json': { schema: toSchema(spec.body) } },
+          },
+        }
+      : {}),
+    ...(spec.binaryBody
+      ? {
+          requestBody: {
+            required: true,
+            content: { [spec.binaryBody]: { schema: { type: 'string', format: 'binary' } } },
           },
         }
       : {}),

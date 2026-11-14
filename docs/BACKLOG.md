@@ -271,7 +271,15 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
 ## M2 — Gobierno completo
 
-- [ ] **M2-01 — Alta de entidades**: flujo `requested → under_review → active/rejected` con documento de designación; invitaciones automáticas a los responsables.
+- [x] **M2-01 — Alta de entidades**: flujo `requested → under_review → active/rejected` con documento de designación; invitaciones automáticas a los responsables.
+  - _Notas de implementación:_
+    - **Cuentas (ADR-0018).** El realm `rid-portal` permite autorregistro, con verificación de correo obligatoria. Una cuenta nueva no tiene roles.
+    - **Solicitud.** Es una fila `Entity` en `requested`, con su máquina de estados en `domain/entity/state-machine.ts`. El revisor puede devolverla a `requested` con comentario. El rechazo libera el identificador y la identificación tributaria (índices únicos parciales). Cada persona tiene hasta 3 solicitudes abiertas.
+    - **Documento de designación.** Modelo `Document` y `StorageService` en volumen local, solo PDF, con SHA-256 y límite de 10 MiB. M2-07 reutiliza ambos.
+    - **Al aprobar.** El solicitante queda como `entity_admin`. Se crea una invitación por correo para cada responsable: datos → `data_steward`, técnico → `api_publisher` + `app_developer`. Las invitaciones se aceptan con el correo verificado y vencen en 14 días. El correo sale desde el outbox (`invitation.email`, nodemailer a Mailpit).
+    - **Separación de funciones.** Nadie revisa su propia solicitud ni una que lo designa.
+    - **Pruebas.** 21 pruebas de integración (autorización, auditoría, documentos, invitaciones). La e2e `onboarding.spec.ts` cubre registro, solicitud, aprobación e invitación aceptada, con axe.
+    - **Pendientes.** El alta creada directamente por el operador. El aviso al solicitante por correo (alta aprobada o rechazada) queda para M2-08. La suspensión y la baja quedan para M2-11.
 - [ ] **M2-02 — Miembros e invitaciones**: `entity_admin` invita por correo, asigna/quita roles, revoca membresías. CA: un miembro revocado pierde acceso en la siguiente petición.
 - [ ] **M2-03 — Matriz de permisos completa**: matriz de `SPEC.md §2` implementada como política central (`authz.policy.ts`); test generado por tabla para cada endpoint × rol.
 - [ ] **M2-04 — Aprobación del regulador**: publicaciones y suscripciones `sensitive` pasan por `regulator` cuando la config lo exige.
@@ -281,6 +289,7 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 - [ ] **M2-08 — Notificaciones**: en el portal y por correo (Mailpit en dev) para los eventos de `SPEC.md §7`; preferencias por usuario.
 - [ ] **M2-09 — Auditoría completa**: todos los eventos del dominio, filtros, exportación CSV/JSON con hash del archivo, anclaje diario, permisos sin `UPDATE`/`DELETE` en la tabla verificados por test.
 - [ ] **M2-10 — Catálogo de finalidades**: administración por el operador; las APIs eligen finalidades permitidas del catálogo.
+- [ ] **M2-11 — Suspensión y baja de entidades**: `active ⇄ suspended`, `active → offboarded` (SPEC.md §4.1 punto 4): la suspensión bloquea publicaciones nuevas y suspende en el gateway las suscripciones de la entidad como consumidora.
 
 **Cierre M2:** recorrido con los cuatro tipos de actor (proveedor, consumidor, operador, regulador) sin intervención técnica.
 

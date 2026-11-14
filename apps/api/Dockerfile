@@ -9,6 +9,9 @@ COPY . .
 RUN pnpm install --frozen-lockfile \
  && pnpm exec turbo run build --filter=@rid/api
 ENV NODE_ENV=production
+# Uploaded documents (RID_DOCUMENTS_DIR); a named volume mounted here keeps this owner.
+RUN mkdir -p /var/lib/rid/documents && chown node /var/lib/rid/documents
+ENV RID_DOCUMENTS_DIR=/var/lib/rid/documents
 USER node
 WORKDIR /repo/apps/api
 EXPOSE 4000

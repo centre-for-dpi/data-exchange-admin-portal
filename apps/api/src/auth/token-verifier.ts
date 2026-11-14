@@ -6,6 +6,8 @@ export const TOKEN_VERIFIER = Symbol('TOKEN_VERIFIER');
 export interface VerifiedIdentity {
   sub: string;
   email?: string;
+  /** Keycloak's email_verified claim: the person proved they own the address (ADR-0018). */
+  emailVerified: boolean;
   name?: string;
 }
 
@@ -47,6 +49,7 @@ export function createTokenVerifier(options: {
       return {
         sub: payload.sub,
         email: typeof payload.email === 'string' ? payload.email : undefined,
+        emailVerified: payload.email_verified === true,
         name: typeof payload.name === 'string' ? payload.name : undefined,
       };
     },
