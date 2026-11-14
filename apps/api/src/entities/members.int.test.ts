@@ -311,6 +311,46 @@ describe('members and invitations (M2-02)', () => {
     ).toBe(200);
   });
 
+  it('withdraws the pending invitations of an admin who is revoked or demoted', async () => {
+    const { entityId, admin } = await entity();
+    const other = await member(entityId, ['entity_admin'], 'admin2');
+    const third = await member(entityId, ['entity_admin'], 'admin3');
+    const invite = async (who: Person) =>
+      entityInvitationSchema.parse(
+        (
+          await call('POST', `/entities/${entityId}/invitations`, who, {
+            email: person('alt').email,
+            roles: ['entity_admin'],
+          })
+        ).json(),
+      );
+    const byRevoked = await invite(other.who);
+    const byDemoted = await invite(third.who);
+    const byAdmin = await invite(admin.who);
+
+    expect(
+      (await call('POST', `/entities/${entityId}/members/${other.membershipId}/revoke`, admin.who))
+        .statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await call('PUT', `/entities/${entityId}/members/${third.membershipId}/roles`, admin.who, {
+          roles: ['entity_viewer'],
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    const status = async (id: string) =>
+      (await prisma.invitation.findUniqueOrThrow({ where: { id } })).status;
+    expect(await status(byRevoked.id)).toBe('revoked');
+    expect(await status(byDemoted.id)).toBe('revoked');
+    expect(await status(byAdmin.id)).toBe('pending');
+    expect((await audited(byRevoked.id)).at(-1)).toMatchObject({
+      action: 'invitation.revoked',
+      after: { reason: 'inviter_no_longer_admin' },
+    });
+  });
+
   describe('authorization', () => {
     it('only the entity_admin manages members (403 for other roles, 404 for other entities)', async () => {
       const { entityId } = await entity();

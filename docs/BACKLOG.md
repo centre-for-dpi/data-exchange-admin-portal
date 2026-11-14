@@ -288,6 +288,7 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Permisos.** El permiso nuevo `entity.members.write` es solo del `entity_admin`. Leer miembros e invitaciones es para admin y viewer. Quien no es de la entidad recibe 404.
     - **Invitación.** Va a un correo, igual que en el alta (ADR-0018). Se envía por el outbox (`invitation.email`) y vence en 14 días. No se puede duplicar una pendiente ni invitar a un miembro activo. Una vencida se cierra (`invitation.expired`) al invitar de nuevo.
     - **Miembro revocado.** Se le puede volver a invitar, y vuelve solo con los roles de la invitación nueva.
+    - **Invitaciones de un exadministrador.** Si a un administrador se le revoca el acceso o se le quita `entity_admin`, sus invitaciones pendientes se retiran en la misma transacción, y queda auditado. Así no puede volver a entrar con una invitación que dejó enviada.
     - **Último administrador.** La entidad nunca queda sin un `entity_admin` activo. Se comprueba dentro de la transacción, con bloqueo de la fila de la entidad.
     - **CA.** Los roles se leen de la base en cada petición (ADR-0004). El test lo prueba: la entidad responde 404 en la petición siguiente a la revocación.
     - **Web.** "Mi entidad" muestra los datos, los miembros con edición de roles y revocación, las invitaciones pendientes y el formulario para invitar.

@@ -151,6 +151,38 @@ export class MembersService {
     }
   }
 
+  /**
+   * Withdraws the pending invitations a user sent for the entity, when that user stops being an
+   * admin (revoked, or entity_admin removed): otherwise a former admin's invitation, possibly to
+   * another address of theirs, would still let someone in.
+   */
+  private async withdrawInvitationsBy(
+    tx: Tx,
+    entity: EntityContext,
+    principal: Principal,
+    inviterId: string,
+    requestId: string | undefined,
+  ): Promise<void> {
+    const pending = await tx.invitation.findMany({
+      where: { entityId: entity.entityId, invitedBy: inviterId, status: 'pending' },
+      select: { id: true },
+    });
+    for (const { id } of pending) {
+      await tx.invitation.update({
+        where: { id },
+        data: { status: 'revoked', respondedAt: new Date(), respondedBy: principal.userId },
+      });
+      await this.audit.record(tx, {
+        actor: actorOf(principal, entity),
+        action: 'invitation.revoked',
+        target: { type: 'invitation', id },
+        before: { status: 'pending' },
+        after: { status: 'revoked', reason: 'inviter_no_longer_admin' },
+        requestId,
+      });
+    }
+  }
+
   private static view(m: {
     id: string;
     roles: EntityRole[];
@@ -177,6 +209,9 @@ export class MembersService {
       });
       if (changed.count === 0) throw new ConflictError('The member changed meanwhile');
       await MembersService.assertAdminRemains(tx, entity.entityId);
+      if (before.roles.includes('entity_admin') && !roles.includes('entity_admin')) {
+        await this.withdrawInvitationsBy(tx, entity, principal, before.userId, requestId);
+      }
       await this.audit.record(tx, {
         actor: actorOf(principal, entity),
         action: 'membership.roles_changed',
@@ -204,6 +239,7 @@ export class MembersService {
       });
       if (changed.count === 0) throw new ConflictError('The member changed meanwhile');
       await MembersService.assertAdminRemains(tx, entity.entityId);
+      await this.withdrawInvitationsBy(tx, entity, principal, before.userId, requestId);
       await this.audit.record(tx, {
         actor: actorOf(principal, entity),
         action: 'membership.revoked',
