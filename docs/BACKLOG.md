@@ -336,8 +336,8 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Descarga.** Es para la consumidora y para la proveedora, y por esta última también el operador y el regulador. Va siempre como adjunto, con `Digest`, sin caché y con CSP `sandbox`.
     - **Plantilla.** `documents.agreementTemplate` de la config del país (ruta relativa al YAML, validada al cargar). Para Colombia hay un acuerdo modelo en Markdown editable. La web la sirve en `/files/agreement-template`.
     - **Eliminación por orden judicial** (SPEC §5). `POST /documents/:id/purge {order}`, solo `platform_admin`. Borra los bytes y deja la fila, su SHA-256, la orden y el evento `document.purged`; las descargas responden 410 (código `gone`).
-    - **Pruebas.** 3 de integración y 1 de configuración. La e2e `agreements.spec.ts` cubre adjuntar, descargar desde ambos lados y la plantilla, con axe.
-    - **Pendiente.** La pantalla del operador para la eliminación por orden judicial; por ahora solo existe el API.
+    - **Registro de documentos.** `GET /documents` (solo `platform_admin`, permiso `document.list`) lista solo metadatos: nombre, tipo, tamaño, SHA-256, entidad dueña y eliminación con su orden. Filtra por entidad, tipo y estado, y pagina por cursor. La pantalla `/operator/documents` filtra con un formulario GET y elimina por orden legal: pide la referencia de la orden y una confirmación explícita, comprobada también en la acción del servidor.
+    - **Pruebas.** 4 de integración y 1 de configuración. La e2e `agreements.spec.ts` cubre adjuntar, descargar desde ambos lados, la plantilla y la eliminación desde la consola (después la descarga responde 410), con axe.
 - [x] **M2-08 — Notificaciones**: en el portal y por correo (Mailpit en dev) para los eventos de `SPEC.md §7`; preferencias por usuario.
   - _Notas de implementación:_
     - **Origen único: la bitácora.** `AuditService.record` deja un mensaje `notification.dispatch` en el outbox, en la misma transacción, para las acciones de `notifications/notifying-actions.ts`. Así un aviso existe solo si el cambio se confirmó.

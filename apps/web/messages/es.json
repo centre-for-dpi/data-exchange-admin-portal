@@ -921,5 +921,43 @@
     "suspendFor": "Suspender {name}",
     "reactivateFor": "Reactivar {name}",
     "offboardFor": "Dar de baja {name}"
+  },
+  "documentsAdmin": {
+    "title": "Documentos adjuntos",
+    "lead": "Registro de los documentos que las entidades adjuntaron (designaciones, acuerdos de intercambio). Solo metadatos y su huella SHA-256. Por orden de una autoridad competente se puede eliminar el contenido de un documento: el registro, su huella y la orden se conservan y la eliminación queda en la bitácora.",
+    "filters": {
+      "title": "Filtrar documentos",
+      "owner": "Entidad",
+      "kind": "Tipo",
+      "state": "Estado",
+      "any": "Todos",
+      "apply": "Aplicar filtros",
+      "clear": "Limpiar"
+    },
+    "kinds": {
+      "designation": "Acto de designación",
+      "agreement": "Acuerdo de intercambio",
+      "annex": "Anexo",
+      "other": "Otro"
+    },
+    "register": "Registro",
+    "empty": "No hay documentos con estos filtros.",
+    "document": "Documento",
+    "owner": "Entidad",
+    "uploaded": "Cargado",
+    "state": "Estado",
+    "actions": "Acciones",
+    "size": "{kb} KB",
+    "available": "Disponible",
+    "purged": "Eliminado por orden legal",
+    "purgedOn": "El {date}. Orden: {order}",
+    "purge": "Eliminar {name}",
+    "purgeFor": "Eliminar {name} por orden legal",
+    "order": "Orden legal",
+    "orderHint": "Autoridad, número y fecha de la orden (por ejemplo, el juzgado y el auto).",
+    "confirm": "Entiendo que el contenido se borra de forma definitiva y no se puede recuperar.",
+    "confirmRequired": "Confirma que entiendes que la eliminación es definitiva.",
+    "purgeButton": "Eliminar contenido",
+    "older": "Documentos anteriores"
   }
 }

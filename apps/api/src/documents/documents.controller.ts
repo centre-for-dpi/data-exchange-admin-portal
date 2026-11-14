@@ -1,5 +1,11 @@
-import { Body, Controller, HttpCode, Param, Post, Req } from '@nestjs/common';
-import { documentIdParamsSchema, purgeDocumentSchema, purgedDocumentSchema } from '@rid/contracts';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  documentIdParamsSchema,
+  documentListQuerySchema,
+  documentPageSchema,
+  purgeDocumentSchema,
+  purgedDocumentSchema,
+} from '@rid/contracts';
 import { z } from 'zod';
 import { type AuthenticatedRequest, CurrentPrincipal, PlatformAccess } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';
@@ -11,6 +17,26 @@ import { DocumentsService } from './documents.service.js';
 @Controller('documents')
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
+
+  @Get()
+  @PlatformAccess('document.list')
+  @ApiOperation({
+    operationId: 'listDocuments',
+    summary: 'Register of attached documents',
+    description:
+      'Metadata only (name, kind, size, SHA-256, owner, deletion): the operator finds here the ' +
+      'document a legal order names. The bytes are never listed.',
+    tags: ['documents'],
+    query: documentListQuerySchema,
+    responses: { 200: { description: 'A page of documents', schema: documentPageSchema } },
+    errors: [400, 401, 403],
+  })
+  list(
+    @Query(new ZodValidationPipe(documentListQuerySchema))
+    query: z.infer<typeof documentListQuerySchema>,
+  ) {
+    return this.documents.list(query);
+  }
 
   @Post(':documentId/purge')
   @HttpCode(200)

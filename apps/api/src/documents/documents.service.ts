@@ -103,6 +103,43 @@ export class DocumentsService {
     return { document, bytes };
   }
 
+  /** The operator's register of documents, newest first; metadata only (M2-07). */
+  async list(query: {
+    ownerEntityId?: string;
+    kind?: DocumentKind;
+    purged?: 'true' | 'false';
+    cursor?: string;
+    limit: number;
+  }) {
+    const rows = await this.prisma.document.findMany({
+      where: {
+        ...(query.ownerEntityId ? { ownerEntityId: query.ownerEntityId } : {}),
+        ...(query.kind ? { kind: query.kind } : {}),
+        ...(query.purged ? { purgedAt: query.purged === 'true' ? { not: null } : null } : {}),
+      },
+      orderBy: { id: 'desc' },
+      take: query.limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      include: { ownerEntity: { select: { id: true, shortName: true, slug: true } } },
+    });
+    const page = rows.slice(0, query.limit);
+    return {
+      items: page.map((d) => ({
+        id: d.id,
+        kind: d.kind,
+        fileName: d.fileName,
+        mimeType: d.mimeType,
+        size: d.size,
+        sha256: d.sha256,
+        uploadedAt: d.createdAt.toISOString(),
+        owner: d.ownerEntity,
+        purgedAt: d.purgedAt?.toISOString() ?? null,
+        purgeOrder: d.purgeOrder,
+      })),
+      nextCursor: rows.length > query.limit ? (page.at(-1)?.id ?? null) : null,
+    };
+  }
+
   /**
    * Deletion by legal order, the only physical deletion in the domain (SPEC.md §5). The bytes
    * go; the row, its SHA-256 and the order stay, and the event is audited. Downloads answer 410.

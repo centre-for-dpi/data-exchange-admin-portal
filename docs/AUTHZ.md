@@ -41,6 +41,7 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | `purpose.read` | ✓ | ✓ | ✓ | · |
 | `purpose.manage` | ✓ | ✓ | · | · |
 | `document.purge` | ✓ | · | · | · |
+| `document.list` | ✓ | · | · | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Rutas
@@ -68,6 +69,7 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | GET | `/api/v1/data-subjects/me/accesses/:id/receipt` | ciudadano (token del realm de ciudadanos) |
 | GET | `/api/v1/data-subjects/me/alerts` | ciudadano (token del realm de ciudadanos) |
 | PUT | `/api/v1/data-subjects/me/alerts` | ciudadano (token del realm de ciudadanos) |
+| GET | `/api/v1/documents` | plataforma: `document.list` |
 | POST | `/api/v1/documents/:documentId/purge` | plataforma: `document.purge` |
 | GET | `/api/v1/entities/:entityId` | entidad: `entity.read` |
 | GET | `/api/v1/entities/:entityId/access-requests` | entidad: `access_request.read` |

@@ -921,5 +921,43 @@
     "suspendFor": "Suspend {name}",
     "reactivateFor": "Reactivate {name}",
     "offboardFor": "Offboard {name}"
+  },
+  "documentsAdmin": {
+    "title": "Attached documents",
+    "lead": "Register of the documents entities have attached (designations, exchange agreements). Metadata and SHA-256 fingerprint only. On the order of a competent authority a document's content can be deleted: the record, its fingerprint and the order are kept and the deletion is audited.",
+    "filters": {
+      "title": "Filter documents",
+      "owner": "Entity",
+      "kind": "Kind",
+      "state": "Status",
+      "any": "All",
+      "apply": "Apply filters",
+      "clear": "Clear"
+    },
+    "kinds": {
+      "designation": "Designation",
+      "agreement": "Exchange agreement",
+      "annex": "Annex",
+      "other": "Other"
+    },
+    "register": "Register",
+    "empty": "No documents match these filters.",
+    "document": "Document",
+    "owner": "Entity",
+    "uploaded": "Uploaded",
+    "state": "Status",
+    "actions": "Actions",
+    "size": "{kb} KB",
+    "available": "Available",
+    "purged": "Deleted by legal order",
+    "purgedOn": "On {date}. Order: {order}",
+    "purge": "Delete {name}",
+    "purgeFor": "Delete {name} by legal order",
+    "order": "Legal order",
+    "orderHint": "Authority, number and date of the order (for example the court and the ruling).",
+    "confirm": "I understand the content is deleted for good and cannot be recovered.",
+    "confirmRequired": "Confirm that you understand the deletion is final.",
+    "purgeButton": "Delete content",
+    "older": "Older documents"
   }
 }

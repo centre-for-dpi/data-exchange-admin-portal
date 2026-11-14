@@ -8,6 +8,8 @@ export interface FormState {
   formError?: string;
   /** The action succeeded (forms that stay on the page show a confirmation). */
   done?: boolean;
+  /** What the user typed, to show again: React resets the form after each action. */
+  values?: Record<string, string>;
 }
 
 export const initialFormState: FormState = {};

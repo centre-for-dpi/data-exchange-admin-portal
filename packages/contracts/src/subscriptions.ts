@@ -226,3 +226,24 @@ export const purgeDocumentSchema = z.strictObject({
 });
 export const documentIdParamsSchema = z.strictObject({ documentId: z.uuid() });
 export const purgedDocumentSchema = z.object({ id: z.uuid(), purgedAt: z.iso.datetime() });
+
+export const DOCUMENT_KINDS = ['designation', 'agreement', 'annex', 'other'] as const;
+export const documentKindSchema = z.enum(DOCUMENT_KINDS);
+export type DocumentKind = z.infer<typeof documentKindSchema>;
+
+/** The operator's register of attached documents: metadata only, never the bytes (M2-07). */
+export const documentListQuerySchema = z.strictObject({
+  ownerEntityId: z.uuid().optional(),
+  kind: documentKindSchema.optional(),
+  purged: z.enum(['true', 'false']).optional(),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+export const documentRecordSchema = documentSummarySchema.extend({
+  kind: documentKindSchema,
+  owner: z.object({ id: z.uuid(), shortName: z.string(), slug: z.string() }),
+  purgedAt: z.iso.datetime().nullable(),
+  purgeOrder: z.string().nullable(),
+});
+export type DocumentRecord = z.infer<typeof documentRecordSchema>;
+export const documentPageSchema = pageOf(documentRecordSchema);

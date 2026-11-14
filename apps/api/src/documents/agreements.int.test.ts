@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { loadCountryConfig } from '@rid/config';
-import { createdApplicationSchema, subscriptionDetailSchema } from '@rid/contracts';
+import {
+  createdApplicationSchema,
+  documentPageSchema,
+  subscriptionDetailSchema,
+} from '@rid/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -202,5 +206,49 @@ describe('exchange agreements and deletion by legal order (M2-07)', () => {
     expect(
       await prisma.auditEvent.count({ where: { targetId: documentId, action: 'document.purged' } }),
     ).toBe(1);
+  });
+
+  it('the operator finds documents in a metadata-only register, filtered by owner and deletion', async () => {
+    const id = await requested();
+    const documentId =
+      subscriptionDetailSchema.parse((await upload(id, 'carlos.dev', PDF)).json()).agreementDocument
+        ?.id ?? '';
+    const list = async (query: string, who = 'pablo.plataforma') =>
+      call('GET', `/documents?${query}`, who);
+
+    const res = await list(`ownerEntityId=${programas}&kind=agreement&purged=false&limit=100`);
+    expect(res.statusCode, res.body).toBe(200);
+    const page = documentPageSchema.parse(res.json());
+    const item = page.items.find((d) => d.id === documentId);
+    expect(item).toMatchObject({
+      kind: 'agreement',
+      owner: { id: programas },
+      purgedAt: null,
+      fileName: 'acuerdo.pdf',
+    });
+    expect(page.items.every((d) => d.owner.id === programas && d.purgedAt === null)).toBe(true);
+    expect(JSON.stringify(res.json())).not.toContain('storageKey');
+
+    // Cursor pagination walks the same rows without repeating.
+    const first = documentPageSchema.parse((await list('limit=1')).json());
+    if (first.nextCursor) {
+      const second = documentPageSchema.parse(
+        (await list(`limit=1&cursor=${first.nextCursor}`)).json(),
+      );
+      expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
+    }
+
+    await call('POST', `/documents/${documentId}/purge`, 'pablo.plataforma', {
+      order: 'Juzgado 2 Administrativo, auto 77 de 2026',
+    });
+    const purged = documentPageSchema.parse((await list('purged=true&limit=100')).json());
+    expect(purged.items.find((d) => d.id === documentId)).toMatchObject({
+      purgeOrder: 'Juzgado 2 Administrativo, auto 77 de 2026',
+    });
+
+    for (const who of ['ana.operadora', 'marta.regulador', 'sofia.auditora', 'carlos.dev']) {
+      expect((await list('', who)).statusCode).toBe(403);
+    }
+    expect((await list('kind=secret')).statusCode).toBe(400);
   });
 });

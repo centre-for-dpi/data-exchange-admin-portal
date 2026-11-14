@@ -118,6 +118,8 @@ export const PLATFORM_PERMISSIONS = {
   'purpose.manage': ['platform_admin', 'platform_reviewer'],
   /** Delete a document's bytes by legal order, the only physical deletion (SPEC.md §5). */
   'document.purge': ['platform_admin'],
+  /** Register of attached documents (metadata only), to find the one a legal order names. */
+  'document.list': ['platform_admin'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;
