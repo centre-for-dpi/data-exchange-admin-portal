@@ -9,3 +9,4 @@ export * from './net.js';
 export * from './audit.js';
 export * from './transparency.js';
 export * from './entities.js';
+export * from './notifications.js';

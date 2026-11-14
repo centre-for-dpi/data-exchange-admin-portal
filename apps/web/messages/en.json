@@ -727,5 +727,55 @@
       "reason": "Reason",
       "notPending": "This request is not waiting for the regulator’s decision."
     }
+  },
+  "notifications": {
+    "title": "Notices",
+    "short": "Notices",
+    "lead": "{count, plural, =0 {You have no unread notices.} one {You have one unread notice.} other {You have # unread notices.}}",
+    "empty": "You have no notices yet.",
+    "unread": "unread",
+    "markAllRead": "Mark all as read",
+    "preferencesTitle": "What you get by e-mail",
+    "preferencesLead": "Every notice shows up here; choose which ones you also want by e-mail.",
+    "emailFor": "Receive by e-mail",
+    "lockedSecurity": "Security notice: always e-mailed.",
+    "lockedOwnEmail": "It has its own e-mail.",
+    "savePreferences": "Save preferences",
+    "preferencesSaved": "Preferences saved.",
+    "kinds": {
+      "invitation_received": "You were invited to {entity}",
+      "entity_request_decided": "The onboarding request of {entity} was {decision, select, approved {approved} rejected {rejected} other {sent back for corrections}}",
+      "api_review_requested": "{api} {version} ({entity}) is waiting for your review",
+      "api_changes_requested": "Changes were requested on {api} {version}",
+      "api_published": "{api} {version} is published",
+      "api_deprecated": "{api} {version} is deprecated and will be retired on {date}",
+      "regulator_approval_needed": "{what, select, api {{api} {version} ({entity}) is waiting for the regulator} other {An access request to {api} is waiting for the regulator}}",
+      "access_requested": "{application} asks for access to {api}",
+      "access_request_answered": "{application} answered about its request to {api}",
+      "access_info_requested": "{entity} has a question about your request to {api}",
+      "access_approved": "Your access request to {api} was approved",
+      "access_rejected": "Your access request to {api} was rejected",
+      "access_expiring": "The access of {application} to {api} expires on {date}",
+      "access_suspended": "The access of {application} to {api} was suspended",
+      "access_revoked": "The access of {application} to {api} was revoked"
+    },
+    "kindNames": {
+      "invitation_received": "Invitations to an entity",
+      "entity_request_decided": "Decisions on your onboarding requests",
+      "api_review_requested": "Versions waiting for review",
+      "api_changes_requested": "Changes requested on your APIs",
+      "api_published": "Published APIs",
+      "api_deprecated": "APIs you use that are deprecated",
+      "regulator_approval_needed": "Pending regulator approvals",
+      "access_requested": "New access requests",
+      "access_request_answered": "Answers from requesters",
+      "access_info_requested": "Questions about your requests",
+      "access_approved": "Approved requests",
+      "access_rejected": "Rejected requests",
+      "access_expiring": "Access about to expire",
+      "access_suspended": "Suspended access",
+      "access_revoked": "Revoked access"
+    },
+    "unreadSuffix": "{count, plural, one {: one unread} other {: # unread}}"
   }
 }

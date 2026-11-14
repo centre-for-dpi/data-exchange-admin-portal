@@ -260,6 +260,7 @@ El proveedor sabe quién consulta, para qué y bajo qué autorización: resuelve
   - **Descarga:** `Content-Disposition: attachment`, `nosniff`, CSP `sandbox` y sin caché. La web la sirve en `/files/...` con el token de la sesión, que nunca llega al navegador.
   - **Acuerdos de intercambio (M2-07).** Se adjuntan a la solicitud con la misma ruta de subida. La plantilla del acuerdo modelo sale de `documents.agreementTemplate` de la config del país.
   - **Eliminación por orden judicial.** Es la única eliminación física. Borra los bytes después de confirmar la transacción y deja la fila con su SHA-256 y la referencia a la orden; las descargas responden 410.
+- **Notificaciones (M2-08).** Derivan de la bitácora: la escritura del evento encola `notification.dispatch` en la misma transacción. El worker resuelve destinatarios con el estado actual y guarda una fila por evento y persona (clave única, entrega idempotente). Envía correo según las preferencias, salvo en los avisos de seguridad, que siempre se envían. Los textos no llevan datos de las personas consultadas, solo nombres de APIs, entidades y aplicaciones.
 - **Correo saliente del API** (`RID_SMTP_URL`, Mailpit en desarrollo): solo lo envían workers desde el outbox (p. ej. `invitation.email`), así un correo sale si y solo si el cambio que lo causó se confirmó. Entrega al menos una vez, con reintentos durante horas. Los textos están en `apps/api/src/mail/messages.ts` (es/en) y los nombres del país vienen de la config.
 
 ## 8. Logs de acceso y privacidad

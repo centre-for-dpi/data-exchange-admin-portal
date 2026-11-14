@@ -338,7 +338,17 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Eliminación por orden judicial** (SPEC §5). `POST /documents/:id/purge {order}`, solo `platform_admin`. Borra los bytes y deja la fila, su SHA-256, la orden y el evento `document.purged`; las descargas responden 410 (código `gone`).
     - **Pruebas.** 3 de integración y 1 de configuración. La e2e `agreements.spec.ts` cubre adjuntar, descargar desde ambos lados y la plantilla, con axe.
     - **Pendiente.** La pantalla del operador para la eliminación por orden judicial; por ahora solo existe el API.
-- [ ] **M2-08 — Notificaciones**: en el portal y por correo (Mailpit en dev) para los eventos de `SPEC.md §7`; preferencias por usuario.
+- [x] **M2-08 — Notificaciones**: en el portal y por correo (Mailpit en dev) para los eventos de `SPEC.md §7`; preferencias por usuario.
+  - _Notas de implementación:_
+    - **Origen único: la bitácora.** `AuditService.record` deja un mensaje `notification.dispatch` en el outbox, en la misma transacción, para las acciones de `notifications/notifying-actions.ts`. Así un aviso existe solo si el cambio se confirmó.
+    - **Destinatarios.** Un worker los calcula con el estado de ese momento (`notification-rules.ts`): responsables de datos de la proveedora, solicitante, desarrolladores de la consumidora, operadores, regulador y solicitante del alta. Nunca avisa a quien hizo la acción.
+    - **Idempotencia.** Una fila por evento y persona (`@@unique([sourceSeq, userId])`), y el correo se marca al enviarse, así que los reintentos no duplican.
+    - **Tipos y preferencias.** 15 tipos (`NOTIFICATION_KINDS`). Cada persona elige cuáles quiere por correo. Los de seguridad (acceso suspendido o revocado) no se pueden apagar, y la invitación ya tiene su propio correo. Los cambios de preferencias quedan en la bitácora.
+    - **API.** `/me/notifications` (lista paginada con el conteo de no leídos), `/:id/read`, `/read-all` y `/me/notification-preferences`.
+    - **Web.** "Avisos" en el encabezado con el conteo, y página con la lista y las preferencias. Abrir un aviso lo marca leído y lleva a su página; solo redirige a rutas del portal.
+    - **Cambio en M2-06.** El aviso de renovación pasa a este mecanismo, así no hay correos dobles.
+    - **Pruebas.** 5 de integración. La e2e `notifications.spec.ts` usa el worker real y Mailpit, con axe.
+    - **Pendiente para M3 y M4.** Los avisos de certificado por vencer y de nodo fuera de línea.
 - [ ] **M2-09 — Auditoría completa**: todos los eventos del dominio, filtros, exportación CSV/JSON con hash del archivo, anclaje diario, permisos sin `UPDATE`/`DELETE` en la tabla verificados por test.
 - [ ] **M2-10 — Catálogo de finalidades**: administración por el operador; las APIs eligen finalidades permitidas del catálogo.
 - [ ] **M2-11 — Suspensión y baja de entidades**: `active ⇄ suspended`, `active → offboarded` (SPEC.md §4.1 punto 4): la suspensión bloquea publicaciones nuevas y suspende en el gateway las suscripciones de la entidad como consumidora.

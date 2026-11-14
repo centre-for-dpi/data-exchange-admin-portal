@@ -11,6 +11,7 @@ import { MAIL_TRANSPORT, type MailMessage } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { SubscriptionLifecycleService } from './subscription-lifecycle.service.js';
 import { POLICY_SYNC_TOPIC } from './subscriptions.service.js';
 
@@ -282,7 +283,11 @@ describe('subscription lifecycle (M2-06)', () => {
     const lifecycle = app.get(SubscriptionLifecycleService);
     expect(await lifecycle.queueRenewalNotices()).toContain(id);
     expect(await lifecycle.queueRenewalNotices()).not.toContain(id);
-    await lifecycle.sendRenewalNotice({ subscriptionId: id });
+    // The notice is a notification (M2-08): dispatch the audited event as the worker would.
+    const event = await prisma.auditEvent.findFirstOrThrow({
+      where: { targetId: id, action: 'subscription.renewal_notice_queued' },
+    });
+    await app.get(NotificationsService).dispatch({ seq: event.seq.toString() });
     const carlos = realmUsers.find((u) => u.username === 'carlos.dev');
     const mail = sent.find((m) => m.to === carlos?.email && m.text.includes(id));
     expect(mail?.subject).toMatch(/vence el/);

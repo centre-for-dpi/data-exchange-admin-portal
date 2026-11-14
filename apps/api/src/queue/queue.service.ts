@@ -24,8 +24,8 @@ const QUEUE_OPTIONS: Record<string, Parameters<PgBoss['createQueue']>[1]> = {
     retryBackoff: true,
     retryDelayMax: 3600,
   },
-  // Renewal notices (M2-06), same delivery guarantees as invitations.
-  'subscription.renewal_notice': {
+  // Notifications (M2-08): one job per audit event; in-portal rows are idempotent.
+  'notification.dispatch': {
     policy: 'standard',
     retryLimit: 20,
     retryDelay: 30,

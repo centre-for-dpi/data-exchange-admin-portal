@@ -727,5 +727,55 @@
       "reason": "Motivo",
       "notPending": "Esta solicitud no está esperando la decisión del regulador."
     }
+  },
+  "notifications": {
+    "title": "Avisos",
+    "short": "Avisos",
+    "lead": "{count, plural, =0 {No tienes avisos sin leer.} one {Tienes un aviso sin leer.} other {Tienes # avisos sin leer.}}",
+    "empty": "Todavía no tienes avisos.",
+    "unread": "sin leer",
+    "markAllRead": "Marcar todos como leídos",
+    "preferencesTitle": "Qué recibes por correo",
+    "preferencesLead": "Todos los avisos aparecen aquí; elige cuáles quieres además por correo.",
+    "emailFor": "Recibir por correo",
+    "lockedSecurity": "Aviso de seguridad: siempre llega por correo.",
+    "lockedOwnEmail": "Tiene su propio correo.",
+    "savePreferences": "Guardar preferencias",
+    "preferencesSaved": "Preferencias guardadas.",
+    "kinds": {
+      "invitation_received": "Te invitaron a {entity}",
+      "entity_request_decided": "La solicitud de alta de {entity} fue {decision, select, approved {aprobada} rejected {rechazada} other {devuelta con correcciones}}",
+      "api_review_requested": "{api} {version} ({entity}) espera tu revisión",
+      "api_changes_requested": "Se pidieron cambios en {api} {version}",
+      "api_published": "{api} {version} está publicada",
+      "api_deprecated": "{api} {version} quedó obsoleta y se retira el {date}",
+      "regulator_approval_needed": "{what, select, api {{api} {version} ({entity}) espera la aprobación del regulador} other {Una solicitud de acceso a {api} espera la aprobación del regulador}}",
+      "access_requested": "{application} pide acceso a {api}",
+      "access_request_answered": "{application} respondió sobre su solicitud a {api}",
+      "access_info_requested": "{entity} pregunta sobre tu solicitud a {api}",
+      "access_approved": "Tu solicitud de acceso a {api} fue aprobada",
+      "access_rejected": "Tu solicitud de acceso a {api} fue rechazada",
+      "access_expiring": "El acceso de {application} a {api} vence el {date}",
+      "access_suspended": "Se suspendió el acceso de {application} a {api}",
+      "access_revoked": "Se revocó el acceso de {application} a {api}"
+    },
+    "kindNames": {
+      "invitation_received": "Invitaciones a una entidad",
+      "entity_request_decided": "Decisiones sobre tus solicitudes de alta",
+      "api_review_requested": "Versiones que esperan revisión",
+      "api_changes_requested": "Cambios pedidos en tus APIs",
+      "api_published": "APIs publicadas",
+      "api_deprecated": "APIs que usas y quedan obsoletas",
+      "regulator_approval_needed": "Aprobaciones del regulador pendientes",
+      "access_requested": "Solicitudes de acceso nuevas",
+      "access_request_answered": "Respuestas de los solicitantes",
+      "access_info_requested": "Preguntas sobre tus solicitudes",
+      "access_approved": "Solicitudes aprobadas",
+      "access_rejected": "Solicitudes rechazadas",
+      "access_expiring": "Accesos por vencer",
+      "access_suspended": "Accesos suspendidos",
+      "access_revoked": "Accesos revocados"
+    },
+    "unreadSuffix": "{count, plural, one {: uno sin leer} other {: # sin leer}}"
   }
 }

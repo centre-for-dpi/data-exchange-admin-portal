@@ -1,6 +1,9 @@
 import Image from 'next/image';
 import { getTranslations } from 'next-intl/server';
+import { Bell } from 'lucide-react';
+import { notificationPageSchema } from '@rid/contracts';
 import { Link } from '../i18n/navigation';
+import { apiGet } from '../lib/api';
 import { visibleNavItems } from '../lib/navigation';
 import { getSite } from '../lib/site';
 import { getViewer } from '../lib/viewer';
@@ -14,6 +17,13 @@ export async function SiteHeader() {
   const site = getSite();
   const t = await getTranslations();
   const items = visibleNavItems(viewer, { publicCatalog: site.publicCatalog });
+  // Unread notices (M2-08); a failure only hides the count.
+  const unread =
+    viewer.authenticated && !viewer.apiUnavailable
+      ? await apiGet('/me/notifications?limit=1&unread=true', notificationPageSchema)
+          .then((p) => p.unread)
+          .catch(() => 0)
+      : 0;
 
   return (
     <header className="border-b border-border bg-background">
@@ -47,6 +57,29 @@ export async function SiteHeader() {
             </span>
           ) : null}
           <LocaleSwitcher />
+          {viewer.authenticated ? (
+            <Link
+              href="/notifications"
+              className="relative inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm text-foreground-strong hover:bg-surface-app"
+            >
+              <Bell aria-hidden="true" className="size-4" />
+              <span>{t('notifications.short')}</span>
+              {unread > 0 ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                  >
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                  {/* The visible label stays the start of the accessible name (WCAG 2.5.3). */}
+                  <span className="sr-only">
+                    {t('notifications.unreadSuffix', { count: unread })}
+                  </span>
+                </>
+              ) : null}
+            </Link>
+          ) : null}
           <UserMenu />
         </div>
       </div>

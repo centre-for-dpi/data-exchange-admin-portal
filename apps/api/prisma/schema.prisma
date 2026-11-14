@@ -295,6 +295,8 @@ model User {
 
   memberships   Membership[]
   platformRoles UserPlatformRole[]
+  notifications Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("app_user")
 }
@@ -937,4 +939,39 @@ model SubjectAlert {
 
   @@unique([subjectRef, clientId])
   @@map("subject_alert")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Notifications (SPEC.md §7, M2-08). Derived from audit events: one per event and recipient.
+// ---------------------------------------------------------------------------------------------
+
+model Notification {
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id])
+  /// One of NOTIFICATION_KINDS in packages/contracts.
+  kind        String
+  /// { params, link }: what the texts need, never secrets nor data of the people consulted.
+  payload     Json
+  /// The audit event (seq) it comes from: the unique key makes delivery idempotent.
+  sourceSeq   BigInt    @map("source_seq")
+  readAt      DateTime? @map("read_at") @db.Timestamptz(3)
+  emailSentAt DateTime? @map("email_sent_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([sourceSeq, userId])
+  @@index([userId, createdAt])
+  @@map("notification")
+}
+
+/// E-mail choice per user and kind; absent = e-mail on. Security kinds ignore it.
+model NotificationPreference {
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  kind      String
+  email     Boolean
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@id([userId, kind])
+  @@map("notification_preference")
 }

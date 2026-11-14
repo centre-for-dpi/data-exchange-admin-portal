@@ -9,8 +9,39 @@ const flatten = (obj: Record<string, unknown>, prefix = ''): string[] =>
       : [`${prefix}${key}`],
   );
 
-const placeholders = (text: string): string[] =>
-  [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1] ?? '').sort();
+/**
+ * Argument names of an ICU message: `{name}` and `{name, plural|select, …}`, walking into the
+ * branches of plural/select. Branch keys and their texts (`approved {aprobada}`) are not
+ * arguments, so translated branches do not count as different placeholders.
+ */
+function placeholders(text: string): string[] {
+  const names: string[] = [];
+  const message = (from: number, closing: boolean): number => {
+    let i = from;
+    while (i < text.length) {
+      const c = text[i];
+      if (c === '}' && closing) return i + 1;
+      if (c === '{') i = argument(i + 1);
+      else i += 1;
+    }
+    return i;
+  };
+  const argument = (from: number): number => {
+    const head = /^\s*(\w+)\s*([,}])/.exec(text.slice(from));
+    if (!head) return from;
+    names.push(head[1] ?? '');
+    let i = from + head[0].length;
+    if (head[2] === '}') return i;
+    // Skip the type (plural, select…) and read `key {message}` branches up to the closing brace.
+    while (i < text.length && text[i] !== '}') {
+      if (text[i] === '{') i = message(i + 1, true);
+      else i += 1;
+    }
+    return i + 1;
+  };
+  message(0, false);
+  return [...new Set(names)].sort();
+}
 
 const lookup = (obj: Record<string, unknown>, path: string): string =>
   path

@@ -1,5 +1,4 @@
 import {
-  Inject,
   Injectable,
   Logger,
   type OnApplicationBootstrap,
@@ -7,29 +6,25 @@ import {
 } from '@nestjs/common';
 import { getCountryConfig } from '@rid/config';
 import type { SubscriptionStatus } from '@rid/contracts';
-import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import { LIVE_STATUSES } from '../domain/subscription/state-machine.js';
-import { MAIL_TRANSPORT, type MailTransport } from '../mail/mail.service.js';
-import { MESSAGES, mailLocale } from '../mail/messages.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { QueueService } from '../queue/queue.service.js';
 import { POLICY_SYNC_TOPIC } from './subscriptions.service.js';
 
-export const RENEWAL_NOTICE_TOPIC = 'subscription.renewal_notice';
 const SYSTEM = { type: 'system' as const, id: 'system:subscription-lifecycle' };
 const EXPIRABLE: SubscriptionStatus[] = ['approved', 'active', 'suspended'];
 const DAY = 24 * 60 * 60 * 1000;
-const jobSchema = z.object({ subscriptionId: z.uuid() });
 
 /**
  * Time-driven steps of a subscription (SPEC.md §4.4, M2-06), every
  * RID_LIFECYCLE_INTERVAL_SECONDS (default 300):
  * - expiry: granted subscriptions past validUntil become `expired` (OPA also denies them by
  *   date; this makes the state and the audit trail say so) and the policy is resynced;
- * - renewal notice: lifecycle.subscriptionRenewalNoticeDays before validUntil, the requester is
- *   e-mailed once (outbox), unless a renewal is already in progress.
+ * - renewal notice: lifecycle.subscriptionRenewalNoticeDays before validUntil, once, unless a
+ *   renewal is in progress. The audited `subscription.renewal_notice_queued` reaches the
+ *   requester as a notification (in the portal and by e-mail, M2-08).
  */
 @Injectable()
 export class SubscriptionLifecycleService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -40,13 +35,10 @@ export class SubscriptionLifecycleService implements OnApplicationBootstrap, OnA
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
-    private readonly queue: QueueService,
-    @Inject(MAIL_TRANSPORT) private readonly mail: MailTransport,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
+  onApplicationBootstrap(): void {
     if (!QueueService.enabled()) return;
-    await this.queue.work(RENEWAL_NOTICE_TOPIC, (data) => this.sendRenewalNotice(data));
     const seconds = Number(process.env.RID_LIFECYCLE_INTERVAL_SECONDS ?? 300);
     this.timer = setInterval(
       () => {
@@ -127,46 +119,10 @@ export class SubscriptionLifecycleService implements OnApplicationBootstrap, OnA
           target: { type: 'subscription', id },
           after: { renewalNoticeSentAt: now.toISOString() },
         });
-        await this.outbox.enqueue(tx, {
-          topic: RENEWAL_NOTICE_TOPIC,
-          aggregate: `subscription:${id}`,
-          payload: { subscriptionId: id },
-        });
         return true;
       });
       if (done) noticed.push(id);
     }
     return noticed;
-  }
-
-  /** Worker for subscription.renewal_notice: e-mails the user who requested the access. */
-  async sendRenewalNotice(data: Record<string, unknown>): Promise<void> {
-    const { subscriptionId } = jobSchema.parse(data);
-    const s = await this.prisma.subscription.findUnique({
-      where: { id: subscriptionId },
-      include: {
-        application: true,
-        apiVersion: { include: { api: { include: { entity: true } } } },
-      },
-    });
-    if (!s || s.status !== 'active') return;
-    const requester = await this.prisma.user.findUnique({ where: { id: s.requestedBy } });
-    if (!requester || requester.status !== 'active') return;
-    const config = getCountryConfig();
-    const locale = mailLocale(config.country.locale);
-    const webUrl = (process.env.RID_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-    const until = new Intl.DateTimeFormat(config.country.locale, {
-      dateStyle: 'long',
-      timeZone: config.country.timezone,
-    }).format(s.validUntil);
-    const message = MESSAGES[locale].renewalNotice({
-      product: config.branding.productName,
-      apiName: s.apiVersion.api.name,
-      provider: s.apiVersion.api.entity.shortName,
-      application: s.application.name,
-      until,
-      link: `${webUrl}${locale === 'es' ? '' : `/${locale}`}/my-apps/requests/${s.id}`,
-    });
-    await this.mail.send({ to: requester.email, ...message });
   }
 }

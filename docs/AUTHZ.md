@@ -103,6 +103,11 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | GET | `/api/v1/me/invitations` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/me/invitations/:invitationId/accept` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/me/invitations/:invitationId/decline` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/me/notification-preferences` | cualquier sesión; solo recursos propios |
+| PUT | `/api/v1/me/notification-preferences` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/me/notifications` | cualquier sesión; solo recursos propios |
+| POST | `/api/v1/me/notifications/:notificationId/read` | cualquier sesión; solo recursos propios |
+| POST | `/api/v1/me/notifications/read-all` | cualquier sesión; solo recursos propios |
 | GET | `/api/v1/opa/bundle.tar.gz` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | POST | `/api/v1/opa/status` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/purposes` | cualquier sesión; solo recursos propios |

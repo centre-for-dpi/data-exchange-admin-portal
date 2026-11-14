@@ -1,3 +1,4 @@
+import { NOTIFICATION_TOPIC, NOTIFYING_ACTIONS } from '../notifications/notifying-actions.js';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import type { Tx } from '../prisma/prisma.service.js';
@@ -84,6 +85,16 @@ export class AuditService {
       },
       select: { seq: true },
     });
+    // Notifications (M2-08) are derived from the event, queued in this same transaction.
+    if (NOTIFYING_ACTIONS.has(input.action)) {
+      await tx.outboxMessage.create({
+        data: {
+          topic: NOTIFICATION_TOPIC,
+          aggregate: `audit:${event.seq}`,
+          payload: { seq: event.seq.toString() },
+        },
+      });
+    }
     return event.seq;
   }
 }
