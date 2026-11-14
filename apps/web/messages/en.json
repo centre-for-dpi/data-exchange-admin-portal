@@ -341,7 +341,8 @@
     "revoked": "Revoked",
     "expired": "Expired",
     "rejected": "Rejected",
-    "withdrawn": "Withdrawn"
+    "withdrawn": "Withdrawn",
+    "info_requested": "Questions from the provider"
   },
   "subscriptions": {
     "requestAccess": "Request access",
@@ -412,6 +413,28 @@
       "revoke": "Revoke access",
       "revokeHint": "The consumer entity can no longer call the API within a minute. This cannot be undone: access again needs a new request.",
       "revokeComment": "Reason for revoking"
+    },
+    "lifecycle": {
+      "requestInfo": "Ask for information",
+      "requestInfoHint": "The request goes back to the requester with your question; once answered, it comes back to you.",
+      "question": "What you need to know",
+      "suspend": "Suspend access",
+      "suspendHint": "The gateway stops allowing calls within a minute. You can reactivate it later.",
+      "reason": "Reason",
+      "reactivate": "Reactivate access",
+      "optionalComment": "Comment (optional)",
+      "providerAsks": "The provider asks for information:",
+      "answer": "Answer the provider",
+      "yourAnswer": "Your answer",
+      "withdraw": "Withdraw the request",
+      "withdrawHint": "The request is closed and the provider no longer decides on it.",
+      "renew": "Request renewal",
+      "renewHint": "A new request is created with the same data; the current access continues while it is decided.",
+      "renewTitle": "Renew access to {api}",
+      "renewalInProgress": "A renewal is in progress.",
+      "seeRenewal": "See the renewal",
+      "isRenewal": "This request renews a current subscription.",
+      "seeRenewed": "See the subscription it renews"
     }
   },
   "audit": {
@@ -464,7 +487,11 @@
         "submitted": "Version submitted for review",
         "approved": "Version approved by the operator",
         "changes_requested": "Changes requested",
-        "published": "Version published"
+        "published": "Version published",
+        "approved_regulator": "Version approved by the regulator",
+        "revised": "Version revised (compatible change)",
+        "deprecated": "Version deprecated",
+        "retired": "Version retired"
       },
       "application": {
         "created": "Application created"
@@ -477,7 +504,17 @@
         "approved": "Request approved",
         "rejected": "Request rejected",
         "activated": "Access active on the gateway",
-        "revoked": "Access revoked"
+        "revoked": "Access revoked",
+        "info_requested": "The provider asked for information",
+        "info_provided": "The requester answered",
+        "withdrawn": "Request withdrawn",
+        "suspended": "Access suspended",
+        "reactivated": "Access reactivated",
+        "expired": "Access expired",
+        "renewal_requested": "Renewal requested",
+        "renewal_notice_queued": "Renewal notice sent",
+        "approved_regulator": "Approved by the regulator",
+        "rejected_regulator": "Rejected by the regulator"
       }
     }
   },

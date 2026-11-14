@@ -19,6 +19,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
   timeout: 60_000,
+  // Server-rendered pages and actions under `next dev` can take many seconds on a loaded machine;
+  // CI runs the production build.
+  expect: { timeout: process.env.CI ? 10_000 : 30_000 },
   use: {
     baseURL,
     trace: 'retain-on-failure',

@@ -45,6 +45,7 @@ export async function requestAccessAction(
       validityMonths: text(formData, 'validityMonths'),
       ...optional(formData, 'legalReference'),
       ...optional(formData, 'requestedRateLimit'),
+      ...optional(formData, 'renewsSubscriptionId'),
     },
     subscriptionDetailSchema,
   );
@@ -110,4 +111,35 @@ export async function revokeSubscriptionAction(
   formData: FormData,
 ): Promise<FormState> {
   return decide(subscriptionId, 'revoke', { comment: text(formData, 'comment') });
+}
+
+export type SubscriptionStep =
+  'request-info' | 'provide-info' | 'withdraw' | 'suspend' | 'reactivate';
+
+/** Lifecycle steps (M2-06), on the provider side (access-requests) or the consumer side. */
+export async function subscriptionStepAction(
+  side: 'provider' | 'consumer',
+  subscriptionId: string,
+  step: SubscriptionStep,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const t = await getTranslations('forms');
+  const entityId = await activeEntityId();
+  if (!entityId) return { formError: t('unexpected') };
+  const collection = side === 'provider' ? 'access-requests' : 'subscriptions';
+  const result = await apiSend(
+    'POST',
+    `/entities/${entityId}/${collection}/${subscriptionId}/${step}`,
+    {
+      ...optional(formData, 'comment'),
+      ...(step === 'provide-info'
+        ? { ...optional(formData, 'purposeDetail'), ...optional(formData, 'legalBasisText') }
+        : {}),
+    },
+    subscriptionDetailSchema,
+  );
+  if (!result.ok) return problemToFormState(result.problem, t('unexpected'));
+  revalidatePath('/', 'layout');
+  return {};
 }

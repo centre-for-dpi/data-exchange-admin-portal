@@ -8,11 +8,14 @@ import { InvalidTransitionError } from '../../common/errors.js';
  *        \-> rejected          \-> rejected
  *   active <-> suspended, active -> revoked, active -> expired
  *   pending_* -> withdrawn (the requester gives up)
+ *   pending_provider -> info_requested -> pending_provider (the steward asks, the requester answers)
+ *   approved | active | suspended -> expired (validUntil passed, M2-06)
  */
 const TRANSITIONS: Record<SubscriptionStatus, readonly SubscriptionStatus[]> = {
-  pending_provider: ['pending_regulator', 'approved', 'rejected', 'withdrawn'],
+  pending_provider: ['pending_regulator', 'approved', 'rejected', 'withdrawn', 'info_requested'],
+  info_requested: ['pending_provider', 'withdrawn'],
   pending_regulator: ['approved', 'rejected', 'withdrawn'],
-  approved: ['active', 'revoked'],
+  approved: ['active', 'revoked', 'expired'],
   active: ['suspended', 'revoked', 'expired'],
   suspended: ['active', 'revoked', 'expired'],
   revoked: [],
@@ -24,6 +27,7 @@ const TRANSITIONS: Record<SubscriptionStatus, readonly SubscriptionStatus[]> = {
 /** Statuses that hold the "one live subscription per app, version and purpose" slot. */
 export const LIVE_STATUSES: readonly SubscriptionStatus[] = [
   'pending_provider',
+  'info_requested',
   'pending_regulator',
   'approved',
   'active',

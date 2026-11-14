@@ -6,6 +6,7 @@ import {
   AccessRequestsController,
   SubscriptionsController,
 } from './subscriptions/subscriptions.controller.js';
+import { SubscriptionLifecycleService } from './subscriptions/subscription-lifecycle.service.js';
 import { SubscriptionsService } from './subscriptions/subscriptions.service.js';
 import { AuditController, EntityAuditController } from './audit/audit.controller.js';
 import { AuditQueryService } from './audit/audit-query.service.js';
@@ -91,6 +92,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     CatalogService,
     ApplicationsService,
     SubscriptionsService,
+    SubscriptionLifecycleService,
     OpaService,
     AuditQueryService,
     SubjectAccessService,

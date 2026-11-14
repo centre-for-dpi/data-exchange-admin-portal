@@ -24,6 +24,14 @@ const QUEUE_OPTIONS: Record<string, Parameters<PgBoss['createQueue']>[1]> = {
     retryBackoff: true,
     retryDelayMax: 3600,
   },
+  // Renewal notices (M2-06), same delivery guarantees as invitations.
+  'subscription.renewal_notice': {
+    policy: 'standard',
+    retryLimit: 20,
+    retryDelay: 30,
+    retryBackoff: true,
+    retryDelayMax: 3600,
+  },
   // Invitation e-mails (M2-01): every message is delivered; SMTP outages are retried for hours.
   'invitation.email': {
     policy: 'standard',

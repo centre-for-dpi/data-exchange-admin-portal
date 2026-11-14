@@ -69,6 +69,14 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['data_steward'],
     platformRoles: [],
   },
+  /**
+   * Suspend, reactivate or revoke a subscription to the entity's APIs: the data steward, and the
+   * operator or the regulator for any entity (SPEC.md §4.4 step 5, M2-06).
+   */
+  'access_request.suspend': {
+    entityRoles: ['data_steward'],
+    platformRoles: ['platform_admin', 'regulator'],
+  },
   /** Timeline of the entity's own objects (its APIs, subscriptions it asked for or received). */
   'audit.entity.read': {
     entityRoles: ENTITY_ROLES,

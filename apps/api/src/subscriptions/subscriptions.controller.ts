@@ -7,8 +7,13 @@ import {
   entityIdParamsSchema,
   type RejectSubscriptionInput,
   rejectSubscriptionSchema,
+  provideInfoSchema,
+  reactivateSubscriptionSchema,
+  requestInfoSchema,
   type RevokeSubscriptionInput,
   revokeSubscriptionSchema,
+  suspendSubscriptionSchema,
+  withdrawSubscriptionSchema,
   subscriptionDetailSchema,
   type SubscriptionListQuery,
   subscriptionListQuerySchema,
@@ -89,6 +94,51 @@ export class SubscriptionsController {
     @Param('subscriptionId', subscriptionId()) id: string,
   ) {
     return this.subscriptions.getForConsumer(entity.entityId, id);
+  }
+
+  @Post(':subscriptionId/provide-info')
+  @HttpCode(200)
+  @EntityAccess('subscription.write')
+  @ApiOperation({
+    operationId: 'provideSubscriptionInfo',
+    summary: 'Answer the provider’s question; the request goes back to the provider',
+    description: 'May also correct the purpose detail and the legal basis.',
+    tags: ['subscriptions'],
+    params: subscriptionParamsSchema,
+    body: provideInfoSchema,
+    responses: { 200: { description: 'The request', schema: subscriptionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  provideInfo(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Body(new ZodValidationPipe(provideInfoSchema)) body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.subscriptions.provideInfo(entity.entityId, id, principal, body, request.id);
+  }
+
+  @Post(':subscriptionId/withdraw')
+  @HttpCode(200)
+  @EntityAccess('subscription.write')
+  @ApiOperation({
+    operationId: 'withdrawSubscription',
+    summary: 'Withdraw a pending access request',
+    tags: ['subscriptions'],
+    params: subscriptionParamsSchema,
+    body: withdrawSubscriptionSchema,
+    responses: { 200: { description: 'The request', schema: subscriptionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  withdraw(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Body(new ZodValidationPipe(withdrawSubscriptionSchema)) body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.subscriptions.withdraw(entity.entityId, id, principal, body, request.id);
   }
 }
 
@@ -178,13 +228,13 @@ export class AccessRequestsController {
 
   @Post(':subscriptionId/revoke')
   @HttpCode(200)
-  @EntityAccess('access_request.decide')
+  @EntityAccess('access_request.suspend')
   @ApiOperation({
     operationId: 'revokeSubscription',
     summary: 'Revoke a subscription to one of the entity’s APIs, with a reason',
     description:
-      'Final. The gateway starts denying calls (403 no_subscription) as soon as OPA downloads ' +
-      'the next bundle, within 60 seconds.',
+      'Final. The data steward, the operator or the regulator. The gateway starts denying calls ' +
+      '(403 no_subscription) as soon as OPA downloads the next bundle, within 60 seconds.',
     tags: ['access-requests'],
     params: subscriptionParamsSchema,
     body: revokeSubscriptionSchema,
@@ -200,6 +250,75 @@ export class AccessRequestsController {
     @Body(new ZodValidationPipe(revokeSubscriptionSchema)) body: RevokeSubscriptionInput,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.subscriptions.revoke(entity.entityId, id, principal, body, request.id);
+    return this.subscriptions.revoke(entity, id, principal, body, request.id);
+  }
+
+  @Post(':subscriptionId/request-info')
+  @HttpCode(200)
+  @EntityAccess('access_request.decide')
+  @ApiOperation({
+    operationId: 'requestSubscriptionInfo',
+    summary: 'Ask the requester for information; the request goes back to them',
+    tags: ['access-requests'],
+    params: subscriptionParamsSchema,
+    body: requestInfoSchema,
+    responses: { 200: { description: 'The request', schema: subscriptionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  requestInfo(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Body(new ZodValidationPipe(requestInfoSchema)) body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.subscriptions.requestInfo(entity.entityId, id, principal, body, request.id);
+  }
+
+  @Post(':subscriptionId/suspend')
+  @HttpCode(200)
+  @EntityAccess('access_request.suspend')
+  @ApiOperation({
+    operationId: 'suspendSubscription',
+    summary: 'Suspend an active subscription, with a reason',
+    description:
+      'The data steward, the operator or the regulator. The gateway denies calls once OPA has ' +
+      'the next bundle. A suspension by the operator or regulator can only be lifted by them.',
+    tags: ['access-requests'],
+    params: subscriptionParamsSchema,
+    body: suspendSubscriptionSchema,
+    responses: { 200: { description: 'The subscription', schema: subscriptionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  suspend(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Body(new ZodValidationPipe(suspendSubscriptionSchema)) body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.subscriptions.suspend(entity, id, principal, body, request.id);
+  }
+
+  @Post(':subscriptionId/reactivate')
+  @HttpCode(200)
+  @EntityAccess('access_request.suspend')
+  @ApiOperation({
+    operationId: 'reactivateSubscription',
+    summary: 'Lift a suspension',
+    tags: ['access-requests'],
+    params: subscriptionParamsSchema,
+    body: reactivateSubscriptionSchema,
+    responses: { 200: { description: 'The subscription', schema: subscriptionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  reactivate(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('subscriptionId', subscriptionId()) id: string,
+    @Body(new ZodValidationPipe(reactivateSubscriptionSchema)) body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.subscriptions.reactivate(entity, id, principal, body, request.id);
   }
 }

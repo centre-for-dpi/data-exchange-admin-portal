@@ -6,6 +6,15 @@ import type { EntityRole } from '@rid/contracts';
  */
 export type MailLocale = 'es' | 'en';
 
+interface RenewalText {
+  product: string;
+  apiName: string;
+  provider: string;
+  application: string;
+  until: string;
+  link: string;
+}
+
 interface InvitationText {
   product: string;
   entityShortName: string;
@@ -51,6 +60,16 @@ export const MESSAGES = {
         'Si no esperabas este mensaje, ignóralo: sin aceptar la invitación no pasa nada.',
       ].join('\n'),
     }),
+    renewalNotice: (t: RenewalText) => ({
+      subject: `Tu acceso a ${t.apiName} vence el ${t.until}`,
+      text: [
+        'Hola:',
+        '',
+        `La aplicación «${t.application}» tiene acceso a ${t.apiName} (${t.provider}) en ${t.product} hasta el ${t.until}.`,
+        'Si la necesitas después de esa fecha, pide la renovación: la solicitud llega prellenada y el acceso actual sigue mientras se decide.',
+        t.link,
+      ].join('\n'),
+    }),
   },
   en: {
     invitation: (t: InvitationText) => ({
@@ -66,6 +85,16 @@ export const MESSAGES = {
         `The invitation expires on ${t.expires}.`,
         '',
         'If you were not expecting this message, ignore it: nothing happens unless you accept.',
+      ].join('\n'),
+    }),
+    renewalNotice: (t: RenewalText) => ({
+      subject: `Your access to ${t.apiName} expires on ${t.until}`,
+      text: [
+        'Hello,',
+        '',
+        `The application "${t.application}" has access to ${t.apiName} (${t.provider}) on ${t.product} until ${t.until}.`,
+        'If you still need it after that date, request the renewal: the request comes prefilled and the current access continues while it is decided.',
+        t.link,
       ].join('\n'),
     }),
   },

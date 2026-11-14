@@ -341,7 +341,8 @@
     "revoked": "Revocada",
     "expired": "Vencida",
     "rejected": "Rechazada",
-    "withdrawn": "Retirada"
+    "withdrawn": "Retirada",
+    "info_requested": "Con preguntas del proveedor"
   },
   "subscriptions": {
     "requestAccess": "Solicitar acceso",
@@ -412,6 +413,28 @@
       "revoke": "Revocar acceso",
       "revokeHint": "La entidad consumidora deja de poder llamar a la API en menos de un minuto. No se puede deshacer: para volver a dar acceso hace falta una nueva solicitud.",
       "revokeComment": "Motivo de la revocación"
+    },
+    "lifecycle": {
+      "requestInfo": "Pedir información",
+      "requestInfoHint": "La solicitud vuelve al solicitante con tu pregunta; cuando responda, vuelve a ti.",
+      "question": "Qué necesitas saber",
+      "suspend": "Suspender el acceso",
+      "suspendHint": "El gateway deja de permitir las llamadas en menos de un minuto. Puedes reactivarlo después.",
+      "reason": "Motivo",
+      "reactivate": "Reactivar el acceso",
+      "optionalComment": "Comentario (opcional)",
+      "providerAsks": "El proveedor pide información:",
+      "answer": "Responder al proveedor",
+      "yourAnswer": "Tu respuesta",
+      "withdraw": "Retirar la solicitud",
+      "withdrawHint": "La solicitud se cierra y el proveedor ya no la decide.",
+      "renew": "Pedir la renovación",
+      "renewHint": "Se crea una solicitud nueva con los mismos datos; el acceso actual sigue mientras se decide.",
+      "renewTitle": "Renovar el acceso a {api}",
+      "renewalInProgress": "Hay una renovación en curso.",
+      "seeRenewal": "Ver la renovación",
+      "isRenewal": "Esta solicitud renueva una suscripción vigente.",
+      "seeRenewed": "Ver la suscripción que renueva"
     }
   },
   "audit": {
@@ -464,7 +487,11 @@
         "submitted": "Versión enviada a revisión",
         "approved": "Versión aprobada por el operador",
         "changes_requested": "Cambios solicitados",
-        "published": "Versión publicada"
+        "published": "Versión publicada",
+        "approved_regulator": "Versión aprobada por el regulador",
+        "revised": "Versión revisada (cambio compatible)",
+        "deprecated": "Versión marcada como obsoleta",
+        "retired": "Versión retirada"
       },
       "application": {
         "created": "Aplicación creada"
@@ -477,7 +504,17 @@
         "approved": "Solicitud aprobada",
         "rejected": "Solicitud rechazada",
         "activated": "Acceso activo en el gateway",
-        "revoked": "Acceso revocado"
+        "revoked": "Acceso revocado",
+        "info_requested": "El proveedor pidió información",
+        "info_provided": "El solicitante respondió",
+        "withdrawn": "Solicitud retirada",
+        "suspended": "Acceso suspendido",
+        "reactivated": "Acceso reactivado",
+        "expired": "Acceso vencido",
+        "renewal_requested": "Renovación solicitada",
+        "renewal_notice_queued": "Aviso de renovación enviado",
+        "approved_regulator": "Aprobada por el regulador",
+        "rejected_regulator": "Rechazada por el regulador"
       }
     }
   },

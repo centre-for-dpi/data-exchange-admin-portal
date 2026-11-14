@@ -318,7 +318,17 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Retiro.** `VersionLifecycleService`, cada `RID_LIFECYCLE_INTERVAL_SECONDS` (300 s), retira las versiones cuya fecha pasó: la ruta sale del gateway, las suscripciones vivas se revocan y las pendientes se rechazan. Todo queda en la bitácora, y el estado de la API se recalcula. Es idempotente.
     - **Pruebas.** 6 de compatibilidad y 6 de integración. La e2e `lifecycle.spec.ts` cubre revisión compatible, rechazo incompatible, deprecación y cabeceras reales del gateway, con axe.
     - **Pendiente para M2-08.** Los avisos a los consumidores sobre la deprecación y el retiro próximo.
-- [ ] **M2-06 — Ciclo de vida de suscripciones**: pedir información, desistir, suspender/reactivar, expiración automática, aviso de renovación a 30 días, renovación prellenada.
+- [x] **M2-06 — Ciclo de vida de suscripciones**: pedir información, desistir, suspender/reactivar, expiración automática, aviso de renovación a 30 días, renovación prellenada.
+  - _Notas de implementación:_
+    - **Pedir información.** Estado nuevo `info_requested`: `POST .../access-requests/:id/request-info`, del responsable de datos. El solicitante responde con `POST .../subscriptions/:id/provide-info` y puede corregir el detalle de la finalidad y la base legal; la solicitud vuelve a `pending_provider`. Mientras espera la respuesta, no se puede aprobar.
+    - **Desistir.** `POST .../subscriptions/:id/withdraw`, mientras esté pendiente.
+    - **Suspender, reactivar y revocar.** Permiso nuevo `access_request.suspend`: el responsable de datos, el operador (`platform_admin`) y el regulador. Una suspensión del operador o del regulador solo la levantan ellos, y el proveedor recibe 403. Cada cambio encola el `policy.sync`.
+    - **Vencimiento y aviso.** `SubscriptionLifecycleService`, cada `RID_LIFECYCLE_INTERVAL_SECONDS`:
+      - pasa a `expired` lo que superó `validUntil`;
+      - `lifecycle.subscriptionRenewalNoticeDays` antes del vencimiento, avisa por correo al solicitante una sola vez (outbox `subscription.renewal_notice`). No avisa si ya hay una renovación en curso.
+    - **Renovación prellenada.** Es una solicitud nueva con `renewsSubscriptionId`, con la misma aplicación, versión y finalidad, y solo de una suscripción activa. Convive con la activa hasta que se decide; hay como máximo una renovación viva por suscripción (índice parcial) y ninguna solicitud duplicada fuera de renovaciones (índice y comprobación en el API). En la web llega prellenada desde "Pedir la renovación".
+    - **Pruebas.** 9 de integración, más la matriz de autorización generada. La e2e `subscription-lifecycle.spec.ts` cubre pregunta y respuesta, aprobación, suspensión, reactivación y renovación, con axe.
+    - **Pendiente para M2-08.** Llevar los avisos al portal y a las preferencias del usuario.
 - [ ] **M2-07 — Documentos y acuerdos**: subir PDF del acuerdo (hash SHA-256, límite de tamaño), plantilla de acuerdo modelo descargable desde la config del país.
 - [ ] **M2-08 — Notificaciones**: en el portal y por correo (Mailpit en dev) para los eventos de `SPEC.md §7`; preferencias por usuario.
 - [ ] **M2-09 — Auditoría completa**: todos los eventos del dominio, filtros, exportación CSV/JSON con hash del archivo, anclaje diario, permisos sin `UPDATE`/`DELETE` en la tabla verificados por test.

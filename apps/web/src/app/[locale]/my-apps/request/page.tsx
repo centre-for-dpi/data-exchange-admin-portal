@@ -1,5 +1,9 @@
 import { getCountryConfig } from '@rid/config';
-import { applicationPageSchema, catalogDetailSchema } from '@rid/contracts';
+import {
+  applicationPageSchema,
+  catalogDetailSchema,
+  subscriptionDetailSchema,
+} from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -47,13 +51,28 @@ export default async function RequestAccessPage({ params, searchParams }: PagePr
   if (!version || version.status !== 'published') notFound();
 
   const apps = await apiGetAll(`/entities/${entity.entity.id}/applications`, applicationPageSchema);
-  const active = apps.items.filter((a) => a.status === 'active');
+  // A renewal (?renew=<id>) keeps the application and purpose of the subscription it renews and
+  // starts from what it had; the API checks it again (M2-06).
+  const renewed = param(query.renew)
+    ? await apiGet(
+        `/entities/${entity.entity.id}/subscriptions/${param(query.renew)}`,
+        subscriptionDetailSchema,
+      ).catch(() => notFound())
+    : null;
+  if (renewed && renewed.version.id !== version.id) notFound();
+  const active = apps.items.filter(
+    (a) => a.status === 'active' && (!renewed || a.id === renewed.application.id),
+  );
   const maxMonths = getCountryConfig().subscriptionMaxValidityMonths[detail.api.classification];
 
   return (
     <Page>
       <PageHeader
-        title={t('form.title', { api: detail.api.name })}
+        title={
+          renewed
+            ? t('lifecycle.renewTitle', { api: detail.api.name })
+            : t('form.title', { api: detail.api.name })
+        }
         description={t('form.version', {
           version: version.version,
           provider: detail.entity.legalName,
@@ -74,12 +93,26 @@ export default async function RequestAccessPage({ params, searchParams }: PagePr
           <RequestAccessForm
             apiVersionId={version.id}
             applications={active.map((a) => ({ id: a.id, name: a.name }))}
-            purposes={version.allowedPurposes.map((p) => ({
-              code: p.code,
-              label: localize(p.name, locale),
-            }))}
+            purposes={version.allowedPurposes
+              .filter((p) => !renewed || p.code === renewed.purpose.code)
+              .map((p) => ({
+                code: p.code,
+                label: localize(p.name, locale),
+              }))}
             operations={version.operations}
             maxMonths={maxMonths}
+            {...(renewed
+              ? {
+                  prefill: {
+                    renewsSubscriptionId: renewed.id,
+                    purposeDetail: renewed.purposeDetail,
+                    legalBasisText: renewed.legalBasisText,
+                    legalReference: renewed.legalReference,
+                    requestedOperations: renewed.requestedOperations,
+                    requestedRateLimit: renewed.requestedRateLimit,
+                  },
+                }
+              : {})}
           />
         </div>
       )}

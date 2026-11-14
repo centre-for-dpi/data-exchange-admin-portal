@@ -11,6 +11,22 @@ describe('subscription state machine (SPEC.md §4.4)', () => {
     expect(canTransition('pending_regulator', 'approved')).toBe(true);
   });
 
+  it('an info request goes back to the requester and returns to the provider (M2-06)', () => {
+    expect(canTransition('pending_provider', 'info_requested')).toBe(true);
+    expect(canTransition('info_requested', 'pending_provider')).toBe(true);
+    expect(canTransition('info_requested', 'withdrawn')).toBe(true);
+    expect(canTransition('info_requested', 'approved')).toBe(false);
+  });
+
+  it('granted subscriptions expire; suspension is reversible; pending ones cannot expire', () => {
+    for (const from of ['approved', 'active', 'suspended'] as const) {
+      expect(canTransition(from, 'expired')).toBe(true);
+    }
+    expect(canTransition('active', 'suspended')).toBe(true);
+    expect(canTransition('suspended', 'active')).toBe(true);
+    expect(canTransition('pending_provider', 'expired')).toBe(false);
+  });
+
   it('final states do not move and approval is not reversible into a request', () => {
     for (const from of ['rejected', 'revoked', 'expired', 'withdrawn'] as const) {
       expect(() => assertTransition(from, 'active')).toThrow(InvalidTransitionError);

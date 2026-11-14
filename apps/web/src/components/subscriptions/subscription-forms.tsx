@@ -8,6 +8,8 @@ import {
   rejectRequestAction,
   requestAccessAction,
   revokeSubscriptionAction,
+  type SubscriptionStep,
+  subscriptionStepAction,
 } from '../../lib/subscription-actions';
 import { ErrorSummary, Field, checkClass, errorTextClass, inputClass } from '../form/field';
 import { Button } from '../ui/button';
@@ -84,12 +86,22 @@ export function RequestAccessForm({
   purposes,
   operations,
   maxMonths,
+  prefill,
 }: {
   apiVersionId: string;
   applications: ReadonlyArray<{ id: string; name: string }>;
   purposes: ReadonlyArray<{ code: string; label: string }>;
   operations: readonly OperationOption[];
   maxMonths: number;
+  /** Renewal (SPEC.md §4.4 step 6): the subscription renewed and what it had (M2-06). */
+  prefill?: {
+    renewsSubscriptionId: string;
+    purposeDetail: string;
+    legalBasisText: string;
+    legalReference: string | null;
+    requestedOperations: readonly string[];
+    requestedRateLimit: number | null;
+  };
 }) {
   const t = useTranslations('subscriptions.form');
   const [state, action, pending] = useActionState(
@@ -99,6 +111,9 @@ export function RequestAccessForm({
   return (
     <form action={action} className="space-y-5" noValidate>
       <ErrorSummary state={state} />
+      {prefill ? (
+        <input type="hidden" name="renewsSubscriptionId" value={prefill.renewsSubscriptionId} />
+      ) : null}
       <Field name="applicationId" label={t('application')} required state={state}>
         {(p) => (
           <select {...p} className={inputClass}>
@@ -128,7 +143,9 @@ export function RequestAccessForm({
         required
         state={state}
       >
-        {(p) => <textarea {...p} rows={3} className={inputClass} />}
+        {(p) => (
+          <textarea {...p} rows={3} defaultValue={prefill?.purposeDetail} className={inputClass} />
+        )}
       </Field>
       <Field
         name="legalBasisText"
@@ -137,17 +154,26 @@ export function RequestAccessForm({
         required
         state={state}
       >
-        {(p) => <textarea {...p} rows={2} className={inputClass} />}
+        {(p) => (
+          <textarea {...p} rows={2} defaultValue={prefill?.legalBasisText} className={inputClass} />
+        )}
       </Field>
       <Field name="legalReference" label={t('legalReference')} state={state}>
-        {(p) => <input {...p} type="text" className={inputClass} />}
+        {(p) => (
+          <input
+            {...p}
+            type="text"
+            defaultValue={prefill?.legalReference ?? ''}
+            className={inputClass}
+          />
+        )}
       </Field>
       <OperationChecks
         name="requestedOperations"
         legend={t('operations')}
         hint={t('operationsHint')}
         operations={operations}
-        checked={[]}
+        checked={prefill?.requestedOperations ?? []}
         state={state}
       />
       <Field
@@ -169,7 +195,15 @@ export function RequestAccessForm({
         )}
       </Field>
       <Field name="requestedRateLimit" label={t('rateLimit')} state={state}>
-        {(p) => <input {...p} type="number" min={1} className={inputClass} />}
+        {(p) => (
+          <input
+            {...p}
+            type="number"
+            min={1}
+            defaultValue={prefill?.requestedRateLimit ?? undefined}
+            className={inputClass}
+          />
+        )}
       </Field>
       <Button type="submit" disabled={pending}>
         {t('submit')}
@@ -274,6 +308,82 @@ export function RevokeForm({ subscriptionId }: { subscriptionId: string }) {
       </Field>
       <Button type="submit" variant="danger" disabled={pending}>
         {t('revoke')}
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * One lifecycle step on a subscription (M2-06): ask for or provide information, withdraw,
+ * suspend or reactivate. Fields beyond `comment` are optional corrections (provide-info).
+ */
+export function LifecycleForm({
+  side,
+  subscriptionId,
+  step,
+  label,
+  hint,
+  commentLabel,
+  commentRequired,
+  variant = 'default',
+  corrections,
+}: {
+  side: 'provider' | 'consumer';
+  subscriptionId: string;
+  step: SubscriptionStep;
+  label: string;
+  hint?: string;
+  commentLabel: string;
+  commentRequired: boolean;
+  variant?: 'default' | 'outline' | 'danger';
+  corrections?: { purposeDetail: string; legalBasisText: string };
+}) {
+  const t = useTranslations('subscriptions.form');
+  const [state, action, pending] = useActionState(
+    subscriptionStepAction.bind(null, side, subscriptionId, step),
+    initialFormState,
+  );
+  const field = `${step}-comment`;
+  const fieldState: FormState = {
+    ...state,
+    fieldErrors: {
+      ...state.fieldErrors,
+      ...(state.fieldErrors?.comment ? { [field]: state.fieldErrors.comment } : {}),
+    },
+  };
+  return (
+    <form action={action} className="space-y-4" aria-label={label} noValidate>
+      <ErrorSummary state={state} />
+      {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
+      <Field name={field} label={commentLabel} required={commentRequired} state={fieldState}>
+        {(p) => <textarea {...p} name="comment" rows={3} className={inputClass} />}
+      </Field>
+      {corrections ? (
+        <>
+          <Field name="purposeDetail" label={t('purposeDetail')} state={state}>
+            {(p) => (
+              <textarea
+                {...p}
+                rows={3}
+                defaultValue={corrections.purposeDetail}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field name="legalBasisText" label={t('legalBasis')} state={state}>
+            {(p) => (
+              <textarea
+                {...p}
+                rows={2}
+                defaultValue={corrections.legalBasisText}
+                className={inputClass}
+              />
+            )}
+          </Field>
+        </>
+      ) : null}
+      <Button type="submit" variant={variant} disabled={pending}>
+        {label}
       </Button>
     </form>
   );

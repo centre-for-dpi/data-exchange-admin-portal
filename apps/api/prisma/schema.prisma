@@ -624,6 +624,8 @@ model Credential {
 /// SPEC.md §4.4. "Pedir información" (M2-06) will add its own state.
 enum SubscriptionStatus {
   pending_provider
+  /// The data steward asked the requester for information (M2-06); back to pending_provider.
+  info_requested
   pending_regulator
   approved
   active
@@ -669,10 +671,19 @@ model Subscription {
   createdBy                     String             @map("created_by")
 
   decisions SubscriptionDecision[]
+  /// The subscription this request renews (a prefilled new request, SPEC.md §4.4 step 6).
+  renewsSubscriptionId          String?            @map("renews_subscription_id") @db.Uuid
+  renews                        Subscription?      @relation("SubscriptionRenewal", fields: [renewsSubscriptionId], references: [id])
+  renewals                      Subscription[]     @relation("SubscriptionRenewal")
+  /// When the renewal notice went out (lifecycle.subscriptionRenewalNoticeDays before validUntil).
+  renewalNoticeSentAt           DateTime?          @map("renewal_notice_sent_at") @db.Timestamptz(3)
 
   /// At most one live subscription per application, API version and purpose (SPEC.md §4.4).
   /// The predicate is written exactly as PostgreSQL normalizes it, so Prisma sees no drift.
-  @@unique([applicationId, apiVersionId, purposeCode], map: "subscription_one_live_per_purpose", where: raw("(status = ANY (ARRAY['pending_provider'::subscription_status, 'pending_regulator'::subscription_status, 'approved'::subscription_status, 'active'::subscription_status, 'suspended'::subscription_status]))"))
+  /// A renewal (M2-06) lives next to the subscription it renews, so it is outside this index; the
+  /// second index allows one live renewal per subscription.
+  @@unique([applicationId, apiVersionId, purposeCode], map: "subscription_one_live_per_purpose", where: raw("((status = ANY (ARRAY['pending_provider'::subscription_status, 'info_requested'::subscription_status, 'pending_regulator'::subscription_status, 'approved'::subscription_status, 'active'::subscription_status, 'suspended'::subscription_status])) AND (renews_subscription_id IS NULL))"))
+  @@unique([renewsSubscriptionId], map: "subscription_one_live_renewal", where: raw("(status = ANY (ARRAY['pending_provider'::subscription_status, 'info_requested'::subscription_status, 'pending_regulator'::subscription_status, 'approved'::subscription_status, 'active'::subscription_status, 'suspended'::subscription_status]))"))
   @@index([apiVersionId, status])
   @@index([status, validUntil])
   @@map("subscription")
@@ -685,6 +696,10 @@ enum DecisionKind {
   suspended
   reactivated
   revoked
+  /// The requester answered an info request.
+  info_provided
+  /// The requester gave up the request.
+  withdrawn
 
   @@map("decision_kind")
 }

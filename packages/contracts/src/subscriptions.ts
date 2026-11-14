@@ -6,6 +6,7 @@ import { pageOf } from './session.js';
 /** Subscription lifecycle (SPEC.md §4.4). */
 export const SUBSCRIPTION_STATUSES = [
   'pending_provider',
+  'info_requested',
   'pending_regulator',
   'approved',
   'active',
@@ -37,6 +38,11 @@ export const createSubscriptionSchema = z.strictObject({
   /** Requested validity in months; the maximum depends on the API classification (SPEC.md §5). */
   validityMonths: z.coerce.number().int().min(1).max(120),
   requestedRateLimit: z.coerce.number().int().min(1).max(100_000).optional(),
+  /**
+   * The active subscription this request renews (SPEC.md §4.4 step 6): same application, version
+   * and purpose. It lives next to that subscription until approved (M2-06).
+   */
+  renewsSubscriptionId: z.uuid().optional(),
 });
 export type CreateSubscriptionInput = z.input<typeof createSubscriptionSchema>;
 
@@ -100,9 +106,14 @@ export const subscriptionDecisionSchema = z.object({
     'suspended',
     'reactivated',
     'revoked',
+    'info_provided',
+    'withdrawn',
   ]),
-  /** provider = a data steward of the provider entity; platform = operator or regulator. */
-  by: z.enum(['provider', 'platform']),
+  /**
+   * provider = a data steward of the provider entity; platform = operator or regulator;
+   * consumer = the requesting entity (answers and withdrawals).
+   */
+  by: z.enum(['provider', 'platform', 'consumer']),
   comment: z.string().nullable(),
   decidedAt: z.iso.datetime(),
 });
@@ -128,6 +139,10 @@ export const subscriptionDetailSchema = subscriptionSummarySchema.extend({
   /** True when approving moves the request to the regulator (M2-04). */
   requiresRegulator: z.boolean(),
   decisions: z.array(subscriptionDecisionSchema),
+  /** The subscription this request renews, if it is a renewal. */
+  renewsSubscriptionId: z.uuid().nullable(),
+  /** The live renewal of this subscription, if one was requested. */
+  renewal: z.object({ id: z.uuid(), status: subscriptionStatusSchema }).nullable(),
 });
 export type SubscriptionDetail = z.infer<typeof subscriptionDetailSchema>;
 
@@ -179,3 +194,25 @@ export const regulatorReasonSchema = z.strictObject({
   comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
 });
 export const subscriptionIdParamsSchema = z.strictObject({ subscriptionId: z.uuid() });
+
+// ---------------------------------------------------------------------------------------------
+// Lifecycle (SPEC.md §4.4, M2-06)
+// ---------------------------------------------------------------------------------------------
+
+const reason = (what: string) => z.string().trim().min(10, `${what} (10+ characters)`).max(2_000);
+
+/** The data steward asks the requester for information; the request goes back to them. */
+export const requestInfoSchema = z.strictObject({ comment: reason('say what you need') });
+/** The requester answers, and may correct the purpose detail and the legal basis. */
+export const provideInfoSchema = z.strictObject({
+  comment: reason('answer the question'),
+  purposeDetail: z.string().trim().min(10).max(2_000).optional(),
+  legalBasisText: z.string().trim().min(10).max(2_000).optional(),
+});
+export const withdrawSubscriptionSchema = z.strictObject({
+  comment: z.string().trim().max(2_000).optional(),
+});
+export const suspendSubscriptionSchema = z.strictObject({ comment: reason('explain the reason') });
+export const reactivateSubscriptionSchema = z.strictObject({
+  comment: z.string().trim().max(2_000).optional(),
+});

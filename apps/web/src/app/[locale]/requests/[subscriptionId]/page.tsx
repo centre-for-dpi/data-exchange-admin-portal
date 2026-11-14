@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import {
+  LifecycleForm,
   RequestDecisionForms,
   RevokeForm,
 } from '../../../../components/subscriptions/subscription-forms';
@@ -84,6 +85,52 @@ export default async function AccessRequestPage({ params }: PageProps) {
             />
           </div>
         </div>
+      ) : null}
+      {canDecide ? (
+        <Section title={t('lifecycle.requestInfo')}>
+          <div className="card max-w-3xl p-6 md:p-8">
+            <LifecycleForm
+              side="provider"
+              subscriptionId={detail.id}
+              step="request-info"
+              label={t('lifecycle.requestInfo')}
+              hint={t('lifecycle.requestInfoHint')}
+              commentLabel={t('lifecycle.question')}
+              commentRequired
+              variant="outline"
+            />
+          </div>
+        </Section>
+      ) : null}
+      {steward && detail.status === 'active' ? (
+        <Section title={t('lifecycle.suspend')}>
+          <div className="card max-w-3xl p-6 md:p-8">
+            <LifecycleForm
+              side="provider"
+              subscriptionId={detail.id}
+              step="suspend"
+              label={t('lifecycle.suspend')}
+              hint={t('lifecycle.suspendHint')}
+              commentLabel={t('lifecycle.reason')}
+              commentRequired
+              variant="outline"
+            />
+          </div>
+        </Section>
+      ) : null}
+      {steward && detail.status === 'suspended' ? (
+        <Section title={t('lifecycle.reactivate')}>
+          <div className="card max-w-3xl p-6 md:p-8">
+            <LifecycleForm
+              side="provider"
+              subscriptionId={detail.id}
+              step="reactivate"
+              label={t('lifecycle.reactivate')}
+              commentLabel={t('lifecycle.optionalComment')}
+              commentRequired={false}
+            />
+          </div>
+        </Section>
       ) : null}
       {canRevoke ? (
         <Section title={t('decide.revoke')}>

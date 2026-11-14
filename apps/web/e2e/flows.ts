@@ -32,7 +32,8 @@ export async function registerApi(
   await page.getByLabel('Clasificación').selectOption({ label: classification });
   await page.getByLabel('Correo del responsable').fill('apis@salud.demo.rid.example');
   await page.getByRole('button', { name: 'Registrar API' }).click();
-  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  // The redirect renders the new API's page; next dev can take several seconds on first compile.
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible({ timeout: 30_000 });
 }
 
 export async function newVersion(
@@ -109,8 +110,8 @@ export async function openRequestForm(page: Page, apiName: string) {
   const heading = page.getByRole('heading', { level: 1, name: `Solicitar acceso a ${apiName}` });
   await expect(async () => {
     await page.getByRole('link', { name: 'Solicitar acceso' }).click();
-    await expect(heading).toBeVisible({ timeout: 5_000 });
-  }).toPass({ timeout: 30_000 });
+    await expect(heading).toBeVisible({ timeout: 15_000 });
+  }).toPass({ timeout: 60_000 });
 }
 
 export async function requestAccess(page: Page, apiName: string, appName: string, months = '12') {

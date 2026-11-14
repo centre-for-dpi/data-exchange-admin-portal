@@ -15,7 +15,12 @@ import {
   approveSubscriptionSchema,
   createSubscriptionSchema,
   rejectSubscriptionSchema,
+  provideInfoSchema,
+  reactivateSubscriptionSchema,
+  requestInfoSchema,
   revokeSubscriptionSchema,
+  suspendSubscriptionSchema,
+  withdrawSubscriptionSchema,
 } from '@rid/contracts';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -29,7 +34,7 @@ import {
   ValidationError,
 } from '../common/errors.js';
 import { requiresRegulator } from '../domain/approval.js';
-import { assertTransition } from '../domain/subscription/state-machine.js';
+import { assertTransition, LIVE_STATUSES } from '../domain/subscription/state-machine.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
@@ -45,6 +50,11 @@ const INCLUDE = {
   apiVersion: { include: { api: { include: { entity: true } } } },
   purpose: true,
   decisions: { orderBy: { createdAt: 'asc' } },
+  renewals: {
+    where: { status: { in: [...LIVE_STATUSES] } },
+    select: { id: true, status: true },
+    take: 1,
+  },
 } satisfies Prisma.SubscriptionInclude;
 
 type Row = Prisma.SubscriptionGetPayload<{ include: typeof INCLUDE }>;
@@ -83,6 +93,15 @@ const readOnlyOperations = (spec: unknown): string[] =>
 function assertProviderStep(from: SubscriptionStatus, to: SubscriptionStatus): void {
   if (from !== 'pending_provider') throw new InvalidTransitionError('subscription', from, to);
   assertTransition(from, to);
+}
+
+/** Decisions the requesting entity takes on its own request (M2-06). */
+const CONSUMER_DECISIONS = new Set<string>(['info_provided', 'withdrawn']);
+
+/** How the caller reached the entity: as one of its members or with a platform role. */
+export interface ActingAs {
+  entityId: string;
+  via: 'membership' | 'platform';
 }
 
 const entityRef = (e: { id: string; slug: string; shortName: string }) => ({
@@ -174,10 +193,16 @@ export class SubscriptionsService {
       // Who decided is in the audit trail; the request only says on whose behalf.
       decisions: s.decisions.map((d) => ({
         decision: d.decision,
-        by: d.decidedByEntityId ? ('provider' as const) : ('platform' as const),
+        by: CONSUMER_DECISIONS.has(d.decision)
+          ? ('consumer' as const)
+          : d.decidedByEntityId
+            ? ('provider' as const)
+            : ('platform' as const),
         comment: d.comment,
         decidedAt: d.createdAt.toISOString(),
       })),
+      renewsSubscriptionId: s.renewsSubscriptionId,
+      renewal: s.renewals[0] ?? null,
     };
   }
 
@@ -275,6 +300,49 @@ export class SubscriptionsService {
     }
     if (errors.length > 0) throw new ValidationError(errors);
 
+    // A renewal (SPEC.md §4.4 step 6) points to an active subscription of the same application,
+    // version and purpose; it may live next to it until approved. Anything else must be the only
+    // live request for that combination, renewals included.
+    if (data.renewsSubscriptionId) {
+      const original = await this.prisma.subscription.findFirst({
+        where: { id: data.renewsSubscriptionId, application: { entityId } },
+      });
+      if (!original) {
+        throw new ValidationError([
+          { path: 'renewsSubscriptionId', message: 'unknown subscription' },
+        ]);
+      }
+      if (
+        original.applicationId !== data.applicationId ||
+        original.apiVersionId !== data.apiVersionId ||
+        original.purposeCode !== data.purposeCode
+      ) {
+        throw new ValidationError([
+          {
+            path: 'renewsSubscriptionId',
+            message: 'a renewal keeps the application, API version and purpose',
+          },
+        ]);
+      }
+      if (original.status !== 'active') {
+        throw new ConflictError('Only an active subscription can be renewed');
+      }
+    } else {
+      const live = await this.prisma.subscription.count({
+        where: {
+          applicationId: data.applicationId,
+          apiVersionId: data.apiVersionId,
+          purposeCode: data.purposeCode,
+          status: { in: [...LIVE_STATUSES] },
+        },
+      });
+      if (live > 0) {
+        throw new ConflictError(
+          'This application already has a live request for this API version and purpose',
+        );
+      }
+    }
+
     const now = new Date();
     const actor = { type: 'user' as const, id: principal.keycloakSub, entityId };
     try {
@@ -297,11 +365,14 @@ export class SubscriptionsService {
             endUserIdentificationRequired: endUserRequired(version.api.classification),
             requestedBy: principal.userId,
             createdBy: principal.keycloakSub,
+            renewsSubscriptionId: data.renewsSubscriptionId ?? null,
           },
         });
         await this.audit.record(tx, {
           actor,
-          action: 'subscription.requested',
+          action: data.renewsSubscriptionId
+            ? 'subscription.renewal_requested'
+            : 'subscription.requested',
           target: { type: 'subscription', id: created.id },
           after: created,
           requestId,
@@ -312,7 +383,9 @@ export class SubscriptionsService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictError(
-          'This application already has a live request for this API version and purpose',
+          data.renewsSubscriptionId
+            ? 'That subscription already has a renewal in progress'
+            : 'This application already has a live request for this API version and purpose',
         );
       }
       throw error;
@@ -499,12 +572,13 @@ export class SubscriptionsService {
    * subscription, so the gateway denies with no_subscription within one polling cycle (< 60 s).
    */
   async revoke(
-    entityId: string,
+    acting: ActingAs,
     subscriptionId: string,
     principal: Principal,
     input: RevokeSubscriptionInput,
     requestId?: string,
   ): Promise<SubscriptionDetail> {
+    const { entityId } = acting;
     const { comment } = revokeSubscriptionSchema.parse(input);
     const before = await this.loadForProvider(entityId, subscriptionId);
     assertTransition(before.status, 'revoked');
@@ -521,7 +595,7 @@ export class SubscriptionsService {
           subscriptionId,
           decision: 'revoked',
           decidedBy: principal.userId,
-          decidedByEntityId: entityId,
+          decidedByEntityId: acting.via === 'membership' ? entityId : null,
           comment,
         },
       });
@@ -540,5 +614,211 @@ export class SubscriptionsService {
       });
     });
     return this.getForProvider(entityId, subscriptionId);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Lifecycle (SPEC.md §4.4, M2-06)
+  // -------------------------------------------------------------------------------------------
+
+  /** One audited state change with its decision row, guarded on the status read before. */
+  private async decide(
+    tx: Tx,
+    before: Row,
+    to: SubscriptionStatus,
+    decision: {
+      kind: 'info_requested' | 'info_provided' | 'withdrawn' | 'suspended' | 'reactivated';
+      by: Principal;
+      onBehalfOf: string | null;
+      comment: string | null;
+      action: string;
+      requestId?: string;
+      data?: Prisma.SubscriptionUpdateManyMutationInput;
+      actorEntityId: string;
+    },
+  ): Promise<void> {
+    assertTransition(before.status, to);
+    const changed = await tx.subscription.updateMany({
+      where: { id: before.id, status: before.status },
+      data: { status: to, ...decision.data },
+    });
+    if (changed.count === 0) throw new ConflictError('The request changed meanwhile; reload it');
+    await tx.subscriptionDecision.create({
+      data: {
+        subscriptionId: before.id,
+        decision: decision.kind,
+        decidedBy: decision.by.userId,
+        decidedByEntityId: decision.onBehalfOf,
+        comment: decision.comment,
+      },
+    });
+    await this.audit.record(tx, {
+      actor: { type: 'user', id: decision.by.keycloakSub, entityId: decision.actorEntityId },
+      action: decision.action,
+      target: { type: 'subscription', id: before.id },
+      before: { status: before.status },
+      after: { status: to, comment: decision.comment },
+      requestId: decision.requestId,
+    });
+  }
+
+  private async loadForConsumer(entityId: string, subscriptionId: string): Promise<Row> {
+    const row = await this.prisma.subscription.findFirst({
+      where: { id: subscriptionId, application: { entityId } },
+      include: INCLUDE,
+    });
+    if (!row) throw new NotFoundError('Subscription');
+    return row;
+  }
+
+  /** The data steward asks the requester for information; the request goes back to them. */
+  async requestInfo(
+    entityId: string,
+    subscriptionId: string,
+    principal: Principal,
+    input: unknown,
+    requestId?: string,
+  ): Promise<SubscriptionDetail> {
+    const { comment } = requestInfoSchema.parse(input);
+    const before = await this.loadForProvider(entityId, subscriptionId);
+    assertProviderStep(before.status, 'info_requested');
+    this.assertNotRequester(principal, before);
+    await this.prisma.$transaction((tx) =>
+      this.decide(tx, before, 'info_requested', {
+        kind: 'info_requested',
+        by: principal,
+        onBehalfOf: entityId,
+        comment,
+        action: 'subscription.info_requested',
+        requestId,
+        actorEntityId: entityId,
+      }),
+    );
+    return this.getForProvider(entityId, subscriptionId);
+  }
+
+  /** The requester answers (and may correct purpose and legal basis); back to the provider. */
+  async provideInfo(
+    entityId: string,
+    subscriptionId: string,
+    principal: Principal,
+    input: unknown,
+    requestId?: string,
+  ): Promise<SubscriptionDetail> {
+    const data = provideInfoSchema.parse(input);
+    const before = await this.loadForConsumer(entityId, subscriptionId);
+    if (before.status !== 'info_requested') {
+      throw new ConflictError('The provider has not asked for information on this request');
+    }
+    await this.prisma.$transaction((tx) =>
+      this.decide(tx, before, 'pending_provider', {
+        kind: 'info_provided',
+        by: principal,
+        onBehalfOf: entityId,
+        comment: data.comment,
+        action: 'subscription.info_provided',
+        requestId,
+        actorEntityId: entityId,
+        data: {
+          ...(data.purposeDetail ? { purposeDetail: data.purposeDetail } : {}),
+          ...(data.legalBasisText ? { legalBasisText: data.legalBasisText } : {}),
+        },
+      }),
+    );
+    return this.getForConsumer(entityId, subscriptionId);
+  }
+
+  /** The requesting entity gives up a request that is still pending. */
+  async withdraw(
+    entityId: string,
+    subscriptionId: string,
+    principal: Principal,
+    input: unknown,
+    requestId?: string,
+  ): Promise<SubscriptionDetail> {
+    const { comment } = withdrawSubscriptionSchema.parse(input);
+    const before = await this.loadForConsumer(entityId, subscriptionId);
+    await this.prisma.$transaction((tx) =>
+      this.decide(tx, before, 'withdrawn', {
+        kind: 'withdrawn',
+        by: principal,
+        onBehalfOf: entityId,
+        comment: comment ?? null,
+        action: 'subscription.withdrawn',
+        requestId,
+        actorEntityId: entityId,
+      }),
+    );
+    return this.getForConsumer(entityId, subscriptionId);
+  }
+
+  /**
+   * Suspension by the provider's data steward, the operator or the regulator (SPEC.md §4.4
+   * step 5). Like revoking, it only takes access away, so separation of duties does not apply.
+   */
+  async suspend(
+    acting: ActingAs,
+    subscriptionId: string,
+    principal: Principal,
+    input: unknown,
+    requestId?: string,
+  ): Promise<SubscriptionDetail> {
+    const { comment } = suspendSubscriptionSchema.parse(input);
+    const before = await this.loadForProvider(acting.entityId, subscriptionId);
+    await this.prisma.$transaction(async (tx) => {
+      await this.decide(tx, before, 'suspended', {
+        kind: 'suspended',
+        by: principal,
+        onBehalfOf: acting.via === 'membership' ? acting.entityId : null,
+        comment,
+        action: 'subscription.suspended',
+        requestId,
+        actorEntityId: acting.entityId,
+      });
+      await this.outbox.enqueue(tx, {
+        topic: POLICY_SYNC_TOPIC,
+        aggregate: `subscription:${subscriptionId}`,
+        payload: { reason: 'suspended' },
+      });
+    });
+    return this.getForProvider(acting.entityId, subscriptionId);
+  }
+
+  /**
+   * Lifts a suspension. A suspension decided by the operator or the regulator can only be lifted
+   * by them: the provider cannot undo it.
+   */
+  async reactivate(
+    acting: ActingAs,
+    subscriptionId: string,
+    principal: Principal,
+    input: unknown,
+    requestId?: string,
+  ): Promise<SubscriptionDetail> {
+    const { comment } = reactivateSubscriptionSchema.parse(input);
+    const before = await this.loadForProvider(acting.entityId, subscriptionId);
+    const suspension = [...before.decisions].reverse().find((d) => d.decision === 'suspended');
+    if (suspension && suspension.decidedByEntityId === null && acting.via === 'membership') {
+      throw new ForbiddenError('The operator or the regulator suspended it; only they can lift it');
+    }
+    if (before.validUntil <= new Date()) {
+      throw new ConflictError('The subscription is past its validity; it can only expire');
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await this.decide(tx, before, 'active', {
+        kind: 'reactivated',
+        by: principal,
+        onBehalfOf: acting.via === 'membership' ? acting.entityId : null,
+        comment: comment ?? null,
+        action: 'subscription.reactivated',
+        requestId,
+        actorEntityId: acting.entityId,
+      });
+      await this.outbox.enqueue(tx, {
+        topic: POLICY_SYNC_TOPIC,
+        aggregate: `subscription:${subscriptionId}`,
+        payload: { reason: 'reactivated' },
+      });
+    });
+    return this.getForProvider(acting.entityId, subscriptionId);
   }
 }

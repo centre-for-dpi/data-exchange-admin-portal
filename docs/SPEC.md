@@ -162,6 +162,7 @@ active ⇄ suspended
 active → revoked
 active → expired (al pasar validUntil)
 pending_* → withdrawn (el solicitante desiste)
+pending_provider → info_requested → pending_provider (pregunta del responsable y respuesta)
 ```
 
 1. `app_developer` de la entidad consumidora elige API y versión, aplicación, finalidad (del catálogo permitido por esa API), detalle de la finalidad, base legal, operaciones requeridas, vigencia, y adjunta el acuerdo de intercambio o referencia a un convenio vigente.

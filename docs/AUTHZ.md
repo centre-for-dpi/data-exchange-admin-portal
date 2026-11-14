@@ -22,6 +22,7 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | `subscription.write` | · | · | · | ✓ | · | · | · | · | · |
 | `access_request.read` | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · |
 | `access_request.decide` | · | · | ✓ | · | · | · | · | · | · |
+| `access_request.suspend` | · | · | ✓ | · | · | ✓ | · | ✓ | · |
 | `audit.entity.read` | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · |
 
 ## Acciones de plataforma
@@ -55,8 +56,11 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | GET | `/api/v1/entities/:entityId/access-requests` | entidad: `access_request.read` |
 | GET | `/api/v1/entities/:entityId/access-requests/:subscriptionId` | entidad: `access_request.read` |
 | POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/approve` | entidad: `access_request.decide` |
+| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/reactivate` | entidad: `access_request.suspend` |
 | POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/reject` | entidad: `access_request.decide` |
-| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/revoke` | entidad: `access_request.decide` |
+| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/request-info` | entidad: `access_request.decide` |
+| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/revoke` | entidad: `access_request.suspend` |
+| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/suspend` | entidad: `access_request.suspend` |
 | GET | `/api/v1/entities/:entityId/apis` | entidad: `api.read` |
 | POST | `/api/v1/entities/:entityId/apis` | entidad: `api.write` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId` | entidad: `api.read` |
@@ -79,6 +83,8 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | GET | `/api/v1/entities/:entityId/subscriptions` | entidad: `subscription.read` |
 | POST | `/api/v1/entities/:entityId/subscriptions` | entidad: `subscription.write` |
 | GET | `/api/v1/entities/:entityId/subscriptions/:subscriptionId` | entidad: `subscription.read` |
+| POST | `/api/v1/entities/:entityId/subscriptions/:subscriptionId/provide-info` | entidad: `subscription.write` |
+| POST | `/api/v1/entities/:entityId/subscriptions/:subscriptionId/withdraw` | entidad: `subscription.write` |
 | GET | `/api/v1/entity-requests` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/entity-requests` | cualquier sesión; solo recursos propios |
 | GET | `/api/v1/entity-requests/:requestId` | cualquier sesión; solo recursos propios |
