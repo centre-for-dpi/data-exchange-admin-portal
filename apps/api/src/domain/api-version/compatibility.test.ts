@@ -119,6 +119,25 @@ describe('OpenAPI compatibility (ADR-0019)', () => {
     expect(breakingChanges(base(), security)[0]).toContain('security');
   });
 
+  it('judges the data subject and the operations as the gateway reads them', () => {
+    // Moving the declaration to the path item looks the same to a lenient reader, but OPA reads
+    // operations only: the operation would lose its data subject.
+    const moved = changed((d) => {
+      const item = d.paths['/afiliados/{numero}'] as Record<string, unknown>;
+      item['x-rid-data-subject'] = op(d)['x-rid-data-subject'];
+      delete op(d)['x-rid-data-subject'];
+    });
+    expect(breakingChanges(base(), moved).join(' ')).toContain('x-rid-data-subject');
+    // A path item behind $ref is not an operation for the gateway.
+    const referenced = changed((d) => {
+      (d.components as Record<string, unknown>).pathItems = {
+        afiliado: d.paths['/afiliados/{numero}'],
+      };
+      d.paths['/afiliados/{numero}'] = { $ref: '#/components/pathItems/afiliado' } as never;
+    });
+    expect(breakingChanges(base(), referenced)).not.toEqual([]);
+  });
+
   it('survives reference cycles', () => {
     const cyclic = changed((d) => {
       (d.components.schemas as Record<string, unknown>).Loop = {

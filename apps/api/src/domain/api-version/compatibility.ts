@@ -1,3 +1,5 @@
+import { listOperations } from '../../apis/lint/openapi-lint.js';
+
 /**
  * Backward compatibility of an OpenAPI revision against the published document (ADR-0019,
  * SPEC.md §4.2). Conservative: anything a consumer built against the published document might
@@ -67,7 +69,8 @@ function operations(doc: Json): Map<string, Operation> {
   const ops = new Map<string, Operation>();
   const paths = isObject(doc.paths) ? doc.paths : {};
   for (const [path, rawItem] of Object.entries(paths)) {
-    const item = deref(doc, rawItem);
+    // Path items are read as the gateway and OPA read them (listOperations): no $ref.
+    const item = rawItem;
     if (!isObject(item)) continue;
     const shared: unknown[] = Array.isArray(item.parameters) ? item.parameters : [];
     for (const method of METHODS) {
@@ -103,7 +106,8 @@ function operations(doc: Json): Map<string, Operation> {
           bodySchema && Array.isArray(bodySchema.required) ? bodySchema.required.map(String) : [],
         ),
         responses,
-        dataSubject: canonical(op[DATA_SUBJECT] ?? item[DATA_SUBJECT] ?? null),
+        // Operation level only, as listOperations reads it.
+        dataSubject: canonical(op[DATA_SUBJECT] ?? null),
         security: canonical(op.security ?? doc.security ?? null),
       });
     }
@@ -116,6 +120,21 @@ export function breakingChanges(published: unknown, revision: unknown): string[]
   const before = operations(published);
   const after = operations(revision);
   const problems: string[] = [];
+  // What the gateway, OPA and the transparency register act on comes from listOperations: the
+  // operations and their data subject must survive exactly as that parser sees them.
+  const enforced = new Map(listOperations(revision).map((o) => [`${o.method} ${o.path}`, o]));
+  for (const old of listOperations(published)) {
+    const key = `${old.method} ${old.path}`;
+    const now = enforced.get(key);
+    if (!now) {
+      if (!after.has(key)) continue; // reported below as removed
+      problems.push(`${key} is no longer an operation the gateway recognises`);
+      continue;
+    }
+    if (canonical(old.dataSubject) !== canonical(now.dataSubject)) {
+      problems.push(`${key} changed its ${DATA_SUBJECT} declaration as the gateway reads it`);
+    }
+  }
   for (const [key, old] of before) {
     const now = after.get(key);
     if (!now) {
