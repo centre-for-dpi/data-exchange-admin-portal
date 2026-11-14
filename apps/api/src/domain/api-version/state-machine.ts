@@ -15,7 +15,8 @@ const TRANSITIONS: Record<ApiVersionStatus, readonly ApiVersionStatus[]> = {
   changes_requested: ['draft', 'in_review'],
   approved_operator: ['approved_regulator', 'published', 'changes_requested'],
   approved_regulator: ['published'],
-  published: ['deprecated'],
+  // published -> retired without notice only when the provider entity is offboarded (M2-11).
+  published: ['deprecated', 'retired'],
   deprecated: ['retired'],
   retired: [],
 };

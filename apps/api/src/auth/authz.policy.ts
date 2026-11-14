@@ -108,6 +108,10 @@ export const PLATFORM_PERMISSIONS = {
   'regulator.read': ['regulator'],
   /** Approve, or send back / reject, what features.approval.regulatorForSensitive routes to it. */
   'regulator.decide': ['regulator'],
+  /** See every entity of the network with its status (operator console, M2-11). */
+  'entity_admin.read': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** Suspend, reactivate or offboard an entity (SPEC.md §2.1: "suspender cualquier cosa"). */
+  'entity_admin.decide': ['platform_admin'],
   /** See the whole purpose catalogue, inactive purposes and their use included (M2-10). */
   'purpose.read': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Add, edit, deactivate and reactivate purposes of the catalogue (operator). */

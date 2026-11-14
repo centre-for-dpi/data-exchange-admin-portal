@@ -554,7 +554,10 @@
         "submitted": "Onboarding sent for review",
         "approved": "Onboarding approved",
         "changes_requested": "Onboarding sent back for corrections",
-        "rejected": "Onboarding rejected"
+        "rejected": "Onboarding rejected",
+        "suspended": "Entity suspended",
+        "reactivated": "Entity reactivated",
+        "offboarded": "Entity offboarded"
       },
       "membership": {
         "created": "Member added",
@@ -668,7 +671,10 @@
     "decision": {
       "approved": "Approved",
       "changes_requested": "Corrections requested",
-      "rejected": "Rejected"
+      "rejected": "Rejected",
+      "suspended": "Suspended",
+      "reactivated": "Reactivated",
+      "offboarded": "Offboarded"
     },
     "reviewerRole": {
       "platform_admin": "Platform administration",
@@ -831,7 +837,8 @@
       "access_rejected": "Your access request to {api} was rejected",
       "access_expiring": "The access of {application} to {api} expires on {date}",
       "access_suspended": "The access of {application} to {api} was suspended",
-      "access_revoked": "The access of {application} to {api} was revoked"
+      "access_revoked": "The access of {application} to {api} was revoked",
+      "entity_status_changed": "{entity} {decision, select, suspended {was suspended on the network} reactivated {was reactivated on the network} other {was offboarded from the network}}"
     },
     "kindNames": {
       "invitation_received": "Invitations to an entity",
@@ -848,7 +855,8 @@
       "access_rejected": "Rejected requests",
       "access_expiring": "Access about to expire",
       "access_suspended": "Suspended access",
-      "access_revoked": "Revoked access"
+      "access_revoked": "Revoked access",
+      "entity_status_changed": "Suspension or offboarding of your entity"
     },
     "unreadSuffix": "{count, plural, one {: one unread} other {: # unread}}"
   },
@@ -892,5 +900,26 @@
       "save": "Save purposes",
       "saved": "Purposes saved."
     }
+  },
+  "entityAdmin": {
+    "title": "Entities of the network",
+    "lead": "Suspending cuts its applications off at the gateway and blocks new publications and requests; it may include its APIs as a provider. Offboarding is final.",
+    "empty": "There are no active entities.",
+    "entity": "Entity",
+    "status": "Status",
+    "activity": "Activity",
+    "actions": "Actions",
+    "providerToo": "Also as a provider",
+    "counts": "{members, plural, one {# member} other {# members}} · {apis, plural, one {# published API} other {# published APIs}} · {subscriptions, plural, one {# live subscription} other {# live subscriptions}}",
+    "manage": "Manage {name}",
+    "reason": "Reason",
+    "optionalComment": "Comment (optional)",
+    "alsoAsProvider": "Also stop serving its APIs to other entities",
+    "suspend": "Suspend",
+    "reactivate": "Reactivate",
+    "offboard": "Offboard",
+    "suspendFor": "Suspend {name}",
+    "reactivateFor": "Reactivate {name}",
+    "offboardFor": "Offboard {name}"
   }
 }

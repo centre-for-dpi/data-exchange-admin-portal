@@ -7,16 +7,16 @@ import { InvalidTransitionError } from '../../common/errors.js';
  *   requested -> under_review -> active
  *       ^            |    \-> rejected
  *       \------------/  (the reviewer asks for corrections)
- *   active <-> suspended, active -> offboarded
+ *   active <-> suspended, active | suspended -> offboarded (final)
  *
  * `requested` is the applicant's turn (edit, attach the designation, submit); `under_review` is
- * the operator's. Suspension and offboarding are not implemented yet (M2-11).
+ * the operator's. Suspension and offboarding are the operator's (M2-11).
  */
 const TRANSITIONS: Record<EntityStatus, readonly EntityStatus[]> = {
   requested: ['under_review'],
   under_review: ['requested', 'active', 'rejected'],
   active: ['suspended', 'offboarded'],
-  suspended: ['active'],
+  suspended: ['active', 'offboarded'],
   rejected: [],
   offboarded: [],
 };

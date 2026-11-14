@@ -34,6 +34,7 @@ import {
   ValidationError,
 } from '../common/errors.js';
 import { requiresRegulator } from '../domain/approval.js';
+import { assertEntityActive } from '../domain/entity/active.js';
 import { assertTransition, LIVE_STATUSES } from '../domain/subscription/state-machine.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { DocumentsService } from '../documents/documents.service.js';
@@ -264,6 +265,7 @@ export class SubscriptionsService {
     requestId?: string,
   ): Promise<SubscriptionDetail> {
     const data = createSubscriptionSchema.parse(input);
+    await assertEntityActive(this.prisma, entityId);
     const application = await scopedRepo(this.prisma.application, entityId).findFirst({
       where: { id: data.applicationId },
     });

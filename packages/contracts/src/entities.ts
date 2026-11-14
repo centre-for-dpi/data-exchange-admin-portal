@@ -109,7 +109,14 @@ export const documentSummarySchema = z.object({
 });
 export type DocumentSummary = z.infer<typeof documentSummarySchema>;
 
-export const ENTITY_REVIEW_DECISIONS = ['approved', 'changes_requested', 'rejected'] as const;
+export const ENTITY_REVIEW_DECISIONS = [
+  'approved',
+  'changes_requested',
+  'rejected',
+  'suspended',
+  'reactivated',
+  'offboarded',
+] as const;
 
 export const entityReviewSchema = z.object({
   decision: z.enum(ENTITY_REVIEW_DECISIONS),
@@ -247,3 +254,39 @@ export const entityMemberParamsSchema = z.strictObject({
   entityId: z.uuid(),
   membershipId: z.uuid(),
 });
+
+// ---------------------------------------------------------------------------------------------
+// Suspension and offboarding of entities by the operator (SPEC.md §4.1 step 4, M2-11)
+// ---------------------------------------------------------------------------------------------
+
+export const adminEntitySchema = z.object({
+  id: z.uuid(),
+  slug: z.string(),
+  shortName: z.string(),
+  legalName: z.string(),
+  status: entityStatusSchema,
+  providerSuspended: z.boolean(),
+  counts: z.object({
+    members: z.number().int(),
+    publishedApis: z.number().int(),
+    liveSubscriptions: z.number().int(),
+  }),
+});
+export const adminEntityListSchema = z.object({ items: z.array(adminEntitySchema) });
+export const adminEntityQuerySchema = z.strictObject({
+  status: z.enum(['active', 'suspended', 'offboarded']).optional(),
+});
+
+export const suspendEntitySchema = z.strictObject({
+  comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
+  /** Also stop serving the entity's APIs to other entities (an explicit decision). */
+  alsoAsProvider: z.boolean().default(false),
+});
+export const reactivateEntitySchema = z.strictObject({
+  comment: z.string().trim().max(2_000).optional(),
+});
+export const offboardEntitySchema = z.strictObject({
+  comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
+});
+/** Platform routes name the entity `:id`: `:entityId` is for routes scoped by membership. */
+export const adminEntityParamsSchema = z.strictObject({ id: z.uuid() });

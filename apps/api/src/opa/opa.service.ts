@@ -99,7 +99,11 @@ export class OpaService implements OnApplicationBootstrap {
         subscriptions: {
           where: {
             status: { in: [...GRANTED] },
-            apiVersion: { status: { in: [...SERVED_VERSIONS] } },
+            // A provider suspended as such (or offboarded) serves nobody (M2-11).
+            apiVersion: {
+              status: { in: [...SERVED_VERSIONS] },
+              api: { entity: { providerSuspended: false } },
+            },
           },
           orderBy: { id: 'asc' },
         },
@@ -110,7 +114,8 @@ export class OpaService implements OnApplicationBootstrap {
     const subscriptionIds: string[] = [];
     for (const app of apps) {
       const client: BundleClient = {
-        status: app.status === 'active' ? 'active' : 'suspended',
+        // A suspended or offboarded consumer entity suspends all its applications (M2-11).
+        status: app.status === 'active' && app.entity.status === 'active' ? 'active' : 'suspended',
         entityId: app.entityId,
         entitySlug: app.entity.slug,
         applicationId: app.id,

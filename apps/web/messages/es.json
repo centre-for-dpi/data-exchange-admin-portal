@@ -554,7 +554,10 @@
         "submitted": "Alta enviada a revisión",
         "approved": "Alta aprobada",
         "changes_requested": "Correcciones pedidas al alta",
-        "rejected": "Alta rechazada"
+        "rejected": "Alta rechazada",
+        "suspended": "Entidad suspendida",
+        "reactivated": "Entidad reactivada",
+        "offboarded": "Entidad dada de baja"
       },
       "membership": {
         "created": "Miembro agregado",
@@ -668,7 +671,10 @@
     "decision": {
       "approved": "Aprobada",
       "changes_requested": "Se pidieron correcciones",
-      "rejected": "Rechazada"
+      "rejected": "Rechazada",
+      "suspended": "Suspendida",
+      "reactivated": "Reactivada",
+      "offboarded": "Dada de baja"
     },
     "reviewerRole": {
       "platform_admin": "Administración de la plataforma",
@@ -831,7 +837,8 @@
       "access_rejected": "Tu solicitud de acceso a {api} fue rechazada",
       "access_expiring": "El acceso de {application} a {api} vence el {date}",
       "access_suspended": "Se suspendió el acceso de {application} a {api}",
-      "access_revoked": "Se revocó el acceso de {application} a {api}"
+      "access_revoked": "Se revocó el acceso de {application} a {api}",
+      "entity_status_changed": "{entity} {decision, select, suspended {fue suspendida en la red} reactivated {fue reactivada en la red} other {fue dada de baja de la red}}"
     },
     "kindNames": {
       "invitation_received": "Invitaciones a una entidad",
@@ -848,7 +855,8 @@
       "access_rejected": "Solicitudes rechazadas",
       "access_expiring": "Accesos por vencer",
       "access_suspended": "Accesos suspendidos",
-      "access_revoked": "Accesos revocados"
+      "access_revoked": "Accesos revocados",
+      "entity_status_changed": "Suspensión o baja de tu entidad"
     },
     "unreadSuffix": "{count, plural, one {: uno sin leer} other {: # sin leer}}"
   },
@@ -892,5 +900,26 @@
       "save": "Guardar finalidades",
       "saved": "Finalidades guardadas."
     }
+  },
+  "entityAdmin": {
+    "title": "Entidades de la red",
+    "lead": "Suspender corta el acceso de sus aplicaciones en el gateway y bloquea publicaciones y solicitudes nuevas; puede incluir sus APIs como proveedora. Dar de baja es definitivo.",
+    "empty": "No hay entidades activas.",
+    "entity": "Entidad",
+    "status": "Estado",
+    "activity": "Actividad",
+    "actions": "Acciones",
+    "providerToo": "También como proveedora",
+    "counts": "{members, plural, one {# miembro} other {# miembros}} · {apis, plural, one {# API publicada} other {# APIs publicadas}} · {subscriptions, plural, one {# suscripción viva} other {# suscripciones vivas}}",
+    "manage": "Gestionar {name}",
+    "reason": "Motivo",
+    "optionalComment": "Comentario (opcional)",
+    "alsoAsProvider": "Dejar de servir también sus APIs a otras entidades",
+    "suspend": "Suspender",
+    "reactivate": "Reactivar",
+    "offboard": "Dar de baja",
+    "suspendFor": "Suspender {name}",
+    "reactivateFor": "Reactivar {name}",
+    "offboardFor": "Dar de baja {name}"
   }
 }

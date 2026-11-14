@@ -15,6 +15,7 @@ import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError, ValidationError } from '../common/errors.js';
 import { breakingChanges } from '../domain/api-version/compatibility.js';
+import { assertEntityActive } from '../domain/entity/active.js';
 import { assertTransition, isEditable } from '../domain/api-version/state-machine.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { OutboxService } from '../outbox/outbox.service.js';
@@ -127,6 +128,7 @@ export class ApisService {
     input: CreateApiInput,
     requestId?: string,
   ): Promise<ApiDetail> {
+    await assertEntityActive(this.prisma, entityId);
     const data = createApiSchema.parse(input);
     const sectors = getCountryConfig().sectors.map((s) => s.code);
     if (!sectors.includes(data.sector)) {
@@ -237,6 +239,7 @@ export class ApisService {
     input: CreateApiVersionInput,
     requestId?: string,
   ): Promise<ApiVersionDetail> {
+    await assertEntityActive(this.prisma, entityId);
     const data = createApiVersionSchema.parse(input);
     const api = await this.findApi(entityId, apiId);
     const entity = await this.prisma.entity.findUniqueOrThrow({ where: { id: entityId } });
@@ -368,6 +371,7 @@ export class ApisService {
     source: string,
     requestId?: string,
   ): Promise<ApiVersionDetail> {
+    await assertEntityActive(this.prisma, entityId);
     const api = await this.findApi(entityId, apiId);
     const parsed = await this.lint(source, api.classification);
     if (!parsed.report.valid) {
@@ -581,6 +585,7 @@ export class ApisService {
     principal: Principal,
     requestId?: string,
   ): Promise<ApiVersionDetail> {
+    await assertEntityActive(this.prisma, entityId);
     const before = await this.findVersion(entityId, apiId, versionId);
     const target: ApiVersionStatus = 'in_review';
     assertTransition(before.status, target);

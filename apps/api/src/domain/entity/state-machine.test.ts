@@ -26,5 +26,7 @@ describe('entity state machine (SPEC.md §4.1)', () => {
     expect(canTransition('suspended', 'active')).toBe(true);
     expect(canTransition('under_review', 'suspended')).toBe(false);
     expect(canTransition('offboarded', 'active')).toBe(false);
+    expect(canTransition('suspended', 'offboarded')).toBe(true);
+    expect(canTransition('active', 'offboarded')).toBe(true);
   });
 });

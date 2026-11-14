@@ -369,7 +369,20 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - Todo queda en la bitácora: `purpose.created`, `purpose.updated`, `purpose.deactivated` y `purpose.activated`.
     - **Por API.** El responsable de datos (permiso nuevo `api.purposes.write`) elige las finalidades activas de cada versión no retirada (`PUT .../versions/:id/purposes`, `api_version.purposes_changed`). OPA autoriza por la finalidad de la suscripción, así que el cambio no toca el tráfico existente.
     - **Pruebas.** 5 de integración. La e2e `purposes.spec.ts` cubre alta en la consola, elección en la versión y desactivación, con axe.
-- [ ] **M2-11 — Suspensión y baja de entidades**: `active ⇄ suspended`, `active → offboarded` (SPEC.md §4.1 punto 4): la suspensión bloquea publicaciones nuevas y suspende en el gateway las suscripciones de la entidad como consumidora.
+- [x] **M2-11 — Suspensión y baja de entidades**: `active ⇄ suspended`, `active → offboarded` (SPEC.md §4.1 punto 4): la suspensión bloquea publicaciones nuevas y suspende en el gateway las suscripciones de la entidad como consumidora.
+  - _Notas de implementación:_
+    - **Quién decide.** `/admin/entities/:id/suspend|reactivate|offboard`, solo `platform_admin`. El revisor y el regulador solo ven la lista.
+    - **Suspender.**
+      - El bundle de OPA marca suspendidas las aplicaciones de la entidad, y el gateway responde `app_suspended`. Con `alsoAsProvider` (`providerSuspended`), sus APIs dejan de servir a otras entidades.
+      - No toca el estado de cada suscripción: al reactivar, cada una vuelve como estaba.
+      - Bloquea con 409 lo nuevo: APIs, versiones, envíos, revisiones compatibles, aprobaciones del operador y del regulador, y solicitudes de acceso.
+    - **Dar de baja** (definitivo, también desde `suspended`). En una sola transacción auditada:
+      - revoca o cierra las suscripciones vivas como consumidora y como proveedora;
+      - retira sus versiones servidas y quita sus rutas. Para eso agregué `published → retired`, permitida solo en la baja.
+      - revoca las membresías y las invitaciones pendientes.
+    - **Avisos.** Los administradores de la entidad reciben un aviso de seguridad (`entity_status_changed`) que no se puede desactivar.
+    - **Web.** "Entidades de la red" en la consola del operador.
+    - **Pruebas.** 4 de integración, con el efecto en el bundle de OPA. La e2e `entity-admin.spec.ts` suspende y reactiva desde la consola, con axe.
 
 **Cierre M2:** recorrido con los cuatro tipos de actor (proveedor, consumidor, operador, regulador) sin intervención técnica.
 

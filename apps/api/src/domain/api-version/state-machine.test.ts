@@ -16,6 +16,7 @@ describe('API version state machine (SPEC.md §4.2)', () => {
     ['approved_regulator', 'published'],
     ['published', 'deprecated'],
     ['deprecated', 'retired'],
+    ['published', 'retired'],
   ] as const)('allows %s -> %s', (from, to) => {
     expect(canTransition(from, to)).toBe(true);
   });

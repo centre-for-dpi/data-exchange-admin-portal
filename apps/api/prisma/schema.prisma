@@ -126,6 +126,8 @@ model Entity {
   designationDocument   Document? @relation("EntityDesignation", fields: [designationDocumentId], references: [id])
   submittedAt           DateTime? @map("submitted_at") @db.Timestamptz(3)
   decidedAt             DateTime? @map("decided_at") @db.Timestamptz(3)
+  /// While suspended: also stop serving its APIs to others (SPEC.md §4.1 step 4, explicit choice).
+  providerSuspended     Boolean   @default(false) @map("provider_suspended")
 
   memberships  Membership[]
   apis         Api[]
@@ -175,6 +177,10 @@ enum EntityReviewDecision {
   approved
   changes_requested
   rejected
+  /// M2-11: decisions on an active entity.
+  suspended
+  reactivated
+  offboarded
 
   @@map("entity_review_decision")
 }

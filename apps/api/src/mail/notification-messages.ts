@@ -26,6 +26,12 @@ export const NOTIFICATION_TEXTS: Record<MailLocale, Record<NotificationKind, Tex
     invitation_received: (p) => `Te invitaron a ${p.entity}`,
     entity_request_decided: (p) =>
       `La solicitud de alta de ${p.entity} fue ${DECISION.es[p.decision ?? ''] ?? p.decision}`,
+    entity_status_changed: (p) =>
+      p.decision === 'suspended'
+        ? `${p.entity} fue suspendida en la red`
+        : p.decision === 'reactivated'
+          ? `${p.entity} fue reactivada en la red`
+          : `${p.entity} fue dada de baja de la red`,
     api_review_requested: (p) => `${p.api} ${p.version} (${p.entity}) espera tu revisión`,
     api_changes_requested: (p) => `Se pidieron cambios en ${p.api} ${p.version}`,
     api_published: (p) => `${p.api} ${p.version} está publicada`,
@@ -47,6 +53,12 @@ export const NOTIFICATION_TEXTS: Record<MailLocale, Record<NotificationKind, Tex
     invitation_received: (p) => `You were invited to ${p.entity}`,
     entity_request_decided: (p) =>
       `The onboarding request of ${p.entity} was ${DECISION.en[p.decision ?? ''] ?? p.decision}`,
+    entity_status_changed: (p) =>
+      p.decision === 'suspended'
+        ? `${p.entity} was suspended on the network`
+        : p.decision === 'reactivated'
+          ? `${p.entity} was reactivated on the network`
+          : `${p.entity} was offboarded from the network`,
     api_review_requested: (p) => `${p.api} ${p.version} (${p.entity}) is waiting for your review`,
     api_changes_requested: (p) => `Changes were requested on ${p.api} ${p.version}`,
     api_published: (p) => `${p.api} ${p.version} is published`,

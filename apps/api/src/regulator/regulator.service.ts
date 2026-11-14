@@ -5,6 +5,7 @@ import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../common/errors.js';
 import { assertTransition as assertVersionTransition } from '../domain/api-version/state-machine.js';
 import { requiresRegulator } from '../domain/approval.js';
+import { assertEntityActive } from '../domain/entity/active.js';
 import { assertTransition as assertSubscriptionTransition } from '../domain/subscription/state-machine.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -137,6 +138,7 @@ export class RegulatorService {
       throw new ConflictError('This version does not need the regulator');
     }
     RegulatorService.assertImpartialOnVersion(principal, before);
+    await assertEntityActive(this.prisma, before.api.entityId);
 
     await this.prisma.$transaction(async (tx) => {
       const changed = await tx.apiVersion.updateMany({

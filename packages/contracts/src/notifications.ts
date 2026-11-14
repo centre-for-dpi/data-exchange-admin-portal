@@ -9,6 +9,7 @@ import { z } from 'zod';
 export const NOTIFICATION_KINDS = {
   invitation_received: { security: false, email: false },
   entity_request_decided: { security: false, email: true },
+  entity_status_changed: { security: true, email: true },
   api_review_requested: { security: false, email: true },
   api_changes_requested: { security: false, email: true },
   api_published: { security: false, email: true },

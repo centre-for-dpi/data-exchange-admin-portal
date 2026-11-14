@@ -7,6 +7,7 @@ import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../common/errors.js';
 import { assertTransition } from '../domain/api-version/state-machine.js';
 import { requiresRegulator } from '../domain/approval.js';
+import { assertEntityActive } from '../domain/entity/active.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
@@ -138,6 +139,7 @@ export class ReviewsService {
     const before = await this.load(versionId);
     const role = this.reviewerRole(principal);
     assertTransition(before.status, 'approved_operator');
+    await assertEntityActive(this.prisma, before.api.entityId);
     this.assertImpartial(principal, before);
     const actor = { type: 'user' as const, id: principal.keycloakSub };
     const publish = !requiresRegulator(before.api.classification, before.exposedFields);

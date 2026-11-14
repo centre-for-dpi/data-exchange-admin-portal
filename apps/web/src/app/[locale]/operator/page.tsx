@@ -38,9 +38,14 @@ export default async function OperatorPage({ params }: PageProps) {
       <PageHeader
         title={t('nav.operator')}
         actions={
-          <Link href="/operator/purposes" className="link">
-            {t('purposes.title')}
-          </Link>
+          <>
+            <Link href="/operator/entities" className="link">
+              {t('entityAdmin.title')}
+            </Link>
+            <Link href="/operator/purposes" className="link">
+              {t('purposes.title')}
+            </Link>
+          </>
         }
       />
       <Section title={t('operator.entitiesTitle')}>

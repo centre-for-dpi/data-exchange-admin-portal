@@ -36,6 +36,8 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | `entity_review.decide` | ✓ | ✓ | · | · |
 | `regulator.read` | · | · | ✓ | · |
 | `regulator.decide` | · | · | ✓ | · |
+| `entity_admin.read` | ✓ | ✓ | ✓ | · |
+| `entity_admin.decide` | ✓ | · | · | · |
 | `purpose.read` | ✓ | ✓ | ✓ | · |
 | `purpose.manage` | ✓ | ✓ | · | · |
 | `document.purge` | ✓ | · | · | · |
@@ -45,6 +47,10 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 
 | Método | Ruta | Acceso |
 | :-- | :-- | :-- |
+| GET | `/api/v1/admin/entities` | plataforma: `entity_admin.read` |
+| POST | `/api/v1/admin/entities/:id/offboard` | plataforma: `entity_admin.decide` |
+| POST | `/api/v1/admin/entities/:id/reactivate` | plataforma: `entity_admin.decide` |
+| POST | `/api/v1/admin/entities/:id/suspend` | plataforma: `entity_admin.decide` |
 | GET | `/api/v1/admin/purposes` | plataforma: `purpose.read` |
 | POST | `/api/v1/admin/purposes` | plataforma: `purpose.manage` |
 | PUT | `/api/v1/admin/purposes/:code` | plataforma: `purpose.manage` |

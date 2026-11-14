@@ -98,7 +98,26 @@ export async function resolveNotification(
 
   if (area === 'entity') {
     const entity = await prisma.entity.findUnique({ where: { id: event.targetId } });
-    if (!entity?.applicantId) return null;
+    if (!entity) return null;
+    const decision = event.action.split('.')[1] ?? '';
+    if (['suspended', 'reactivated', 'offboarded'].includes(decision)) {
+      // The entity's administrators; after offboarding their memberships are already revoked.
+      const admins = await prisma.membership.findMany({
+        where: {
+          entityId: entity.id,
+          roles: { has: 'entity_admin' },
+          ...(decision === 'offboarded' ? {} : { status: 'active' as const }),
+        },
+        select: { userId: true },
+      });
+      return {
+        kind: 'entity_status_changed',
+        params: { entity: entity.shortName, decision },
+        link: decision === 'offboarded' ? '/' : '/my-entity',
+        recipients: admins.map((a) => a.userId),
+      };
+    }
+    if (!entity.applicantId) return null;
     return {
       kind: 'entity_request_decided',
       params: { entity: entity.shortName, decision: event.action.split('.')[1] },
