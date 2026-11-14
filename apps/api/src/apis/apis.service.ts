@@ -503,6 +503,59 @@ export class ApisService {
     return this.toVersionDetail(updated);
   }
 
+  /**
+   * The provider's data steward chooses which catalogue purposes a version allows (SPEC.md §2.2,
+   * M2-10). Only active purposes; on any version that is not retired. Subscriptions already
+   * granted keep their purpose: only new requests use the new list (OPA authorizes by the
+   * subscription's purpose, not by this list).
+   */
+  async setPurposes(
+    entityId: string,
+    apiId: string,
+    versionId: string,
+    principal: Principal,
+    codes: string[],
+    requestId?: string,
+  ): Promise<ApiVersionDetail> {
+    const before = await this.findVersion(entityId, apiId, versionId);
+    if (before.status === 'retired') {
+      throw new ConflictError('A retired version takes no changes');
+    }
+    const active = await this.prisma.purpose.findMany({
+      where: { code: { in: codes }, active: true },
+      select: { code: true },
+    });
+    const unknown = codes.filter((c) => !active.some((p) => p.code === c));
+    if (unknown.length > 0) {
+      throw new ValidationError(
+        unknown.map((code) => ({
+          path: 'allowedPurposes',
+          message: `"${code}" is not an active purpose of the catalogue`,
+        })),
+      );
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.apiVersionPurpose.deleteMany({ where: { apiVersionId: versionId } });
+      await tx.apiVersionPurpose.createMany({
+        data: codes.map((purposeCode) => ({ apiVersionId: versionId, purposeCode })),
+      });
+      const after = await tx.apiVersion.findUniqueOrThrow({
+        where: { id: versionId },
+        include: VERSION_INCLUDE,
+      });
+      await this.audit.record(tx, {
+        actor: this.actor(principal, entityId),
+        action: 'api_version.purposes_changed',
+        target: { type: 'api_version', id: versionId },
+        before: { allowedPurposes: before.allowedPurposes.map((p) => p.purposeCode).sort() },
+        after: { allowedPurposes: [...codes].sort() },
+        requestId,
+      });
+      return after;
+    });
+    return this.toVersionDetail(updated);
+  }
+
   /** Api.status is derived from its versions (SPEC.md §3). */
   async refreshApiStatus(tx: Prisma.TransactionClient, apiId: string): Promise<void> {
     const statuses = new Set(

@@ -9,6 +9,7 @@ import {
   SubmitVersionForm,
 } from '../../../../../../components/apis/api-forms';
 import { VersionSheet } from '../../../../../../components/apis/version-sheet';
+import { VersionPurposesForm } from '../../../../../../components/purposes/forms';
 import { Notice } from '../../../../../../components/ui/notice';
 import { Page, PageHeader, Section } from '../../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../../lib/api';
@@ -113,6 +114,19 @@ export default async function VersionPage({ params }: PageProps) {
               </li>
             ))}
           </ul>
+        </Section>
+      ) : null}
+
+      {entity.roles.includes('data_steward') && version.status !== 'retired' ? (
+        <Section title={t('purposes.version.title')} description={t('purposes.version.lead')}>
+          <div className="card max-w-3xl p-6 md:p-8">
+            <VersionPurposesForm
+              apiId={api.id}
+              versionId={version.id}
+              options={[...purposeNames].map(([code, label]) => ({ code, label }))}
+              selected={version.allowedPurposes}
+            />
+          </div>
         </Section>
       ) : null}
 

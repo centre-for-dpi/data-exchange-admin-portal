@@ -36,7 +36,9 @@ import { HealthController } from './health/health.controller.js';
 import { MeController } from './me/me.controller.js';
 import { NotificationsController } from './notifications/notifications.controller.js';
 import { NotificationsService } from './notifications/notifications.service.js';
+import { AdminPurposesController } from './purposes/admin-purposes.controller.js';
 import { PurposesController } from './purposes/purposes.controller.js';
+import { PurposesService } from './purposes/purposes.service.js';
 import { ReconcilersModule } from './reconcilers/reconcilers.module.js';
 import { RegulatorController } from './regulator/regulator.controller.js';
 import { RegulatorService } from './regulator/regulator.service.js';
@@ -71,6 +73,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     DocumentsController,
     EntityReviewsController,
     PurposesController,
+    AdminPurposesController,
     ApisController,
     ReviewsController,
     RegulatorController,
@@ -94,6 +97,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     MembersService,
     { provide: MAIL_TRANSPORT, useFactory: createSmtpTransport },
     ApisService,
+    PurposesService,
     VersionLifecycleService,
     ReviewsService,
     RegulatorService,

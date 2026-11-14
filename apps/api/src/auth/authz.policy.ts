@@ -77,6 +77,11 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['data_steward'],
     platformRoles: ['platform_admin', 'regulator'],
   },
+  /** Choose which catalogue purposes the entity's API versions allow (SPEC.md §2.2, M2-10). */
+  'api.purposes.write': {
+    entityRoles: ['data_steward'],
+    platformRoles: [],
+  },
   /** Timeline of the entity's own objects (its APIs, subscriptions it asked for or received). */
   'audit.entity.read': {
     entityRoles: ENTITY_ROLES,
@@ -103,6 +108,10 @@ export const PLATFORM_PERMISSIONS = {
   'regulator.read': ['regulator'],
   /** Approve, or send back / reject, what features.approval.regulatorForSensitive routes to it. */
   'regulator.decide': ['regulator'],
+  /** See the whole purpose catalogue, inactive purposes and their use included (M2-10). */
+  'purpose.read': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** Add, edit, deactivate and reactivate purposes of the catalogue (operator). */
+  'purpose.manage': ['platform_admin', 'platform_reviewer'],
   /** Delete a document's bytes by legal order, the only physical deletion (SPEC.md §5). */
   'document.purge': ['platform_admin'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */

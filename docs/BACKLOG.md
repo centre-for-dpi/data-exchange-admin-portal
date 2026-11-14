@@ -361,10 +361,29 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - `GET /audit/verify` comprueba que cada anclaje encuentre su evento con el mismo hash. Así se detecta el corte de la cola, que quedó pendiente desde M1-11.
     - **Permisos verificados por test.** Ni `rid_app` ni el dueño del esquema pueden hacer UPDATE, DELETE ni TRUNCATE en `audit_event` ni en `audit_anchor`.
     - **Pruebas.** 8 de integración, 3 del catálogo y 3 de días locales. La e2e `audit-export.spec.ts` cubre filtrar, exportar firmado y verificar con anclajes, con axe.
-- [ ] **M2-10 — Catálogo de finalidades**: administración por el operador; las APIs eligen finalidades permitidas del catálogo.
+- [x] **M2-10 — Catálogo de finalidades**: administración por el operador; las APIs eligen finalidades permitidas del catálogo.
+  - _Notas de implementación:_
+    - **Administración.** `/admin/purposes`: el operador (`platform_admin`, `platform_reviewer`) agrega, edita, desactiva y reactiva finalidades. El regulador solo lee.
+      - Las finalidades de la config del país se editan en el YAML (409 aquí) y el seed las mantiene sincronizadas, sin tocar `active`. Las del operador se editan en el portal.
+      - Nada se borra. Una finalidad desactivada no se ofrece para versiones ni solicitudes nuevas, y las suscripciones que ya la usan la conservan.
+      - Todo queda en la bitácora: `purpose.created`, `purpose.updated`, `purpose.deactivated` y `purpose.activated`.
+    - **Por API.** El responsable de datos (permiso nuevo `api.purposes.write`) elige las finalidades activas de cada versión no retirada (`PUT .../versions/:id/purposes`, `api_version.purposes_changed`). OPA autoriza por la finalidad de la suscripción, así que el cambio no toca el tráfico existente.
+    - **Pruebas.** 5 de integración. La e2e `purposes.spec.ts` cubre alta en la consola, elección en la versión y desactivación, con axe.
 - [ ] **M2-11 — Suspensión y baja de entidades**: `active ⇄ suspended`, `active → offboarded` (SPEC.md §4.1 punto 4): la suspensión bloquea publicaciones nuevas y suspende en el gateway las suscripciones de la entidad como consumidora.
 
 **Cierre M2:** recorrido con los cuatro tipos de actor (proveedor, consumidor, operador, regulador) sin intervención técnica.
+
+  - **Estado (2026-11-14).** Las historias de M2 están hechas, cada una con su e2e en la que intervienen los cuatro tipos de actor desde la UI:
+    - `onboarding`: alta con autorregistro, aprobación del operador e invitación;
+    - `members`: el administrador de la entidad invita, cambia roles y revoca;
+    - `regulator`: publicación y suscripción sensibles;
+    - `lifecycle`: revisión compatible, deprecación y cabeceras reales del gateway;
+    - `subscription-lifecycle`: pregunta, respuesta, suspensión y renovación;
+    - `agreements`: acuerdo de intercambio y plantilla;
+    - `notifications`: avisos en el portal y en Mailpit;
+    - `audit-export`: exportación firmada y anclajes;
+    - `purposes`: catálogo de finalidades.
+  - **Pendiente para cerrarlo formalmente.** Falta un recorrido único que encadene todo en una sola corrida, y desplegarlo en el VPS. El despliegue quedó acordado para el cierre de M2.
 
 ---
 

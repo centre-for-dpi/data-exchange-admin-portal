@@ -35,7 +35,14 @@ export default async function OperatorPage({ params }: PageProps) {
 
   return (
     <Page>
-      <PageHeader title={t('nav.operator')} />
+      <PageHeader
+        title={t('nav.operator')}
+        actions={
+          <Link href="/operator/purposes" className="link">
+            {t('purposes.title')}
+          </Link>
+        }
+      />
       <Section title={t('operator.entitiesTitle')}>
         {onboarding.items.length === 0 ? (
           <EmptyState>{t('operator.entitiesEmpty')}</EmptyState>

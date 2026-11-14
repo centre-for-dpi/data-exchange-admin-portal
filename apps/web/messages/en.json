@@ -510,7 +510,8 @@
         "revised": "Version revised (compatible change)",
         "deprecated": "Version deprecated",
         "retired": "Version retired",
-        "openapi_replaced": "OpenAPI document replaced"
+        "openapi_replaced": "OpenAPI document replaced",
+        "purposes_changed": "Allowed purposes changed"
       },
       "application": {
         "created": "Application created"
@@ -574,7 +575,9 @@
       },
       "purpose": {
         "created": "Purpose created",
-        "updated": "Purpose updated"
+        "updated": "Purpose updated",
+        "deactivated": "Purpose deactivated",
+        "activated": "Purpose reactivated"
       },
       "subject_access": {
         "purged": "Consultation records purged by retention"
@@ -848,5 +851,46 @@
       "access_revoked": "Revoked access"
     },
     "unreadSuffix": "{count, plural, one {: one unread} other {: # unread}}"
+  },
+  "purposes": {
+    "title": "Purpose catalogue",
+    "lead": "The purposes APIs may allow and consumers declare. Those from the country configuration are edited there; here they can be deactivated.",
+    "purpose": "Purpose",
+    "source": "Source",
+    "usage": "Use",
+    "state": "Status",
+    "actions": "Actions",
+    "sources": {
+      "config": "Country configuration",
+      "operator": "Operator"
+    },
+    "usageCount": "{versions, plural, one {# version} other {# versions}} · {subscriptions, plural, one {# subscription} other {# subscriptions}}",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Reactivate",
+    "deactivate": "Deactivate",
+    "activateFor": "Reactivate {code}",
+    "deactivateFor": "Deactivate {code}",
+    "editFor": "Edit {code}",
+    "createLead": "The code cannot change later; subscriptions store it.",
+    "form": {
+      "create": "Add a purpose",
+      "editOf": "Edit {code}",
+      "code": "Code (lower case and underscores)",
+      "nameEs": "Name in Spanish",
+      "nameEn": "Name in English",
+      "descriptionEs": "Description in Spanish",
+      "descriptionEn": "Description in English",
+      "legalReference": "Legal reference (optional)",
+      "save": "Save",
+      "saved": "Saved."
+    },
+    "version": {
+      "title": "Allowed purposes",
+      "lead": "As data steward you choose what access to this version can be requested for. Subscriptions already granted keep their purpose.",
+      "legend": "Purposes of the catalogue",
+      "save": "Save purposes",
+      "saved": "Purposes saved."
+    }
   }
 }

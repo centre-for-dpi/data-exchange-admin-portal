@@ -33,10 +33,13 @@ export const AUDIT_ACTIONS = [
   // Catalogue of purposes
   'purpose.created',
   'purpose.updated',
+  'purpose.deactivated',
+  'purpose.activated',
   // APIs and versions (M1, M2-04, M2-05)
   'api.created',
   'api_version.created',
   'api_version.openapi_replaced',
+  'api_version.purposes_changed',
   'api_version.submitted',
   'api_version.approved',
   'api_version.changes_requested',

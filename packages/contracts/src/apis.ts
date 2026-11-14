@@ -268,3 +268,44 @@ export const versionIdParamsSchema = z.strictObject({ versionId: z.uuid() });
 export const deprecateVersionSchema = z.strictObject({
   sunsetAt: z.iso.datetime({ offset: true }),
 });
+
+// ---------------------------------------------------------------------------------------------
+// Purpose catalogue administration (SPEC.md §3, M2-10)
+// ---------------------------------------------------------------------------------------------
+
+const purposeText = (min: number, max: number) =>
+  z.strictObject({
+    es: z.string().trim().min(min).max(max),
+    en: z.string().trim().min(min).max(max),
+  });
+
+export const purposeAdminSchema = purposeSchema.extend({
+  /** config: defined in the country configuration (edited there); operator: added in the portal. */
+  source: z.enum(['config', 'operator']),
+  active: z.boolean(),
+  /** Versions that allow it and subscriptions that use it (not retired / still live). */
+  usage: z.object({ versions: z.number().int(), subscriptions: z.number().int() }),
+});
+export type PurposeAdmin = z.infer<typeof purposeAdminSchema>;
+export const purposeAdminListSchema = z.object({ items: z.array(purposeAdminSchema) });
+
+export const createPurposeSchema = z.strictObject({
+  code: z
+    .string()
+    .regex(/^[a-z][a-z0-9]*(_[a-z0-9]+)*$/, 'lower snake_case, e.g. benefit_targeting')
+    .max(60),
+  name: purposeText(3, 120),
+  description: purposeText(10, 1_000),
+  legalReference: z.string().trim().max(300).optional(),
+});
+export const updatePurposeSchema = createPurposeSchema.omit({ code: true });
+export const purposeCodeParamsSchema = z.strictObject({ code: z.string().regex(/^[a-z0-9_]+$/) });
+
+/** The data steward chooses which catalogue purposes a version allows (SPEC.md §2.2). */
+export const setVersionPurposesSchema = z.strictObject({
+  allowedPurposes: z
+    .array(z.string().regex(/^[a-z0-9_]+$/))
+    .min(1)
+    .max(50)
+    .refine((codes) => new Set(codes).size === codes.length, 'each purpose once'),
+});

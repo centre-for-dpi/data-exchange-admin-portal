@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@nestjs/common';
 import {
   deprecateVersionSchema,
+  setVersionPurposesSchema,
   type ApiDetail,
   apiDetailSchema,
   apiPageSchema,
@@ -239,6 +240,38 @@ export class ApisController {
       versionId,
       principal,
       new Date(body.sunsetAt),
+      request.id,
+    );
+  }
+
+  @Put(':apiId/versions/:versionId/purposes')
+  @EntityAccess('api.purposes.write')
+  @ApiOperation({
+    operationId: 'setApiVersionPurposes',
+    summary: 'Choose the catalogue purposes a version allows (data steward)',
+    description:
+      'Only active purposes. Subscriptions already granted keep their purpose; only new ' +
+      'requests use the new list.',
+    tags: ['apis'],
+    params: apiVersionParamsSchema,
+    body: setVersionPurposesSchema,
+    responses: { 200: { description: 'The version', schema: apiVersionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  setPurposes(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('apiId', uuid) apiId: string,
+    @Param('versionId', uuid) versionId: string,
+    @Body(new ZodValidationPipe(setVersionPurposesSchema)) body: { allowedPurposes: string[] },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.apis.setPurposes(
+      entity.entityId,
+      apiId,
+      versionId,
+      principal,
+      body.allowedPurposes,
       request.id,
     );
   }

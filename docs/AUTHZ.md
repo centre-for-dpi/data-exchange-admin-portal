@@ -23,6 +23,7 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | `access_request.read` | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · |
 | `access_request.decide` | · | · | ✓ | · | · | · | · | · | · |
 | `access_request.suspend` | · | · | ✓ | · | · | ✓ | · | ✓ | · |
+| `api.purposes.write` | · | · | ✓ | · | · | · | · | · | · |
 | `audit.entity.read` | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · |
 
 ## Acciones de plataforma
@@ -35,6 +36,8 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | `entity_review.decide` | ✓ | ✓ | · | · |
 | `regulator.read` | · | · | ✓ | · |
 | `regulator.decide` | · | · | ✓ | · |
+| `purpose.read` | ✓ | ✓ | ✓ | · |
+| `purpose.manage` | ✓ | ✓ | · | · |
 | `document.purge` | ✓ | · | · | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
@@ -42,6 +45,11 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 
 | Método | Ruta | Acceso |
 | :-- | :-- | :-- |
+| GET | `/api/v1/admin/purposes` | plataforma: `purpose.read` |
+| POST | `/api/v1/admin/purposes` | plataforma: `purpose.manage` |
+| PUT | `/api/v1/admin/purposes/:code` | plataforma: `purpose.manage` |
+| POST | `/api/v1/admin/purposes/:code/activate` | plataforma: `purpose.manage` |
+| POST | `/api/v1/admin/purposes/:code/deactivate` | plataforma: `purpose.manage` |
 | GET | `/api/v1/audit/events` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/export` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/timeline/:kind/:id` | plataforma: `audit.read` |
@@ -73,6 +81,7 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/deprecate` | entidad: `api.write` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.read` |
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.write` |
+| PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/purposes` | entidad: `api.purposes.write` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/submit` | entidad: `api.write` |
 | GET | `/api/v1/entities/:entityId/applications` | entidad: `application.read` |
 | POST | `/api/v1/entities/:entityId/applications` | entidad: `application.write` |

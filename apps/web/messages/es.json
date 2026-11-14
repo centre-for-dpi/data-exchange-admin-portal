@@ -510,7 +510,8 @@
         "revised": "Versión revisada (cambio compatible)",
         "deprecated": "Versión marcada como obsoleta",
         "retired": "Versión retirada",
-        "openapi_replaced": "Documento OpenAPI reemplazado"
+        "openapi_replaced": "Documento OpenAPI reemplazado",
+        "purposes_changed": "Finalidades permitidas cambiadas"
       },
       "application": {
         "created": "Aplicación creada"
@@ -574,7 +575,9 @@
       },
       "purpose": {
         "created": "Finalidad creada",
-        "updated": "Finalidad actualizada"
+        "updated": "Finalidad actualizada",
+        "deactivated": "Finalidad desactivada",
+        "activated": "Finalidad reactivada"
       },
       "subject_access": {
         "purged": "Registros de consultas purgados por retención"
@@ -848,5 +851,46 @@
       "access_revoked": "Accesos revocados"
     },
     "unreadSuffix": "{count, plural, one {: uno sin leer} other {: # sin leer}}"
+  },
+  "purposes": {
+    "title": "Catálogo de finalidades",
+    "lead": "Las finalidades que las APIs pueden permitir y los consumidores declarar. Las que vienen de la configuración del país se editan allí; aquí se pueden desactivar.",
+    "purpose": "Finalidad",
+    "source": "Origen",
+    "usage": "Uso",
+    "state": "Estado",
+    "actions": "Acciones",
+    "sources": {
+      "config": "Configuración del país",
+      "operator": "Operador"
+    },
+    "usageCount": "{versions, plural, one {# versión} other {# versiones}} · {subscriptions, plural, one {# suscripción} other {# suscripciones}}",
+    "active": "Activa",
+    "inactive": "Inactiva",
+    "activate": "Reactivar",
+    "deactivate": "Desactivar",
+    "activateFor": "Reactivar {code}",
+    "deactivateFor": "Desactivar {code}",
+    "editFor": "Editar {code}",
+    "createLead": "El código no cambia después; las suscripciones lo guardan.",
+    "form": {
+      "create": "Agregar una finalidad",
+      "editOf": "Editar {code}",
+      "code": "Código (minúsculas y guiones bajos)",
+      "nameEs": "Nombre en español",
+      "nameEn": "Nombre en inglés",
+      "descriptionEs": "Descripción en español",
+      "descriptionEn": "Descripción en inglés",
+      "legalReference": "Referencia legal (opcional)",
+      "save": "Guardar",
+      "saved": "Guardado."
+    },
+    "version": {
+      "title": "Finalidades permitidas",
+      "lead": "Como responsable de datos eliges para qué se puede pedir acceso a esta versión. Las suscripciones ya concedidas conservan su finalidad.",
+      "legend": "Finalidades del catálogo",
+      "save": "Guardar finalidades",
+      "saved": "Finalidades guardadas."
+    }
   }
 }

@@ -287,6 +287,11 @@ export class SubscriptionsService {
     if (!version.allowedPurposes.some((p) => p.purposeCode === data.purposeCode)) {
       errors.push({ path: 'purposeCode', message: 'this API version does not allow that purpose' });
     }
+    const purpose = await this.prisma.purpose.findUnique({ where: { code: data.purposeCode } });
+    if (purpose && !purpose.active) {
+      // Deactivated in the catalogue (M2-10): no new requests; existing subscriptions keep it.
+      errors.push({ path: 'purposeCode', message: 'that purpose is no longer offered' });
+    }
     const known = new Set(operationsOf(version.openapiSpec).map((o) => o.operationId));
     const unknown = data.requestedOperations.filter((id) => !known.has(id));
     if (unknown.length > 0) {
