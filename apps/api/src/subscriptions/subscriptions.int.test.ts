@@ -408,12 +408,14 @@ describe('access requests and approval (M1-07)', () => {
 
     it('sensitive data moves the approval to the regulator, without syncing the gateway', async () => {
       const sensitive = await publishApi(`sensible-${run}`, 'sensitive');
-      // Publishing a sensitive version also waits for the regulator, whose step arrives in M2-04:
-      // the fixture takes that step directly in the database.
-      await prisma.apiVersion.update({
-        where: { id: sensitive.versionId },
-        data: { status: 'published', publishedAt: new Date() },
-      });
+      // Publishing a sensitive version also waits for the regulator (M2-04).
+      const published = await call(
+        'POST',
+        `/regulator/api-versions/${sensitive.versionId}/approve`,
+        'marta.regulador',
+        {},
+      );
+      expect(published.statusCode, published.body).toBe(200);
       const s = await requestAccess({
         applicationId: await createApplication(),
         apiVersionId: sensitive.versionId,

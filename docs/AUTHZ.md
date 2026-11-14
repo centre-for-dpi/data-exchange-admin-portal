@@ -32,6 +32,8 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | `review.decide` | ✓ | ✓ | · | · |
 | `entity_review.read` | ✓ | ✓ | ✓ | · |
 | `entity_review.decide` | ✓ | ✓ | · | · |
+| `regulator.read` | · | · | ✓ | · |
+| `regulator.decide` | · | · | ✓ | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Rutas
@@ -92,6 +94,11 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | GET | `/api/v1/opa/bundle.tar.gz` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | POST | `/api/v1/opa/status` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/purposes` | cualquier sesión; solo recursos propios |
+| POST | `/api/v1/regulator/api-versions/:versionId/approve` | plataforma: `regulator.decide` |
+| POST | `/api/v1/regulator/api-versions/:versionId/request-changes` | plataforma: `regulator.decide` |
+| GET | `/api/v1/regulator/approvals` | plataforma: `regulator.read` |
+| POST | `/api/v1/regulator/subscriptions/:subscriptionId/approve` | plataforma: `regulator.decide` |
+| POST | `/api/v1/regulator/subscriptions/:subscriptionId/reject` | plataforma: `regulator.decide` |
 | GET | `/api/v1/review/api-versions` | plataforma: `review.read` |
 | GET | `/api/v1/review/api-versions/:versionId` | plataforma: `review.read` |
 | POST | `/api/v1/review/api-versions/:versionId/approve` | plataforma: `review.decide` |

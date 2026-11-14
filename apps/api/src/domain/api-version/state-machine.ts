@@ -6,13 +6,14 @@ import { InvalidTransitionError } from '../../common/errors.js';
  *
  *   draft -> in_review -> approved_operator -> [approved_regulator] -> published
  *              \-> changes_requested -> draft (or straight back to in_review)
+ *   approved_operator -> changes_requested (the regulator sends it back, M2-04)
  *   published -> deprecated -> retired
  */
 const TRANSITIONS: Record<ApiVersionStatus, readonly ApiVersionStatus[]> = {
   draft: ['in_review'],
   in_review: ['changes_requested', 'approved_operator'],
   changes_requested: ['draft', 'in_review'],
-  approved_operator: ['approved_regulator', 'published'],
+  approved_operator: ['approved_regulator', 'published', 'changes_requested'],
   approved_regulator: ['published'],
   published: ['deprecated'],
   deprecated: ['retired'],

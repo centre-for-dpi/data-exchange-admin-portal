@@ -12,6 +12,7 @@ describe('API version state machine (SPEC.md §4.2)', () => {
     ['changes_requested', 'draft'],
     ['approved_operator', 'approved_regulator'],
     ['approved_operator', 'published'],
+    ['approved_operator', 'changes_requested'],
     ['approved_regulator', 'published'],
     ['published', 'deprecated'],
     ['deprecated', 'retired'],
@@ -26,6 +27,7 @@ describe('API version state machine (SPEC.md §4.2)', () => {
     ['published', 'draft'],
     ['retired', 'published'],
     ['deprecated', 'published'],
+    ['approved_regulator', 'changes_requested'],
   ] as const)('rejects %s -> %s with InvalidTransitionError', (from, to) => {
     expect(() => assertTransition(from, to)).toThrow(InvalidTransitionError);
   });

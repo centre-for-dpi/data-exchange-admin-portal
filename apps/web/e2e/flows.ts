@@ -17,14 +17,19 @@ export async function signIn(page: Page, username: string, path = '/') {
 }
 
 export const signInAsPublisher = (page: Page) => signIn(page, 'pedro.publicador', '/my-apis');
-export async function registerApi(page: Page, slug: string, name = 'Consulta de afiliación') {
+export async function registerApi(
+  page: Page,
+  slug: string,
+  name = 'Consulta de afiliación',
+  classification = 'Datos personales',
+) {
   await page.getByRole('link', { name: 'Registrar API' }).click();
   await page.getByLabel(/^Nombre/).fill(name);
   await page.getByLabel('Identificador en la URL').fill(slug);
   await page.getByLabel('Resumen').fill('Consulta el estado de afiliación de una persona.');
   await page.getByLabel('Descripción (Markdown)').fill('API de prueba con datos sintéticos.');
   await page.getByLabel('Sector').selectOption({ label: 'Salud' });
-  await page.getByLabel('Clasificación').selectOption({ label: 'Datos personales' });
+  await page.getByLabel('Clasificación').selectOption({ label: classification });
   await page.getByLabel('Correo del responsable').fill('apis@salud.demo.rid.example');
   await page.getByRole('button', { name: 'Registrar API' }).click();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
@@ -48,12 +53,12 @@ export async function newVersion(
 /** pedro registers an API and a version from the salud mock and sends it to review. */
 export async function submitNewApi(
   page: Page,
-  options: { name?: string; slug?: string } = {},
+  options: { name?: string; slug?: string; classification?: string } = {},
 ): Promise<{ name: string; slug: string; versionUrl: string }> {
   const slug = options.slug ?? `afiliacion-${Date.now().toString(36)}`;
   const name = options.name ?? 'Consulta de afiliación';
   await signInAsPublisher(page);
-  await registerApi(page, slug, name);
+  await registerApi(page, slug, name, options.classification);
   await newVersion(page, { version: '1.0', file: openapiFile });
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
   await expect(page.getByTestId('version-status')).toHaveText('En revisión');
@@ -108,7 +113,7 @@ export async function openRequestForm(page: Page, apiName: string) {
   }).toPass({ timeout: 30_000 });
 }
 
-export async function requestAccess(page: Page, apiName: string, appName: string) {
+export async function requestAccess(page: Page, apiName: string, appName: string, months = '12') {
   await openRequestForm(page, apiName);
   await page.getByLabel(/^Aplicación que hará las llamadas/).selectOption({ label: appName });
   await page.getByLabel(/^Finalidad/).selectOption('eligibility_check');
@@ -116,7 +121,7 @@ export async function requestAccess(page: Page, apiName: string, appName: string
     .getByLabel(/^Para qué usarás los datos/)
     .fill('Verificar afiliación al asignar el subsidio X.');
   await page.getByLabel(/^Base legal/).fill('Ley de protección de datos, artículo 10, literal b.');
-  await page.getByLabel(/^Vigencia en meses/).fill('12');
+  await page.getByLabel(/^Vigencia en meses/).fill(months);
   await page.getByRole('button', { name: 'Enviar solicitud' }).click();
   await expect(page.getByTestId('subscription-status')).toHaveText('Pendiente del proveedor');
   return page.url().split('/my-apps/requests/')[1] ?? '';

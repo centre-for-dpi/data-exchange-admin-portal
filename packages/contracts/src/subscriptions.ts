@@ -144,3 +144,38 @@ export const subscriptionParamsSchema = z.strictObject({
   entityId: z.uuid(),
   subscriptionId: z.uuid(),
 });
+
+/** An access request waiting for the regulator (M2-04). */
+export const regulatorSubscriptionItemSchema = z.object({
+  id: z.uuid(),
+  requestedAt: z.iso.datetime(),
+  api: z.object({ id: z.uuid(), name: z.string(), classification: z.string() }),
+  version: z.object({ id: z.uuid(), version: z.string() }),
+  provider: z.object({ id: z.uuid(), slug: z.string(), shortName: z.string() }),
+  consumer: z.object({ id: z.uuid(), slug: z.string(), shortName: z.string() }),
+  purposeCode: z.string(),
+});
+
+/** The regulator's inbox: what waits for their approval (SPEC.md §6, M2-04). */
+export const regulatorQueueSchema = z.object({
+  apiVersions: z.array(
+    z.object({
+      versionId: z.uuid(),
+      version: z.string(),
+      operatorApprovedAt: z.iso.datetime().nullable(),
+      api: z.object({ id: z.uuid(), name: z.string(), classification: z.string() }),
+      entity: z.object({ id: z.uuid(), slug: z.string(), shortName: z.string() }),
+    }),
+  ),
+  subscriptions: z.array(regulatorSubscriptionItemSchema),
+});
+export type RegulatorQueue = z.infer<typeof regulatorQueueSchema>;
+
+export const regulatorDecisionSchema = z.strictObject({
+  comment: z.string().trim().max(2_000).optional(),
+});
+/** Sending a version back or rejecting a request always carries a reason. */
+export const regulatorReasonSchema = z.strictObject({
+  comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
+});
+export const subscriptionIdParamsSchema = z.strictObject({ subscriptionId: z.uuid() });

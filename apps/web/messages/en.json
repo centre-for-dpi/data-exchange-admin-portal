@@ -33,7 +33,7 @@
     "myApps": "Applications, credentials and requests",
     "requests": "Access requests awaiting a decision",
     "operator": "Versions waiting for review",
-    "regulator": "Network oversight",
+    "regulator": "Sensitive data approvals and network oversight",
     "audit": "Audit log and integrity check",
     "invitations": "Invitations to join an entity",
     "entityRequests": "Ask for your entity to join the network"
@@ -638,6 +638,26 @@
       "roles": "Roles",
       "submit": "Send invitation",
       "sent": "Invitation sent."
+    }
+  },
+  "regulator": {
+    "lead": "Publications and access requests to sensitive data that the country configuration sends for your approval.",
+    "versionsTitle": "Publications to approve",
+    "versionsEmpty": "No publications are waiting for your approval.",
+    "operatorApprovedAt": "Approved by the operator",
+    "subscriptionsTitle": "Access requests to approve",
+    "subscriptionsEmpty": "No access requests are waiting for your approval.",
+    "provider": "Provider",
+    "consumer": "Consumer",
+    "requestedAt": "Requested",
+    "decision": {
+      "title": "Regulator decision",
+      "approve": "Approve",
+      "approveComment": "Comment (optional)",
+      "requestChanges": "Send back to the provider",
+      "reject": "Reject",
+      "reason": "Reason",
+      "notPending": "This request is not waiting for the regulator’s decision."
     }
   }
 }

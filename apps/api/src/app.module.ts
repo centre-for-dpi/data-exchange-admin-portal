@@ -31,6 +31,8 @@ import { HealthController } from './health/health.controller.js';
 import { MeController } from './me/me.controller.js';
 import { PurposesController } from './purposes/purposes.controller.js';
 import { ReconcilersModule } from './reconcilers/reconcilers.module.js';
+import { RegulatorController } from './regulator/regulator.controller.js';
+import { RegulatorService } from './regulator/regulator.service.js';
 import { ReviewsController } from './reviews/reviews.controller.js';
 import { ReviewsService } from './reviews/reviews.service.js';
 import {
@@ -62,6 +64,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     PurposesController,
     ApisController,
     ReviewsController,
+    RegulatorController,
     CatalogController,
     ApplicationsController,
     SubscriptionsController,
@@ -82,6 +85,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     { provide: MAIL_TRANSPORT, useFactory: createSmtpTransport },
     ApisService,
     ReviewsService,
+    RegulatorService,
     CatalogService,
     ApplicationsService,
     SubscriptionsService,

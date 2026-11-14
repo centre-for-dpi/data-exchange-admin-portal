@@ -85,12 +85,16 @@ export type EntityAction = keyof typeof ENTITY_PERMISSIONS;
 export const PLATFORM_PERMISSIONS = {
   /** See the review queue and versions under review, from any entity. */
   'review.read': ['platform_admin', 'platform_reviewer', 'regulator'],
-  /** Approve or request changes on a version (operator). The regulator step is M2-04. */
+  /** Approve or request changes on a version (operator). The regulator step is regulator.decide. */
   'review.decide': ['platform_admin', 'platform_reviewer'],
   /** See onboarding requests of entities and their designation documents (SPEC.md §4.1). */
   'entity_review.read': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Approve, send back or reject an onboarding request (operator). */
   'entity_review.decide': ['platform_admin', 'platform_reviewer'],
+  /** The regulator's inbox: sensitive publications and access requests waiting for it (M2-04). */
+  'regulator.read': ['regulator'],
+  /** Approve, or send back / reject, what features.approval.regulatorForSensitive routes to it. */
+  'regulator.decide': ['regulator'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;

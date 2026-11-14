@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { VersionSheet } from '../../../../../components/apis/version-sheet';
+import { RegulatorDecisionForms } from '../../../../../components/regulator/decision-forms';
 import { DecisionForms } from '../../../../../components/review/decision-forms';
 import { Badge, classificationTone } from '../../../../../components/ui/badge';
 import { Notice } from '../../../../../components/ui/notice';
@@ -49,6 +50,10 @@ export default async function ReviewPage({ params }: PageProps) {
     (r) => r === 'platform_admin' || r === 'platform_reviewer',
   );
   const inReview = review.version.status === 'in_review';
+  const regulatorTurn =
+    review.version.status === 'approved_operator' &&
+    review.requiresRegulator &&
+    viewer.platformRoles.includes('regulator');
 
   return (
     <Page>
@@ -92,6 +97,14 @@ export default async function ReviewPage({ params }: PageProps) {
       </div>
 
       <VersionSheet version={review.version} purposeNames={purposeNames} />
+
+      {regulatorTurn ? (
+        <Section title={t('regulator.decision.title')}>
+          <div className="card p-6 md:p-8">
+            <RegulatorDecisionForms target="api-versions" id={versionId} />
+          </div>
+        </Section>
+      ) : null}
 
       <Section title={t('operator.review.decision')}>
         {!inReview ? (

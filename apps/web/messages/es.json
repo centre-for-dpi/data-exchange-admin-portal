@@ -33,7 +33,7 @@
     "myApps": "Aplicaciones, credenciales y solicitudes",
     "requests": "Solicitudes de acceso por decidir",
     "operator": "Versiones pendientes de revisión",
-    "regulator": "Supervisión de la red",
+    "regulator": "Aprobaciones de datos sensibles y supervisión de la red",
     "audit": "Bitácora y verificación de integridad",
     "invitations": "Invitaciones para unirte a una entidad",
     "entityRequests": "Pide que tu entidad se una a la red"
@@ -638,6 +638,26 @@
       "roles": "Roles",
       "submit": "Enviar invitación",
       "sent": "Invitación enviada."
+    }
+  },
+  "regulator": {
+    "lead": "Publicaciones y solicitudes de acceso a datos sensibles que la configuración del país envía a tu aprobación.",
+    "versionsTitle": "Publicaciones por aprobar",
+    "versionsEmpty": "No hay publicaciones esperando tu aprobación.",
+    "operatorApprovedAt": "Aprobada por el operador",
+    "subscriptionsTitle": "Solicitudes de acceso por aprobar",
+    "subscriptionsEmpty": "No hay solicitudes esperando tu aprobación.",
+    "provider": "Proveedora",
+    "consumer": "Consumidora",
+    "requestedAt": "Solicitada",
+    "decision": {
+      "title": "Decisión del regulador",
+      "approve": "Aprobar",
+      "approveComment": "Comentario (opcional)",
+      "requestChanges": "Devolver al proveedor",
+      "reject": "Rechazar",
+      "reason": "Motivo",
+      "notPending": "Esta solicitud no está esperando la decisión del regulador."
     }
   }
 }
