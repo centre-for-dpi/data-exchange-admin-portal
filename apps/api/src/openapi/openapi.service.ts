@@ -1,6 +1,7 @@
 import { Injectable, RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants.js';
 import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
+import { type RouteAccess, routeAccess } from '../auth/decorators.js';
 import { OPENAPI_OPERATION, type OperationSpec } from './api-operation.decorator.js';
 import { buildOpenApiDocument, type RouteDoc } from './openapi.document.js';
 
@@ -9,6 +10,8 @@ export interface DiscoveredRoute {
   path: string;
   handler: string;
   spec?: OperationSpec;
+  /** Who may call it, as the global guard reads it (M2-03). */
+  access: RouteAccess;
 }
 
 const joinPath = (...parts: string[]): string =>
@@ -57,6 +60,7 @@ export class OpenApiService {
         if (methodPath === undefined) continue;
         const method = RequestMethod[this.reflector.get<RequestMethod>(METHOD_METADATA, handler)];
         const spec = this.reflector.get<OperationSpec | undefined>(OPENAPI_OPERATION, handler);
+        const access = routeAccess(this.reflector, [handler, metatype]);
         for (const base of controllerPaths) {
           for (const path of asList(methodPath)) {
             routes.push({
@@ -64,6 +68,7 @@ export class OpenApiService {
               path: joinPath(this.prefix, base, path),
               handler: `${metatype.name}.${name}`,
               spec,
+              access,
             });
           }
         }

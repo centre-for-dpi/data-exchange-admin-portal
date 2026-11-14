@@ -6,11 +6,12 @@ import {
   Inject,
   Injectable,
   Logger,
+  SetMetadata,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
-import { Public } from '../../auth/decorators.js';
+import { CITIZEN, Public } from '../../auth/decorators.js';
 import {
   CITIZEN_TOKEN_VERIFIER,
   type CitizenIdentity,
@@ -52,7 +53,8 @@ export class CitizenGuard implements CanActivate {
  * Endpoint for citizens only. Skips the portal's guard (people of the entities) and requires a
  * citizen token instead.
  */
-export const CitizenAccess = () => applyDecorators(Public(), UseGuards(CitizenGuard));
+export const CitizenAccess = () =>
+  applyDecorators(Public(), SetMetadata(CITIZEN, true), UseGuards(CitizenGuard));
 
 export const CurrentCitizen = createParamDecorator((_data: unknown, ctx: ExecutionContext) => {
   const citizen = ctx.switchToHttp().getRequest<CitizenRequest>().citizen;

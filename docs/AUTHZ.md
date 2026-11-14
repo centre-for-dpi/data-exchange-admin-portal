@@ -1,0 +1,107 @@
+# Matriz de autorización
+
+> Generado desde `apps/api/src/auth/authz.policy.ts` y las rutas del API. No lo edites a mano:
+> `RID_UPDATE_AUTHZ_DOC=1 pnpm --filter @rid/api test -- authz.matrix`.
+
+Reglas del guard global (ADR-0014): sin sesión, 401. En rutas de una entidad: quien no es miembro
+ni tiene un rol de plataforma permitido recibe 404; un miembro sin el rol, 403. En rutas de
+plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede llamar (403).
+
+## Acciones sobre recursos de una entidad
+
+| Acción | `entity_admin` | `api_publisher` | `data_steward` | `app_developer` | `entity_viewer` | `platform_admin` | `platform_reviewer` | `regulator` | `auditor` |
+| :-- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| `entity.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| `entity.members.read` | ✓ | · | · | · | ✓ | ✓ | · | ✓ | · |
+| `entity.members.write` | ✓ | · | · | · | · | · | · | · | · |
+| `api.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| `api.write` | · | ✓ | · | · | · | · | · | · | · |
+| `application.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · |
+| `application.write` | · | · | · | ✓ | · | · | · | · | · |
+| `subscription.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · |
+| `subscription.write` | · | · | · | ✓ | · | · | · | · | · |
+| `access_request.read` | ✓ | ✓ | ✓ | · | ✓ | ✓ | · | ✓ | · |
+| `access_request.decide` | · | · | ✓ | · | · | · | · | · | · |
+| `audit.entity.read` | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · |
+
+## Acciones de plataforma
+
+| Acción | `platform_admin` | `platform_reviewer` | `regulator` | `auditor` |
+| :-- | :-: | :-: | :-: | :-: |
+| `review.read` | ✓ | ✓ | ✓ | · |
+| `review.decide` | ✓ | ✓ | · | · |
+| `entity_review.read` | ✓ | ✓ | ✓ | · |
+| `entity_review.decide` | ✓ | ✓ | · | · |
+| `audit.read` | ✓ | ✓ | ✓ | ✓ |
+
+## Rutas
+
+| Método | Ruta | Acceso |
+| :-- | :-- | :-- |
+| GET | `/api/v1/audit/events` | plataforma: `audit.read` |
+| GET | `/api/v1/audit/timeline/:kind/:id` | plataforma: `audit.read` |
+| GET | `/api/v1/audit/verify` | plataforma: `audit.read` |
+| GET | `/api/v1/catalog/apis` | sesión opcional (catálogo público según la config del país) |
+| GET | `/api/v1/catalog/apis/:apiId` | sesión opcional (catálogo público según la config del país) |
+| GET | `/api/v1/catalog/apis/:apiId/versions/:versionId/openapi` | sesión opcional (catálogo público según la config del país) |
+| GET | `/api/v1/catalog/entities` | sesión opcional (catálogo público según la config del país) |
+| GET | `/api/v1/data-subjects/me/accesses` | ciudadano (token del realm de ciudadanos) |
+| GET | `/api/v1/data-subjects/me/accesses/:id/receipt` | ciudadano (token del realm de ciudadanos) |
+| GET | `/api/v1/data-subjects/me/alerts` | ciudadano (token del realm de ciudadanos) |
+| PUT | `/api/v1/data-subjects/me/alerts` | ciudadano (token del realm de ciudadanos) |
+| GET | `/api/v1/entities/:entityId` | entidad: `entity.read` |
+| GET | `/api/v1/entities/:entityId/access-requests` | entidad: `access_request.read` |
+| GET | `/api/v1/entities/:entityId/access-requests/:subscriptionId` | entidad: `access_request.read` |
+| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/approve` | entidad: `access_request.decide` |
+| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/reject` | entidad: `access_request.decide` |
+| POST | `/api/v1/entities/:entityId/access-requests/:subscriptionId/revoke` | entidad: `access_request.decide` |
+| GET | `/api/v1/entities/:entityId/apis` | entidad: `api.read` |
+| POST | `/api/v1/entities/:entityId/apis` | entidad: `api.write` |
+| GET | `/api/v1/entities/:entityId/apis/:apiId` | entidad: `api.read` |
+| POST | `/api/v1/entities/:entityId/apis/:apiId/versions` | entidad: `api.write` |
+| GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId` | entidad: `api.read` |
+| GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.read` |
+| PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.write` |
+| POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/submit` | entidad: `api.write` |
+| GET | `/api/v1/entities/:entityId/applications` | entidad: `application.read` |
+| POST | `/api/v1/entities/:entityId/applications` | entidad: `application.write` |
+| GET | `/api/v1/entities/:entityId/applications/:applicationId` | entidad: `application.read` |
+| GET | `/api/v1/entities/:entityId/audit/timeline/:kind/:id` | entidad: `audit.entity.read` |
+| GET | `/api/v1/entities/:entityId/invitations` | entidad: `entity.members.read` |
+| POST | `/api/v1/entities/:entityId/invitations` | entidad: `entity.members.write` |
+| POST | `/api/v1/entities/:entityId/invitations/:invitationId/revoke` | entidad: `entity.members.write` |
+| GET | `/api/v1/entities/:entityId/members` | entidad: `entity.members.read` |
+| POST | `/api/v1/entities/:entityId/members/:membershipId/revoke` | entidad: `entity.members.write` |
+| PUT | `/api/v1/entities/:entityId/members/:membershipId/roles` | entidad: `entity.members.write` |
+| GET | `/api/v1/entities/:entityId/subscriptions` | entidad: `subscription.read` |
+| POST | `/api/v1/entities/:entityId/subscriptions` | entidad: `subscription.write` |
+| GET | `/api/v1/entities/:entityId/subscriptions/:subscriptionId` | entidad: `subscription.read` |
+| GET | `/api/v1/entity-requests` | cualquier sesión; solo recursos propios |
+| POST | `/api/v1/entity-requests` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/entity-requests/:requestId` | cualquier sesión; solo recursos propios |
+| PUT | `/api/v1/entity-requests/:requestId` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/entity-requests/:requestId/designation-document` | cualquier sesión; solo recursos propios |
+| PUT | `/api/v1/entity-requests/:requestId/designation-document` | cualquier sesión; solo recursos propios |
+| POST | `/api/v1/entity-requests/:requestId/submit` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/health` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| POST | `/api/v1/internal/subject-access` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/me` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/me/invitations` | cualquier sesión; solo recursos propios |
+| POST | `/api/v1/me/invitations/:invitationId/accept` | cualquier sesión; solo recursos propios |
+| POST | `/api/v1/me/invitations/:invitationId/decline` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/opa/bundle.tar.gz` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| POST | `/api/v1/opa/status` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/purposes` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/review/api-versions` | plataforma: `review.read` |
+| GET | `/api/v1/review/api-versions/:versionId` | plataforma: `review.read` |
+| POST | `/api/v1/review/api-versions/:versionId/approve` | plataforma: `review.decide` |
+| POST | `/api/v1/review/api-versions/:versionId/request-changes` | plataforma: `review.decide` |
+| GET | `/api/v1/review/entities` | plataforma: `entity_review.read` |
+| POST | `/api/v1/review/entities/:requestId/approve` | plataforma: `entity_review.decide` |
+| POST | `/api/v1/review/entities/:requestId/reject` | plataforma: `entity_review.decide` |
+| POST | `/api/v1/review/entities/:requestId/request-changes` | plataforma: `entity_review.decide` |
+| GET | `/api/v1/transparency/checkpoints` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/transparency/checkpoints/:seq` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/transparency/jwks` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/transparency/records/:id/receipt` | plataforma: `audit.read` |
+| GET | `/api/v1/transparency/verify` | plataforma: `audit.read` |

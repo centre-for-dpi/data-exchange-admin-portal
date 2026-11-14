@@ -293,7 +293,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **CA.** Los roles se leen de la base en cada petición (ADR-0004). El test lo prueba: la entidad responde 404 en la petición siguiente a la revocación.
     - **Web.** "Mi entidad" muestra los datos, los miembros con edición de roles y revocación, las invitaciones pendientes y el formulario para invitar.
     - **Pruebas.** 10 de integración, con autorización por rol y entidad y auditoría. La e2e `members.spec.ts` recorre invitar, aceptar, cambiar roles y revocar, con axe.
-- [ ] **M2-03 — Matriz de permisos completa**: matriz de `SPEC.md §2` implementada como política central (`authz.policy.ts`); test generado por tabla para cada endpoint × rol.
+- [x] **M2-03 — Matriz de permisos completa**: matriz de `SPEC.md §2` implementada como política central (`authz.policy.ts`); test generado por tabla para cada endpoint × rol.
+  - _Notas de implementación:_
+    - **Política central.** Vive en `apps/api/src/auth/authz.policy.ts`.
+    - **Declaración obligatoria.** Cada ruta declara su acceso, y el decorador nuevo `@SignedIn` cubre las de "cualquier sesión, solo lo propio" (`/me`, invitaciones, solicitudes de alta y finalidades). El guard falla cerrado ante una ruta sin declaración.
+    - **Matriz publicada.** `docs/AUTHZ.md` se genera desde la política y las rutas; `authz.matrix.test.ts` falla si está desactualizada. El mismo test exige que toda ruta declare su acceso, que las de entidad vivan bajo `/entities/:entityId` y que ninguna escritura sea de sesión opcional.
+    - **Test generado.** `authz.matrix.int.test.ts` recorre todas las rutas protegidas con 11 tipos de llamante: los 5 roles de entidad, los 4 de plataforma, un miembro de otra entidad y un usuario sin roles, más la petición sin sesión. Espera 401, 403, el 404 del guard o que la petición llegue al handler, según la política. Las verificaciones completas de la bitácora y del registro de transparencia solo se prueban en sus negaciones, porque recorren toda la base.
+    - **Verificación del test.** Si el guard concede un permiso que la política niega, el test lo detecta; lo comprobé con una mutación temporal.
 - [ ] **M2-04 — Aprobación del regulador**: publicaciones y suscripciones `sensitive` pasan por `regulator` cuando la config lo exige.
 - [ ] **M2-05 — Ciclo de vida de versiones**: nueva versión mayor, cambios compatibles en versión publicada (lint de compatibilidad contra la anterior), `deprecated` con fecha de retiro, `retired` con revocación y aviso previo.
 - [ ] **M2-06 — Ciclo de vida de suscripciones**: pedir información, desistir, suspender/reactivar, expiración automática, aviso de renovación a 30 días, renovación prellenada.

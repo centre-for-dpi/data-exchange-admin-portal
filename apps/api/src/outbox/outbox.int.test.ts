@@ -19,6 +19,9 @@ describe('outbox -> pg-boss relay against PostgreSQL (M0-08)', () => {
     outbox = moduleRef.get(OutboxService);
     queue = moduleRef.get(QueueService);
     await queue.start();
+    // Other suites leave unrelayed messages in the shared test database (RID_WORKER=off), and
+    // the relay takes the oldest first: drain them so this run's messages are in the next batch.
+    while ((await queue.relayOnce(1000)) > 0);
   });
   afterAll(async () => {
     await queue.onApplicationShutdown();

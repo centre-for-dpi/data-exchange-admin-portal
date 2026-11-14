@@ -1,3 +1,4 @@
+import { SignedIn } from '../auth/decorators.js';
 import { Controller, Get } from '@nestjs/common';
 import { purposeListSchema } from '@rid/contracts';
 import type { z } from 'zod';
@@ -5,6 +6,7 @@ import { ApiOperation } from '../openapi/api-operation.decorator.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Purpose catalogue (SPEC.md §3). Readable by any authenticated user. */
+@SignedIn()
 @Controller('purposes')
 export class PurposesController {
   constructor(private readonly prisma: PrismaService) {}

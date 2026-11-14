@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { ApiVersionStatus, PlatformRole, ReviewDetail } from '@rid/contracts';
 import { ApisService, VERSION_INCLUDE, versionSnapshot } from '../apis/apis.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { PLATFORM_PERMISSIONS } from '../auth/policy.js';
+import { PLATFORM_PERMISSIONS } from '../auth/authz.policy.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../common/errors.js';
 import { assertTransition } from '../domain/api-version/state-machine.js';

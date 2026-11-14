@@ -8,7 +8,7 @@ import {
 } from '@rid/contracts';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { type AuthenticatedRequest, CurrentPrincipal } from '../auth/decorators.js';
+import { type AuthenticatedRequest, CurrentPrincipal, SignedIn } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';
 import { UnsupportedMediaTypeError } from '../common/errors.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
@@ -23,6 +23,7 @@ export const DESIGNATION_DOCUMENT_PATH = 'entity-requests/:requestId/designation
  * Onboarding requests, from the applicant's side (SPEC.md §4.1). Any signed-in user may file one
  * (ADR-0018); only its applicant and the operator can see it, everyone else gets 404.
  */
+@SignedIn()
 @Controller('entity-requests')
 export class EntityRequestsController {
   constructor(private readonly requests: EntityRequestsService) {}

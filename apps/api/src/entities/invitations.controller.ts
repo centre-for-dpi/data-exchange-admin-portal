@@ -5,7 +5,7 @@ import {
   membershipSummarySchema,
 } from '@rid/contracts';
 import { z } from 'zod';
-import { type AuthenticatedRequest, CurrentPrincipal } from '../auth/decorators.js';
+import { type AuthenticatedRequest, CurrentPrincipal, SignedIn } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
@@ -14,6 +14,7 @@ import { InvitationsService } from './invitations.service.js';
 const uuid = new ZodValidationPipe(z.uuid());
 
 /** The caller's invitations, matched by verified e-mail (ADR-0018). */
+@SignedIn()
 @Controller('me/invitations')
 export class InvitationsController {
   constructor(private readonly invitations: InvitationsService) {}

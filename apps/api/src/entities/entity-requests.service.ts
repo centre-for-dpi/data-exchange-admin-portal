@@ -12,7 +12,7 @@ import {
 } from '@rid/contracts';
 import type { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
-import { PLATFORM_PERMISSIONS } from '../auth/policy.js';
+import { PLATFORM_PERMISSIONS } from '../auth/authz.policy.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../common/errors.js';
 import { DocumentsService } from '../documents/documents.service.js';

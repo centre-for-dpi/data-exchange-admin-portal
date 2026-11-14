@@ -2,6 +2,7 @@ import {
   type CanActivate,
   type ExecutionContext,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -15,13 +16,14 @@ import {
   IS_PUBLIC,
   OPTIONAL_AUTH,
   PLATFORM_ACTION,
+  routeAccess,
 } from './decorators.js';
 import {
   ENTITY_PERMISSIONS,
   type EntityAction,
   PLATFORM_PERMISSIONS,
   type PlatformAction,
-} from './policy.js';
+} from './authz.policy.js';
 import { type Principal, PrincipalService } from './principal.service.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,6 +37,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
+  private readonly logger = new Logger(AuthGuard.name);
+
   constructor(
     private readonly reflector: Reflector,
     private readonly principals: PrincipalService,
@@ -43,6 +47,12 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const targets = [context.getHandler(), context.getClass()];
+    const access = routeAccess(this.reflector, targets);
+    // Fail closed: a route that does not declare who may call it is not callable (M2-03).
+    if (access.kind === 'undeclared') {
+      this.logger.error(`Route without an access declaration: ${context.getClass().name}`);
+      throw new ForbiddenError();
+    }
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
     const request = context.switchToHttp().getRequest<FastifyRequest & AuthenticatedRequest>();
