@@ -24,6 +24,11 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['entity_admin', 'entity_viewer'],
     platformRoles: ['platform_admin', 'regulator'],
   },
+  /** Invite people, change members' roles and revoke memberships (SPEC.md §2.2, M2-02). */
+  'entity.members.write': {
+    entityRoles: ['entity_admin'],
+    platformRoles: [],
+  },
   /** See the entity's APIs and versions, including drafts. */
   'api.read': {
     entityRoles: ENTITY_ROLES,

@@ -280,7 +280,18 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Separación de funciones.** Nadie revisa su propia solicitud ni una que lo designa.
     - **Pruebas.** 23 pruebas de integración (autorización, auditoría, documentos, invitaciones). La e2e `onboarding.spec.ts` cubre registro, solicitud, aprobación e invitación aceptada, con axe.
     - **Pendientes.** El alta creada directamente por el operador. El aviso al solicitante por correo (alta aprobada o rechazada) queda para M2-08. La suspensión y la baja quedan para M2-11.
-- [ ] **M2-02 — Miembros e invitaciones**: `entity_admin` invita por correo, asigna/quita roles, revoca membresías. CA: un miembro revocado pierde acceso en la siguiente petición.
+- [x] **M2-02 — Miembros e invitaciones**: `entity_admin` invita por correo, asigna/quita roles, revoca membresías. CA: un miembro revocado pierde acceso en la siguiente petición.
+  - _Notas de implementación:_
+    - **API** bajo `/entities/:entityId`:
+      - `invitations`: `GET`, `POST` y `POST :id/revoke`;
+      - `members/:id/roles` (`PUT`) y `members/:id/revoke` (`POST`).
+    - **Permisos.** El permiso nuevo `entity.members.write` es solo del `entity_admin`. Leer miembros e invitaciones es para admin y viewer. Quien no es de la entidad recibe 404.
+    - **Invitación.** Va a un correo, igual que en el alta (ADR-0018). Se envía por el outbox (`invitation.email`) y vence en 14 días. No se puede duplicar una pendiente ni invitar a un miembro activo. Una vencida se cierra (`invitation.expired`) al invitar de nuevo.
+    - **Miembro revocado.** Se le puede volver a invitar, y vuelve solo con los roles de la invitación nueva.
+    - **Último administrador.** La entidad nunca queda sin un `entity_admin` activo. Se comprueba dentro de la transacción, con bloqueo de la fila de la entidad.
+    - **CA.** Los roles se leen de la base en cada petición (ADR-0004). El test lo prueba: la entidad responde 404 en la petición siguiente a la revocación.
+    - **Web.** "Mi entidad" muestra los datos, los miembros con edición de roles y revocación, las invitaciones pendientes y el formulario para invitar.
+    - **Pruebas.** 10 de integración, con autorización por rol y entidad y auditoría. La e2e `members.spec.ts` recorre invitar, aceptar, cambiar roles y revocar, con axe.
 - [ ] **M2-03 — Matriz de permisos completa**: matriz de `SPEC.md §2` implementada como política central (`authz.policy.ts`); test generado por tabla para cada endpoint × rol.
 - [ ] **M2-04 — Aprobación del regulador**: publicaciones y suscripciones `sensitive` pasan por `regulator` cuando la config lo exige.
 - [ ] **M2-05 — Ciclo de vida de versiones**: nueva versión mayor, cambios compatibles en versión publicada (lint de compatibilidad contra la anterior), `deprecated` con fecha de retiro, `retired` con revocación y aviso previo.

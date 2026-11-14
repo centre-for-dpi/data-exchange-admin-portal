@@ -607,5 +607,37 @@
     "decline": "Decline",
     "acceptFor": "Accept the invitation of {entity}",
     "declineFor": "Decline the invitation of {entity}"
+  },
+  "myEntity": {
+    "myRoles": "Your roles",
+    "members": {
+      "title": "Members",
+      "lead": "People with access to the entity and their roles. Changes apply from each person’s next action.",
+      "empty": "There are no active members.",
+      "name": "Person",
+      "roles": "Roles",
+      "actions": "Actions",
+      "manage": "Manage {name}",
+      "rolesOf": "Roles of {name}",
+      "saveRoles": "Save roles",
+      "revoke": "Revoke {name}’s access"
+    },
+    "invitations": {
+      "title": "Pending invitations",
+      "empty": "There are no pending invitations.",
+      "email": "E-mail",
+      "expires": "Expires",
+      "revoke": "Withdraw",
+      "revokeFor": "Withdraw the invitation to {email}"
+    },
+    "invite": {
+      "title": "Invite a person",
+      "lead": "They will receive an e-mail and can accept by signing in to the portal with that same, verified address.",
+      "email": "E-mail",
+      "fullName": "Name (optional)",
+      "roles": "Roles",
+      "submit": "Send invitation",
+      "sent": "Invitation sent."
+    }
   }
 }

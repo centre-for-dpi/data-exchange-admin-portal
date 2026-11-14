@@ -469,19 +469,21 @@ describe('entity onboarding (M2-01)', () => {
       const res = await call('POST', `/review/entities/${created.id}/approve`, 'ana.operadora', {});
       expect(res.statusCode).toBe(403);
 
+      // A fresh operator each run: open requests accumulate in the shared test database.
+      const reviewer = person('revisor');
+      await call('GET', '/me', reviewer);
+      const reviewerUser = await prisma.user.findUniqueOrThrow({
+        where: { keycloakSub: reviewer.sub },
+      });
+      await prisma.userPlatformRole.create({
+        data: { userId: reviewerUser.id, role: 'platform_admin', grantedBy: 'test' },
+      });
       const own = entityRequestSchema.parse(
-        (
-          await call(
-            'POST',
-            '/entity-requests',
-            'pablo.plataforma',
-            input(person('d'), person('t')),
-          )
-        ).json(),
+        (await call('POST', '/entity-requests', reviewer, input(person('d'), person('t')))).json(),
       );
-      await upload(own.id, 'pablo.plataforma', PDF);
-      await call('POST', `/entity-requests/${own.id}/submit`, 'pablo.plataforma');
-      const self = await call('POST', `/review/entities/${own.id}/approve`, 'pablo.plataforma', {});
+      await upload(own.id, reviewer, PDF);
+      await call('POST', `/entity-requests/${own.id}/submit`, reviewer);
+      const self = await call('POST', `/review/entities/${own.id}/approve`, reviewer, {});
       expect(self.statusCode).toBe(403);
     });
 

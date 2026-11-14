@@ -18,9 +18,8 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '.
 import { DocumentsService } from '../documents/documents.service.js';
 import { assertTransition, OPEN_REQUEST_STATUSES } from '../domain/entity/state-machine.js';
 import { Prisma } from '../generated/prisma/client.js';
-import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
-import { INVITATION_EMAIL_TOPIC, invitationExpiry } from './invitations.service.js';
+import { InvitationsService } from './invitations.service.js';
 
 type RequestInput = z.output<typeof entityRequestInputSchema>;
 
@@ -70,8 +69,8 @@ export class EntityRequestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly outbox: OutboxService,
     private readonly documents: DocumentsService,
+    private readonly invitations: InvitationsService,
   ) {}
 
   // ------------------------------------------------------------------------------------------
@@ -589,33 +588,15 @@ export class EntityRequestsService {
     });
 
     for (const [email, designee] of byEmail) {
-      const invitation = await tx.invitation.create({
-        data: {
-          entityId: entity.id,
-          email,
-          fullName: designee.fullName,
-          roles: [...designee.roles],
-          expiresAt: invitationExpiry(),
-          invitedBy: principal.userId,
-          createdBy: 'system:entity-onboarding',
-        },
-      });
-      await this.audit.record(tx, {
+      await this.invitations.createInTx(tx, {
+        entityId: entity.id,
+        email,
+        fullName: designee.fullName,
+        roles: [...designee.roles],
+        invitedBy: principal.userId,
+        createdBy: 'system:entity-onboarding',
         actor: { type: 'system', id: 'system:entity-onboarding' },
-        action: 'invitation.created',
-        target: { type: 'invitation', id: invitation.id },
-        after: {
-          entityId: entity.id,
-          email,
-          roles: invitation.roles,
-          expiresAt: invitation.expiresAt.toISOString(),
-        },
         requestId,
-      });
-      await this.outbox.enqueue(tx, {
-        topic: INVITATION_EMAIL_TOPIC,
-        aggregate: `invitation:${invitation.id}`,
-        payload: { invitationId: invitation.id },
       });
     }
   }

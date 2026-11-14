@@ -19,6 +19,8 @@ import { CoreModule } from './core.module.js';
 import { DocumentsService } from './documents/documents.service.js';
 import { StorageService } from './documents/storage.service.js';
 import { EntitiesController } from './entities/entities.controller.js';
+import { EntityMembersController } from './entities/entity-members.controller.js';
+import { MembersService } from './entities/members.service.js';
 import { EntityRequestsController } from './entities/entity-requests.controller.js';
 import { EntityRequestsService } from './entities/entity-requests.service.js';
 import { EntityReviewsController } from './entities/entity-reviews.controller.js';
@@ -54,6 +56,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     MeController,
     InvitationsController,
     EntitiesController,
+    EntityMembersController,
     EntityRequestsController,
     EntityReviewsController,
     PurposesController,
@@ -75,6 +78,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     DocumentsService,
     EntityRequestsService,
     InvitationsService,
+    MembersService,
     { provide: MAIL_TRANSPORT, useFactory: createSmtpTransport },
     ApisService,
     ReviewsService,

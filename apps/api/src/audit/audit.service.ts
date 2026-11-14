@@ -6,8 +6,14 @@ import { sanitizeForAudit } from './sanitize.js';
 
 export type ActorType = 'user' | 'system' | 'application';
 
+export interface AuditActor {
+  type: ActorType;
+  id: string;
+  entityId?: string;
+}
+
 export interface AuditInput {
-  actor: { type: ActorType; id: string; entityId?: string };
+  actor: AuditActor;
   /** Dotted, lower snake_case: `<context>.<event>`, e.g. `subscription.approved`. */
   action: string;
   target: { type: string; id: string };

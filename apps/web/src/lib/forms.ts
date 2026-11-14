@@ -6,6 +6,8 @@ export interface FormState {
   fieldErrors?: Record<string, string[]>;
   /** Error not tied to a field. */
   formError?: string;
+  /** The action succeeded (forms that stay on the page show a confirmation). */
+  done?: boolean;
 }
 
 export const initialFormState: FormState = {};

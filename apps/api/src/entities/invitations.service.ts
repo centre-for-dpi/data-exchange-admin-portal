@@ -2,12 +2,13 @@ import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs
 import { getCountryConfig } from '@rid/config';
 import type { EntityRole, Invitation, MembershipSummary } from '@rid/contracts';
 import { z } from 'zod';
-import { AuditService } from '../audit/audit.service.js';
+import { type AuditActor, AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../common/errors.js';
 import { MAIL_TRANSPORT, type MailTransport } from '../mail/mail.service.js';
 import { MESSAGES, mailLocale } from '../mail/messages.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { OutboxService } from '../outbox/outbox.service.js';
+import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { QueueService } from '../queue/queue.service.js';
 
 export const INVITATION_EMAIL_TOPIC = 'invitation.email';
@@ -34,12 +35,81 @@ export class InvitationsService implements OnApplicationBootstrap {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly outbox: OutboxService,
     @Inject(MAIL_TRANSPORT) private readonly mail: MailTransport,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     if (!QueueService.enabled()) return;
     await this.queue.work(INVITATION_EMAIL_TOPIC, (data) => this.sendEmail(data));
+  }
+
+  /**
+   * Creates a pending invitation inside `tx`, audits it and queues its e-mail (outbox), so the
+   * e-mail goes out only if the transaction commits. A pending invitation to the same address
+   * that already expired is closed first (status revoked, audited as invitation.expired).
+   */
+  async createInTx(
+    tx: Tx,
+    input: {
+      entityId: string;
+      email: string;
+      fullName: string | null;
+      roles: EntityRole[];
+      invitedBy: string;
+      createdBy: string;
+      actor: AuditActor;
+      requestId?: string;
+    },
+  ) {
+    const stale = await tx.invitation.findMany({
+      where: {
+        entityId: input.entityId,
+        email: input.email,
+        status: 'pending',
+        expiresAt: { lte: new Date() },
+      },
+    });
+    for (const old of stale) {
+      await tx.invitation.update({ where: { id: old.id }, data: { status: 'revoked' } });
+      await this.audit.record(tx, {
+        actor: input.actor,
+        action: 'invitation.expired',
+        target: { type: 'invitation', id: old.id },
+        before: { status: 'pending', expiresAt: old.expiresAt.toISOString() },
+        after: { status: 'revoked' },
+        requestId: input.requestId,
+      });
+    }
+    const invitation = await tx.invitation.create({
+      data: {
+        entityId: input.entityId,
+        email: input.email,
+        fullName: input.fullName,
+        roles: input.roles,
+        expiresAt: invitationExpiry(),
+        invitedBy: input.invitedBy,
+        createdBy: input.createdBy,
+      },
+    });
+    await this.audit.record(tx, {
+      actor: input.actor,
+      action: 'invitation.created',
+      target: { type: 'invitation', id: invitation.id },
+      after: {
+        entityId: input.entityId,
+        email: input.email,
+        roles: invitation.roles,
+        expiresAt: invitation.expiresAt.toISOString(),
+      },
+      requestId: input.requestId,
+    });
+    await this.outbox.enqueue(tx, {
+      topic: INVITATION_EMAIL_TOPIC,
+      aggregate: `invitation:${invitation.id}`,
+      payload: { invitationId: invitation.id },
+    });
+    return invitation;
   }
 
   private static view(row: {

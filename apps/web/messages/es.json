@@ -607,5 +607,37 @@
     "decline": "Rechazar",
     "acceptFor": "Aceptar la invitación de {entity}",
     "declineFor": "Rechazar la invitación de {entity}"
+  },
+  "myEntity": {
+    "myRoles": "Tus roles",
+    "members": {
+      "title": "Miembros",
+      "lead": "Personas con acceso a la entidad y sus roles. Los cambios aplican desde la siguiente acción de cada persona.",
+      "empty": "No hay miembros activos.",
+      "name": "Persona",
+      "roles": "Roles",
+      "actions": "Acciones",
+      "manage": "Gestionar a {name}",
+      "rolesOf": "Roles de {name}",
+      "saveRoles": "Guardar roles",
+      "revoke": "Revocar el acceso de {name}"
+    },
+    "invitations": {
+      "title": "Invitaciones pendientes",
+      "empty": "No hay invitaciones pendientes.",
+      "email": "Correo",
+      "expires": "Vence",
+      "revoke": "Retirar",
+      "revokeFor": "Retirar la invitación a {email}"
+    },
+    "invite": {
+      "title": "Invitar a una persona",
+      "lead": "Le llegará un correo; podrá aceptar al entrar al portal con esa misma dirección, ya verificada.",
+      "email": "Correo electrónico",
+      "fullName": "Nombre (opcional)",
+      "roles": "Roles",
+      "submit": "Enviar invitación",
+      "sent": "Invitación enviada."
+    }
   }
 }

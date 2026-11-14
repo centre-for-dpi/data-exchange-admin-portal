@@ -203,3 +203,47 @@ export const invitationSchema = z.object({
 export type Invitation = z.infer<typeof invitationSchema>;
 export const invitationListSchema = z.object({ items: z.array(invitationSchema) });
 export const invitationIdParamsSchema = z.strictObject({ invitationId: z.uuid() });
+
+// ---------------------------------------------------------------------------------------------
+// Members and invitations managed by the entity_admin (M2-02)
+// ---------------------------------------------------------------------------------------------
+
+const entityRolesSchema = z
+  .array(entityRoleSchema)
+  .min(1, 'choose at least one role')
+  .max(5)
+  .refine((roles) => new Set(roles).size === roles.length, 'each role once');
+
+export const inviteMemberSchema = z.strictObject({
+  email: emailSchema,
+  fullName: z.string().trim().min(3).max(120).optional(),
+  roles: entityRolesSchema,
+});
+export type InviteMemberInput = z.input<typeof inviteMemberSchema>;
+
+export const INVITATION_STATUSES = ['pending', 'accepted', 'declined', 'revoked'] as const;
+
+export const entityInvitationSchema = z.object({
+  id: z.uuid(),
+  email: z.string(),
+  fullName: z.string().nullable(),
+  roles: z.array(entityRoleSchema),
+  status: z.enum(INVITATION_STATUSES),
+  /** A pending invitation past this instant can no longer be accepted. */
+  expiresAt: z.iso.datetime(),
+  expired: z.boolean(),
+  createdAt: z.iso.datetime(),
+});
+export type EntityInvitation = z.infer<typeof entityInvitationSchema>;
+export const entityInvitationListSchema = z.object({ items: z.array(entityInvitationSchema) });
+
+export const updateMemberRolesSchema = z.strictObject({ roles: entityRolesSchema });
+
+export const entityInvitationParamsSchema = z.strictObject({
+  entityId: z.uuid(),
+  invitationId: z.uuid(),
+});
+export const entityMemberParamsSchema = z.strictObject({
+  entityId: z.uuid(),
+  membershipId: z.uuid(),
+});
