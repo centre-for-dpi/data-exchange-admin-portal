@@ -135,10 +135,11 @@ model Entity {
   documents    Document[]       @relation("EntityDocuments")
   invitations  Invitation[]
 
-  /// A rejected request frees its slug and tax id, so a squatted request cannot block the real
-  /// entity forever. Predicates are written as PostgreSQL normalizes them, so Prisma sees no drift.
-  @@unique([slug], map: "entity_slug_live", where: raw("(status <> 'rejected'::entity_status)"))
-  @@unique([taxIdType, taxId], map: "entity_tax_id_live", where: raw("(status <> 'rejected'::entity_status)"))
+  /// Slug and tax id are claimed only once a request is submitted: drafts (`requested`) the
+  /// operator never sees cannot squat them, and a rejection frees them. Among drafts the first to
+  /// submit wins. Predicates are written as PostgreSQL normalizes them, so Prisma sees no drift.
+  @@unique([slug], map: "entity_slug_live", where: raw("(status <> ALL (ARRAY['requested'::entity_status, 'rejected'::entity_status]))"))
+  @@unique([taxIdType, taxId], map: "entity_tax_id_live", where: raw("(status <> ALL (ARRAY['requested'::entity_status, 'rejected'::entity_status]))"))
   @@index([status])
   @@index([applicantId])
   @@map("entity")

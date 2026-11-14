@@ -217,6 +217,37 @@ export class EntityRequestsService {
     if (errors.length > 0) throw new ValidationError(errors);
   }
 
+  /** Statuses that hold the slug and tax id (see the partial unique indexes on `entity`). */
+  private static readonly CLAIMING: EntityStatus[] = [
+    'under_review',
+    'active',
+    'suspended',
+    'offboarded',
+  ];
+
+  /**
+   * Field errors when a submitted or existing entity already holds the slug or tax id. Drafts
+   * never block each other; the indexes settle races when a draft is submitted.
+   */
+  private async assertUnclaimed(input: RequestInput, exceptId?: string): Promise<void> {
+    const taken = await this.prisma.entity.findMany({
+      where: {
+        status: { in: EntityRequestsService.CLAIMING },
+        ...(exceptId ? { id: { not: exceptId } } : {}),
+        OR: [{ slug: input.slug }, { taxIdType: input.taxIdType, taxId: input.taxId }],
+      },
+      select: { slug: true, taxIdType: true, taxId: true },
+    });
+    const errors: Array<{ path: string; message: string }> = [];
+    if (taken.some((e) => e.slug === input.slug)) {
+      errors.push({ path: 'slug', message: 'Another entity already uses this identifier' });
+    }
+    if (taken.some((e) => e.taxIdType === input.taxIdType && e.taxId === input.taxId)) {
+      errors.push({ path: 'taxId', message: 'Another entity already uses this tax id' });
+    }
+    if (errors.length > 0) throw new ValidationError(errors);
+  }
+
   /** Turns a unique-index violation (slug or tax id already taken) into a field error. */
   private static async uniquely<T>(work: () => Promise<T>): Promise<T> {
     try {
@@ -230,8 +261,8 @@ export class EntityRequestsService {
             path,
             message:
               path === 'slug'
-                ? 'Another entity or open request already uses this identifier'
-                : 'Another entity or open request already uses this tax id',
+                ? 'Another entity already uses this identifier'
+                : 'Another entity already uses this tax id',
           },
         ]);
       }
@@ -269,6 +300,10 @@ export class EntityRequestsService {
     requestId?: string,
   ): Promise<EntityRequest> {
     EntityRequestsService.checkAgainstConfig(input);
+    if (!principal.emailVerified) {
+      throw new ForbiddenError('Verify your e-mail address before requesting an onboarding');
+    }
+    await this.assertUnclaimed(input);
     const open = await this.prisma.entity.count({
       where: { applicantId: principal.userId, status: { in: [...OPEN_REQUEST_STATUSES] } },
     });
@@ -331,6 +366,7 @@ export class EntityRequestsService {
   ): Promise<EntityRequest> {
     const before = await this.loadForApplicant(requestId, principal);
     EntityRequestsService.checkAgainstConfig(input);
+    await this.assertUnclaimed(input, requestId);
     await EntityRequestsService.uniquely(() =>
       this.prisma.$transaction(async (tx) => {
         await EntityRequestsService.stillRequested(tx, requestId);
@@ -409,21 +445,26 @@ export class EntityRequestsService {
         { path: 'designationDocument', message: 'Attach the designation document first' },
       ]);
     }
-    await this.prisma.$transaction(async (tx) => {
-      const changed = await tx.entity.updateMany({
-        where: { id: requestId, status: 'requested' },
-        data: { status: 'under_review', submittedAt: new Date() },
-      });
-      if (changed.count === 0) throw new ConflictError('The request changed meanwhile; reload it');
-      await this.audit.record(tx, {
-        actor: userActor(principal),
-        action: 'entity.submitted',
-        target: { type: 'entity', id: requestId },
-        before: { status: before.status },
-        after: { status: 'under_review' },
-        requestId: requestIdHeader,
-      });
-    });
+    // Submitting claims the slug and tax id: if another request got there first, the partial
+    // unique index rejects it and the applicant sees which field to change.
+    await EntityRequestsService.uniquely(() =>
+      this.prisma.$transaction(async (tx) => {
+        const changed = await tx.entity.updateMany({
+          where: { id: requestId, status: 'requested' },
+          data: { status: 'under_review', submittedAt: new Date() },
+        });
+        if (changed.count === 0)
+          throw new ConflictError('The request changed meanwhile; reload it');
+        await this.audit.record(tx, {
+          actor: userActor(principal),
+          action: 'entity.submitted',
+          target: { type: 'entity', id: requestId },
+          before: { status: before.status },
+          after: { status: 'under_review' },
+          requestId: requestIdHeader,
+        });
+      }),
+    );
     return this.get(requestId, principal);
   }
 

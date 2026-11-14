@@ -71,6 +71,6 @@ export const MESSAGES = {
   },
 } as const;
 
-/** Language of the country's locale (es-CO -> es), falling back to Spanish. */
+/** Language of the country locale (e.g. "es-XX" -> "es"), falling back to Spanish. */
 export const mailLocale = (countryLocale: string): MailLocale =>
   countryLocale.toLowerCase().startsWith('en') ? 'en' : 'es';

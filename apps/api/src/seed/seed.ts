@@ -96,7 +96,7 @@ export async function runSeed(
     const entityIds = new Map<string, string>();
     for (const seed of entities) {
       const existing = await tx.entity.findFirst({
-        where: { slug: seed.slug, status: { not: 'rejected' } },
+        where: { slug: seed.slug, status: { notIn: ['requested', 'rejected'] } },
       });
       if (existing) {
         entityIds.set(seed.slug, existing.id);

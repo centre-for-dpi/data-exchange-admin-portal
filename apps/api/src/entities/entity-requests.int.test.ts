@@ -67,9 +67,10 @@ describe('entity onboarding (M2-01)', () => {
     rmSync(documentsDir, { recursive: true, force: true });
   });
 
+  const emailOf = (username: string) => realmUsers.find((u) => u.username === username)?.email;
   const token = (who: string | Person) =>
     typeof who === 'string'
-      ? issuer.token(subOf(who))
+      ? issuer.token(subOf(who), { email: emailOf(who), emailVerified: true })
       : issuer.token(who.sub, {
           email: who.email,
           name: who.name,
@@ -194,6 +195,41 @@ describe('entity onboarding (M2-01)', () => {
         slug: 'internal',
       });
       expect(reserved.statusCode).toBe(400);
+    });
+
+    it('needs a verified e-mail to file a request', async () => {
+      const res = await call(
+        'POST',
+        '/entity-requests',
+        { ...person('s'), verified: false },
+        input(person('d'), person('t')),
+      );
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('drafts claim nothing: the first request submitted gets the identifier and tax id', async () => {
+      const first = person('primero');
+      const second = person('segundo');
+      const body = input(person('d'), person('t'));
+      const a = entityRequestSchema.parse(
+        (await call('POST', '/entity-requests', first, body)).json(),
+      );
+      const created = await call('POST', '/entity-requests', second, body);
+      expect(created.statusCode, created.body).toBe(201);
+      const b = entityRequestSchema.parse(created.json());
+      for (const [who, id] of [
+        [first, a.id],
+        [second, b.id],
+      ] as const) {
+        expect((await upload(id, who, PDF)).statusCode).toBe(200);
+      }
+      expect((await call('POST', `/entity-requests/${b.id}/submit`, second)).statusCode).toBe(200);
+      const late = await call('POST', `/entity-requests/${a.id}/submit`, first);
+      expect(late.statusCode).toBe(400);
+      expect(late.json<{ errors: Array<{ path: string }> }>().errors[0]?.path).toBe('slug');
+      // Nor can a new draft take what a submitted request holds.
+      const third = await call('POST', '/entity-requests', person('tercero'), body);
+      expect(third.statusCode).toBe(400);
     });
 
     it('may have at most three open requests', async () => {
