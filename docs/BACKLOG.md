@@ -396,8 +396,21 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - `agreements`: acuerdo de intercambio y plantilla;
     - `notifications`: avisos en el portal y en Mailpit;
     - `audit-export`: exportación firmada y anclajes;
-    - `purposes`: catálogo de finalidades.
-  - **Pendiente para cerrarlo formalmente.** Falta un recorrido único que encadene todo en una sola corrida, y desplegarlo en el VPS. El despliegue quedó acordado para el cierre de M2.
+    - `purposes`: catálogo de finalidades;
+    - `entity-admin`: suspensión, reactivación y alta directa por el operador.
+  - **Recorrido único** (`e2e/governance.spec.ts`, unos 2 minutos), alrededor de una entidad nueva:
+    1. El operador la registra directamente.
+    2. Su administrador se autorregistra y acepta la invitación.
+    3. Una API de salud se publica con revisión del operador.
+    4. La entidad nueva crea una aplicación y pide acceso con el acuerdo adjunto.
+    5. La responsable de datos aprueba y el administrador recibe el aviso.
+    6. La llamada pasa por el gateway.
+    7. El operador suspende la entidad, el gateway la niega (`app_suspended`), y al reactivarla vuelve a pasar.
+    8. El operador la da de baja: la suscripción se cierra y sus personas pierden el acceso.
+    9. La exportación firmada de la bitácora contiene cada paso.
+
+    El regulador tiene su propio recorrido (`regulator.spec.ts`), porque interviene solo con datos sensibles.
+  - **Pendiente.** El despliegue en el VPS, acordado para el cierre de M2. Requiere activar en Keycloak el registro y la verificación de correo, y crear el volumen de documentos.
 
 ---
 
