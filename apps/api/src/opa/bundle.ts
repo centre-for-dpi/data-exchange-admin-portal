@@ -49,6 +49,8 @@ export interface BundleRoute {
   apiVersionId: string;
   classification: string;
   operations: BundleOperation[];
+  /** Served through X-Road (M4-05): the policy also sets X-Road-UserId and X-Road-Issue. */
+  xroad?: true;
 }
 
 /**

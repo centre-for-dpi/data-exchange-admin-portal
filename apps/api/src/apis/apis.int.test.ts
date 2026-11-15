@@ -128,6 +128,69 @@ describe('API registration (M1-03)', () => {
     });
   });
 
+  describe('versions through X-Road (M4-05)', () => {
+    const serviceId = (memberCode: string) => ({
+      instance: 'CO',
+      memberClass: 'GOV',
+      memberCode,
+      serviceCode: 'consultaAfiliacion',
+    });
+    const register = async (apiId: string, memberCode: string) =>
+      request('POST', `/api/v1/entities/${salud}/apis/${apiId}/versions`, 'pedro.publicador', {
+        ...versionBody(),
+        upstream: { type: 'xroad', serviceId: serviceId(memberCode) },
+      });
+    const code = `9${randomUUID().replace(/\D/g, '').slice(0, 9)}`;
+
+    it('needs the entity X-Road member, set by the operator, and only that member', async () => {
+      await prisma.entity.updateMany({
+        where: { id: salud },
+        data: { xroadMemberClass: null, xroadMemberCode: null },
+      });
+      const api = await createApi();
+      expect((await register(api.id, code)).statusCode).toBe(400);
+
+      const set = await request(
+        'PUT',
+        `/api/v1/admin/entities/${salud}/xroad-member`,
+        'pablo.plataforma',
+        { member: { memberClass: 'GOV', memberCode: code } },
+      );
+      expect(set.statusCode, set.body).toBe(200);
+      expect(set.json()).toMatchObject({ xroadMember: { memberClass: 'GOV', memberCode: code } });
+      // The entity cannot set it itself.
+      expect(
+        (
+          await request('PUT', `/api/v1/admin/entities/${salud}/xroad-member`, 'elena.admin', {
+            member: { memberClass: 'GOV', memberCode: '1' },
+          })
+        ).statusCode,
+      ).toBe(403);
+
+      expect((await register(api.id, '1234567890')).statusCode).toBe(400);
+      const ok = await register(api.id, code);
+      expect(ok.statusCode, ok.body).toBe(201);
+      expect(apiVersionDetailSchema.parse(ok.json()).upstream).toMatchObject({
+        type: 'xroad',
+        servicePath: '',
+      });
+      const event = await prisma.auditEvent.findFirstOrThrow({
+        where: { targetId: salud, action: 'entity.xroad_member_set' },
+        orderBy: { seq: 'desc' },
+      });
+      expect(event.after).toMatchObject({ xroadMember: { memberCode: code } });
+
+      // Another entity cannot take the same member.
+      const taken = await request(
+        'PUT',
+        `/api/v1/admin/entities/${programas}/xroad-member`,
+        'pablo.plataforma',
+        { member: { memberClass: 'GOV', memberCode: code } },
+      );
+      expect(taken.statusCode).toBe(409);
+    });
+  });
+
   describe('happy path', () => {
     it('registers an API, uploads a version, lints it and submits it for review', async () => {
       const api = await createApi();

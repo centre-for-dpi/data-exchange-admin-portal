@@ -205,7 +205,7 @@ export function CreateVersionForm({
     createVersionAction.bind(null, apiId),
     initialFormState,
   );
-  const [upstreamType, setUpstreamType] = useState<'node' | 'direct'>('node');
+  const [upstreamType, setUpstreamType] = useState<'node' | 'direct' | 'xroad'>('node');
   const purposeErrors = state.fieldErrors?.allowedPurposes ?? [];
   return (
     <form action={action} className="space-y-5" noValidate>
@@ -219,8 +219,8 @@ export function CreateVersionForm({
         <legend className="mb-1 text-sm font-medium text-foreground-strong">
           {t('upstreamType')}
         </legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {(['node', 'direct'] as const).map((type) => (
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(['node', 'direct', 'xroad'] as const).map((type) => (
             <label
               key={type}
               className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border-control bg-background px-4 py-3 text-sm has-[:checked]:border-primary-ink has-[:checked]:bg-primary-soft"
@@ -233,7 +233,11 @@ export function CreateVersionForm({
                 checked={upstreamType === type}
                 onChange={() => setUpstreamType(type)}
               />
-              {type === 'node' ? t('upstreamNode') : t('upstreamDirect')}
+              {type === 'node'
+                ? t('upstreamNode')
+                : type === 'direct'
+                  ? t('upstreamDirect')
+                  : t('upstreamXroad')}
             </label>
           ))}
         </div>
@@ -264,6 +268,26 @@ export function CreateVersionForm({
             )}
           </Field>
         </>
+      ) : upstreamType === 'xroad' ? (
+        <fieldset className="grid gap-4 sm:grid-cols-2">
+          <legend className="mb-1 text-sm font-medium text-foreground-strong">
+            {t('xroadServiceId')}
+          </legend>
+          {(
+            [
+              ['xroadInstance', true],
+              ['xroadMemberClass', true],
+              ['xroadMemberCode', true],
+              ['xroadSubsystem', false],
+              ['xroadService', true],
+              ['xroadPath', false],
+            ] as const
+          ).map(([name, required]) => (
+            <Field key={name} name={name} label={t(name)} required={required} state={state}>
+              {(p) => <input {...p} type="text" className={`${inputClass} font-mono`} />}
+            </Field>
+          ))}
+        </fieldset>
       ) : (
         <>
           <Field name="upstream" label={t('url')} required state={state}>

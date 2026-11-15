@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { xroadMemberSchema } from './apis.js';
 import { type EntityRole, entityRoleSchema, platformRoleSchema } from './roles.js';
 
 /** SPEC.md §4.1. */
@@ -266,6 +267,8 @@ export const adminEntitySchema = z.object({
   legalName: z.string(),
   status: entityStatusSchema,
   providerSuspended: z.boolean(),
+  /** X-Road member, set by the operator (M4-05); null when the entity is not in X-Road. */
+  xroadMember: xroadMemberSchema.nullable(),
   counts: z.object({
     members: z.number().int(),
     publishedApis: z.number().int(),
@@ -282,6 +285,9 @@ export const suspendEntitySchema = z.strictObject({
   /** Also stop serving the entity's APIs to other entities (an explicit decision). */
   alsoAsProvider: z.boolean().default(false),
 });
+/** The entity's X-Road member (M4-05, SPIKE S-5); null takes it out of X-Road. */
+export const setXroadMemberSchema = z.strictObject({ member: xroadMemberSchema.nullable() });
+
 export const reactivateEntitySchema = z.strictObject({
   comment: z.string().trim().max(2_000).optional(),
 });

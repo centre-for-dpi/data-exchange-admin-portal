@@ -220,6 +220,58 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     ]);
   });
 
+  describe('a version consumed through X-Road (M4-05, SPIKE S-5)', () => {
+    const serviceId = {
+      instance: 'CO',
+      memberClass: 'GOV',
+      memberCode: '8999999999',
+      serviceCode: 'consultaHogar',
+    };
+    const xroadSettings = {
+      ...settings,
+      xroad: { securityServerUrl: 'https://ss.and.example:8443', client: 'CO/GOV/1/RID' },
+    };
+    const onXroad = (member: VersionForGateway['xroadMember']) =>
+      version({ upstream: { type: 'xroad', serviceId, servicePath: '/v1' }, xroadMember: member });
+
+    it('goes to the operator Security Server with the serviceId path and the X-Road client', () => {
+      const { upstream, route } = desiredGateway(
+        onXroad({ memberClass: 'GOV', memberCode: '8999999999' }),
+        xroadSettings,
+      );
+      expect(upstream).toMatchObject({
+        scheme: 'https',
+        nodes: { 'ss.and.example:8443': 1 },
+        upstream_host: 'ss.and.example',
+        tls: { verify: true, client_cert_id: 'rid-ssl-gateway-xroad' },
+      });
+      const plugins = route.plugins as Plugins;
+      expect(plugins['proxy-rewrite']).toMatchObject({
+        regex_uri: ['^/salud/afiliacion/v1/(.*)$', '/r1/CO/GOV/8999999999/consultaHogar/v1/$1'],
+        headers: { set: { 'X-Road-Client': 'CO/GOV/1/RID' } },
+      });
+      expect((plugins.opa as { send_headers_upstream: string[] }).send_headers_upstream).toEqual(
+        expect.arrayContaining(['X-Road-UserId', 'X-Road-Issue']),
+      );
+    });
+
+    it('fails closed for another member, no member, or no Security Server configured', () => {
+      for (const member of [null, { memberClass: 'GOV', memberCode: '1' }]) {
+        expect(() => desiredGateway(onXroad(member), xroadSettings)).toThrow(
+          UnsupportedUpstreamError,
+        );
+      }
+      expect(() =>
+        desiredGateway(onXroad({ memberClass: 'GOV', memberCode: '8999999999' }), settings),
+      ).toThrow(UnsupportedUpstreamError);
+    });
+
+    it('other routes carry no X-Road header', () => {
+      const plugins = desiredGateway(version(), settings).route.plugins as Plugins;
+      expect(JSON.stringify(plugins)).not.toContain('X-Road');
+    });
+  });
+
   describe('a version on an enrolled kit node (M4-04, ADR-0023)', () => {
     const NODE = '0190d0c4-0000-7000-8000-00000000a0de';
     const pki = {

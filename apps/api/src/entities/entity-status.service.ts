@@ -30,9 +30,12 @@ export class EntityStatusService {
     private readonly apis: ApisService,
   ) {}
 
-  async list(status?: EntityStatus) {
+  async list(status?: EntityStatus, id?: string) {
     const rows = await this.prisma.entity.findMany({
-      where: { status: status ? status : { in: ['active', 'suspended', 'offboarded'] } },
+      where: {
+        status: status ? status : { in: ['active', 'suspended', 'offboarded'] },
+        ...(id ? { id } : {}),
+      },
       orderBy: { shortName: 'asc' },
       take: 500,
       include: {
@@ -66,6 +69,10 @@ export class EntityStatusService {
         legalName: e.legalName,
         status: e.status,
         providerSuspended: e.providerSuspended,
+        xroadMember:
+          e.xroadMemberClass && e.xroadMemberCode
+            ? { memberClass: e.xroadMemberClass, memberCode: e.xroadMemberCode }
+            : null,
         counts: {
           members: e._count.memberships,
           publishedApis: e._count.apis,
@@ -75,8 +82,66 @@ export class EntityStatusService {
     };
   }
 
+  /**
+   * Registers (or clears) the entity's X-Road member (M4-05, SPIKE S-5). Only the operator does:
+   * the entity's xroad versions must name this member, and they are reconciled again, so a
+   * changed member takes their routes away (fail closed).
+   */
+  async setXroadMember(
+    entityId: string,
+    principal: Principal,
+    member: { memberClass: string; memberCode: string } | null,
+    requestId?: string,
+  ) {
+    const entity = await this.load(entityId);
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.entity.updateMany({
+          where: { id: entityId },
+          data: {
+            xroadMemberClass: member?.memberClass ?? null,
+            xroadMemberCode: member?.memberCode ?? null,
+          },
+        });
+        await this.audit.record(tx, {
+          actor: { type: 'user', id: principal.keycloakSub },
+          action: 'entity.xroad_member_set',
+          target: { type: 'entity', id: entityId },
+          before: {
+            xroadMember: entity.xroadMemberClass
+              ? { memberClass: entity.xroadMemberClass, memberCode: entity.xroadMemberCode }
+              : null,
+          },
+          after: { xroadMember: member },
+          requestId,
+        });
+        const versions = await tx.apiVersion.findMany({
+          where: {
+            upstreamType: 'xroad',
+            status: { in: ['published', 'deprecated'] },
+            api: { entityId },
+          },
+          select: { id: true },
+        });
+        for (const v of versions) {
+          await this.outbox.enqueue(tx, {
+            topic: GATEWAY_SYNC_TOPIC,
+            aggregate: `apiVersion:${v.id}`,
+            payload: { reason: 'xroad_member_changed' },
+          });
+        }
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') {
+        throw new ConflictError('Another entity already has that X-Road member');
+      }
+      throw error;
+    }
+    return this.one(entityId);
+  }
+
   async one(entityId: string) {
-    const item = (await this.list()).items.find((e) => e.id === entityId);
+    const item = (await this.list(undefined, entityId)).items[0];
     if (!item) throw new NotFoundError('Network entity');
     return item;
   }

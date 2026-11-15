@@ -91,6 +91,7 @@ export class OpaService implements OnApplicationBootstrap {
       routes[routeId(v.id)] = {
         apiVersionId: v.id,
         classification: v.api.classification,
+        ...(v.upstreamType === 'xroad' ? { xroad: true as const } : {}),
         operations: listOperations(v.openapiSpec as Record<string, unknown>).map((o) => {
           const subject = bundleSubject(v.basePath, o.path, o.dataSubject);
           return {

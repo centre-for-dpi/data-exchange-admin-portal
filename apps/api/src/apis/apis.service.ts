@@ -287,6 +287,27 @@ export class ApisService {
         ]);
       }
     }
+    // Every xroad route leaves with the operator's identity: an entity only publishes services
+    // of its own X-Road member, which the operator set (M4-05, SPIKE S-5).
+    if (data.upstream.type === 'xroad') {
+      const { memberClass, memberCode } = data.upstream.serviceId;
+      if (!entity.xroadMemberClass || !entity.xroadMemberCode) {
+        throw new ValidationError([
+          {
+            path: 'upstream.serviceId',
+            message: 'The operator has not registered the entity’s X-Road member yet',
+          },
+        ]);
+      }
+      if (memberClass !== entity.xroadMemberClass || memberCode !== entity.xroadMemberCode) {
+        throw new ValidationError([
+          {
+            path: 'upstream.serviceId',
+            message: 'The service is not of the entity’s X-Road member',
+          },
+        ]);
+      }
+    }
 
     const [major = 0, minor = 0] = data.version.split('.').map(Number);
     // One version per major until it is retired (ADR-0019): compatible changes are revisions of

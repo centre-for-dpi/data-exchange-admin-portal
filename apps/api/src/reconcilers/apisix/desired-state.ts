@@ -1,5 +1,11 @@
 import { isIP } from 'node:net';
-import { isPublicHostname, nodeDnsName, type Upstream } from '@rid/contracts';
+import {
+  isPublicHostname,
+  nodeDnsName,
+  type Upstream,
+  xroadPartSchema,
+  xroadServicePath,
+} from '@rid/contracts';
 import type { ApisixObject } from './apisix-admin.js';
 
 /** Deterministic ids (ARCHITECTURE.md §4): reconciling needs no extra state. */
@@ -63,7 +69,25 @@ export interface GatewaySettings {
    * enrolled kit nodes go there (M4-04, ADR-0023).
    */
   wgHub?: string;
+  /**
+   * The operator's X-Road Security Server (M4-05, SPIKE S-5): its URL, the operator's client
+   * subsystem (INSTANCE/CLASS/MEMBER/SUBSYSTEM) and, over HTTPS, the PEM that verifies its
+   * internal TLS certificate. Without it, xroad versions stay in sync error.
+   */
+  xroad?: { securityServerUrl: string; client: string; caPem?: string };
 }
+
+/** The gateway's client certificate towards the operator's Security Server (one for X-Road). */
+export const GATEWAY_XROAD_SSL_ID = 'rid-ssl-gateway-xroad';
+/** X-Road request headers a consumer could use to steer the Security Server (SPIKE S-5). */
+export const XROAD_CONTROL_HEADERS = [
+  'X-Road-Security-Server',
+  'X-Road-Represented-Party',
+  'X-Road-Id',
+  'X-Road-Request-Hash',
+];
+/** Decided by OPA on xroad routes: removed when the policy does not return them. */
+export const XROAD_OPA_HEADERS = ['X-Road-UserId', 'X-Road-Issue'];
 
 /** Headers only the gateway may set: removed if a client sends them (ARCHITECTURE.md §4.1). */
 export const GATEWAY_ONLY_HEADERS = [
@@ -173,6 +197,8 @@ export interface VersionForGateway {
   version: string;
   /** Set while the version is deprecated (ADR-0019): announced on every response. */
   deprecation?: { deprecatedAt: Date; sunsetAt: Date };
+  /** The provider entity's X-Road member, as the operator set it (M4-05). */
+  xroadMember?: { memberClass: string; memberCode: string } | null;
   /** The kit node a `node` upstream with a nodeId names, as stored (M4-04). */
   node?: { id: string; entityId: string; status: string } | null;
 }
@@ -257,6 +283,7 @@ function resolveUpstream(
       pathPrefix: url.pathname.replace(/\/$/, ''),
     };
   }
+  if (v.upstream.type === 'xroad') return xroadUpstream(v, base, settings);
   if (v.upstream.nodeId) {
     return {
       upstream: nodeUpstream(v, v.upstream.nodeId, base, settings, pki),
@@ -293,6 +320,65 @@ function resolveUpstream(
       tls: { client_cert_id: gatewayClientSslId(v.entityId), verify: true, ca_certs: ca },
     },
     pathPrefix,
+  };
+}
+
+/**
+ * Upstream of a version consumed through X-Road (M4-05, SPIKE S-5): the operator's Security
+ * Server, never a URL of the version (SSRF), with the serviceId in the path. The serviceId's
+ * member must be the entity's X-Road member, checked again here (fail closed): every xroad route
+ * leaves with the operator's identity, so no entity may serve another member's service.
+ */
+function xroadUpstream(
+  v: VersionForGateway,
+  base: ApisixObject,
+  settings: GatewaySettings,
+): ResolvedUpstream {
+  if (v.upstream.type !== 'xroad') throw new UnsupportedUpstreamError('Not an xroad upstream');
+  const { serviceId, servicePath } = v.upstream;
+  if (!settings.xroad) {
+    throw new UnsupportedUpstreamError('X-Road is not configured (RID_XROAD_SECURITY_SERVER_URL)');
+  }
+  const parts = [
+    serviceId.instance,
+    serviceId.memberClass,
+    serviceId.memberCode,
+    serviceId.subsystemCode,
+    serviceId.serviceCode,
+  ].filter((p): p is string => p !== undefined);
+  if (parts.some((part) => !xroadPartSchema.safeParse(part).success)) {
+    throw new UnsupportedUpstreamError('The X-Road service identifier has invalid characters');
+  }
+  const member = v.xroadMember;
+  if (
+    !member ||
+    member.memberClass !== serviceId.memberClass ||
+    member.memberCode !== serviceId.memberCode
+  ) {
+    throw new UnsupportedUpstreamError('The service is not of the entity’s X-Road member');
+  }
+  const url = new URL(settings.xroad.securityServerUrl);
+  const tls = url.protocol === 'https:';
+  const ca = settings.xroad.caPem ? certificatesOf(settings.xroad.caPem) : [];
+  return {
+    upstream: {
+      ...base,
+      scheme: tls ? 'https' : 'http',
+      pass_host: 'rewrite',
+      upstream_host: url.hostname,
+      nodes: { [nodeKey(url.hostname, url.port || (tls ? '443' : '80'))]: 1 },
+      ...(tls
+        ? {
+            tls: {
+              verify: true,
+              client_cert_id: GATEWAY_XROAD_SSL_ID,
+              ...(ca.length ? { ca_certs: ca } : {}),
+            },
+          }
+        : {}),
+    },
+    // Literal parts: APISIX encodes upstream_uri itself (S-5).
+    pathPrefix: `${url.pathname.replace(/\/$/, '')}${xroadServicePath(serviceId)}${servicePath.replace(/\/$/, '')}`,
   };
 }
 
@@ -401,13 +487,23 @@ export function desiredGateway(
       'proxy-rewrite': {
         // Only upstream_uri changes; OPA still sees the full public path.
         regex_uri: [`^${escapeRegex(v.basePath)}/(.*)$`, `${pathPrefix}/$1`],
-        headers: { remove: GATEWAY_ONLY_HEADERS },
+        headers:
+          v.upstream.type === 'xroad' && settings.xroad
+            ? {
+                // The operator's subsystem always; the consumer cannot steer the Security Server.
+                set: { 'X-Road-Client': settings.xroad.client },
+                remove: [...GATEWAY_ONLY_HEADERS, ...XROAD_CONTROL_HEADERS],
+              }
+            : { remove: GATEWAY_ONLY_HEADERS },
       },
       opa: {
         host: settings.opaUrl,
         policy: 'rid/authz',
         with_route: true,
-        send_headers_upstream: OPA_UPSTREAM_HEADERS,
+        send_headers_upstream:
+          v.upstream.type === 'xroad'
+            ? [...OPA_UPSTREAM_HEADERS, ...XROAD_OPA_HEADERS]
+            : OPA_UPSTREAM_HEADERS,
       },
       // Per-subscription limit (S-2, ADR-0020): OPA puts the subscription and its share of the
       // limit for this node in headers; counters live in each node. A denied call never gets here.

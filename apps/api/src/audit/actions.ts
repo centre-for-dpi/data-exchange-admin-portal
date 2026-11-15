@@ -21,6 +21,7 @@ export const AUDIT_ACTIONS = [
   'entity.suspended',
   'entity.reactivated',
   'entity.offboarded',
+  'entity.xroad_member_set',
   'membership.created',
   'membership.updated',
   'membership.roles_changed',

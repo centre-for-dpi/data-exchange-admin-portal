@@ -615,7 +615,15 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - El detalle de la versión (proveedor y revisor) y el del catálogo (consumidor) muestran el nodo, su estado y su último heartbeat. El formulario de versión ofrece los nodos de la entidad. Sin nodo, sigue el servicio de prueba del entorno (`RID_DEV_NODES`), como hasta M3.
     - e2e (`kit-node.spec.ts`): el nodo simulado se enrola, pedro publica una API en él, carlos la consume con mTLS y token ligado, y la llamada pasa por el túnel (el nodo la registra). El catálogo muestra el nodo en línea. Al darlo de baja, la ruta desaparece.
     - Despliegue: `RID_GATEWAY_WG_HUB` (por defecto `wg-hub:8443`).
-- [ ] **M4-05 — Upstream `xroad`**: según S-5.
+- [x] **M4-05 — Upstream `xroad`**: según S-5.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1`.
+    - El upstream guarda solo el `serviceId` y una ruta opcional. El Security Server es el del operador, de la configuración del despliegue (SSRF). `SPEC.md §3.1` se ajustó: ya no hay `securityServerUrl` por versión.
+    - Ruta `/r1/{serviceId}{ruta}/…` con partes literales, validadas (letras, dígitos, espacio y `. _ - : ~`). `X-Road-Client` fijo y borrado de las cabeceras de control del consumidor. `X-Road-UserId` (hash del funcionario) y `X-Road-Issue` (`rid:subscription:<id>`) desde la política.
+    - Miembro X-Road de la entidad, registrado por el operador (`PUT /admin/entities/{id}/xroad-member`, único por entidad, auditado). Una versión `xroad` solo puede nombrar un servicio de ese miembro: se valida al registrar y en cada pasada del reconciliador, que falla cerrado.
+    - Sobre HTTPS, certificado de cliente propio del gateway para X-Road (`rid-ssl-gateway-xroad`).
+    - Probado contra APISIX y OPA reales, con la política real y un Security Server simulado (`xroad.int.test.ts`): URL y `X-Road-Client`, cabeceras de la política, cabeceras falsas del consumidor, truco de ruta, llamada negada. Además, 3 tests de política, el registro con y sin miembro, y un e2e del operador y del publicador.
+    - Pendiente de confirmar con un Security Server real (piloto): que las `X-RID-*` llegan intactas al sistema del proveedor (S-5).
+    - Despliegue: `RID_XROAD_SECURITY_SERVER_URL`, `RID_XROAD_CLIENT` y `RID_XROAD_SECURITY_SERVER_CA` (archivo PEM).
 - [ ] **M4-06 — Validaciones al enviar a revisión**: healthcheck a través del gateway y prueba de contrato con Schemathesis en sandbox; resultados adjuntos a la revisión.
 - [ ] **M4-07 — Lista de preparación del bootcamp**: por entidad, checklist de prerrequisitos (servidor, usuario de solo lectura, salida 443, responsables designados, caso de uso) con estado visible para el operador.
 - [ ] **M4-08 — Modo sandbox**: aplicaciones sandbox con aprobación automática hacia upstreams de prueba.

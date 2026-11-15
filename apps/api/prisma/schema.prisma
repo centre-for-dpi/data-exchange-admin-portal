@@ -128,6 +128,10 @@ model Entity {
   decidedAt             DateTime? @map("decided_at") @db.Timestamptz(3)
   /// While suspended: also stop serving its APIs to others (SPEC.md §4.1 step 4, explicit choice).
   providerSuspended     Boolean   @default(false) @map("provider_suspended")
+  /// X-Road member of the entity (class and code), set by the operator (M4-05): the member of
+  /// every xroad upstream the entity publishes must be this one (SPIKE S-5, confused deputy).
+  xroadMemberClass      String?   @map("xroad_member_class")
+  xroadMemberCode       String?   @map("xroad_member_code")
 
   memberships  Membership[]
   apis         Api[]
@@ -143,6 +147,7 @@ model Entity {
   /// submit wins. Predicates are written as PostgreSQL normalizes them, so Prisma sees no drift.
   @@unique([slug], map: "entity_slug_live", where: raw("(status <> ALL (ARRAY['requested'::entity_status, 'rejected'::entity_status]))"))
   @@unique([taxIdType, taxId], map: "entity_tax_id_live", where: raw("(status <> ALL (ARRAY['requested'::entity_status, 'rejected'::entity_status]))"))
+  @@unique([xroadMemberClass, xroadMemberCode], map: "entity_xroad_member_key")
   @@index([status])
   @@index([applicantId])
   @@map("entity")

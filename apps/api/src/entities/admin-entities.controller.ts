@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Req } from '@nestjs/common';
 import {
   adminEntityListSchema,
   adminEntityQuerySchema,
@@ -8,6 +8,7 @@ import {
   adminEntityParamsSchema,
   offboardEntitySchema,
   reactivateEntitySchema,
+  setXroadMemberSchema,
   suspendEntitySchema,
 } from '@rid/contracts';
 import { z } from 'zod';
@@ -86,6 +87,30 @@ export class AdminEntitiesController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.entities.suspend(entityId, principal, body, request.id);
+  }
+
+  @Put(':id/xroad-member')
+  @PlatformAccess('entity_admin.decide')
+  @ApiOperation({
+    operationId: 'setEntityXroadMember',
+    summary: 'Register the entity’s X-Road member (or clear it)',
+    description:
+      'Every xroad upstream the entity publishes must name this member (M4-05): all of them ' +
+      'leave with the operator’s identity in X-Road.',
+    tags: ['entities'],
+    params: adminEntityParamsSchema,
+    body: setXroadMemberSchema,
+    responses: { 200: { description: 'The entity', schema: adminEntitySchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  setXroadMember(
+    @Param('id', new ZodValidationPipe(z.uuid())) entityId: string,
+    @CurrentPrincipal() principal: Principal,
+    @Body(new ZodValidationPipe(setXroadMemberSchema))
+    body: { member: { memberClass: string; memberCode: string } | null },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.entities.setXroadMember(entityId, principal, body.member, request.id);
   }
 
   @Post(':id/reactivate')

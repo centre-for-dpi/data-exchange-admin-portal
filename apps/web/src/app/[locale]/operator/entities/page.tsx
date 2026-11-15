@@ -2,7 +2,7 @@ import { adminEntityListSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { EntityStatusActions } from '../../../../components/entity-admin/forms';
+import { EntityStatusActions, XroadMemberForm } from '../../../../components/entity-admin/forms';
 import { StatusBadge } from '../../../../components/ui/badge';
 import { EmptyState, Page, PageHeader } from '../../../../components/ui/page';
 import { Button } from '../../../../components/ui/button';
@@ -79,10 +79,22 @@ export default async function EntitiesAdminPage({ params }: PageProps) {
                       apis: e.counts.publishedApis,
                       subscriptions: e.counts.liveSubscriptions,
                     })}
+                    {e.xroadMember ? (
+                      <span className="mt-1 block font-mono text-xs text-muted-foreground">
+                        X-Road: {e.xroadMember.memberClass}/{e.xroadMember.memberCode}
+                      </span>
+                    ) : null}
                   </td>
                   {canDecide ? (
                     <td>
                       <EntityStatusActions entityId={e.id} name={e.shortName} status={e.status} />
+                      {e.status !== 'offboarded' ? (
+                        <XroadMemberForm
+                          entityId={e.id}
+                          name={e.shortName}
+                          member={e.xroadMember}
+                        />
+                      ) : null}
                     </td>
                   ) : null}
                 </tr>

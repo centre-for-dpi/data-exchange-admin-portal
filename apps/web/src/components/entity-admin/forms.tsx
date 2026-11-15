@@ -2,7 +2,11 @@
 
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
-import { decideEntityStatusAction, type EntityDecision } from '../../lib/entity-admin-actions';
+import {
+  decideEntityStatusAction,
+  type EntityDecision,
+  setXroadMemberAction,
+} from '../../lib/entity-admin-actions';
 import { type FormState, initialFormState } from '../../lib/forms';
 import { checkClass, ErrorSummary, Field, inputClass } from '../form/field';
 import { Button } from '../ui/button';
@@ -84,6 +88,72 @@ export function EntityStatusActions({
         ) : null}
         <DecisionForm entityId={entityId} name={name} decision="offboard" />
       </div>
+    </details>
+  );
+}
+
+/** The entity's X-Road member (M4-05): its xroad versions may only name services of it. */
+export function XroadMemberForm({
+  entityId,
+  name,
+  member,
+}: {
+  entityId: string;
+  name: string;
+  member: { memberClass: string; memberCode: string } | null;
+}) {
+  const t = useTranslations('entityAdmin.xroad');
+  const [state, action, pending] = useActionState(
+    setXroadMemberAction.bind(null, entityId),
+    initialFormState,
+  );
+  const fieldState: FormState = {
+    ...state,
+    fieldErrors: state.fieldErrors?.member
+      ? { [`memberCode-${entityId}`]: state.fieldErrors.member }
+      : {},
+  };
+  return (
+    <details>
+      <summary className="link cursor-pointer text-sm">{t('manage', { name })}</summary>
+      <form action={action} className="mt-3 space-y-3" noValidate>
+        <ErrorSummary state={fieldState} />
+        {state.done ? (
+          <p role="status" className="text-sm font-medium text-success-fg">
+            {t('saved')}
+          </p>
+        ) : null}
+        <Field name={`memberClass-${entityId}`} label={t('memberClass')} state={fieldState}>
+          {(p) => (
+            <input
+              {...p}
+              name="memberClass"
+              type="text"
+              defaultValue={state.values?.memberClass ?? member?.memberClass ?? ''}
+              className={inputClass}
+            />
+          )}
+        </Field>
+        <Field
+          name={`memberCode-${entityId}`}
+          label={t('memberCode')}
+          hint={t('hint')}
+          state={fieldState}
+        >
+          {(p) => (
+            <input
+              {...p}
+              name="memberCode"
+              type="text"
+              defaultValue={state.values?.memberCode ?? member?.memberCode ?? ''}
+              className={inputClass}
+            />
+          )}
+        </Field>
+        <Button type="submit" size="sm" disabled={pending}>
+          {t('save')}
+        </Button>
+      </form>
     </details>
   );
 }

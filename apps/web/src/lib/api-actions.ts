@@ -85,11 +85,25 @@ export async function createVersionAction(
       upstream:
         upstreamType === 'direct'
           ? { type: 'direct', url: text(formData, 'url'), mtls: formData.get('mtls') === 'on' }
-          : {
-              type: 'node',
-              servicePath: text(formData, 'servicePath'),
-              ...(text(formData, 'nodeId') ? { nodeId: text(formData, 'nodeId') } : {}),
-            },
+          : upstreamType === 'xroad'
+            ? {
+                type: 'xroad',
+                serviceId: {
+                  instance: text(formData, 'xroadInstance'),
+                  memberClass: text(formData, 'xroadMemberClass'),
+                  memberCode: text(formData, 'xroadMemberCode'),
+                  ...(text(formData, 'xroadSubsystem')
+                    ? { subsystemCode: text(formData, 'xroadSubsystem') }
+                    : {}),
+                  serviceCode: text(formData, 'xroadService'),
+                },
+                servicePath: text(formData, 'xroadPath'),
+              }
+            : {
+                type: 'node',
+                servicePath: text(formData, 'servicePath'),
+                ...(text(formData, 'nodeId') ? { nodeId: text(formData, 'nodeId') } : {}),
+              },
       exposedFields,
       allowedPurposes: formData.getAll('allowedPurposes').map(String),
       ...(text(formData, 'legalBasisText')

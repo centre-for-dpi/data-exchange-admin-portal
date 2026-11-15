@@ -61,6 +61,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | POST | `/api/v1/admin/entities/:id/offboard` | plataforma: `entity_admin.decide` |
 | POST | `/api/v1/admin/entities/:id/reactivate` | plataforma: `entity_admin.decide` |
 | POST | `/api/v1/admin/entities/:id/suspend` | plataforma: `entity_admin.decide` |
+| PUT | `/api/v1/admin/entities/:id/xroad-member` | plataforma: `entity_admin.decide` |
 | GET | `/api/v1/admin/nodes` | plataforma: `node.list` |
 | GET | `/api/v1/admin/purposes` | plataforma: `purpose.read` |
 | POST | `/api/v1/admin/purposes` | plataforma: `purpose.manage` |

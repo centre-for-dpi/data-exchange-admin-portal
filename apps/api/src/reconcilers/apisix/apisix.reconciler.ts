@@ -21,6 +21,7 @@ import {
   desiredTokenRoute,
   GATEWAY_CLIENT_SSL_PREFIX,
   GATEWAY_SSL_ID,
+  GATEWAY_XROAD_SSL_ID,
   gatewayClientName,
   gatewayClientSslId,
   type GatewaySettings,
@@ -170,6 +171,38 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * SSL object of type client that its upstreams with mTLS reference by id: renewing it updates
    * one object, not every upstream. Returns the network CA, which verifies kit nodes.
    */
+  /**
+   * The SSL object of the gateway's client certificate towards the operator's X-Road Security
+   * Server (M4-05, SPIKE S-5): one identity, CN=<RID_GATEWAY_CLIENT_NAME>.xroad, which the
+   * operator registers in the Security Server as the internal TLS certificate of its subsystem.
+   */
+  async reconcileXroadTls(now = new Date()): Promise<void> {
+    const target = `apisix:ssl:${GATEWAY_XROAD_SSL_ID}`;
+    let desiredHash = hash(null);
+    try {
+      const certificate = await this.certificates.upstreamClient(
+        `${this.settings.tls.clientName}.xroad`,
+        now,
+      );
+      const desired = {
+        type: 'client',
+        cert: certificate.certificatePem,
+        key: certificate.keyPem,
+        labels: { 'rid-managed': 'true' },
+        status: 1,
+      };
+      desiredHash = hash({ ...desired, key: certificate.fingerprint });
+      const actual = await this.admin.get('ssls', GATEWAY_XROAD_SSL_ID);
+      if (!actual || !sslMatches(desired, actual)) {
+        await this.admin.put('ssls', GATEWAY_XROAD_SSL_ID, desired);
+      }
+      await this.recordSuccess(target, desiredHash);
+    } catch (error) {
+      await this.recordError(target, desiredHash, error);
+      throw error;
+    }
+  }
+
   async reconcileClientTls(
     entity: { id: string; slug: string },
     now = new Date(),
@@ -307,6 +340,13 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       const pki = needsGatewayPki(upstreamConfig, version.api.entity.slug, this.settings)
         ? await this.reconcileClientTls(version.api.entity)
         : undefined;
+      // X-Road over HTTPS: the gateway's own certificate towards the Security Server (M4-05).
+      if (
+        upstreamConfig.type === 'xroad' &&
+        this.settings.xroad?.securityServerUrl.startsWith('https:')
+      ) {
+        await this.reconcileXroadTls();
+      }
       const desired = desiredGateway(
         {
           id: version.id,
@@ -334,6 +374,13 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
           ),
           entitySlug: version.api.entity.slug,
           ...(node !== undefined ? { node } : {}),
+          xroadMember:
+            version.api.entity.xroadMemberClass && version.api.entity.xroadMemberCode
+              ? {
+                  memberClass: version.api.entity.xroadMemberClass,
+                  memberCode: version.api.entity.xroadMemberCode,
+                }
+              : null,
           apiName: version.api.name,
           version: version.version,
           ...(version.status === 'deprecated' && version.deprecatedAt && version.sunsetAt

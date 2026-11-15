@@ -80,7 +80,7 @@ Los nombres son los del código. Todos los registros tienen `id` (UUIDv7), `crea
 Uno de:
 
 - `node`: servicio expuesto por un nodo del kit (`nodeId`, `servicePath`). Es el camino de las APIs instantáneas. El nodo debe ser de la entidad que publica; el gateway lo llama por su túnel y deja de hacerlo si se da de baja. El detalle de la API, para el proveedor, el revisor y el consumidor, muestra el estado del nodo.
-- `xroad`: servicio consumido vía X-Road (`securityServerUrl`, `serviceId` con instancia/clase/miembro/subsistema/servicio). El gateway actúa como miembro cliente.
+- `xroad`: servicio consumido vía X-Road (`serviceId` con instancia/clase/miembro/subsistema/servicio, y una ruta opcional). El gateway actúa como miembro cliente, a través del Security Server del operador, que fija la configuración del despliegue y no la versión (SPIKE S-5). El miembro del servicio debe ser el miembro X-Road de la entidad, que registra el operador.
 - `direct`: URL HTTPS de una API existente de la entidad (`url`, `mtls: bool`).
 
 ### Application (aplicación consumidora)

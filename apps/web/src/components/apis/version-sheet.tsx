@@ -1,4 +1,4 @@
-import type { ApiVersionDetail } from '@rid/contracts';
+import { type ApiVersionDetail, xroadServicePath } from '@rid/contracts';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Badge, StatusBadge } from '../ui/badge';
 import { Notice } from '../ui/notice';
@@ -21,7 +21,11 @@ export async function VersionSheet({
   const format = await getFormatter();
   const errors = version.lintReport.issues.filter((i) => i.severity === 'error');
   const upstream =
-    version.upstream.type === 'node' ? version.upstream.servicePath : version.upstream.url;
+    version.upstream.type === 'node'
+      ? version.upstream.servicePath
+      : version.upstream.type === 'xroad'
+        ? `X-Road ${xroadServicePath(version.upstream.serviceId)}${version.upstream.servicePath}`
+        : version.upstream.url;
   const when = (value: string | null) =>
     value ? format.dateTime(new Date(value), { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 

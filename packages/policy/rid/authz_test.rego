@@ -549,3 +549,42 @@ test_the_longest_valid_official_is_accepted if {
 	h := headers_for(with_headers({"x-rid-end-user": long}), bundle)
 	h["X-RID-End-User-Hash"] == crypto.hmac.sha256(long, "test-salt")
 }
+
+# --- X-Road routes (M4-05, SPIKE S-5) -----------------------------------------------------------
+
+xroad_bundle := json.patch(bundle, [{"op": "add", "path": "/routes/rid-route-v1/xroad", "value": true}])
+
+test_xroad_routes_carry_the_official_hash_and_the_subscription if {
+	h := authz.headers with input as request({})
+		with data.routes as xroad_bundle.routes
+		with data.clients as xroad_bundle.clients
+		with data.config as xroad_bundle.config
+		with time.now_ns as june_2026
+	h["X-Road-UserId"] == crypto.hmac.sha256("funcionario-42", "test-salt")
+	h["X-Road-Issue"] == "rid:subscription:sub-1"
+	h["X-RID-Subscription"] == "sub-1"
+}
+
+test_xroad_without_an_official_carries_only_the_subscription if {
+	b := json.patch(xroad_bundle, [
+		{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"},
+		{"op": "replace", "path": "/clients/rid-app-a/subscriptions/0/endUserRequired", "value": false},
+	])
+	h := authz.headers with input as without_header("x-rid-end-user")
+		with data.routes as b.routes
+		with data.clients as b.clients
+		with data.config as b.config
+		with time.now_ns as june_2026
+	h["X-Road-Issue"] == "rid:subscription:sub-1"
+	not h["X-Road-UserId"]
+}
+
+test_other_routes_never_carry_x_road_headers if {
+	h := authz.headers with input as request({})
+		with data.routes as bundle.routes
+		with data.clients as bundle.clients
+		with data.config as bundle.config
+		with time.now_ns as june_2026
+	not h["X-Road-UserId"]
+	not h["X-Road-Issue"]
+}

@@ -167,7 +167,15 @@
       "submit": "Crear versión",
       "node": "Nodo del kit",
       "nodeHint": "Donde corre el servicio. El gateway lo llama por el túnel del nodo.",
-      "noNode": "Ninguno (servicio de prueba del entorno)"
+      "noNode": "Ninguno (servicio de prueba del entorno)",
+      "upstreamXroad": "Servicio en X-Road",
+      "xroadServiceId": "Identificador del servicio en X-Road",
+      "xroadInstance": "Instancia",
+      "xroadMemberClass": "Clase de miembro",
+      "xroadMemberCode": "Código de miembro",
+      "xroadSubsystem": "Subsistema (opcional)",
+      "xroadService": "Código del servicio",
+      "xroadPath": "Ruta después del servicio (opcional)"
     },
     "detail": {
       "title": "{api} · versión {version}",
@@ -617,7 +625,8 @@
         "rejected": "Alta rechazada",
         "suspended": "Entidad suspendida",
         "reactivated": "Entidad reactivada",
-        "offboarded": "Entidad dada de baja"
+        "offboarded": "Entidad dada de baja",
+        "xroad_member_set": "Miembro X-Road registrado"
       },
       "membership": {
         "created": "Miembro agregado",
@@ -1008,6 +1017,14 @@
       "basis": "Acto o decisión que fundamenta el alta",
       "basisHint": "Por ejemplo, el decreto, la resolución o el acta que incorporó a la entidad. Queda en la bitácora.",
       "submit": "Registrar entidad"
+    },
+    "xroad": {
+      "manage": "X-Road de {name}",
+      "memberClass": "Clase de miembro",
+      "memberCode": "Código de miembro",
+      "hint": "Vacíos los dos, la entidad queda fuera de X-Road.",
+      "save": "Guardar miembro X-Road",
+      "saved": "Miembro X-Road guardado."
     }
   },
   "documentsAdmin": {

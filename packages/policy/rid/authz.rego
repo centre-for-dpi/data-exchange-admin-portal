@@ -248,9 +248,24 @@ subject_header := {"X-RID-Subject-Ref": subject_ref} if subject_ref
 
 else := {}
 
+# Routes served through X-Road (M4-05, SPIKE S-5): the Security Server only knows the operator's
+# subsystem, so the call carries the official (its hash) and the subscription in the X-Road headers
+# for that. Whatever the consumer sent under those names is replaced or removed.
+xroad_headers := object.union(
+	{"X-Road-Issue": sprintf("rid:subscription:%s", [subscription])},
+	{"X-Road-UserId": end_user_hash},
+) if {
+	route.xroad
+	end_user_hash
+}
+
+else := {"X-Road-Issue": sprintf("rid:subscription:%s", [subscription])} if route.xroad
+
+else := {}
+
 # X-RID-End-User, X-RID-Body-Subject and X-RID-Client-Cert-S256 are never returned: the opa
 # plugin then removes them before the upstream (SPIKE S-1).
-headers := object.union_n([base_headers, end_user_header, subject_header]) if allow
+headers := object.union_n([base_headers, end_user_header, subject_header, xroad_headers]) if allow
 
 # Rule 6, deny: response headers and a problem+json body.
 headers := {

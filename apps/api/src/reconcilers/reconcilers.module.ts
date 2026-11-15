@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { lookup } from 'node:dns/promises';
 import { Module } from '@nestjs/common';
 import { APISIX_ADMIN, HttpApisixAdmin } from './apisix/apisix-admin.js';
@@ -60,6 +61,16 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
           },
         },
         wgHub: process.env.RID_GATEWAY_WG_HUB ?? 'wg-hub:8443',
+        xroad:
+          process.env.RID_XROAD_SECURITY_SERVER_URL && process.env.RID_XROAD_CLIENT
+            ? {
+                securityServerUrl: process.env.RID_XROAD_SECURITY_SERVER_URL,
+                client: process.env.RID_XROAD_CLIENT,
+                ...(process.env.RID_XROAD_SECURITY_SERVER_CA
+                  ? { caPem: readFileSync(process.env.RID_XROAD_SECURITY_SERVER_CA, 'utf8') }
+                  : {}),
+              }
+            : undefined,
         nodeControl:
           process.env.RID_GATEWAY_PORTAL_API_URL && process.env.RID_NODE_CONTROL_TOKEN
             ? {

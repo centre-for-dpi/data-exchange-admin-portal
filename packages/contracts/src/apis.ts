@@ -56,7 +56,43 @@ export const operationSchema = z.object({
 });
 export type Operation = z.infer<typeof operationSchema>;
 
-/** Where the service lives (SPEC.md §3.1). X-Road arrives with M4-05. */
+/**
+ * One part of an X-Road identifier (SPIKE S-5): letters, digits, spaces and `. _ - : ~`, no
+ * spaces at the ends. They go literally into the gateway's URL rewrite, which encodes them, so
+ * `/`, `%`, `?`, `#` and `$` are never allowed.
+ */
+export const xroadPartSchema = z
+  .string()
+  .max(255)
+  .regex(
+    /^[\p{L}\p{N}._~:-](?:[\p{L}\p{N} ._~:-]*[\p{L}\p{N}._~:-])?$/u,
+    'letters, digits, spaces and . _ - : ~ only',
+  );
+
+/** X-Road member: class and code (e.g. GOV / 8999999999). */
+export const xroadMemberSchema = z.strictObject({
+  memberClass: xroadPartSchema,
+  memberCode: xroadPartSchema,
+});
+export type XroadMember = z.infer<typeof xroadMemberSchema>;
+
+/** X-Road service identifier (PR-REST serviceId). */
+export const xroadServiceIdSchema = z.strictObject({
+  instance: xroadPartSchema,
+  memberClass: xroadPartSchema,
+  memberCode: xroadPartSchema,
+  subsystemCode: xroadPartSchema.optional(),
+  serviceCode: xroadPartSchema,
+});
+export type XroadServiceId = z.infer<typeof xroadServiceIdSchema>;
+
+/** `/r1/{instance}/{class}/{member}[/{subsystem}]/{service}` (PR-REST 1.0, SPIKE S-5). */
+export const xroadServicePath = (id: XroadServiceId): string =>
+  `/r1/${[id.instance, id.memberClass, id.memberCode, id.subsystemCode, id.serviceCode]
+    .filter((part): part is string => part !== undefined)
+    .join('/')}`;
+
+/** Where the service lives (SPEC.md §3.1). */
 export const upstreamSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('direct'),
@@ -77,6 +113,19 @@ export const upstreamSchema = z.discriminatedUnion('type', [
     nodeId: z.uuid().optional(),
     /** Path of the service on the node, e.g. /salud */
     servicePath: z.string().regex(/^\/[A-Za-z0-9._~\-/]*$/, 'must be an absolute path'),
+  }),
+  z.strictObject({
+    type: z.literal('xroad'),
+    /**
+     * Service of the provider in X-Road, called through the operator's Security Server
+     * (M4-05, SPIKE S-5). Its member must be the publishing entity's X-Road member.
+     */
+    serviceId: xroadServiceIdSchema,
+    /** Path of the service after the serviceId, e.g. /v1; empty by default. */
+    servicePath: z
+      .string()
+      .regex(/^(\/[A-Za-z0-9._~\-/]*)?$/, 'must be empty or an absolute path')
+      .default(''),
   }),
 ]);
 export type Upstream = z.infer<typeof upstreamSchema>;
