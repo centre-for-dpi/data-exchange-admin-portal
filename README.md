@@ -52,6 +52,9 @@ Todos los puertos se publican solo en `127.0.0.1`. Si alguno ya está ocupado en
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — arquitectura técnica
 - [docs/BACKLOG.md](docs/BACKLOG.md) — hitos e historias
 - [docs/DEMO.md](docs/DEMO.md) — guion de demo
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — despliegue de cada componente (desarrollo y piloto)
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — puesta en marcha, rutina de operación, respaldos y problemas frecuentes
+- [docs/AUTHZ.md](docs/AUTHZ.md) — matriz de autorización (generada)
 - [docs/adr/](docs/adr/) — decisiones de arquitectura
 
 ## Licencia

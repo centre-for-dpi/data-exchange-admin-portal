@@ -1,0 +1,402 @@
+# Despliegue — Portal RID
+
+Versión 0.1 · noviembre 2026 · estado del código al cierre de M2 (M3 en curso)
+
+Este documento describe **cómo se despliega cada componente** del portal y del gateway: imagen, configuración, puertos, volúmenes, secretos y dependencias. Cómo dejarlo operativo y cómo operarlo día a día está en [`OPERATIONS.md`](OPERATIONS.md). La arquitectura de referencia está en [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+> **Alcance (ADR-0011).** Aquí solo se despliega el portal + el gateway. El kit de APIs instantáneas que se instala en las entidades es otro producto, con su propio repositorio. `mock-salud`, `mock-socioeconomico` y la carpeta ciudadana (`carpeta`) son utilería de pruebas y demostración.
+
+## 1. Topologías
+
+| Topología | Archivos | Estado | Uso |
+| :-- | :-- | :-- | :-- |
+| **Desarrollo local** | `infra/compose/docker-compose.yml`; web y API en el host con `pnpm dev` | Disponible | Programar y probar |
+| **Piloto en una máquina** | `docker-compose.yml` + `docker-compose.deploy.yml`, detrás de un proxy inverso existente | Disponible | Demos y pilotos |
+| **Producción** | Helm charts (`infra/helm/`) con la topología de `ARCHITECTURE.md §11` | **No existe todavía** (M6-05) | Operador nacional |
+
+El piloto no es un despliegue de producción. Sus límites conocidos están en la §8.
+
+## 2. Requisitos
+
+| Requisito | Versión | Para qué |
+| :-- | :-- | :-- |
+| Docker Engine con Compose v2 | Compose ≥ 2.26 | `!reset` en los puertos y montaje con `subpath` del volumen de step-ca (piloto) |
+| Node.js | ≥ 24 (`engines` en `package.json`) | Desarrollo, `scripts/make-deploy-env.mjs` |
+| pnpm | 11.15.0 (`packageManager`) | Desarrollo |
+| `vm.max_map_count` del host | ≥ 262144 | OpenSearch (perfil `observability`) |
+| Memoria | OpenSearch arranca con `-Xms512m -Xmx512m`; Keycloak, APISIX y los builds de Next.js suman varios GB | — |
+
+En Linux, para OpenSearch:
+
+```bash
+echo 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-rid-opensearch.conf
+sudo sysctl --system
+```
+
+## 3. Componentes
+
+Todos los servicios están en `infra/compose/docker-compose.yml` (proyecto Compose `rid`). En desarrollo, cada puerto publicado se enlaza solo a `127.0.0.1` y se puede mover con su variable `*_PORT` en `.env`. En el piloto no se publica ningún puerto (§5).
+
+Los componentes se agrupan en dos planos (`ARCHITECTURE.md §1`):
+
+- **Plano de gobierno:** PostgreSQL, Keycloak, step-ca, la TSA, el API y la web. Deciden quién puede qué y lo traducen a configuración.
+- **Plano de datos:** etcd, APISIX, OPA y los Fluent Bit. Atienden y registran cada llamada entre entidades. Siguen funcionando aunque caiga el plano de gobierno.
+
+Cada subsección empieza por la **función** del componente en el despliegue y sigue con su configuración.
+
+### 3.1 Resumen
+
+| Servicio | Imagen | Puerto interno | Puerto dev (host) | Volumen | Perfil | Health check |
+| :-- | :-- | :-- | :-- | :-- | :-- | :-- |
+| `postgres` | `postgres:18.6-alpine` | 5432 | `POSTGRES_PORT` 5432 | `pg-data` | base | `pg_isready` |
+| `keycloak` | `quay.io/keycloak/keycloak:26.8.0` | 8080 (HTTP), 9000 (gestión) | `KEYCLOAK_PORT` 8080 | — (usa `postgres`) | base | `GET /health/ready` en 9000 |
+| `etcd` | `quay.io/coreos/etcd:v3.6.16` | 2379 | no se publica | `etcd-data` | base | `etcdctl endpoint health` |
+| `apisix` | `apache/apisix:3.19.0-debian` | 9080 (HTTP), 9443 (HTTPS), 9180 (admin), 7085 (estado), 9091 (métricas) | 9080, 9443, 9180 | — (estado en etcd) | base | `GET /status/ready` en 7085 |
+| `opa` | `openpolicyagent/opa:1.21.4-static` | 8181 | `OPA_PORT` 8181 | — | base | `GET /health` |
+| `step-ca` | `smallstep/step-ca:0.30.2` | 9000 | `STEP_CA_PORT` 9000 | `step-ca-data` | base | `step ca health` |
+| `fluent-bit-transparency` | `fluent/fluent-bit:5.1.5-debug` | 5170 (TCP), 2020 (salud) | no se publica | `transparency-buffer` | base | `GET /api/v1/health` en 2020 |
+| `tsa-init` | `smallstep/step-ca:0.30.2` | — (tarea única) | — | `tsa-data` | base | termina con código 0 |
+| `tsa` | `ghcr.io/sigstore/timestamp-server:v2.1.4` | 3004 | `RID_TSA_PORT` 3004 | `tsa-data` (lectura) | base | ninguno (imagen distroless) |
+| `mailpit` | `axllent/mailpit:v1.32.0` | 8025 (UI), 1025 (SMTP) | 8025, 1025 | — | base | `mailpit readyz` |
+| `mock-salud`, `mock-socioeconomico` | `rid/mock-providers:dev` (build local) | 8000 | 8101, 8102 | — | base | `GET /health` |
+| `opensearch` | `opensearchproject/opensearch:3.9.0` | 9200 | `OPENSEARCH_PORT` 9200 | `opensearch-data` | `observability` | `_cluster/health` amarillo |
+| `fluent-bit` | `fluent/fluent-bit:5.1.5-debug` | 9880 (HTTP), 2020 | no se publica | — | `observability` | `GET /api/v1/health` en 2020 |
+| `api` | `rid/portal-api:deploy` (`apps/api/Dockerfile`) | 4000 | — (en dev corre en el host) | `api-documents`, `step-ca-data` (solo `certs/`, lectura) | solo piloto | `GET /api/v1/health` |
+| `web` | `rid/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (en dev corre en el host) | — | solo piloto | `GET /api/auth/providers` |
+| `carpeta` | `rid/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (en dev corre en el host) | `carpeta-data` | solo piloto | — |
+
+Prometheus, Alertmanager y Grafana **no** están en el Compose todavía (M5-06). Tampoco el hub WireGuard `wg-hub` (M4-03).
+
+### 3.2 PostgreSQL
+
+**Función en el despliegue.** Es la única fuente de verdad del plano de gobierno. Guarda:
+
+- el estado de dominio: entidades, personas y roles, APIs y versiones, aplicaciones, suscripciones y documentos;
+- la bitácora de auditoría encadenada por hash, con sus anclajes;
+- el outbox y las colas de trabajos en segundo plano (pg-boss; no hay Redis);
+- el registro de transparencia y sus lotes sellados;
+- en una base aparte, los datos de Keycloak.
+
+Lo que hay en APISIX, OPA y en los clientes de Keycloak se calcula desde aquí, así que se puede reconstruir. Si PostgreSQL cae, el portal se detiene, pero el gateway sigue atendiendo con la última configuración.
+
+- Una sola instancia guarda la base del portal (`POSTGRES_DB`, por defecto `rid`), la de pruebas (`rid_test`) y la de Keycloak (`keycloak`).
+- **Scripts de inicialización** (`infra/postgres/init`, solo con el volumen vacío):
+  - `01-keycloak.sh`: rol `KEYCLOAK_DB_USER` y base `keycloak`.
+  - `02-app-role.sh`: rol `rid_app` (sin DDL) con la contraseña `RID_APP_DB_PASSWORD`, base `rid_test` y privilegios por defecto para que `rid_app` use todo lo que cree el dueño.
+- **Dos roles del portal:** el dueño del esquema (`POSTGRES_USER`, `rid`) solo corre migraciones (`DATABASE_MIGRATION_URL`); el API corre como `rid_app` (`DATABASE_URL`). Las tablas de auditoría y de transparencia son de solo inserción incluso para el dueño (triggers, `ARCHITECTURE.md §7` y §13).
+- **Migraciones:** Prisma (`apps/api/prisma/migrations`), con `DATABASE_MIGRATION_URL` (`apps/api/prisma.config.ts`). El esquema de la cola pg-boss también es una migración: el API arranca pg-boss sin permisos de DDL (`migrate: false`).
+- Las contraseñas de `.env` solo se usan **la primera vez**. Cambiarlas en `.env` con el volumen ya creado no cambia los roles: hay que hacer `ALTER ROLE ... PASSWORD` y actualizar `.env` a la vez.
+
+### 3.3 Keycloak
+
+**Función en el despliegue.** Es el proveedor de identidad: **autentica, no autoriza**. Los roles viven en PostgreSQL (ADR-0004). Tiene tres realms, uno por tipo de usuario:
+
+- **`rid-portal`**, para las personas que usan el portal: inicio de sesión OIDC de la web, autorregistro, verificación de correo y recuperación de contraseña.
+- **`rid-gateway`**, para las aplicaciones consumidoras. Emite los tokens `client_credentials` (5 min, `aud = rid-gateway`) que APISIX valida en cada llamada. Sus clientes `rid-app-<uuid>` los crea y mantiene el reconciliador del API, nunca una persona.
+- **`rid-citizens`**, que simula la identidad digital del país para la carpeta ciudadana. En producción se reemplaza por el emisor del país (`RID_CITIZEN_ISSUER`).
+
+Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen tokens nuevos.
+
+- Corre con `start-dev --import-realm` (también en el piloto: el override no cambia el comando).
+- Importa al arrancar `infra/keycloak/*-realm.json` (`rid-portal`, `rid-gateway`, `rid-citizens`). Los secretos son marcadores `${VARIABLE}` resueltos con el entorno del contenedor: `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`, `RID_WEB_URL`, `RID_CARPETA_URL`, `RID_DEMO_USER_PASSWORD`.
+- **La importación no actualiza un realm que ya existe** (`IGNORE_EXISTING`). Un cambio en los JSON, en esos secretos o en las URLs no llega a un Keycloak ya inicializado: se aplica con `kcadm.sh` (ver `OPERATIONS.md §5.3`) o borrando la base de Keycloak.
+- Emisor de los tokens: en desarrollo `KC_HOSTNAME=http://localhost:${KEYCLOAK_PORT}`; en el piloto `${RID_PUBLIC_URL}/auth` con `KC_HTTP_RELATIVE_PATH=/auth` y `KC_PROXY_HEADERS=xforwarded`. `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` deja que los contenedores (APISIX) lo alcancen por nombre de servicio.
+- Administrador inicial: `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD` (`KC_BOOTSTRAP_ADMIN_*`).
+- Detalle de los tres realms y los usuarios semilla: `infra/keycloak/README.md`.
+
+### 3.4 etcd + APISIX
+
+**Función de etcd en el despliegue.** Guarda la configuración del gateway: rutas, upstreams, plugins y objetos SSL. El reconciliador del API la escribe por el Admin API de APISIX, y cada nodo de APISIX la lee y aplica los cambios en cuanto ocurren, sin reiniciar. No es una fuente de verdad: si se pierde, el API la reconstruye desde PostgreSQL.
+
+**Función de APISIX en el despliegue.** Es el **gateway**, el corazón del plano de datos: toda llamada entre entidades pasa por él. En cada petición:
+
+1. valida el token de `rid-gateway`;
+2. borra las cabeceras `X-RID-*` que solo el gateway puede poner;
+3. si la operación lo declara, lee el titular del cuerpo (plugin `rid-data-subject`);
+4. pregunta a OPA si la llamada se permite;
+5. reenvía la petición al proveedor con las cabeceras de trazabilidad que devolvió OPA;
+6. envía los metadatos de la llamada a los dos Fluent Bit: analítica y transparencia.
+
+No guarda cuerpos de petición ni de respuesta. En el piloto se publica en `/gw`.
+
+- etcd guarda la configuración de APISIX (prefijo `/apisix`). Un solo nodo, HTTP sin TLS, no se publica.
+- APISIX en modo `traditional` con `config_provider: etcd` (`infra/apisix/config.yaml`, montado de solo lectura). La clave del Admin API llega por `APISIX_ADMIN_KEY`.
+- El Admin API (9180) acepta solo direcciones privadas (`127.0.0.0/24`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) y exige la clave. Nunca se expone al público.
+- Plugins propios en `infra/apisix/plugins` (montados en `/usr/local/apisix/rid`): `rid-data-subject` (ADR-0017). La lista de plugins de `config.yaml` es explícita.
+- **Privacidad:** el access log de nginx está desactivado y el error log en nivel `error` (`ARCHITECTURE.md §8`).
+- **Nadie escribe rutas a mano.** Rutas, upstreams y plugins los crea el reconciliador del API (ADR-0007). Cada ruta lleva `prometheus`, `http-logger` (analítica → `fluent-bit:9880`) y, si alguna operación declara titular, `tcp-logger` (transparencia → `fluent-bit-transparency:5170`).
+- **Estado reconstruible:** si se pierde etcd, el reconciliador completo (cada 5 minutos o al reiniciar el API) recrea todo desde PostgreSQL.
+
+### 3.5 OPA
+
+**Función en el despliegue.** Decide cada llamada: la permite o la niega con una razón estable (`no_subscription`, `purpose_not_allowed`…). Decide solo con los datos del **bundle** que publica el portal:
+
+- rutas y operaciones;
+- clientes y su estado;
+- suscripciones vigentes con sus operaciones, finalidades y fechas;
+- la sal del funcionario y la clave del seudónimo.
+
+Además calcula el hash del funcionario y el seudónimo del titular, y devuelve las cabeceras de trazabilidad que APISIX envía al proveedor. Nunca consulta en línea la base del portal, y por eso el tráfico sobrevive a una caída del portal. Su reporte de estado le indica al portal cuándo una suscripción aprobada ya rige en el gateway, y entonces la suscripción pasa a `active`.
+
+- Config en `infra/opa/config.yaml`: descarga el bundle `rid` de `${OPA_PORTAL_URL}/bundle.tar.gz` con `Bearer ${OPA_BUNDLE_TOKEN}` cada 10–20 s, y reporta la revisión activa a `${OPA_PORTAL_URL}/status`.
+- Sin estado propio. Sin bundle no tiene política y el gateway niega todo (falla cerrado).
+- Los *decision logs* están desactivados a propósito (la entrada lleva cabeceras con datos en claro).
+- `OPA_PORTAL_URL`: en desarrollo `http://host.docker.internal:4000/api/v1/opa` (el API corre en el host); en el piloto `http://api:4000/api/v1/opa`.
+
+### 3.6 step-ca
+
+**Función en el despliegue.** Es la autoridad certificadora de la red. Firma los certificados de cliente de las aplicaciones consumidoras a partir de los CSR que las entidades suben al portal (M3-01). Esos certificados sirven para el mTLS con el gateway y para los tokens ligados al certificado (RFC 8705) cuando `features.mtls.required` está activo. En M3 y M4 también emitirá el certificado de servidor del gateway y los de los nodos del kit. Solo el API habla con ella; las entidades nunca la llaman directamente.
+
+- En el primer arranque la imagen inicializa la CA con `DOCKER_STEPCA_INIT_*`: nombre `RID Dev CA`, DNS `localhost,step-ca`, provisioner JWK `rid-portal`, contraseña `STEP_CA_PASSWORD`. **El piloto usa esta misma CA de desarrollo**; la raíz fuera de línea y la intermedia en HSM son de producción (M6).
+- En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `rid-portal` (plantilla `app.tpl`, 90 días por defecto, 397 como máximo) y luego inicia la CA. Es idempotente.
+- El estado (raíz, intermedia, claves, `secrets/password`) vive en `step-ca-data`. **Perder ese volumen invalida todos los certificados emitidos.**
+- El API firma los CSR con el provisioner (`RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER`, `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD`) y verifica el TLS de la CA con `RID_STEP_CA_ROOT_FILE` o `RID_STEP_CA_ROOT_FINGERPRINT`. Con `NODE_ENV=production` (imágenes del piloto) una de las dos es **obligatoria**; sin ninguna, solo en desarrollo, confía en la raíz que sirve la CA.
+
+### 3.7 Registro de transparencia: Fluent Bit + TSA
+
+**Función de `fluent-bit-transparency` en el despliegue.** Lleva del gateway al portal el registro de cada llamada **autorizada** que tocó datos de una persona: quién consultó, para qué, con qué suscripción y el seudónimo del titular, nunca la ruta ni el número de documento. Deja solo los campos permitidos y descarta las llamadas sin seudónimo o que no llegaron al proveedor. Con su búfer en disco no se pierden registros si el API está caído. Sin este servicio, el ciudadano no ve quién consultó sus datos (ADR-0015).
+
+**Función de `tsa-init` en el despliegue.** Es una tarea que corre una sola vez: genera la cadena de certificados de la TSA de desarrollo y termina.
+
+**Función de `tsa` en el despliegue.** Es la autoridad de sellado de tiempo (RFC 3161), independiente de la clave del operador. Sella dos cosas: los puntos de control del registro de transparencia y el anclaje diario de la bitácora de auditoría. Con el sello cualquiera puede probar que esos datos existían en ese momento y que no se reescribieron después (ADR-0016). Su cadena pública permite que terceros (la carpeta, `rid-verify-receipt`) verifiquen los sellos sin confiar en el portal.
+
+- `fluent-bit-transparency` (`infra/fluent-bit/transparency.yaml`): entrada TCP 5170 en JSON, filtro Lua `transparency.lua`, salida HTTP a `${RID_TRANSPARENCY_COLLECTOR_HOST}:${RID_TRANSPARENCY_COLLECTOR_PORT}/api/v1/internal/subject-access` con `Bearer ${RID_TRANSPARENCY_INGEST_TOKEN}`. Búfer en disco (`transparency-buffer`, hasta 1 GB) y reintentos sin límite: si el API cae, los registros esperan.
+- `tsa-init` crea una sola vez la cadena de la TSA de desarrollo en `tsa-data` (`infra/tsa/init.sh`). `tsa` es sigstore timestamp-server con esa clave. En producción se usa la TSA acreditada del país (`RID_TSA_URL`).
+- La cadena de la TSA es pública: `GET /api/v1/timestamp/certchain`.
+
+### 3.8 Analítica: Fluent Bit + OpenSearch (perfil `observability`)
+
+**Función de `fluent-bit` en el despliegue.** Es la segunda barrera de privacidad del log de acceso. Recibe del `http-logger` de APISIX los metadatos de **todas** las llamadas, también las negadas con su razón. Descarta cualquier campo fuera de la lista permitida y escribe el resto en OpenSearch.
+
+**Función de `opensearch` en el despliegue.** Guarda los logs de acceso para la analítica de uso: llamadas por consumidor, por finalidad y por operación, latencias y razones de negación. Hoy solo acumula datos, porque las pantallas que los consultan llegan con M5. Se puede prescindir de él: perderlo no afecta al tráfico, a la auditoría ni al registro de transparencia.
+
+- `fluent-bit` (`infra/fluent-bit/fluent-bit.yaml`): entrada HTTP 9880, filtro de lista permitida `allowlist.lua`, salida a OpenSearch, índice `rid-access-YYYY.MM`.
+- OpenSearch en modo un solo nodo **sin plugin de seguridad** (`DISABLE_SECURITY_PLUGIN=true`), solo dentro de la red de Compose.
+- Hoy el portal no consulta OpenSearch (las pantallas de uso son M5-02 a M5-04) ni hay política de retención del índice configurada.
+- `pnpm infra:up:core` levanta todo sin este perfil. Las rutas siguen enviando a `fluent-bit:9880`; sin ese servicio, esos logs se pierden y el tráfico no se afecta.
+
+### 3.9 Mailpit
+
+**Función en el despliegue.** Hace de servidor de correo de pruebas: captura todo el correo saliente sin entregarlo a nadie y lo muestra en una bandeja web. Eso incluye las invitaciones, las notificaciones del portal, los anclajes enviados a los reguladores, los correos de verificación y recuperación de Keycloak y los avisos de la carpeta ciudadana. Ocupa el lugar del SMTP real del operador.
+
+- Recibe todo el correo de desarrollo y del piloto (SMTP 1025): el del API (`RID_SMTP_URL`), el de Keycloak (verificación y recuperación) y el de la carpeta.
+- En el piloto se sirve en `/mail` (`MP_WEBROOT`) detrás de usuario y contraseña (`MP_UI_AUTH=${MAILPIT_UI_AUTH}`): Keycloak envía allí los enlaces de recuperación de contraseña, así que una bandeja abierta permitiría tomar cualquier cuenta.
+- En producción se reemplaza por el SMTP real del operador (`RID_SMTP_URL`, `RID_MAIL_FROM`).
+
+### 3.10 API del portal (`apps/api`)
+
+**Función en el despliegue.** Es el centro del plano de gobierno, y el único componente que escribe en APISIX, Keycloak (`rid-gateway`) y step-ca. Tiene dos caras:
+
+- **REST (`/api/v1`).** Atiende a la web y a los sistemas. Aplica los flujos de publicación, solicitud y aprobación. Verifica rol y pertenencia a la entidad en cada endpoint y registra cada cambio en la bitácora.
+- **Trabajos en segundo plano.** Traducen el estado de PostgreSQL a configuración: rutas de APISIX, clientes de Keycloak y bundle de OPA. También firman certificados con step-ca, reciben y sellan el registro de transparencia (firma del operador más sello de la TSA), envían correos y webhooks, y vencen suscripciones, versiones y certificados.
+
+Además sirve la API del titular que consume la carpeta ciudadana.
+
+- Imagen: `apps/api/Dockerfile`, construida desde la raíz del repo (`COPY . .`). **La configuración del país (`config/country/*.yaml`) queda dentro de la imagen**: un cambio en el YAML exige reconstruir.
+- Al arrancar: `pnpm db:deploy` (migraciones como dueño) → `pnpm db:seed` si `RID_ALLOW_SEED=true` → `node dist/main.js` en `API_PORT` (4000). Si la configuración del país es inválida o falta `RID_COUNTRY`, termina con código 1.
+- Corre como usuario `node`. Documentos en `/var/lib/rid/documents` (`RID_DOCUMENTS_DIR`, volumen `api-documents`).
+- **Trabajos en segundo plano en el mismo proceso** (`OPERATIONS.md §3`). `RID_WORKER=off` arranca el API sin ellos (pruebas, réplicas de solo lectura).
+- Expone `/api/v1/*`. Rutas que **nunca** van al ingreso público: `/api/v1/internal/*` (colector de transparencia) y `/api/v1/opa/*` (bundle y estado de OPA).
+
+### 3.11 Web del portal (`apps/web`)
+
+**Función en el despliegue.** Es la interfaz de las personas. Por un lado, el portal de desarrolladores: catálogo, documentación interactiva, aplicaciones y solicitudes de acceso. Por otro, las consolas de cada rol: publicador, responsable de datos, administrador de entidad, operador, regulador y auditoría. Inicia sesión con Keycloak (`rid-portal`) y llama al API con el token del usuario, guardado en la cookie cifrada de Auth.js. No tiene base de datos propia, y la autorización la decide siempre el API.
+
+- Imagen: `apps/web/Dockerfile`. Se compila con secretos de relleno; los reales llegan en tiempo de ejecución.
+- Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `RID_PORTAL_WEB_CLIENT_ID`, `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_API_URL` (interno, `http://api:4000`), `RID_WEB_URL`, `RID_GATEWAY_PUBLIC_URL`, opcional `RID_AUTH_REFRESH_BEFORE_SECONDS`. En el piloto, `AUTH_TRUST_HOST=true` (está detrás del proxy).
+- Corre con `next start` en 3000.
+
+### 3.12 Carpeta ciudadana de referencia (`infra/mock-citizen-app`)
+
+**Función en el despliegue.** En las demos hace el papel de la aplicación ciudadana del país. El ciudadano:
+
+- entra con la identidad digital simulada (`rid-citizens`);
+- ve quién consultó sus datos, para qué y con qué resultado;
+- recibe avisos por correo cuando lo consultan (webhooks firmados del portal);
+- verifica cada comprobante por su cuenta, sin confiar en el portal.
+
+Muestra lo que debe implementar una carpeta real; no es un producto.
+
+- Utilería de demostración (MT-07). Su URL pública (`RID_CARPETA_URL`) fija la ruta base: en el piloto, `/carpeta`.
+- Variables principales: `RID_CARPETA_URL`, `RID_CITIZEN_ISSUER`, `RID_CARPETA_CLIENT_SECRET`, `CITIZEN_APP_WEBHOOK_SECRET` (obligatoria), `CITIZEN_APP_PORTAL_API_URL`, `CITIZEN_APP_JWKS_URL`, `CITIZEN_APP_TSA_ROOT_URL`, `CITIZEN_APP_SMTP_HOST/PORT`, `CITIZEN_APP_DATA_FILE`.
+- Guarda correos de ciudadanos y vínculos de avisos en `carpeta-data` (`alerts.json`).
+
+### 3.13 Proveedores de prueba (`infra/mock-providers`)
+
+**Función en el despliegue.** `mock-salud` y `mock-socioeconomico` simulan los servicios de dos entidades proveedoras con datos sintéticos (ADR-0009). Ocupan el lugar de los nodos del kit hasta M4: el reconciliador apunta los upstreams a ellos según `RID_DEV_NODES` (`slug=host:puerto`). Registran en su log las cabeceras `X-RID-*` que reciben, y así la demo muestra qué le llega al proveedor. En producción no existen: los upstreams son nodos del kit, APIs existentes de las entidades o un Security Server de X-Road.
+
+- Una sola imagen (`rid/mock-providers:dev`); `PROVIDER` elige el servicio y sus datos (`salud` o `socioeconomico`), con su OpenAPI en `infra/mock-providers/<proveedor>/openapi.yaml`.
+- Escuchan en 8000 dentro de la red de Compose; en desarrollo se publican en 8101 y 8102.
+
+## 4. Variables de entorno
+
+La referencia completa, comentada, es `.env.example`. Todos los servicios leen el mismo `.env` de la raíz (Compose con `--env-file .env`; en el piloto también `env_file` para `api`, `web` y `carpeta`).
+
+### 4.1 Secretos que no se pueden cambiar a la ligera
+
+| Variable | Qué pasa si cambia |
+| :-- | :-- |
+| `RID_SUBJECT_REF_KEY` (≥ 32 caracteres) | Cambia el seudónimo de cada titular: se pierde el vínculo entre un ciudadano y sus registros anteriores |
+| `RID_END_USER_HASH_SALT` (≥ 16 caracteres) | Cambian todos los hashes de funcionario |
+| `RID_TRANSPARENCY_SIGNING_JWK` | Los comprobantes anteriores solo verifican si la clave pública vieja pasa a `RID_TRANSPARENCY_RETIRED_JWKS` |
+| `RID_SECRETS_KEY` (32 bytes base64) | No se pueden abrir los secretos de cliente sellados que el reconciliador de Keycloak aún no aplicó |
+| `POSTGRES_PASSWORD`, `RID_APP_DB_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Solo se aplican al crear el volumen (§3.2) |
+| `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET` | Solo se aplican al importar el realm (§3.3) |
+| `STEP_CA_PASSWORD` | Cifra las claves de la CA ya creadas |
+| `AUTH_SECRET` | Cierra todas las sesiones de la web |
+
+Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, el API no puede construir el bundle de OPA y el gateway niega todo.
+
+### 4.2 Lo que cambia entre desarrollo y piloto
+
+`scripts/make-deploy-env.mjs` las escribe; en desarrollo valen los valores de `.env.example`.
+
+| Variable | Desarrollo | Piloto |
+| :-- | :-- | :-- |
+| `DATABASE_URL`, `DATABASE_MIGRATION_URL` | `@localhost:5432` | `@postgres:5432` |
+| `KEYCLOAK_URL` | `http://localhost:8080` | `${RID_PUBLIC_URL}/auth` |
+| `RID_GATEWAY_KEYCLOAK_URL` | `http://keycloak:8080` | `http://keycloak:8080/auth` |
+| `RID_API_URL` | `http://localhost:4000` | `http://api:4000` |
+| `APISIX_ADMIN_URL` | `http://localhost:9180` | `http://apisix:9180` |
+| `OPA_PORTAL_URL` | `http://host.docker.internal:4000/api/v1/opa` | `http://api:4000/api/v1/opa` |
+| `RID_TRANSPARENCY_COLLECTOR_HOST` | `host.docker.internal` | `api` |
+| `RID_TSA_URL` | `http://localhost:3004` | `http://tsa:3004` |
+| `RID_STEP_CA_URL` | `https://localhost:9000` | `https://step-ca:9000` |
+| `RID_STEP_CA_ROOT_FILE` | vacío | `/var/lib/rid/step-ca/root_ca.crt` |
+| `RID_WEB_URL`, `AUTH_URL` | `http://localhost:3000` | `${RID_PUBLIC_URL}` |
+| `RID_GATEWAY_PUBLIC_URL` | `http://localhost:9080` | `${RID_PUBLIC_URL}/gw` |
+| `RID_CITIZEN_ISSUER` | `http://localhost:8080/realms/rid-citizens` | `${RID_PUBLIC_URL}/auth/realms/rid-citizens` |
+| `RID_CARPETA_URL` | `http://localhost:3100` | `${RID_PUBLIC_URL}/carpeta` |
+| `RID_CITIZEN_APPS` (webhook) | `http://localhost:3100/api/rid/alerts` | `http://carpeta:3100/carpeta/api/rid/alerts` |
+| `RID_DEMO_USER_PASSWORD` | `demo` | aleatoria, salvo `--demo-password` |
+| `MAILPIT_UI_AUTH`, `TRAEFIK_NETWORK`, `RID_PUBLIC_URL` | — | solo piloto |
+
+El API usa `KEYCLOAK_URL` para validar los tokens y para el Admin API de `rid-gateway`: en el piloto llega a Keycloak por la URL pública, a través del proxy.
+
+## 5. Piloto en una máquina
+
+### 5.1 Qué hace el override `docker-compose.deploy.yml`
+
+- Quita todos los puertos publicados (`ports: !reset []`) y pone `restart: unless-stopped`.
+- Agrega `api`, `web` y `carpeta` como contenedores. El API aplica migraciones y el seed al arrancar (`RID_ALLOW_SEED=true`) y envía correo a `smtp://mailpit:1025`.
+- Une al proxy, por la red externa `${TRAEFIK_NETWORK}` (por defecto `lab-router_default`), solo los servicios que se publican, con alias fijos: `rid-portal-web`, `rid-portal-api`, `rid-keycloak`, `rid-apisix`, `rid-mailpit`, `rid-carpeta`, `rid-tsa`.
+- Keycloak con `start_period` de 300 s: en una máquina compartida tarda minutos en arrancar.
+
+### 5.2 Rutas del proxy inverso (un solo nombre público)
+
+| Ruta pública | Destino | Prefijo |
+| :-- | :-- | :-- |
+| `/` | `rid-portal-web:3000` | se conserva |
+| `/api/v1` | `rid-portal-api:4000` | se conserva; **excepto** `/api/v1/internal` y `/api/v1/opa`, que no se publican |
+| `/auth` | `rid-keycloak:8080` | se conserva (`KC_HTTP_RELATIVE_PATH=/auth`) |
+| `/gw` | `rid-apisix:9080` | **se quita** `/gw` |
+| `/mail` | `rid-mailpit:8025` | se conserva (`MP_WEBROOT=/mail`) |
+| `/carpeta` | `rid-carpeta:3100` | se conserva (ruta base de `RID_CARPETA_URL`) |
+| `/tsa/api/v1/timestamp/certchain` | `rid-tsa:3004` | **se quita** `/tsa`; nada más de la TSA se publica |
+
+`/api/auth/*` (Auth.js) es de la web: por eso la regla del API es `/api/v1`, no `/api`.
+
+Ejemplo para Traefik (proveedor de archivo). No está en el repo; ajústalo a tu proxy y a tu resolutor de certificados:
+
+```yaml
+http:
+  middlewares:
+    rid-strip-gw: { stripPrefix: { prefixes: ['/gw'] } }
+    rid-strip-tsa: { stripPrefix: { prefixes: ['/tsa'] } }
+  routers:
+    rid-web:     { rule: 'Host(`portal.example.org`)', service: rid-web, tls: { certResolver: le } }
+    rid-api:     { rule: 'Host(`portal.example.org`) && PathPrefix(`/api/v1`) && !PathPrefix(`/api/v1/internal`) && !PathPrefix(`/api/v1/opa`)', service: rid-api, tls: { certResolver: le } }
+    rid-auth:    { rule: 'Host(`portal.example.org`) && PathPrefix(`/auth`)', service: rid-keycloak, tls: { certResolver: le } }
+    rid-gw:      { rule: 'Host(`portal.example.org`) && PathPrefix(`/gw`)', service: rid-apisix, middlewares: [rid-strip-gw], tls: { certResolver: le } }
+    rid-mail:    { rule: 'Host(`portal.example.org`) && PathPrefix(`/mail`)', service: rid-mailpit, tls: { certResolver: le } }
+    rid-carpeta: { rule: 'Host(`portal.example.org`) && PathPrefix(`/carpeta`)', service: rid-carpeta, tls: { certResolver: le } }
+    rid-tsa:     { rule: 'Host(`portal.example.org`) && Path(`/tsa/api/v1/timestamp/certchain`)', service: rid-tsa, middlewares: [rid-strip-tsa], tls: { certResolver: le } }
+  services:
+    rid-web:      { loadBalancer: { servers: [{ url: 'http://rid-portal-web:3000' }] } }
+    rid-api:      { loadBalancer: { servers: [{ url: 'http://rid-portal-api:4000' }] } }
+    rid-keycloak: { loadBalancer: { servers: [{ url: 'http://rid-keycloak:8080' }] } }
+    rid-apisix:   { loadBalancer: { servers: [{ url: 'http://rid-apisix:9080' }] } }
+    rid-mailpit:  { loadBalancer: { servers: [{ url: 'http://rid-mailpit:8025' }] } }
+    rid-carpeta:  { loadBalancer: { servers: [{ url: 'http://rid-carpeta:3100' }] } }
+    rid-tsa:      { loadBalancer: { servers: [{ url: 'http://rid-tsa:3004' }] } }
+```
+
+Traefik da más prioridad a la regla más larga, así que `/api/v1`, `/auth`, etc. ganan sobre `/`.
+
+> **mTLS (M3).** Con `features.mtls.required` el TLS del gateway debe terminar en APISIX (SPIKE S-3): `/gw` detrás de un proxy que termina TLS no sirve. El gateway necesita un nombre propio con un router TCP `HostSNI(<nombre>)` y `tls.passthrough: true` hacia `rid-apisix:9443`. Se documenta al cerrar M3-10.
+
+### 5.3 Primer despliegue
+
+```bash
+git clone <repo> && cd <repo>
+node scripts/make-deploy-env.mjs https://portal.example.org [--traefik-network <red>] [--demo-password <pw>]
+# → escribe .env (modo 600) con secretos aleatorios, una clave de firma nueva y los nombres internos.
+#   Se niega a sobrescribir un .env existente.
+docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
+  --env-file .env --profile observability up -d --build
+```
+
+- El build de `api` y `web` tarda varios minutos; Keycloak, uno o dos más.
+- Configura el proxy (§5.2) y luego sigue `OPERATIONS.md §2`.
+- Guarda una copia del `.env` fuera de la máquina: sin él no se pueden recuperar ni verificar los datos (§4.1).
+
+### 5.4 Actualización
+
+```bash
+# 1. Respaldo si la versión trae migraciones (OPERATIONS.md §6)
+# 2. Código nuevo
+git pull --ff-only
+# 3. Reconstruir y reiniciar (todo, o solo los servicios que cambiaron)
+docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
+  --env-file .env --profile observability up -d --build [api web carpeta]
+```
+
+- Las migraciones se aplican solas al arrancar el API.
+- Revisa en las notas de la historia (`BACKLOG.md`) si la versión pide pasos manuales: cambios de realm de Keycloak (no se reimportan, §3.3), variables nuevas en `.env` (`make-deploy-env.mjs` no edita un `.env` existente) o volúmenes nuevos.
+- Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
+
+## 6. Desarrollo local
+
+```bash
+cp .env.example .env
+pnpm install
+pnpm infra:up            # o infra:up:core (sin OpenSearch ni el Fluent Bit de analítica)
+pnpm db:migrate && pnpm db:seed
+pnpm dev                 # web 3000 + api 4000 + carpeta ciudadana 3100
+```
+
+| Comando | Qué hace |
+| :-- | :-- |
+| `pnpm infra:up` / `infra:up:core` | Levanta los servicios y espera su health check (hasta 180 s) |
+| `pnpm infra:ps` / `infra:logs` | Estado y logs |
+| `pnpm infra:down` | Detiene, conserva datos |
+| `pnpm infra:reset` | Detiene y **borra** volúmenes (base de datos, CA, TSA, índices, búfer) |
+
+En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.docker.internal`.
+
+## 7. CI
+
+`.github/workflows/ci.yml`:
+
+| Trabajo | Qué corre |
+| :-- | :-- |
+| Lint, typecheck, test, licencias | `pnpm format:check`, `typecheck`, `lint`, `test`, `license:check` |
+| Integración del API | `docker compose up -d --wait postgres etcd apisix tsa step-ca` y `pnpm --filter @rid/api test:integration`; luego `test:dist` sobre el build |
+| Políticas OPA | `opa check --strict`, `opa test`, cobertura ≥ 90 % |
+
+## 8. Límites del piloto frente a producción
+
+| Tema | Piloto (hoy) | Producción (objetivo, `ARCHITECTURE.md §11`) |
+| :-- | :-- | :-- |
+| Datos iniciales | Siempre carga el seed: entidades ficticias y usuarios de demo, incluidos administradores de plataforma | Sin datos de demo. **Falta** un mecanismo para dar el primer `platform_admin` sin el seed (los roles de plataforma hoy solo los da el seed) |
+| Keycloak | `start-dev`, misma instancia de PostgreSQL | Clúster en modo producción, base propia |
+| CA | CA de desarrollo en un volumen | Raíz fuera de línea, intermedia en HSM |
+| TSA | sigstore con clave en archivo | TSA acreditada del país |
+| etcd | Un nodo, sin TLS | Clúster de 3 con mTLS |
+| OpenSearch | Sin seguridad, sin retención | Plugin de seguridad, política de retención |
+| Correo | Mailpit | SMTP del operador |
+| Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
+| Alta disponibilidad | Ninguna | ≥ 2 nodos de APISIX con OPA local, ≥ 2 réplicas de web y API, PostgreSQL con réplica |
+| Métricas y alertas | No hay Prometheus; APISIX expone métricas en 9091 sin que nadie las lea | Prometheus + Alertmanager (M5-06) |
+| Respaldos | `pg_dump` manual | pgBackRest con restauración probada (M6-06) |
+| mTLS de aplicaciones | Desactivado (`features.mtls.required: false`, ADR-0010) | Obligatorio desde M3-10 |

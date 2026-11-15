@@ -26,6 +26,7 @@ Documentos que mandan (léelos antes de tocar un área):
 | `docs/BACKLOG.md` | Hitos M0–M6 con historias y criterios de aceptación. **Trabaja en orden.** |
 | `docs/adr/` | Decisiones tomadas. No las contradigas sin escribir un ADR nuevo |
 | `docs/DEMO.md` | Guion de la demo del hito M1 |
+| `docs/DEPLOYMENT.md` / `docs/OPERATIONS.md` | Despliegue por componente; puesta en marcha y operación. Actualízalos si cambias un servicio, una variable de entorno, un volumen o un paso manual |
 
 ## Reglas de oro (no negociables)
 
@@ -80,14 +81,17 @@ rid-portal/
 │       └── example.yaml     # plantilla para otros países
 ├── infra/
 │   ├── compose/             # docker-compose.yml + overrides
-│   ├── keycloak/            # realm-export.json para dev
+│   ├── keycloak/            # *-realm.json de dev (rid-portal, rid-gateway, rid-citizens)
+│   ├── postgres/            # init: roles rid_app y keycloak
+│   ├── tsa/                 # TSA RFC 3161 de desarrollo (ADR-0016)
 │   ├── apisix/              # config.yaml de APISIX
 │   ├── opa/                 # config de OPA (apunta al bundle del portal)
 │   ├── step-ca/             # init de la CA de dev
 │   ├── fluent-bit/          # pipeline de logs con enmascarado
 │   ├── mock-providers/      # servicios de ejemplo (Fastify + datos sintéticos, ADR-0009)
 │   └── mock-citizen-app/    # carpeta ciudadana de referencia (MT-07): consultas, avisos, comprobantes
-├── scripts/                 # seed, license-check, demo
+├── tests/infra/             # pruebas de la configuración de infra (privacidad de logs, realms)
+├── scripts/                 # license-check, demo, make-deploy-env, opa-test (el seed vive en apps/api/src/seed)
 └── docs/
     ├── SPEC.md
     ├── ARCHITECTURE.md

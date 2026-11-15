@@ -65,7 +65,7 @@ Dos planos separados:
 | Fluent Bit | Recibe logs de APISIX, aplica enmascarado, envía a OpenSearch | Segunda barrera de privacidad |
 | OpenSearch | Logs de acceso (metadatos) y analítica | El navegador nunca habla con OpenSearch |
 | Prometheus + Alertmanager | Métricas y alertas | Grafana opcional para operadores |
-| WireGuard hub | Extremo central de los túneles de los nodos | Contenedor `wg-hub` en la red del gateway |
+| WireGuard hub | Extremo central de los túneles de los nodos | Contenedor `wg-hub` en la red del gateway (M4-03, todavía no existe) |
 
 ## 3. Identidad y autenticación
 
@@ -235,7 +235,7 @@ Reconciliador de aplicaciones: crea/actualiza/deshabilita clientes en `rid-gatew
   - Antes de la CA, el portal revisa el CSR (`pkijs`): un solo bloque PEM, campo de atributos presente, firma propia válida, clave ECDSA P-256/P-384 o RSA 2048-4096, CN = clientId y ningún otro nombre alternativo. Un CSR inválido da 400 con un mensaje estable por causa. Si la CA no responde o rechaza, 503.
   - El certificado que devuelve la CA debe tener ese sujeto y esa clave, y encadenar hasta la raíz. El portal guarda la cadena (pública), la huella RFC 8705 (`x5t#S256`), el serial y las fechas. Una aplicación tiene un solo certificado activo (índice único parcial); la rotación es M3-04.
   - Un trabajo periódico (`RID_LIFECYCLE_INTERVAL_SECONDS`) avisa a los desarrolladores de la entidad `lifecycle.certificateExpiryWarningDays` antes del vencimiento (`credential.expiry_notice_queued` → notificación `certificate_expiring`) y marca `expired` los certificados vencidos.
-- Dos plantillas: `app` (CN = clientId, 90 días) y `node` (CN = `rid-node-<id>`, 90 días, renovación automática por el kit). La de `app` está en `infra/step-ca/app.tpl`: solo el CN del token como sujeto, el clientId como SAN DNS y uso de clave solo para autenticación de cliente TLS.
+- Dos plantillas: `app` (CN = clientId, 90 días) y `node` (CN = `rid-node-<id>`, 90 días, renovación automática por el kit; llega con M4). La de `app` está en `infra/step-ca/app.tpl`: solo el CN del token como sujeto, el clientId como SAN DNS y uso de clave solo para autenticación de cliente TLS.
 - Revocación: certificados de vida corta + lista de huellas revocadas en el bundle OPA (requiere SPIKE S-3).
 
 ## 5. Flujo de una llamada
@@ -277,7 +277,7 @@ El proveedor sabe quién consulta, para qué y bajo qué autorización: resuelve
 
 ## 7. Datos
 
-- **Prisma** con migraciones versionadas. Tablas principales = entidades de `SPEC.md §3` + `outbox`, `sync_state`, `audit_event`, `opa_bundle_revision`.
+- **Prisma** con migraciones versionadas. Tablas principales = entidades de `SPEC.md §3` + `outbox`, `sync_state`, `audit_event`, `policy_bundle` (revisiones del bundle de OPA).
 - **Outbox** para que estado de dominio y trabajo de sincronización se confirmen en la misma transacción.
 - **Auditoría encadenada:** `hash = SHA-256(prevHash ‖ JSON canónico del evento)`, con claves ordenadas y los valores tal como vuelven de `jsonb`. `seq` = último + 1 bajo un bloqueo consultivo de la transacción (`pg_advisory_xact_lock`), sin usar la secuencia: así una transacción revertida no deja huecos. El bloqueo serializa las escrituras de auditoría hasta que termina cada transacción. Los eventos anteriores a M1-11 quedan fuera de la cadena, y la verificación los cuenta aparte. Endpoint de verificación de la cadena. Anclaje diario (M2-09): el hash del último evento encadenado de cada día cerrado, en la zona horaria del país, se sella con la TSA (RFC 3161). Se guarda en `audit_anchor`, de solo inserción incluso para el dueño, y se envía por correo a los reguladores. La verificación exige que cada anclaje encuentre su evento con el mismo hash, lo que detecta el corte de la cola. Exportación CSV/JSON con la misma selección de filtros, con su SHA-256 firmado por la clave del operador (JWS EdDSA, verificable con `/transparency/jwks`). Cada exportación queda auditada.
 - La tabla `audit_event` tiene permisos solo de `INSERT`/`SELECT` para el rol de la aplicación (sin `UPDATE`/`DELETE`), y un trigger rechaza `UPDATE`/`DELETE`/`TRUNCATE` incluso para el dueño del esquema.
@@ -307,10 +307,12 @@ deny_reason
 - **No se registran**: `uri` real, query string, cuerpos, `Authorization`, IP del ciudadano (no hay; los consumidores son sistemas).
 - El access log propio de nginx en APISIX está **desactivado** (`nginx_config.http.enable_access_log: false`), porque escribe la línea de la petición y la URI del upstream. El error log queda en nivel `error`, porque los avisos (p. ej. cada denegación de un plugin) también incluyen la línea de la petición. Hay una prueba de regresión en `tests/infra`. Pendiente para M5-01: los errores reales todavía pueden llevar la línea de la petición en el log de nginx.
 - Fluent Bit aplica un filtro Lua que descarta cualquier campo fuera de la lista permitida (defensa en profundidad).
-- OpenSearch: índice `rid-access-YYYY.MM`, política de retención por configuración.
+- OpenSearch: índice `rid-access-YYYY.MM`, política de retención por configuración (pendiente: hoy no hay política configurada).
 - La analítica del portal consulta OpenSearch desde `apps/api` filtrando por la entidad del usuario; los roles de plataforma ven todo.
 
 ## 9. Observabilidad
+
+Objetivo de M5-06. Hoy solo existe el plugin `prometheus` en cada ruta de APISIX (exportado en el puerto interno 9091); no hay Prometheus, Alertmanager ni `/metrics` en el API.
 
 - Métricas: plugin `prometheus` de APISIX, `/metrics` de `apps/api` (latencia por endpoint, jobs pendientes, edad del último bundle OPA, deriva de sync), métricas de OPA.
 - Alertas mínimas: gateway 5xx > 2 % 5 min, p95 de latencia del gateway > 200 ms, bundle OPA con más de 2 min de antigüedad, reconciliación fallando, nodo offline, certificado por vencer, cola pg-boss acumulada.
@@ -330,14 +332,16 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 
 ## 11. Despliegue
 
-**Desarrollo y pilotos:** `infra/compose/docker-compose.yml` con todos los servicios, datos semilla y realms importados.
+**Desarrollo:** `infra/compose/docker-compose.yml` con todos los servicios, datos semilla y realms importados; web y API en el host.
+
+**Pilotos y demos:** el mismo archivo más `infra/compose/docker-compose.deploy.yml` (web, API y carpeta en contenedores, sin puertos publicados, detrás de un proxy inverso). Detalle por componente en `docs/DEPLOYMENT.md`; puesta en marcha y operación en `docs/OPERATIONS.md`.
 
 **Producción (M6):**
 - Gateway: ≥ 2 nodos APISIX en zonas distintas, OPA local en cada uno, etcd en clúster de 3 con mTLS.
 - Portal: ≥ 2 réplicas de web y api; PostgreSQL con réplica y respaldos (pgBackRest).
 - Keycloak en clúster con base de datos propia.
 - step-ca con raíz fuera de línea; intermedia con clave en HSM.
-- Helm charts en `infra/helm/`.
+- Helm charts en `infra/helm/` (M6-05, todavía no existen).
 
 ## 12. Seguridad
 
