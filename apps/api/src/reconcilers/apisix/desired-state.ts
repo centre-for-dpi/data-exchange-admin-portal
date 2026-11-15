@@ -323,6 +323,9 @@ export function desiredGateway(
     labels: { 'rid-managed': 'true', 'rid-entity': v.entitySlug, 'rid-api-version': v.id },
     plugins: {
       'request-id': { header_name: 'X-Request-Id', include_in_response: true },
+      // Anti-spoofing (M3-07): every client-sent X-RID-* header except X-RID-Purpose and
+      // X-RID-End-User is removed before anything reads it.
+      'rid-header-guard': {},
       'openid-connect': {
         client_id: settings.audience,
         discovery: settings.keycloakDiscoveryUrl,

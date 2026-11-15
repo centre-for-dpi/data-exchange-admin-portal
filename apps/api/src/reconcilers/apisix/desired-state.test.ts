@@ -111,8 +111,10 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       'proxy-rewrite',
       'request-id',
       'rid-client-cert',
+      'rid-header-guard',
       'rid-rate-limited',
     ]);
+    expect(plugins['rid-header-guard']).toEqual({});
     // Per-subscription limit (S-2): from OPA's headers, counted on each node.
     expect(plugins['limit-count']).toMatchObject({
       count: '$http_x_rid_rate_limit',

@@ -496,7 +496,20 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Pruebas de que el valor en claro no sale: los formatos de log del gateway y una prueba estática de las listas permitidas de Fluent Bit (`tests/infra`). El e2e de la demo ya comprobaba que al proveedor solo llega el hash.
     - Al escribir esa prueba se encontró que el filtro del log de acceso descartaba `deny_reason`, así que la analítica perdía la razón de las negaciones. Se corrigió.
     - La guía de integración de la aplicación muestra la cabecera y explica qué valor va.
-- [ ] **M3-07 — Anti-suplantación de cabeceras**: test que envía `X-RID-*` falsas desde el cliente y verifica que el proveedor recibe las correctas.
+- [x] **M3-07 — Anti-suplantación de cabeceras**: test que envía `X-RID-*` falsas desde el cliente y verifica que el proveedor recibe las correctas.
+  - _Notas de implementación:_
+    - Prueba de integración contra APISIX y OPA reales, con la **política real** (cargada en OPA bajo un paquete de prueba, sin tocar el bundle del portal) y la cadena de plugins del reconciliador. Un proveedor en el host devuelve las cabeceras que recibe.
+    - Comprueba que:
+      - el proveedor recibe los valores de OPA (entidad, aplicación, suscripción, operación, finalidad, límite, hash del funcionario y seudónimo del titular), nunca los falsos;
+      - no llegan los valores en claro ni las entradas del gateway;
+      - las variantes de mayúsculas y de guiones bajos y una cabecera repetida no cuelan nada;
+      - una cabecera falsa no convierte una llamada negada en permitida.
+    - La prueba encontró dos huecos:
+      - una cabecera `X-RID-*` fuera de las listas (por ejemplo `X-RID-Deny-Reason`) llegaba al proveedor;
+      - `X_RID_Subscription` pasaba, porque APISIX acepta guiones bajos, y los servidores tipo CGI la leen igual que `X-RID-Subscription`.
+    - Se cerraron con el plugin propio `rid-header-guard`, primero en la fase rewrite: borra toda `X-RID-*` del cliente, guiones bajos incluidos, salvo `X-RID-Purpose` y `X-RID-End-User`.
+    - Solo `openid-connect` queda fuera de la ruta de prueba: la política decodifica el token, y su firma la cubre el e2e del gateway.
+    - La suplantación de `SSL_CLIENT_CERT` hacia Keycloak (S-4) va con M3-10.
 - [ ] **M3-08 — MFA para roles críticos**: roles de plataforma y `data_steward` exigen MFA en Keycloak.
 - [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
 - [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
