@@ -15,6 +15,7 @@ import {
   checkRoutePath,
   sandboxCheckRouteId,
   sandboxCheckRoutePath,
+  versionCheckToken,
 } from '../reconcilers/apisix/desired-state.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
@@ -142,26 +143,31 @@ describe('validations when a version goes to review (M4-06)', () => {
     expect(await admin.get('routes', checkRouteId(versionId))).toBeDefined();
     expect(await admin.get('routes', sandboxCheckRouteId(versionId))).toBeDefined();
     const health = `${GATEWAY}${checkRoutePath(versionId)}`;
+    // Each version has its own token: the global one opens nothing.
+    const own = versionCheckToken(TOKEN, versionId);
     const sandbox = `${GATEWAY}${sandboxCheckRoutePath(versionId)}/afiliados/1000000001`;
     let ok = 0;
     for (let i = 0; i < 40 && ok !== 200; i += 1) {
-      ok = (await fetch(sandbox, { headers: { 'x-rid-validation': TOKEN } })).status;
+      ok = (await fetch(sandbox, { headers: { 'x-rid-validation': own } })).status;
       if (ok !== 200) await new Promise((r) => setTimeout(r, 250));
     }
     expect(ok).toBe(200);
-    // Without the token the routes do not exist.
+    // Without the token the routes do not exist, nor with the global token or another version's.
     expect((await fetch(health)).status).toBe(404);
+    for (const other of [TOKEN, versionCheckToken(TOKEN, randomUUID())]) {
+      expect((await fetch(health, { headers: { 'x-rid-validation': other } })).status).toBe(404);
+    }
     expect((await fetch(sandbox, { headers: { 'x-rid-validation': 'otro' } })).status).toBe(404);
     // The production upstream: GET on the service root only, never a data path.
-    expect((await fetch(health, { headers: { 'x-rid-validation': TOKEN } })).status).toBeLessThan(
+    expect((await fetch(health, { headers: { 'x-rid-validation': own } })).status).toBeLessThan(
       500,
     );
     expect(
-      (await fetch(`${health}/afiliados/1000000001`, { headers: { 'x-rid-validation': TOKEN } }))
+      (await fetch(`${health}/afiliados/1000000001`, { headers: { 'x-rid-validation': own } }))
         .status,
     ).toBe(404);
     expect(
-      (await fetch(health, { method: 'POST', headers: { 'x-rid-validation': TOKEN } })).status,
+      (await fetch(health, { method: 'POST', headers: { 'x-rid-validation': own } })).status,
     ).toBe(404);
 
     // The healthcheck through the route passes; the contract test runs if a runner is set.

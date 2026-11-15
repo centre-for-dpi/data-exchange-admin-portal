@@ -11,6 +11,7 @@ import {
   checkRoutePath,
   sandboxCheckRoutePath,
   VALIDATION_TOKEN_HEADER,
+  versionCheckToken,
 } from '../reconcilers/apisix/desired-state.js';
 
 /** Outbox topic of the validations at submission (aggregate apiVersion:<id>). */
@@ -91,7 +92,9 @@ export class GatewayValidationProbes implements ValidationProbes {
       const started = Date.now();
       try {
         const res = await fetch(url, {
-          headers: { [VALIDATION_TOKEN_HEADER]: s.token },
+          headers: { [VALIDATION_TOKEN_HEADER]: versionCheckToken(s.token, versionId) },
+          // A redirect is an answer of the service; following it would carry the token away.
+          redirect: 'manual',
           signal: AbortSignal.timeout(15_000),
         });
         await res.arrayBuffer();
@@ -135,7 +138,7 @@ export class GatewayValidationProbes implements ValidationProbes {
         body: JSON.stringify({
           openapi,
           baseUrl: `${s.runnerGatewayUrl}${sandboxCheckRoutePath(versionId)}`,
-          headers: { [VALIDATION_TOKEN_HEADER]: s.token },
+          headers: { [VALIDATION_TOKEN_HEADER]: versionCheckToken(s.token, versionId) },
           maxExamples: s.maxExamples,
           timeoutSeconds: s.timeoutSeconds,
         }),

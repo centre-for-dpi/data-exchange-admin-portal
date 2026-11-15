@@ -403,6 +403,22 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
         line: result.range.start.line + 1,
       });
     }
+    // Paths stay inside the version: no `.`/`..` segments, encoded dots or slashes, backslashes or
+    // empty segments, which a gateway, a Security Server or the contract test could resolve to
+    // another route (M4-06 security review).
+    for (const path of Object.keys((spec.paths ?? {}))) {
+      if (/(^|\/)\.{1,2}(\/|$)|%2e|%2f|%5c|\\|\/\//i.test(path)) {
+        const at = ['paths', path];
+        const range = document.getRangeForJsonPath(at, true);
+        issues.push({
+          code: 'rid-path-traversal',
+          message: `Path ${path} must not contain . or .. segments, encoded dots or slashes, backslashes or empty segments`,
+          severity: 'error',
+          path: at,
+          line: range ? range.start.line + 1 : 1,
+        });
+      }
+    }
     issues.push(
       ...dataSubjectIssues(spec, options, (path) => {
         const range = document.getRangeForJsonPath(path, true);

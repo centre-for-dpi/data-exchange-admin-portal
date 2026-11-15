@@ -81,6 +81,8 @@ def run(spec, base_url, headers, max_examples, timeout):
             "--report", "junit",
             "--report-dir", work,
             "--request-timeout", "10",
+            # Never follow a redirect of the sandbox: it would carry the check token elsewhere.
+            "--max-redirects", "0",
             "--seed", "1",
         ]
         for name, value in headers.items():

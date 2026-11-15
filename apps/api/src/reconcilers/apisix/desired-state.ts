@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { isIP } from 'node:net';
 import {
   isPublicHostname,
@@ -94,6 +95,13 @@ export const sandboxCheckRoutePath = (apiVersionId: string): string =>
   `/__rid/check-sandbox/${apiVersionId}`;
 /** Only a request with the validation token matches a check route (APISIX `vars`). */
 export const VALIDATION_TOKEN_HEADER = 'X-RID-Validation';
+
+/**
+ * The token of one version's check routes: HMAC of RID_VALIDATION_TOKEN and the version id. A
+ * token that leaks (a redirect, a log of the provider) opens only that version's routes.
+ */
+export const versionCheckToken = (secret: string, apiVersionId: string): string =>
+  createHmac('sha256', secret).update(`rid-check:${apiVersionId}`).digest('base64url');
 
 /** The gateway's client certificate towards the operator's Security Server (one for X-Road). */
 export const GATEWAY_XROAD_SSL_ID = 'rid-ssl-gateway-xroad';
@@ -831,8 +839,8 @@ export function desiredCheckRoutes(
   settings: GatewaySettings,
   pki?: UpstreamPki,
 ): { health: ApisixObject; sandbox: ApisixObject | null } | null {
-  const token = settings.validationToken;
-  if (!token) return null;
+  if (!settings.validationToken) return null;
+  const token = versionCheckToken(settings.validationToken, v.id);
   const vars = [
     [`http_${VALIDATION_TOKEN_HEADER.toLowerCase().replaceAll('-', '_')}`, '==', token],
   ];

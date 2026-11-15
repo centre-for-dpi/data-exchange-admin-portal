@@ -56,6 +56,26 @@ paths:
     },
   );
 
+  it('refuses paths that could leave the version (dot segments, encoded slashes)', async () => {
+    const withPath = (path: string) => `openapi: 3.1.0
+info: { title: T, version: '1' }
+paths:
+  '${path}':
+    get:
+      operationId: op
+      responses: { '200': { description: ok } }
+`;
+    for (const path of ['/../otra', '/a/./b', '/a/%2e%2e/b', '/a%2Fb', '/a\\\\b', '/a//b']) {
+      const result = await lintOpenApi(withPath(path), { noIdInQuery: true });
+      expect(
+        result.report.issues.some((i) => i.code === 'rid-path-traversal'),
+        path,
+      ).toBe(true);
+    }
+    const fine = await lintOpenApi(withPath('/afiliados/{id}'), { noIdInQuery: true });
+    expect(fine.report.issues.some((i) => i.code === 'rid-path-traversal')).toBe(false);
+  });
+
   it('still resolves local #/components refs', async () => {
     const source = `${withRef('#/components/schemas/X')}components:
   schemas:

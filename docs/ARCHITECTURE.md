@@ -163,7 +163,7 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
 - Lo aplica el reconciliador de APISIX en cada pasada completa (`sync_state` `apisix:ssl:rid-ssl-gateway`). La clave no se compara, porque APISIX la guarda cifrada: una clave nueva siempre llega con un certificado nuevo.
 
 **Rutas de verificación (M4-06)** de una versión `in_review`, para las validaciones al enviar a revisión (`SPEC.md §4.2` paso 2). Se saltan el token y la política, así que son estrechas:
-- solo existen para una petición con `X-RID-Validation` = `RID_VALIDATION_TOKEN` (`vars` de APISIX; sin el token, 404);
+- solo existen para una petición con `X-RID-Validation` = el token de esa versión, `HMAC(RID_VALIDATION_TOKEN, versionId)` (`vars` de APISIX; sin él, 404): un token filtrado abre solo las rutas de su versión. Ni el healthcheck ni Schemathesis siguen redirecciones, que llevarían el token a otra parte, y el lint rechaza rutas del OpenAPI con segmentos `.`/`..`, puntos o barras codificados o segmentos vacíos;
 - `rid-check-<id>` (`/__rid/check/<id>`) solo acepta GET y lo envía a la raíz del servicio del upstream real (`servicePath/`): prueba la conectividad (TLS, mTLS, túnel, Security Server), nunca un dato;
 - `rid-check-sandbox-<id>` (`/__rid/check-sandbox/<id>/*`) va al `sandboxUpstream` de la versión, con datos sintéticos, para la prueba de contrato;
 - los upstreams van dentro de la ruta y se construyen como el publicado (mTLS, hub, Security Server y sus controles). Fuera de `in_review` se borran, y la pasada completa elimina las que sobran.
