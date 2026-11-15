@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { nodeDnsName } from '@rid/contracts';
 import { ENROLLED_NODE_STATUSES } from '../../domain/node/state-machine.js';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { PrismaService, type Tx } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
 import { HUB_AGENT, type HubAgent, type HubDesiredState } from './hub-agent.js';
 
@@ -16,6 +16,8 @@ import { HUB_AGENT, type HubAgent, type HubDesiredState } from './hub-agent.js';
 export const WIREGUARD_SYNC_TOPIC = 'wireguard.sync';
 export const WIREGUARD_SYNC_TARGET = 'wg-hub:state';
 const FULL_RECONCILE_MS = 60 * 1000;
+/** Serializes passes across API replicas ("rid_wgsy"): see reconcile(). */
+const RECONCILE_LOCK = 0x7269645f77677379n;
 /** Port of the nodes' TLS listener when a node has not declared one. */
 const DEFAULT_SERVICE_PORT = 8443;
 
@@ -64,8 +66,8 @@ export class WireguardReconciler implements OnApplicationBootstrap, OnApplicatio
     if (this.timer) clearInterval(this.timer);
   }
 
-  async desired(): Promise<HubDesiredState> {
-    const nodes = await this.prisma.node.findMany({
+  async desired(db: Pick<Tx, 'node'> = this.prisma): Promise<HubDesiredState> {
+    const nodes = await db.node.findMany({
       where: {
         status: { in: [...ENROLLED_NODE_STATUSES] },
         wireguardPublicKey: { not: null },
@@ -88,41 +90,60 @@ export class WireguardReconciler implements OnApplicationBootstrap, OnApplicatio
     };
   }
 
+  /**
+   * One pass at a time across replicas: the lock covers reading the desired state and writing
+   * the hub. Otherwise a pass that read the state before a decommission could write it after a
+   * later pass, and bring the node's peer back until the next one. A change that commits during a
+   * pass queues its own pass (outbox), which waits for the lock and reads the change.
+   */
   async reconcile(): Promise<'updated' | 'unchanged'> {
-    if (!this.hub) throw new Error('The WireGuard hub agent is not configured');
-    const desired = await this.desired();
-    const desiredHash = hash(desired);
+    const hub = this.hub;
+    if (!hub) throw new Error('The WireGuard hub agent is not configured');
+    let desiredHash = hash(null);
     try {
-      const actual = await this.hub.state();
-      const current: HubDesiredState = {
-        peers: actual.peers
-          .map((p) => ({ publicKey: p.publicKey, address: p.address }))
-          .sort(byKey('publicKey')),
-        routes: [...actual.routes].sort(byKey('name')),
-      };
-      let result: 'updated' | 'unchanged' = 'unchanged';
-      if (hash(current) !== desiredHash) {
-        await this.hub.apply(desired);
-        result = 'updated';
-        this.logger.log(
-          `WireGuard hub: ${desired.peers.length} peers, ${desired.routes.length} routes`,
-        );
-      }
-      await this.record(desiredHash, null);
-      return result;
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(${RECONCILE_LOCK})`;
+          const desired = await this.desired(tx);
+          desiredHash = hash(desired);
+          const actual = await hub.state();
+          const current: HubDesiredState = {
+            peers: actual.peers
+              .map((p) => ({ publicKey: p.publicKey, address: p.address }))
+              .sort(byKey('publicKey')),
+            routes: [...actual.routes].sort(byKey('name')),
+          };
+          let result: 'updated' | 'unchanged' = 'unchanged';
+          if (hash(current) !== desiredHash) {
+            await hub.apply(desired);
+            result = 'updated';
+            this.logger.log(
+              `WireGuard hub: ${desired.peers.length} peers, ${desired.routes.length} routes`,
+            );
+          }
+          await this.record(desiredHash, null, tx);
+          return result;
+        },
+        // Two calls to the hub (10 s timeout each) inside; the lock waits for a running pass.
+        { timeout: 30_000, maxWait: 30_000 },
+      );
     } catch (error) {
       await this.record(desiredHash, error);
       throw error;
     }
   }
 
-  private async record(desiredHash: string, error: unknown): Promise<void> {
+  private async record(
+    desiredHash: string,
+    error: unknown,
+    db: Pick<Tx, 'syncState'> = this.prisma,
+  ): Promise<void> {
     const now = new Date();
     const failed = error !== null;
     const message = failed
       ? (error instanceof Error ? error.message : JSON.stringify(error)).slice(0, 1000)
       : null;
-    await this.prisma.syncState.upsert({
+    await db.syncState.upsert({
       where: { target: WIREGUARD_SYNC_TARGET },
       create: {
         target: WIREGUARD_SYNC_TARGET,

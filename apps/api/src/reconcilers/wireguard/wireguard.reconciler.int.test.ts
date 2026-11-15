@@ -143,6 +143,33 @@ describe('WireGuard hub reconciler (M4-03)', () => {
     expect(has(hub.current, n)).toEqual({ peer: false, route: false });
   });
 
+  it('runs one pass at a time: a stale pass never writes after a newer one', async () => {
+    const n = await node('online');
+    // The first pass is slow to reach the hub; the node is decommissioned meanwhile and a second
+    // pass starts. The second waits for the first, then reads the decommission.
+    let release = () => {};
+    const slow = new Promise<void>((r) => (release = r));
+    const original = hub.state.bind(hub);
+    let calls = 0;
+    hub.state = async () => {
+      calls += 1;
+      if (calls === 1) await slow;
+      return original();
+    };
+    try {
+      const first = reconciler.reconcile();
+      await new Promise((r) => setTimeout(r, 200));
+      await prisma.node.updateMany({ where: { id: n.id }, data: { status: 'decommissioned' } });
+      const second = reconciler.reconcile();
+      await new Promise((r) => setTimeout(r, 200));
+      release();
+      await Promise.all([first, second]);
+    } finally {
+      hub.state = original;
+    }
+    expect(has(hub.current, n)).toEqual({ peer: false, route: false });
+  });
+
   it('records an unreachable hub as a sync error', async () => {
     hub.failing = true;
     try {
