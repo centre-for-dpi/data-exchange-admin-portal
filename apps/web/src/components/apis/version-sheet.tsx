@@ -22,6 +22,8 @@ export async function VersionSheet({
   const errors = version.lintReport.issues.filter((i) => i.severity === 'error');
   const upstream =
     version.upstream.type === 'node' ? version.upstream.servicePath : version.upstream.url;
+  const when = (value: string | null) =>
+    value ? format.dateTime(new Date(value), { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
   const yesNo = (value: boolean, tone: 'info' | 'warning') =>
     value ? <Badge tone={tone}>{t('version.detail.yes')}</Badge> : t('version.detail.no');
@@ -40,6 +42,20 @@ export async function VersionSheet({
           <dd className="font-mono">{version.basePath}</dd>
           <dt>{t('version.detail.upstream')}</dt>
           <dd className="font-mono">{upstream}</dd>
+          {version.node ? (
+            <>
+              <dt>{t('version.detail.node')}</dt>
+              <dd data-testid="version-node">
+                <span className="font-medium">{version.node.name}</span>{' '}
+                <StatusBadge status={version.node.status}>
+                  {t(`nodeStatus.${version.node.status}`)}
+                </StatusBadge>
+                <span className="block text-sm text-muted-foreground">
+                  {t('nodes.lastHeartbeat')}: {when(version.node.lastHeartbeatAt)}
+                </span>
+              </dd>
+            </>
+          ) : null}
           <dt>{t('version.detail.purposes')}</dt>
           <dd>
             {version.allowedPurposes.map((code) => purposeNames.get(code) ?? code).join(', ')}

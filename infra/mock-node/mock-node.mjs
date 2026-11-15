@@ -121,6 +121,8 @@ function serve(state) {
         res.end('{"error":"not the gateway"}');
         return;
       }
+      // Only the request id, so tests can see the call went through the tunnel; never content.
+      log(`forwarding ${req.method} request ${req.headers['x-request-id'] ?? '-'}`);
       const headers = { ...req.headers, host: BACKEND.host };
       const upstream = httpRequest(
         { host: BACKEND.hostname, port: BACKEND.port, path: req.url, method: req.method, headers },

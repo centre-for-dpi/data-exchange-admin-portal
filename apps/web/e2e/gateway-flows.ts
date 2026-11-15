@@ -201,9 +201,14 @@ export async function approveAsSteward(page: Page, subscriptionId: string) {
  * the path and in the body), carlos asks for both operations for eligibility_check, lucia
  * approves, and the subscription is active at the gateway.
  */
-export async function activeAffiliationSubscription(browser: Browser, page: Page, slug: string) {
+export async function activeAffiliationSubscription(
+  browser: Browser,
+  page: Page,
+  slug: string,
+  options: { node?: string } = {},
+) {
   const apiName = `Afiliación ${slug}`;
-  await publishNewApi(browser, { slug, name: apiName });
+  await publishNewApi(browser, { slug, name: apiName, node: options.node });
   await signIn(page, 'carlos.dev', '/my-apps');
   const appName = `Verificador ${slug}`;
   const { clientId, clientSecret } = await createGatewayApplication(page, appName);

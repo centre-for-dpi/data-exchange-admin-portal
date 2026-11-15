@@ -38,13 +38,19 @@ export async function registerApi(
 
 export async function newVersion(
   page: Page,
-  options: { version: string; file?: string; text?: string },
+  options: { version: string; file?: string; text?: string; node?: string },
 ) {
   await page.getByRole('link', { name: 'Nueva versión' }).click();
   await page.getByLabel(/^Versión/).fill(options.version);
   if (options.file)
     await page.getByLabel('Archivo OpenAPI (YAML o JSON)').setInputFiles(options.file);
   if (options.text) await page.getByLabel('O pega el documento OpenAPI').fill(options.text);
+  // A kit node of the entity (M4-04), by name; the environment's test service otherwise.
+  if (options.node) {
+    const select = page.getByLabel('Nodo del kit', { exact: true });
+    const value = await select.locator('option', { hasText: options.node }).getAttribute('value');
+    await select.selectOption(value ?? '');
+  }
   await page.getByLabel('Ruta del servicio en el nodo').fill('/salud');
   await page.getByLabel('Verificación de requisitos de un trámite').check();
   await page.getByLabel('Nombre del dato').fill('regimen');
@@ -54,13 +60,13 @@ export async function newVersion(
 /** pedro registers an API and a version from the salud mock and sends it to review. */
 export async function submitNewApi(
   page: Page,
-  options: { name?: string; slug?: string; classification?: string } = {},
+  options: { name?: string; slug?: string; classification?: string; node?: string } = {},
 ): Promise<{ name: string; slug: string; versionUrl: string }> {
   const slug = options.slug ?? `afiliacion-${Date.now().toString(36)}`;
   const name = options.name ?? 'Consulta de afiliación';
   await signInAsPublisher(page);
   await registerApi(page, slug, name, options.classification);
-  await newVersion(page, { version: '1.0', file: openapiFile });
+  await newVersion(page, { version: '1.0', file: openapiFile, node: options.node });
   await page.getByRole('button', { name: 'Enviar a revisión' }).click();
   await expect(page.getByTestId('version-status')).toHaveText('En revisión');
   return { name, slug, versionUrl: page.url() };
@@ -69,7 +75,7 @@ export async function submitNewApi(
 /** pedro submits a new API and ana approves it, in separate browser sessions. */
 export async function publishNewApi(
   browser: Browser,
-  options: { name?: string; slug?: string } = {},
+  options: { name?: string; slug?: string; node?: string } = {},
 ): Promise<{ name: string; slug: string }> {
   const publisher = await (await browser.newContext()).newPage();
   const submitted = await submitNewApi(publisher, options);

@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { classificationSchema, exposedFieldSchema, operationSchema } from './apis.js';
+import {
+  classificationSchema,
+  exposedFieldSchema,
+  operationSchema,
+  upstreamNodeSchema,
+} from './apis.js';
 import { pageOf } from './session.js';
 
 /** Catalogue search (SPEC.md §6). Only published (and deprecated) versions are listed. */
@@ -61,6 +66,8 @@ export const catalogVersionSchema = z.object({
   defaultRateLimit: z.number().int(),
   legalBasisText: z.string().nullable(),
   legalReferences: z.array(z.string()),
+  /** State of the kit node that serves the version, when it is served by one (M4-04). */
+  node: upstreamNodeSchema.pick({ status: true, lastHeartbeatAt: true }).nullable(),
 });
 export type CatalogVersion = z.infer<typeof catalogVersionSchema>;
 

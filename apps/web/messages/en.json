@@ -164,7 +164,10 @@
       "legalBasis": "Legal basis",
       "legalReferences": "Legal references",
       "legalReferencesHint": "One per line",
-      "submit": "Create version"
+      "submit": "Create version",
+      "node": "Kit node",
+      "nodeHint": "Where the service runs. The gateway calls it through the node's tunnel.",
+      "noNode": "None (the environment's test service)"
     },
     "detail": {
       "title": "{api} · version {version}",
@@ -188,7 +191,8 @@
       "path": "Path",
       "none": "None",
       "reviews": "Reviews",
-      "published": "The version is published."
+      "published": "The version is published.",
+      "node": "Kit node"
     },
     "lifecycle": {
       "deprecatedNotice": "Deprecated version: it is retired on {date}. Current consumers keep access until then; no new requests are accepted.",
@@ -265,7 +269,9 @@
       "documentation": "Interactive documentation",
       "documentationNote": "Read-only documentation. To call the API you need an application and an approved access request.",
       "deprecated": "Deprecated",
-      "operations": "Operations"
+      "operations": "Operations",
+      "node": "Provider node",
+      "nodeStatusHint": "Last heartbeat: {date}"
     },
     "signInRequired": "Sign in to see the catalogue of the network APIs."
   },

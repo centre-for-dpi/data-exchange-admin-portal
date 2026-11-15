@@ -1,5 +1,5 @@
 import { isIP } from 'node:net';
-import { isPublicHostname, type Upstream } from '@rid/contracts';
+import { isPublicHostname, nodeDnsName, type Upstream } from '@rid/contracts';
 import type { ApisixObject } from './apisix-admin.js';
 
 /** Deterministic ids (ARCHITECTURE.md §4): reconciling needs no extra state. */
@@ -58,6 +58,11 @@ export interface GatewaySettings {
    * (RID_NODE_CONTROL_TOKEN). Without both, the gateway has no control route.
    */
   nodeControl?: { portalUrl: string; token: string };
+  /**
+   * The hub's SNI router as APISIX reaches it (RID_GATEWAY_WG_HUB, `wg-hub:8443`): versions on
+   * enrolled kit nodes go there (M4-04, ADR-0023).
+   */
+  wgHub?: string;
 }
 
 /** Headers only the gateway may set: removed if a client sends them (ARCHITECTURE.md §4.1). */
@@ -168,7 +173,12 @@ export interface VersionForGateway {
   version: string;
   /** Set while the version is deprecated (ADR-0019): announced on every response. */
   deprecation?: { deprecatedAt: Date; sunsetAt: Date };
+  /** The kit node a `node` upstream with a nodeId names, as stored (M4-04). */
+  node?: { id: string; entityId: string; status: string } | null;
 }
+
+/** Node statuses the gateway calls: an offline node keeps its route and answers when it is back. */
+const SERVED_NODE_STATUSES = ['enrolled', 'online', 'offline'];
 
 /**
  * Deprecation (RFC 9745, `@` + Unix seconds) and Sunset (RFC 8594, HTTP-date) response headers.
@@ -248,7 +258,10 @@ function resolveUpstream(
     };
   }
   if (v.upstream.nodeId) {
-    throw new UnsupportedUpstreamError('Upstreams on enrolled kit nodes arrive with M4');
+    return {
+      upstream: nodeUpstream(v, v.upstream.nodeId, base, settings, pki),
+      pathPrefix: v.upstream.servicePath.replace(/\/$/, ''),
+    };
   }
   const node = settings.devNodes.get(v.entitySlug);
   if (!node) {
@@ -284,6 +297,44 @@ function resolveUpstream(
 }
 
 /**
+ * Upstream of a version served by an enrolled kit node (M4-04, ADR-0023): APISIX opens TLS to
+ * the hub's SNI router with the node's name as SNI, Host and verified name, presents the provider
+ * entity's client certificate (M3-03) and verifies the node's certificate against the network CA.
+ * The hub passes the connection to the node's tunnel address. A node of another entity, not
+ * enrolled or decommissioned, is never called: fail closed.
+ */
+function nodeUpstream(
+  v: VersionForGateway,
+  nodeId: string,
+  base: ApisixObject,
+  settings: GatewaySettings,
+  pki?: UpstreamPki,
+): ApisixObject {
+  const node = v.node;
+  if (!node || node.id !== nodeId || node.entityId !== v.entityId) {
+    throw new UnsupportedUpstreamError(`Node ${nodeId} is not a node of the provider entity`);
+  }
+  if (!SERVED_NODE_STATUSES.includes(node.status)) {
+    throw new UnsupportedUpstreamError(`Node ${nodeId} is ${node.status}`);
+  }
+  if (!settings.wgHub) {
+    throw new UnsupportedUpstreamError('The WireGuard hub is not configured (RID_GATEWAY_WG_HUB)');
+  }
+  const ca = pki ? certificatesOf(pki.networkCaPem) : [];
+  if (ca.length === 0) {
+    throw new UnsupportedUpstreamError('The network CA is not available to verify the node');
+  }
+  return {
+    ...base,
+    scheme: 'https',
+    pass_host: 'rewrite',
+    upstream_host: nodeDnsName(nodeId),
+    nodes: { [settings.wgHub]: 1 },
+    tls: { client_cert_id: gatewayClientSslId(v.entityId), verify: true, ca_certs: ca },
+  };
+}
+
+/**
  * Whether building this upstream needs the gateway's PKI (its client certificate and the network
  * CA): direct upstreams with mTLS and nodes served over TLS.
  */
@@ -296,7 +347,8 @@ export function needsGatewayPki(
   if (upstream.type === 'node' && !upstream.nodeId) {
     return settings.devNodes.get(entitySlug)?.tls ?? false;
   }
-  return false;
+  // Enrolled kit nodes are always called over mTLS (M4-04).
+  return upstream.type === 'node';
 }
 
 /** True when the upstream presents the gateway's client certificate (it needs that SSL object). */

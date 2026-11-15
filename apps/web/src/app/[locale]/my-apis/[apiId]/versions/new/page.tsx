@@ -1,4 +1,4 @@
-import { apiDetailSchema, purposeListSchema } from '@rid/contracts';
+import { apiDetailSchema, nodeListSchema, purposeListSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -38,11 +38,20 @@ export default async function NewVersionPage({ params }: PageProps) {
     description: localize(p.description, locale),
   }));
 
+  // Nodes of the kit still in the network (M4-04), newest first.
+  const nodes = (await apiGet(`/entities/${entity.entity.id}/nodes`, nodeListSchema)).items
+    .filter((n) => n.status !== 'decommissioned')
+    .map((n) => ({
+      value: n.id,
+      label: `${n.name} (${t(`nodeStatus.${n.status}`)})`,
+      description: '',
+    }));
+
   return (
     <Page>
       <PageHeader title={t('version.create.title', { api: api.name })} />
       <div className="card max-w-3xl p-6 md:p-8">
-        <CreateVersionForm apiId={api.id} purposes={purposes} />
+        <CreateVersionForm apiId={api.id} purposes={purposes} nodes={nodes} />
       </div>
     </Page>
   );

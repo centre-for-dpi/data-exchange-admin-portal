@@ -220,6 +220,71 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     ]);
   });
 
+  describe('a version on an enrolled kit node (M4-04, ADR-0023)', () => {
+    const NODE = '0190d0c4-0000-7000-8000-00000000a0de';
+    const pki = {
+      networkCaPem: ['-----BEGIN CERTIFICATE-----', 'AA', '-----END CERTIFICATE-----', ''].join(
+        '\n',
+      ),
+    };
+    const onNode = (node: VersionForGateway['node']) =>
+      version({ upstream: { type: 'node', nodeId: NODE, servicePath: '/salud/' }, node });
+    const hubSettings = { ...settings, wgHub: 'wg-hub:8443' };
+
+    it('goes to the hub with the node name as SNI, mTLS and the network CA', () => {
+      const { upstream, route } = desiredGateway(
+        onNode({ id: NODE, entityId: PROVIDER, status: 'online' }),
+        hubSettings,
+        pki,
+      );
+      expect(upstream).toMatchObject({
+        scheme: 'https',
+        nodes: { 'wg-hub:8443': 1 },
+        pass_host: 'rewrite',
+        upstream_host: `rid-node-${NODE}`,
+        tls: {
+          verify: true,
+          client_cert_id: gatewayClientSslId(PROVIDER),
+          ca_certs: [pki.networkCaPem],
+        },
+      });
+      // The service path on the node, without its trailing slash.
+      expect((route.plugins as Plugins)['proxy-rewrite']).toMatchObject({
+        regex_uri: ['^/salud/afiliacion/v1/(.*)$', '/salud/$1'],
+      });
+      expect(needsGatewayPki(onNode(null).upstream, 'salud', hubSettings)).toBe(true);
+    });
+
+    it('keeps an offline node: it answers again when it reports back', () => {
+      expect(() =>
+        desiredGateway(
+          onNode({ id: NODE, entityId: PROVIDER, status: 'offline' }),
+          hubSettings,
+          pki,
+        ),
+      ).not.toThrow();
+    });
+
+    it('never calls a node of another entity, one not enrolled, or a decommissioned one', () => {
+      for (const node of [
+        null,
+        { id: NODE, entityId: '0190d0c4-0000-7000-8000-00000000e002', status: 'online' },
+        { id: NODE, entityId: PROVIDER, status: 'enrollment_issued' },
+        { id: NODE, entityId: PROVIDER, status: 'decommissioned' },
+      ]) {
+        expect(() => desiredGateway(onNode(node), hubSettings, pki), JSON.stringify(node)).toThrow(
+          UnsupportedUpstreamError,
+        );
+      }
+    });
+
+    it('needs the hub and the network CA', () => {
+      const node = { id: NODE, entityId: PROVIDER, status: 'online' };
+      expect(() => desiredGateway(onNode(node), settings, pki)).toThrow(UnsupportedUpstreamError);
+      expect(() => desiredGateway(onNode(node), hubSettings)).toThrow(UnsupportedUpstreamError);
+    });
+  });
+
   it('presents the gateway client certificate to a direct upstream that requires mTLS (M3-03)', () => {
     const { upstream } = desiredGateway(
       version({

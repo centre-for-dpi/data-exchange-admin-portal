@@ -4,6 +4,7 @@ import type {
   ApiDetail,
   ApiSummary,
   ApiVersionDetail,
+  UpstreamNode,
   ApiVersionStatus,
   CreateApiInput,
   CreateApiVersionInput,
@@ -22,6 +23,7 @@ import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
+import { nodeIdOf, upstreamNodes } from '../nodes/node-status.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
 import { lintOpenApi, listOperations } from './lint/openapi-lint.js';
 
@@ -172,7 +174,24 @@ export class ApisService {
     return version;
   }
 
-  toVersionDetail(v: VersionRow): ApiVersionDetail {
+  /** The detail of a version, with the state of its kit node (M4-04). */
+  async detailOf(v: VersionRow & { api?: { entityId: string } }): Promise<ApiVersionDetail> {
+    const nodeId = nodeIdOf(v.upstream);
+    const entityId =
+      v.api?.entityId ??
+      (
+        await this.prisma.api.findUniqueOrThrow({
+          where: { id: v.apiId },
+          select: { entityId: true },
+        })
+      ).entityId;
+    const nodes = nodeId
+      ? await upstreamNodes(this.prisma, [{ upstream: v.upstream, entityId }])
+      : null;
+    return this.toVersionDetail(v, (nodeId && nodes?.get(nodeId)) || null);
+  }
+
+  toVersionDetail(v: VersionRow, node: UpstreamNode | null = null): ApiVersionDetail {
     return {
       id: v.id,
       apiId: v.apiId,
@@ -181,6 +200,7 @@ export class ApisService {
       basePath: v.basePath,
       updatedAt: v.updatedAt.toISOString(),
       upstream: upstreamSchema.parse(v.upstream),
+      node,
       exposedFields: v.exposedFields as ApiVersionDetail['exposedFields'],
       allowedPurposes: v.allowedPurposes.map((p) => p.purposeCode).sort(),
       legalBasisText: v.legalBasisText,
@@ -209,7 +229,7 @@ export class ApisService {
   }
 
   async getVersion(entityId: string, apiId: string, versionId: string): Promise<ApiVersionDetail> {
-    return this.toVersionDetail(await this.findVersion(entityId, apiId, versionId));
+    return this.detailOf(await this.findVersion(entityId, apiId, versionId));
   }
 
   /** The OpenAPI document of a version as uploaded (stored as JSON). */
@@ -253,6 +273,19 @@ export class ApisService {
       throw new ValidationError(
         unknown.map((code) => ({ path: 'allowedPurposes', message: `Unknown purpose "${code}"` })),
       );
+    }
+    // A version on a kit node names a node of the same entity that is still in the network
+    // (M4-04); the reconciler checks it again on every pass and fails closed.
+    if (data.upstream.type === 'node' && data.upstream.nodeId) {
+      const node = await scopedRepo(this.prisma.node, entityId).findFirst({
+        where: { id: data.upstream.nodeId, status: { not: 'decommissioned' } },
+        select: { id: true },
+      });
+      if (!node) {
+        throw new ValidationError([
+          { path: 'upstream.nodeId', message: 'Not a node of this entity in the network' },
+        ]);
+      }
     }
 
     const [major = 0, minor = 0] = data.version.split('.').map(Number);
@@ -304,7 +337,7 @@ export class ApisService {
         });
         return created;
       });
-      return this.toVersionDetail(version);
+      return this.detailOf(version);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictError(`Version ${data.version} already exists for this API`);
@@ -355,7 +388,7 @@ export class ApisService {
       });
       return after;
     });
-    return this.toVersionDetail(updated);
+    return this.detailOf(updated);
   }
 
   /**
@@ -443,7 +476,7 @@ export class ApisService {
         }
         return after;
       });
-      return this.toVersionDetail(updated);
+      return this.detailOf(updated);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictError(`Version ${version} already exists for this API`);
@@ -504,7 +537,7 @@ export class ApisService {
       });
       return after;
     });
-    return this.toVersionDetail(updated);
+    return this.detailOf(updated);
   }
 
   /**
@@ -557,7 +590,7 @@ export class ApisService {
       });
       return after;
     });
-    return this.toVersionDetail(updated);
+    return this.detailOf(updated);
   }
 
   /** Api.status is derived from its versions (SPEC.md §3). */
@@ -623,6 +656,6 @@ export class ApisService {
       });
       return after;
     });
-    return this.toVersionDetail(updated);
+    return this.detailOf(updated);
   }
 }

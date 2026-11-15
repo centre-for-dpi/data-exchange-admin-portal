@@ -79,7 +79,7 @@ Los nombres son los del código. Todos los registros tienen `id` (UUIDv7), `crea
 ### 3.1 Upstream (dónde vive el servicio)
 Uno de:
 
-- `node`: servicio expuesto por un nodo del kit (`nodeId`, `servicePath`). Es el camino de las APIs instantáneas.
+- `node`: servicio expuesto por un nodo del kit (`nodeId`, `servicePath`). Es el camino de las APIs instantáneas. El nodo debe ser de la entidad que publica; el gateway lo llama por su túnel y deja de hacerlo si se da de baja. El detalle de la API, para el proveedor, el revisor y el consumidor, muestra el estado del nodo.
 - `xroad`: servicio consumido vía X-Road (`securityServerUrl`, `serviceId` con instancia/clase/miembro/subsistema/servicio). El gateway actúa como miembro cliente.
 - `direct`: URL HTTPS de una API existente de la entidad (`url`, `mtls: bool`).
 

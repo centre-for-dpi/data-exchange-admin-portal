@@ -89,6 +89,45 @@ describe('API registration (M1-03)', () => {
     return apiDetailSchema.parse(res.json());
   };
 
+  describe('versions on kit nodes (M4-04)', () => {
+    const nodeOf = async (entityId: string, status: 'enrolled' | 'decommissioned') =>
+      prisma.node.create({
+        data: { entityId, name: `nodo-${randomUUID().slice(0, 8)}`, status, createdBy: 'test' },
+      });
+    const register = async (apiId: string, nodeId: string) =>
+      request('POST', `/api/v1/entities/${salud}/apis/${apiId}/versions`, 'pedro.publicador', {
+        ...versionBody(),
+        upstream: { type: 'node', nodeId, servicePath: '/salud' },
+      });
+
+    it('serves a version on a node of the entity, and shows the node', async () => {
+      const node = await nodeOf(salud, 'enrolled');
+      const api = await createApi();
+      const res = await register(api.id, node.id);
+      expect(res.statusCode, res.body).toBe(201);
+      expect(apiVersionDetailSchema.parse(res.json()).node).toMatchObject({
+        id: node.id,
+        name: node.name,
+        status: 'enrolled',
+      });
+    });
+
+    it('refuses a node of another entity, a decommissioned one or one that does not exist', async () => {
+      const api = await createApi();
+      for (const nodeId of [
+        (await nodeOf(programas, 'enrolled')).id,
+        (await nodeOf(salud, 'decommissioned')).id,
+        randomUUID(),
+      ]) {
+        const res = await register(api.id, nodeId);
+        expect(res.statusCode, res.body).toBe(400);
+        expect(res.json<{ errors: Array<{ path: string }> }>().errors[0]?.path).toBe(
+          'upstream.nodeId',
+        );
+      }
+    });
+  });
+
   describe('happy path', () => {
     it('registers an API, uploads a version, lints it and submits it for review', async () => {
       const api = await createApi();

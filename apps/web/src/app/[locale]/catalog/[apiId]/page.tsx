@@ -1,13 +1,13 @@
 import { getCountryConfig } from '@rid/config';
 import { catalogDetailSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
-import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import Markdown from 'react-markdown';
 import { z } from 'zod';
 import { dataSubjectLabel } from '../../../../components/apis/data-subject';
 import { ApiDocs } from '../../../../components/catalog/api-docs';
-import { Badge, classificationTone } from '../../../../components/ui/badge';
+import { Badge, classificationTone, StatusBadge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
 import { Card, Page, PageHeader, Section } from '../../../../components/ui/page';
 import { Link } from '../../../../i18n/navigation';
@@ -46,6 +46,7 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
   const { locale, apiId } = await params;
   setRequestLocale(locale);
   const t = await getTranslations();
+  const format = await getFormatter();
   const { anonymous, detail } = await load(apiId);
   const requested = (await searchParams).version;
   const version = detail.versions.find((v) => v.id === requested) ?? detail.versions[0];
@@ -151,6 +152,26 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
                 <dd className="font-mono break-all">{version.gatewayUrl}</dd>
                 <dt>{t('catalog.detail.purposes')}</dt>
                 <dd>{version.allowedPurposes.map((p) => localize(p.name, locale)).join(', ')}</dd>
+                {version.node ? (
+                  <>
+                    <dt>{t('catalog.detail.node')}</dt>
+                    <dd data-testid="catalog-node">
+                      <StatusBadge status={version.node.status}>
+                        {t(`nodeStatus.${version.node.status}`)}
+                      </StatusBadge>
+                      {version.node.lastHeartbeatAt ? (
+                        <span className="block text-sm text-muted-foreground">
+                          {t('catalog.detail.nodeStatusHint', {
+                            date: format.dateTime(new Date(version.node.lastHeartbeatAt), {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            }),
+                          })}
+                        </span>
+                      ) : null}
+                    </dd>
+                  </>
+                ) : null}
                 {version.legalBasisText ? (
                   <>
                     <dt>{t('catalog.detail.legalBasis')}</dt>

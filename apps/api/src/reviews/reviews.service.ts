@@ -97,7 +97,7 @@ export class ReviewsService {
         classification: api.classification,
         ownerContact: api.ownerContact,
       },
-      version: this.apis.toVersionDetail(v),
+      version: await this.apis.detailOf(v),
       requiresRegulator: requiresRegulator(api.classification, v.exposedFields),
     };
   }

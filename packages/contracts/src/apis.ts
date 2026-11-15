@@ -70,7 +70,10 @@ export const upstreamSchema = z.discriminatedUnion('type', [
   }),
   z.strictObject({
     type: z.literal('node'),
-    /** Node of the instant-APIs kit (M4). Until nodes exist, the development mock stands in. */
+    /**
+     * Enrolled node of the instant-APIs kit (M4-04). Without it, a development stand-in serves
+     * the version (RID_DEV_NODES).
+     */
     nodeId: z.uuid().optional(),
     /** Path of the service on the node, e.g. /salud */
     servicePath: z.string().regex(/^\/[A-Za-z0-9._~\-/]*$/, 'must be an absolute path'),
@@ -172,9 +175,20 @@ export const versionReviewSchema = z.object({
 });
 export type VersionReview = z.infer<typeof versionReviewSchema>;
 
+/** State of the kit node a version is served by (SPEC.md §4.6 step 5, M4-04). */
+export const upstreamNodeSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  status: z.enum(['enrollment_issued', 'enrolled', 'online', 'offline', 'decommissioned']),
+  lastHeartbeatAt: z.iso.datetime().nullable(),
+});
+export type UpstreamNode = z.infer<typeof upstreamNodeSchema>;
+
 export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
   apiId: z.uuid(),
   upstream: upstreamSchema,
+  /** The kit node of a `node` upstream with a nodeId; null otherwise. */
+  node: upstreamNodeSchema.nullable(),
   exposedFields: z.array(exposedFieldSchema),
   allowedPurposes: z.array(z.string()),
   legalBasisText: z.string().nullable(),

@@ -21,6 +21,7 @@ import { assertTransition } from '../domain/node/state-machine.js';
 import type { NodeEnrollmentToken, Node as NodeRow } from '../generated/prisma/client.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { OutboxService } from '../outbox/outbox.service.js';
+import { queueGatewaySyncForNode } from './node-versions.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconciler.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
@@ -298,6 +299,8 @@ export class NodesService {
         aggregate: `node:${nodeId}`,
         payload: { reason: 'decommissioned' },
       });
+      // Its versions lose their routes (M4-04): the gateway never calls a decommissioned node.
+      await queueGatewaySyncForNode(tx, this.outbox, nodeId, 'node_decommissioned');
     });
     return this.get(entityId, nodeId);
   }

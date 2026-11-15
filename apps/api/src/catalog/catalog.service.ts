@@ -4,6 +4,7 @@ import { catalogQuerySchema } from '@rid/contracts';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { NotFoundError } from '../common/errors.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { nodeIdOf, upstreamNodes } from '../nodes/node-status.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Version states visible in the catalogue. */
@@ -125,6 +126,11 @@ export class CatalogService {
       },
     });
     if (!api) throw new NotFoundError('API');
+    // Consumers see whether the kit node behind a version is up (SPEC.md §6, M4-04).
+    const nodes = await upstreamNodes(
+      this.prisma,
+      api.versions.map((v) => ({ upstream: v.upstream, entityId: api.entityId })),
+    );
     return {
       api: {
         id: api.id,
@@ -164,6 +170,10 @@ export class CatalogService {
         defaultRateLimit: v.defaultRateLimit,
         legalBasisText: v.legalBasisText,
         legalReferences: v.legalReferences,
+        node: (() => {
+          const node = nodes.get(nodeIdOf(v.upstream) ?? '');
+          return node ? { status: node.status, lastHeartbeatAt: node.lastHeartbeatAt } : null;
+        })(),
       })),
     };
   }

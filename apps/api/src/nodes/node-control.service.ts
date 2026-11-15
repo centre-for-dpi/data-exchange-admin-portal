@@ -36,6 +36,7 @@ import type { Node as NodeRow } from '../generated/prisma/client.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { OutboxService } from '../outbox/outbox.service.js';
+import { queueGatewaySyncForNode } from './node-versions.js';
 import { QueueService } from '../queue/queue.service.js';
 import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconciler.js';
 import { hubAddress, nextNodeAddress, tunnelSubnet } from './tunnel.js';
@@ -250,6 +251,8 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
           aggregate: `node:${node.id}`,
           payload: { reason: 'enrolled' },
         });
+        // Versions already registered on this node become callable (M4-04).
+        await queueGatewaySyncForNode(tx, this.outbox, node.id, 'node_enrolled');
         return next;
       });
     } catch (error) {

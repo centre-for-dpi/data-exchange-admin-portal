@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../../..');
@@ -35,8 +35,10 @@ export function stopMockNode(): void {
   compose('stop', 'mock-node');
 }
 
-export const mockNodeLogs = (): string =>
-  execFileSync('docker', ['logs', '--tail', '50', 'rid-mock-node-1'], {
+/** The node logs to stderr, which docker logs passes on as its own stderr. */
+export const mockNodeLogs = (): string => {
+  const res = spawnSync('docker', ['logs', '--tail', '200', 'rid-mock-node-1'], {
     encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe'],
   });
+  return `${res.stdout}${res.stderr}`;
+};

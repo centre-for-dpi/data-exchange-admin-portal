@@ -293,6 +293,14 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       }
 
       const upstreamConfig = upstreamSchema.parse(version.upstream);
+      // The kit node of the version, as stored now (M4-04): its entity and state decide.
+      const node =
+        upstreamConfig.type === 'node' && upstreamConfig.nodeId
+          ? await this.prisma.node.findUnique({
+              where: { id: upstreamConfig.nodeId },
+              select: { id: true, entityId: true, status: true },
+            })
+          : undefined;
       const operations = listOperations(version.openapiSpec as Record<string, unknown>);
       const addresses = await this.assertPublicUpstream(upstreamConfig);
       // Only upstreams with mTLS depend on step-ca: the others keep working if the CA is down.
@@ -325,6 +333,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
               : [],
           ),
           entitySlug: version.api.entity.slug,
+          ...(node !== undefined ? { node } : {}),
           apiName: version.api.name,
           version: version.version,
           ...(version.status === 'deprecated' && version.deprecatedAt && version.sunsetAt

@@ -2,6 +2,11 @@
 
 import '@scalar/api-reference-react/style.css';
 import dynamic from 'next/dynamic';
+import { config as zodConfig } from 'zod';
+
+// Scalar validates its configuration with zod, whose JIT probes `Function("")`. The CSP forbids
+// eval (M3-09), so the probe only produces a violation report: zod runs the same without it.
+zodConfig({ jitless: true });
 
 // Scalar renders in the browser only (it uses window); the document comes from our server.
 const ApiReferenceReact = dynamic(

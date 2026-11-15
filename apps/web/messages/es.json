@@ -164,7 +164,10 @@
       "legalBasis": "Base legal",
       "legalReferences": "Referencias normativas",
       "legalReferencesHint": "Una por línea",
-      "submit": "Crear versión"
+      "submit": "Crear versión",
+      "node": "Nodo del kit",
+      "nodeHint": "Donde corre el servicio. El gateway lo llama por el túnel del nodo.",
+      "noNode": "Ninguno (servicio de prueba del entorno)"
     },
     "detail": {
       "title": "{api} · versión {version}",
@@ -188,7 +191,8 @@
       "path": "Ruta",
       "none": "Ninguno",
       "reviews": "Revisiones",
-      "published": "La versión está publicada."
+      "published": "La versión está publicada.",
+      "node": "Nodo del kit"
     },
     "lifecycle": {
       "deprecatedNotice": "Versión obsoleta: se retira el {date}. Los consumidores actuales siguen con acceso hasta entonces; no se aceptan solicitudes nuevas.",
@@ -265,7 +269,9 @@
       "documentation": "Documentación interactiva",
       "documentationNote": "Documentación de solo lectura. Para llamar a la API necesitas una aplicación y una solicitud de acceso aprobada.",
       "deprecated": "Obsoleta",
-      "operations": "Operaciones"
+      "operations": "Operaciones",
+      "node": "Nodo del proveedor",
+      "nodeStatusHint": "Último heartbeat: {date}"
     },
     "signInRequired": "Inicia sesión para ver el catálogo de APIs de la red."
   },

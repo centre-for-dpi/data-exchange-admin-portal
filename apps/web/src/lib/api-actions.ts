@@ -85,7 +85,11 @@ export async function createVersionAction(
       upstream:
         upstreamType === 'direct'
           ? { type: 'direct', url: text(formData, 'url'), mtls: formData.get('mtls') === 'on' }
-          : { type: 'node', servicePath: text(formData, 'servicePath') },
+          : {
+              type: 'node',
+              servicePath: text(formData, 'servicePath'),
+              ...(text(formData, 'nodeId') ? { nodeId: text(formData, 'nodeId') } : {}),
+            },
       exposedFields,
       allowedPurposes: formData.getAll('allowedPurposes').map(String),
       ...(text(formData, 'legalBasisText')

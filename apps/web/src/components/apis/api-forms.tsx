@@ -190,7 +190,16 @@ function OpenapiInputs({ state }: { state: FormState }) {
   );
 }
 
-export function CreateVersionForm({ apiId, purposes }: { apiId: string; purposes: Option[] }) {
+export function CreateVersionForm({
+  apiId,
+  purposes,
+  nodes = [],
+}: {
+  apiId: string;
+  purposes: Option[];
+  /** Kit nodes of the entity in the network (M4-04). */
+  nodes?: Option[];
+}) {
   const t = useTranslations('version.create');
   const [state, action, pending] = useActionState(
     createVersionAction.bind(null, apiId),
@@ -230,11 +239,31 @@ export function CreateVersionForm({ apiId, purposes }: { apiId: string; purposes
         </div>
       </fieldset>
       {upstreamType === 'node' ? (
-        <Field name="upstream" label={t('servicePath')} required state={state}>
-          {(p) => (
-            <input {...p} name="servicePath" type="text" defaultValue="/" className={inputClass} />
-          )}
-        </Field>
+        <>
+          <Field name="nodeId" label={t('node')} hint={t('nodeHint')} state={state}>
+            {(p) => (
+              <select {...p} className={inputClass} defaultValue="">
+                <option value="">{t('noNode')}</option>
+                {nodes.map((node) => (
+                  <option key={node.value} value={node.value}>
+                    {node.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field name="upstream" label={t('servicePath')} required state={state}>
+            {(p) => (
+              <input
+                {...p}
+                name="servicePath"
+                type="text"
+                defaultValue="/"
+                className={inputClass}
+              />
+            )}
+          </Field>
+        </>
       ) : (
         <>
           <Field name="upstream" label={t('url')} required state={state}>

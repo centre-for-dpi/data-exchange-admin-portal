@@ -59,6 +59,7 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
             return getCountryConfig().features.mtls.required;
           },
         },
+        wgHub: process.env.RID_GATEWAY_WG_HUB ?? 'wg-hub:8443',
         nodeControl:
           process.env.RID_GATEWAY_PORTAL_API_URL && process.env.RID_NODE_CONTROL_TOKEN
             ? {

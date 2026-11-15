@@ -608,7 +608,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - reconciliador contra PostgreSQL;
       - e2e: elena emite el token, el nodo simulado se enrola, se une al hub y queda "En línea".
     - Despliegue: el piloto publica UDP 51820 del hub (`docker-compose.deploy.yml`), y el firewall del host debe dejarlo pasar. Variables nuevas: `RID_WG_HUB_AGENT_URL` y `RID_WG_HUB_AGENT_TOKEN`.
-- [ ] **M4-04 — Upstream `node` real**: la ruta apunta a la IP del túnel del nodo; el detalle de API muestra el estado del nodo.
+- [x] **M4-04 — Upstream `node` real**: la ruta apunta a la IP del túnel del nodo; el detalle de API muestra el estado del nodo.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1`.
+    - Interpretación (ADR-0023): la ruta apunta al enrutador SNI del hub (`wg-hub:8443`) con el nombre del nodo (`rid-node-<id>`) como SNI, `Host` y nombre verificado. El hub resuelve la dirección del túnel del nodo y su puerto de servicio. mTLS de punta a punta con el certificado del gateway para la entidad (M3-03) y la CA de la red.
+    - Falla cerrado: un nodo de otra entidad, sin enrolar o dado de baja nunca se llama; el reconciliador borra la ruta. Un nodo `offline` conserva la suya. Enrolar o dar de baja un nodo reconcilia sus versiones. Al registrar, el `nodeId` debe ser de un nodo de la entidad que no esté dado de baja.
+    - El detalle de la versión (proveedor y revisor) y el del catálogo (consumidor) muestran el nodo, su estado y su último heartbeat. El formulario de versión ofrece los nodos de la entidad. Sin nodo, sigue el servicio de prueba del entorno (`RID_DEV_NODES`), como hasta M3.
+    - e2e (`kit-node.spec.ts`): el nodo simulado se enrola, pedro publica una API en él, carlos la consume con mTLS y token ligado, y la llamada pasa por el túnel (el nodo la registra). El catálogo muestra el nodo en línea. Al darlo de baja, la ruta desaparece.
+    - Despliegue: `RID_GATEWAY_WG_HUB` (por defecto `wg-hub:8443`).
 - [ ] **M4-05 — Upstream `xroad`**: según S-5.
 - [ ] **M4-06 — Validaciones al enviar a revisión**: healthcheck a través del gateway y prueba de contrato con Schemathesis en sandbox; resultados adjuntos a la revisión.
 - [ ] **M4-07 — Lista de preparación del bootcamp**: por entidad, checklist de prerrequisitos (servidor, usuario de solo lectura, salida 443, responsables designados, caso de uso) con estado visible para el operador.
