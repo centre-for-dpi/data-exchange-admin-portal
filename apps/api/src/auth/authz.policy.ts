@@ -82,6 +82,19 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['data_steward'],
     platformRoles: [],
   },
+  /**
+   * See the entity's nodes of the kit and their enrollment tokens (never a token itself). The
+   * reviewer sees them too: API versions on a node show its state (SPEC.md §4.6).
+   */
+  'node.read': {
+    entityRoles: ENTITY_ROLES,
+    platformRoles: ['platform_admin', 'platform_reviewer', 'regulator'],
+  },
+  /** Issue and revoke enrollment tokens, decommission nodes (SPEC.md §4.6 step 1). */
+  'node.write': {
+    entityRoles: ['entity_admin'],
+    platformRoles: ['platform_admin'],
+  },
   /** Timeline of the entity's own objects (its APIs, subscriptions it asked for or received). */
   'audit.entity.read': {
     entityRoles: ENTITY_ROLES,
@@ -122,6 +135,8 @@ export const PLATFORM_PERMISSIONS = {
   'document.purge': ['platform_admin'],
   /** Register of attached documents (metadata only), to find the one a legal order names. */
   'document.list': ['platform_admin'],
+  /** Every node of the network with its state, version and last heartbeat (SPEC.md §6). */
+  'node.list': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;

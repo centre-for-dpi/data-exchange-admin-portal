@@ -573,7 +573,14 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - El consumidor real viaja en las `X-RID-*`, que X-Road pasa como cabeceras definidas por el usuario. OPA pone además `X-Road-UserId` (hash del funcionario) y `X-Road-Issue` (`rid:subscription:<id>`).
     - Riesgo nuevo, el diputado confundido: todas las rutas `xroad` salen con la identidad del operador. El miembro del `serviceId` debe ser el miembro X-Road de la entidad que publica, y ese miembro lo registra el operador.
     - Queda por confirmar con un Security Server real (piloto) que las `X-RID-*` llegan intactas al sistema del proveedor.
-- [ ] **M4-01 — Tokens de enrolamiento**: emisión de un solo uso (72 h) por entidad; listado y anulación.
+- [x] **M4-01 — Tokens de enrolamiento**: emisión de un solo uso (72 h) por entidad; listado y anulación.
+  - _Notas de implementación:_
+    - Interpretación: el token es **de un nodo**. Emitirlo registra el nodo (`enrollment_issued`, nombre único en la entidad), y el token enrola esa sola instalación del kit. Así el nodo ya tiene nombre e ID antes del bootcamp, y el estado `enrollment_issued` de `SPEC.md §4.6` tiene un dueño.
+    - El token (`rid-enroll-` + 256 bits) se muestra una vez (`cache-control: no-store`). Se guarda solo su SHA-256, que no sale del API ni va a la bitácora. Vale `RID_NODE_ENROLLMENT_TTL_HOURS` (72 por defecto); vencido, se lista como `expired`.
+    - Mientras el nodo no se enrola, se puede anular el token o emitir otro, que anula el vigente (motivo `superseded` en la bitácora).
+    - Permisos: emiten y anulan `entity_admin` y `platform_admin` (`node.write`). Ven los nodos todos los miembros, el revisor y el regulador (`node.read`). La consola del operador lista todos los nodos de la red (`node.list`).
+    - Auditoría: `node.created`, `node.enrollment_token_issued`, `node.enrollment_token_revoked`.
+    - Web: "Mi entidad → Nodos del kit" (`/my-entity/nodes`) y "Consola del operador → Nodos de la red" (`/operator/nodes`).
 - [ ] **M4-02 — Enrolamiento y heartbeat**: endpoints de `ARCHITECTURE.md §10`; estados `enrollment_issued → enrolled → online/offline`; alerta a los 5 min sin heartbeat.
 - [ ] **M4-03 — Hub WireGuard**: contenedor `wg-hub`, alta de peers por reconciliador, nodo simulado conectándose en Compose.
 - [ ] **M4-04 — Upstream `node` real**: la ruta apunta a la IP del túnel del nodo; el detalle de API muestra el estado del nodo.

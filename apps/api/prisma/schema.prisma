@@ -136,6 +136,7 @@ model Entity {
   reviews      EntityReview[]
   documents    Document[]       @relation("EntityDocuments")
   invitations  Invitation[]
+  nodes        Node[]
 
   /// Slug and tax id are claimed only once a request is submitted: drafts (`requested`) the
   /// operator never sees cannot squat them, and a rejection frees them. Among drafts the first to
@@ -1042,4 +1043,81 @@ model GatewayCertificate {
 
   @@index([purpose, notAfter])
   @@map("gateway_certificate")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Nodes of the instant-APIs kit (SPEC.md §3, §4.6; ARCHITECTURE.md §10; M4)
+// ---------------------------------------------------------------------------------------------
+
+/// SPEC.md §4.6
+enum NodeStatus {
+  enrollment_issued
+  enrolled
+  online
+  offline
+  decommissioned
+
+  @@map("node_status")
+}
+
+/// A node of the kit installed at a provider entity. Created when its first enrollment token is
+/// issued (M4-01); the kit fills in its keys and certificate when it enrolls (M4-02).
+model Node {
+  id                     String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  entityId               String     @map("entity_id") @db.Uuid
+  entity                 Entity     @relation(fields: [entityId], references: [id])
+  /// Unique per entity, chosen by whoever issues the token ("servidor-bogota").
+  name                   String
+  status                 NodeStatus @default(enrollment_issued)
+  /// Address of the node inside the WireGuard network of the hub (M4-03).
+  tunnelAddress          String?    @unique @map("tunnel_address")
+  wireguardPublicKey     String?    @unique @map("wireguard_public_key")
+  /// Certificate the network CA issued at enrollment (PEM chain, public).
+  certificatePem         String?    @map("certificate_pem")
+  certificateSerial      String?    @map("certificate_serial")
+  /// RFC 8705 x5t#S256 of the certificate: how the node is recognized on the mTLS channel.
+  certificateFingerprint String?    @unique @map("certificate_fingerprint")
+  certificateNotAfter    DateTime?  @map("certificate_not_after") @db.Timestamptz(3)
+  kitVersion             String?    @map("kit_version")
+  lastHeartbeatAt        DateTime?  @map("last_heartbeat_at") @db.Timestamptz(3)
+  /// What the node declares it exposes, from its last heartbeat (M4-02).
+  services               Json       @default("[]")
+  enrolledAt             DateTime?  @map("enrolled_at") @db.Timestamptz(3)
+  decommissionedAt       DateTime?  @map("decommissioned_at") @db.Timestamptz(3)
+  createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy              String     @map("created_by")
+
+  enrollmentTokens NodeEnrollmentToken[]
+
+  @@unique([entityId, name])
+  @@index([status])
+  @@map("node")
+}
+
+enum EnrollmentTokenStatus {
+  active
+  used
+  revoked
+
+  @@map("enrollment_token_status")
+}
+
+/// Single-use enrollment token of a node (SPEC.md §4.6 step 1). Only its SHA-256 is kept: the
+/// token is shown once, to whoever issued it. Past expiresAt an active token no longer works.
+model NodeEnrollmentToken {
+  id        String                @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  nodeId    String                @map("node_id") @db.Uuid
+  node      Node                  @relation(fields: [nodeId], references: [id])
+  tokenHash String                @unique @map("token_hash")
+  status    EnrollmentTokenStatus @default(active)
+  expiresAt DateTime              @map("expires_at") @db.Timestamptz(3)
+  issuedBy  String                @map("issued_by") @db.Uuid
+  usedAt    DateTime?             @map("used_at") @db.Timestamptz(3)
+  revokedAt DateTime?             @map("revoked_at") @db.Timestamptz(3)
+  revokedBy String?               @map("revoked_by") @db.Uuid
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([nodeId, createdAt])
+  @@map("node_enrollment_token")
 }

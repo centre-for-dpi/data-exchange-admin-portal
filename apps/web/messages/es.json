@@ -651,6 +651,11 @@
       },
       "gateway_certificate": {
         "issued": "Certificado del gateway emitido"
+      },
+      "node": {
+        "created": "Nodo registrado",
+        "enrollment_token_issued": "Token de enrolamiento emitido",
+        "enrollment_token_revoked": "Token de enrolamiento anulado"
       }
     },
     "filters": {
@@ -1032,5 +1037,53 @@
   "session": {
     "mfaRequired": "Tus roles exigen un segundo factor. Vuelve a entrar con el código de un solo uso de tu app autenticadora.",
     "mfaAction": "Verificar con el código"
+  },
+  "nodeStatus": {
+    "enrollment_issued": "Esperando enrolamiento",
+    "enrolled": "Enrolado",
+    "online": "En línea",
+    "offline": "Sin conexión",
+    "decommissioned": "Dado de baja"
+  },
+  "nodes": {
+    "title": "Nodos del kit",
+    "lead": "Servidores de la entidad donde se instala el kit de APIs instantáneas. Cada nodo se enrola con un token de un solo uso.",
+    "listTitle": "Nodos",
+    "empty": "La entidad todavía no tiene nodos.",
+    "name": "Nodo",
+    "status": "Estado",
+    "enrollment": "Token de enrolamiento",
+    "lastHeartbeat": "Último heartbeat",
+    "kitVersion": "Versión del kit",
+    "tunnelAddress": "IP del túnel",
+    "actions": "Acciones",
+    "expires": "Vence: {date}",
+    "reissue": "Emitir token nuevo",
+    "reissueFor": "Emitir token nuevo para {name}",
+    "revoke": "Anular token",
+    "revokeFor": "Anular token de {name}",
+    "tokenStatus": {
+      "active": "Vigente",
+      "used": "Usado",
+      "revoked": "Anulado",
+      "expired": "Vencido"
+    },
+    "token": {
+      "title": "Token de enrolamiento de {name}",
+      "label": "token de enrolamiento",
+      "warning": "Copia el token ahora: no se vuelve a mostrar. Sirve una sola vez para instalar el kit y vence el {date}."
+    },
+    "create": {
+      "title": "Registrar un nodo",
+      "lead": "Registra el servidor y entrega el token a quien instala el kit (por ejemplo, en el bootcamp). El token vale 72 horas.",
+      "name": "Nombre del nodo",
+      "nameHint": "Único en la entidad, por ejemplo \"servidor-principal\".",
+      "submit": "Registrar y emitir token"
+    },
+    "network": {
+      "title": "Nodos de la red",
+      "lead": "Todos los nodos del kit: estado, versión y último heartbeat.",
+      "empty": "Todavía no hay nodos en la red."
+    }
   }
 }

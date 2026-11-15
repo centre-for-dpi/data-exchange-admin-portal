@@ -58,6 +58,7 @@ export function statusTone(status: string): Tone {
     case 'approved':
     case 'approved_operator':
     case 'approved_regulator':
+    case 'online':
       return 'success';
     case 'in_review':
     case 'under_review':
@@ -67,14 +68,17 @@ export function statusTone(status: string): Tone {
     case 'changes_requested':
     case 'rotating':
     case 'suspended':
+    case 'enrollment_issued':
       return 'warning';
     case 'rejected':
     case 'revoked':
     case 'error':
     case 'deleted':
+    case 'offline':
       return 'danger';
     case 'draft':
     case 'requested':
+    case 'enrolled':
       return 'info';
     default:
       return 'neutral';

@@ -28,6 +28,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `access_request.decide` | · | · | ✓ | · | · | · | · | · | · |
 | `access_request.suspend` | · | · | ✓ | · | · | ✓ | · | ✓ | · |
 | `api.purposes.write` | · | · | ✓ | · | · | · | · | · | · |
+| `node.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| `node.write` | ✓ | · | · | · | · | ✓ | · | · | · |
 | `audit.entity.read` | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · |
 
 ## Acciones de plataforma
@@ -47,6 +49,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `purpose.manage` | ✓ | ✓ | · | · |
 | `document.purge` | ✓ | · | · | · |
 | `document.list` | ✓ | · | · | · |
+| `node.list` | ✓ | ✓ | ✓ | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Rutas
@@ -58,6 +61,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | POST | `/api/v1/admin/entities/:id/offboard` | plataforma: `entity_admin.decide` |
 | POST | `/api/v1/admin/entities/:id/reactivate` | plataforma: `entity_admin.decide` |
 | POST | `/api/v1/admin/entities/:id/suspend` | plataforma: `entity_admin.decide` |
+| GET | `/api/v1/admin/nodes` | plataforma: `node.list` |
 | GET | `/api/v1/admin/purposes` | plataforma: `purpose.read` |
 | POST | `/api/v1/admin/purposes` | plataforma: `purpose.manage` |
 | PUT | `/api/v1/admin/purposes/:code` | plataforma: `purpose.manage` |
@@ -111,6 +115,11 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | GET | `/api/v1/entities/:entityId/members` | entidad: `entity.members.read` |
 | POST | `/api/v1/entities/:entityId/members/:membershipId/revoke` | entidad: `entity.members.write` |
 | PUT | `/api/v1/entities/:entityId/members/:membershipId/roles` | entidad: `entity.members.write` |
+| GET | `/api/v1/entities/:entityId/nodes` | entidad: `node.read` |
+| POST | `/api/v1/entities/:entityId/nodes` | entidad: `node.write` |
+| GET | `/api/v1/entities/:entityId/nodes/:nodeId` | entidad: `node.read` |
+| POST | `/api/v1/entities/:entityId/nodes/:nodeId/enrollment-tokens` | entidad: `node.write` |
+| POST | `/api/v1/entities/:entityId/nodes/:nodeId/enrollment-tokens/:tokenId/revoke` | entidad: `node.write` |
 | GET | `/api/v1/entities/:entityId/subscriptions` | entidad: `subscription.read` |
 | POST | `/api/v1/entities/:entityId/subscriptions` | entidad: `subscription.write` |
 | GET | `/api/v1/entities/:entityId/subscriptions/:subscriptionId` | entidad: `subscription.read` |

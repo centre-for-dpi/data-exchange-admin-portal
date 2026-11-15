@@ -47,6 +47,8 @@ import { NotificationsService } from './notifications/notifications.service.js';
 import { AdminPurposesController } from './purposes/admin-purposes.controller.js';
 import { PurposesController } from './purposes/purposes.controller.js';
 import { PurposesService } from './purposes/purposes.service.js';
+import { AdminNodesController, NodesController } from './nodes/nodes.controller.js';
+import { NodesService } from './nodes/nodes.service.js';
 import { ReconcilersModule } from './reconcilers/reconcilers.module.js';
 import { RegulatorController } from './regulator/regulator.controller.js';
 import { RegulatorService } from './regulator/regulator.service.js';
@@ -99,6 +101,8 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     SubjectAccessController,
     TransparencyController,
     DataSubjectsController,
+    NodesController,
+    AdminNodesController,
   ],
   providers: [
     StorageService,
@@ -131,6 +135,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     TsaClient,
     DataSubjectsService,
     SubjectAlertsService,
+    NodesService,
     CitizenGuard,
     {
       provide: CITIZEN_TOKEN_VERIFIER,

@@ -14,6 +14,7 @@ import {
 } from '../../../components/members/forms';
 import { StatusBadge } from '../../../components/ui/badge';
 import { Card, EmptyState, Page, PageHeader, Section } from '../../../components/ui/page';
+import { Link } from '../../../i18n/navigation';
 import { apiGet, apiGetAll } from '../../../lib/api';
 import { localize } from '../../../lib/localize';
 import { getViewer } from '../../../lib/viewer';
@@ -61,6 +62,11 @@ export default async function MyEntityPage({ params }: PageProps) {
         title={entity.legalName}
         description={
           <StatusBadge status={entity.status}>{t(`entityStatus.${entity.status}`)}</StatusBadge>
+        }
+        actions={
+          <Link href="/my-entity/nodes" className="link">
+            {t('nodes.title')}
+          </Link>
         }
       />
       <Card>

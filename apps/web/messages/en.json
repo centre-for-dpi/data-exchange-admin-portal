@@ -651,6 +651,11 @@
       },
       "gateway_certificate": {
         "issued": "Gateway certificate issued"
+      },
+      "node": {
+        "created": "Node registered",
+        "enrollment_token_issued": "Enrollment token issued",
+        "enrollment_token_revoked": "Enrollment token revoked"
       }
     },
     "filters": {
@@ -1032,5 +1037,53 @@
   "session": {
     "mfaRequired": "Your roles require a second factor. Sign in again with the one-time code from your authenticator app.",
     "mfaAction": "Verify with the code"
+  },
+  "nodeStatus": {
+    "enrollment_issued": "Waiting for enrollment",
+    "enrolled": "Enrolled",
+    "online": "Online",
+    "offline": "Offline",
+    "decommissioned": "Decommissioned"
+  },
+  "nodes": {
+    "title": "Kit nodes",
+    "lead": "Servers of the entity where the instant-APIs kit is installed. Each node enrolls with a single-use token.",
+    "listTitle": "Nodes",
+    "empty": "The entity has no nodes yet.",
+    "name": "Node",
+    "status": "Status",
+    "enrollment": "Enrollment token",
+    "lastHeartbeat": "Last heartbeat",
+    "kitVersion": "Kit version",
+    "tunnelAddress": "Tunnel IP",
+    "actions": "Actions",
+    "expires": "Expires: {date}",
+    "reissue": "Issue a new token",
+    "reissueFor": "Issue a new token for {name}",
+    "revoke": "Revoke token",
+    "revokeFor": "Revoke token of {name}",
+    "tokenStatus": {
+      "active": "Valid",
+      "used": "Used",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
+    "token": {
+      "title": "Enrollment token of {name}",
+      "label": "enrollment token",
+      "warning": "Copy the token now: it is not shown again. It installs the kit once and expires on {date}."
+    },
+    "create": {
+      "title": "Register a node",
+      "lead": "Register the server and hand the token to whoever installs the kit (for example, at the bootcamp). The token is valid for 72 hours.",
+      "name": "Node name",
+      "nameHint": "Unique in the entity, for example \"main-server\".",
+      "submit": "Register and issue token"
+    },
+    "network": {
+      "title": "Network nodes",
+      "lead": "Every kit node: status, version and last heartbeat.",
+      "empty": "There are no nodes in the network yet."
+    }
   }
 }

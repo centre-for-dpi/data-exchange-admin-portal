@@ -78,6 +78,10 @@ export const AUDIT_ACTIONS = [
   'subscription.expired',
   'subscription.renewal_notice_queued',
   'subscription.agreement_attached',
+  // Nodes of the kit (M4)
+  'node.created',
+  'node.enrollment_token_issued',
+  'node.enrollment_token_revoked',
   // Transparency for the data subject (MT)
   'subject_access.purged',
   'subject_alert.updated',
