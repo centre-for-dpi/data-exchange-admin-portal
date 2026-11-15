@@ -165,7 +165,7 @@ Además calcula el hash del funcionario y el seudónimo del titular, y devuelve 
 En M4 también firmará los de los nodos del kit. Solo el API habla con ella; las entidades nunca la llaman directamente.
 
 - En el primer arranque la imagen inicializa la CA con `DOCKER_STEPCA_INIT_*`: nombre `RID Dev CA`, DNS `localhost,step-ca`, provisioner JWK `rid-portal`, contraseña `STEP_CA_PASSWORD`. **El piloto usa esta misma CA de desarrollo**; la raíz fuera de línea y la intermedia en HSM son de producción (M6).
-- En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `rid-portal` (plantilla `app.tpl`, solo autenticación de cliente, 90 días por defecto, 397 como máximo). También crea, si no existe, el provisioner `rid-gateway-tls` con la contraseña de la CA (plantilla `gateway.tpl`, solo autenticación de servidor, 90 días). Luego inicia la CA. Es idempotente.
+- En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `rid-portal` (plantilla `app.tpl`, solo autenticación de cliente, 90 días por defecto, 397 como máximo). También crea, si no existe, el provisioner `rid-gateway-tls` con la contraseña de la CA (plantilla `gateway.tpl`, solo autenticación de servidor, 90 días) y el provisioner `rid-nodes` de los nodos del kit (plantilla `node.tpl`, autenticación de servidor y de cliente, 90 días, M4-02). Luego inicia la CA. Es idempotente: una CA existente recibe un provisioner nuevo al reiniciar el contenedor.
 - El portal genera las claves de los certificados del gateway y las guarda selladas con `RID_SECRETS_KEY` (tabla `gateway_certificate`). Los renueva en el último tercio de su vida, en la pasada completa del reconciliador de APISIX.
 - El estado (raíz, intermedia, claves, `secrets/password`) vive en `step-ca-data`. **Perder ese volumen invalida todos los certificados emitidos.**
 - El API firma los CSR con los provisioners (`RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER`, `RID_STEP_CA_GATEWAY_PROVISIONER`, `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD` para los dos) y verifica el TLS de la CA con `RID_STEP_CA_ROOT_FILE` o `RID_STEP_CA_ROOT_FINGERPRINT`. Con `NODE_ENV=production` (imágenes del piloto) una de las dos es **obligatoria**; sin ninguna, solo en desarrollo, confía en la raíz que sirve la CA.
@@ -268,6 +268,8 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
 
+Nodos del kit (M4-02, `ARCHITECTURE.md §10`): `RID_NODE_CONTROL_TOKEN` (lo agrega la ruta de control del gateway; sin él y sin `RID_GATEWAY_PORTAL_API_URL` no hay ruta de control), `RID_NODE_CONTROL_URL` (URL del canal de control que se le da al nodo, por defecto `RID_GATEWAY_PUBLIC_URL`), `RID_WG_SUBNET`, `RID_WG_HUB_PUBLIC_KEY` y `RID_WG_HUB_ENDPOINT` (sin estos dos, el enrolamiento da 503), y opcionales `RID_NODE_ENROLLMENT_TTL_HOURS` (72), `RID_NODE_HEARTBEAT_SECONDS` (60), `RID_NODE_OFFLINE_AFTER_SECONDS` (300), `RID_NODE_CERT_VALIDITY_HOURS` (2160), `RID_NODE_RENEWAL_GRACE_HOURS` (24) y `RID_NODE_MIN_KIT_VERSION`.
+
 Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX atienden el tráfico, 1 por defecto: cada nodo cuenta las peticiones por su lado y el bundle le da a cada uno su parte del límite de la suscripción, ADR-0020; un valor inválido deja a OPA sin bundle), `RID_GATEWAY_TLS_HOSTS` (nombres del certificado de servidor del gateway, por defecto `localhost`; en el piloto, el nombre propio del gateway de M3-10) y `RID_GATEWAY_CLIENT_NAME` (prefijo del certificado de cliente hacia los proveedores, por defecto `rid-gateway`). La ventana de rotación de credenciales es `lifecycle.credentialRotationDays` en la configuración del país (7 días por defecto).
 
 ### 4.2 Lo que cambia entre desarrollo y piloto
@@ -293,6 +295,10 @@ Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX 
 | `RID_CITIZEN_APPS` (webhook) | `http://localhost:3100/api/rid/alerts` | `http://carpeta:3100/carpeta/api/rid/alerts` |
 | `RID_DEMO_USER_PASSWORD` | `demo` | aleatoria, salvo `--demo-password` |
 | `RID_DEMO_TOTP_SECRET` | `rid-demo-totp-secret` | aleatoria (`pnpm demo:otp` da el código) |
+| `RID_GATEWAY_PORTAL_API_URL` (ruta de control de los nodos) | `http://host.docker.internal:4000` | `http://api:4000` |
+| `RID_NODE_CONTROL_TOKEN` | valor de desarrollo | aleatorio |
+| `RID_WG_HUB_PRIVATE_KEY`, `RID_WG_HUB_PUBLIC_KEY` | par de desarrollo | par aleatorio |
+| `RID_WG_HUB_ENDPOINT` | `wg-hub:51820` | `<nombre del gateway>:51820` |
 | `MAILPIT_UI_AUTH`, `TRAEFIK_NETWORK`, `RID_PUBLIC_URL` | — | solo piloto |
 
 El API usa `KEYCLOAK_URL` para validar los tokens y para el Admin API de `rid-gateway`: en el piloto llega a Keycloak por la URL pública, a través del proxy.

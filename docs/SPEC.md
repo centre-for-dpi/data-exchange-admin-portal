@@ -196,9 +196,10 @@ enrollment_issued → enrolled → online ⇄ offline
 ```
 
 1. `platform_admin` o `entity_admin` registra el nodo (nombre único en la entidad) y recibe un token de enrolamiento de un solo uso (válido 72 h), que se muestra una sola vez. Se usa en el bootcamp. Mientras el nodo no se enrola, se puede anular el token o emitir otro, que anula el vigente: un nodo tiene a lo sumo un token usable. El portal guarda solo el hash del token.
-2. El kit, al instalarse, llama a `POST /api/v1/nodes/enroll` con el token, su CSR y su clave pública WireGuard. Recibe certificado, configuración del túnel y el ID del nodo.
-3. El nodo envía heartbeat cada 60 s con versión y servicios expuestos. Sin heartbeat por 5 min → `offline` y alerta.
-4. Las APIs con upstream `node` muestran el estado del nodo.
+2. El kit, al instalarse, llama a `POST /api/v1/nodes/enroll` con el token, su CSR y su clave pública WireGuard. Recibe certificado, configuración del túnel y el ID del nodo. El token deja de servir.
+3. El nodo envía heartbeat cada 60 s con versión y servicios expuestos. Sin heartbeat por 5 min → `offline` y alerta a los administradores de la entidad y al operador. El siguiente heartbeat lo devuelve a `online`.
+4. El nodo renueva su certificado antes de que venza. `entity_admin` o `platform_admin` pueden dar de baja un nodo (`decommissioned`): deja de funcionar para siempre.
+5. Las APIs con upstream `node` muestran el estado del nodo.
 
 ### 4.7 Transparencia para el titular (ADR-0015, ADR-0016)
 

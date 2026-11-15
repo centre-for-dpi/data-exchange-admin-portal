@@ -24,6 +24,7 @@ export const NOTIFICATION_KINDS = {
   access_suspended: { security: true, email: true },
   access_revoked: { security: true, email: true },
   certificate_expiring: { security: false, email: true },
+  node_offline: { security: false, email: true },
 } as const satisfies Record<string, { security: boolean; email: boolean }>;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;
@@ -37,6 +38,7 @@ export const notificationParamsSchema = z.object({
   api: z.string().optional(),
   version: z.string().optional(),
   application: z.string().optional(),
+  node: z.string().optional(),
   decision: z.string().optional(),
   what: z.enum(['api', 'subscription']).optional(),
   date: z.iso.datetime().optional(),

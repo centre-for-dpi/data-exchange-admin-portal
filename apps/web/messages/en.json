@@ -655,7 +655,13 @@
       "node": {
         "created": "Node registered",
         "enrollment_token_issued": "Enrollment token issued",
-        "enrollment_token_revoked": "Enrollment token revoked"
+        "enrollment_token_revoked": "Enrollment token revoked",
+        "enrolled": "Node enrolled",
+        "online": "Node online",
+        "offline": "Node offline",
+        "services_changed": "Node services changed",
+        "certificate_renewed": "Node certificate renewed",
+        "decommissioned": "Node decommissioned"
       }
     },
     "filters": {
@@ -901,7 +907,8 @@
       "access_suspended": "The access of {application} to {api} was suspended",
       "access_revoked": "The access of {application} to {api} was revoked",
       "certificate_expiring": "The client certificate of {application} expires on {date}",
-      "entity_status_changed": "{entity} {decision, select, suspended {was suspended on the network} reactivated {was reactivated on the network} other {was offboarded from the network}}"
+      "entity_status_changed": "{entity} {decision, select, suspended {was suspended on the network} reactivated {was reactivated on the network} other {was offboarded from the network}}",
+      "node_offline": "Node {node} of {entity} has sent no heartbeat for 5 minutes"
     },
     "kindNames": {
       "invitation_received": "Invitations to an entity",
@@ -920,7 +927,8 @@
       "access_suspended": "Suspended access",
       "access_revoked": "Revoked access",
       "certificate_expiring": "Certificates about to expire",
-      "entity_status_changed": "Suspension or offboarding of your entity"
+      "entity_status_changed": "Suspension or offboarding of your entity",
+      "node_offline": "Nodes offline"
     },
     "unreadSuffix": "{count, plural, one {: one unread} other {: # unread}}"
   },
@@ -1084,6 +1092,10 @@
       "title": "Network nodes",
       "lead": "Every kit node: status, version and last heartbeat.",
       "empty": "There are no nodes in the network yet."
-    }
+    },
+    "services": "Services: {list}",
+    "decommission": "Decommission",
+    "decommissionFor": "Decommission {name}",
+    "decommissionConfirm": "Decommission node {name}? It stops working for good: its certificate and tunnel are revoked."
   }
 }

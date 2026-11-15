@@ -82,6 +82,12 @@ export const AUDIT_ACTIONS = [
   'node.created',
   'node.enrollment_token_issued',
   'node.enrollment_token_revoked',
+  'node.enrolled',
+  'node.online',
+  'node.offline',
+  'node.services_changed',
+  'node.certificate_renewed',
+  'node.decommissioned',
   // Transparency for the data subject (MT)
   'subject_access.purged',
   'subject_alert.updated',

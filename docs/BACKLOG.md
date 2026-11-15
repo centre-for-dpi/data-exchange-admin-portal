@@ -581,7 +581,19 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Permisos: emiten y anulan `entity_admin` y `platform_admin` (`node.write`). Ven los nodos todos los miembros, el revisor y el regulador (`node.read`). La consola del operador lista todos los nodos de la red (`node.list`).
     - Auditoría: `node.created`, `node.enrollment_token_issued`, `node.enrollment_token_revoked`.
     - Web: "Mi entidad → Nodos del kit" (`/my-entity/nodes`) y "Consola del operador → Nodos de la red" (`/operator/nodes`).
-- [ ] **M4-02 — Enrolamiento y heartbeat**: endpoints de `ARCHITECTURE.md §10`; estados `enrollment_issued → enrolled → online/offline`; alerta a los 5 min sin heartbeat.
+- [x] **M4-02 — Enrolamiento y heartbeat**: endpoints de `ARCHITECTURE.md §10`; estados `enrollment_issued → enrolled → online/offline`; alerta a los 5 min sin heartbeat.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §10`.
+    - Contrato v1 versionado en `docs/contracts/node-contract-v1.openapi.json`, generado desde el API (ADR-0011). Un test falla si se desactualiza.
+    - Certificado del nodo: el CSR lleva siempre `CN=rid-node` sin nombres. step-ca exige que el CN sea el `sub` del OTT y el kit no sabe su ID antes de enrolarse. El provisioner propio `rid-nodes` (`node.tpl`) pone el nombre `rid-node-<nodeId>` como único SAN DNS, con autenticación de servidor y de cliente. El portal comprueba ese nombre en lo que devuelve la CA.
+    - Enrolamiento: cualquier rechazo del token es el mismo 401. La CA firma antes de la transacción, y un fallo antes del commit deja el token usable. Dirección `/32` del túnel nunca reutilizada. Clave WireGuard repetida: 409.
+    - Canal de control (mTLS del nodo): ruta `rid-node-control` del gateway hacia el API. La huella del certificado verificado vale solo con el token de control que agrega APISIX, comparado en tiempo constante.
+      - Interpretación: el TLS del nodo termina en el gateway, como el de las aplicaciones (ADR-0022), y no en el API.
+      - Sin mTLS obligatorio en la red, el objeto SSL igual exige el certificado en el canal de control (`skip_mtls_uri_regex` exime el resto). Así funciona en un país sin `features.mtls.required`.
+    - Renovación con gracia de 24 h para el certificado reemplazado. `GET /config` lista las versiones publicadas que sirve el nodo.
+    - `offline` a los 5 min sin heartbeat (también un enrolado que nunca envió uno). La notificación `node_offline` llega a los administradores de la entidad y a los `platform_admin`. Baja definitiva (`decommissioned`) por `entity_admin` o `platform_admin`.
+    - Auditoría: `node.enrolled`, `node.online`, `node.offline`, `node.services_changed`, `node.certificate_renewed`, `node.decommissioned`.
+    - Probado con step-ca real y la ruta de control en APISIX real (`node-control-route.int.test.ts`): heartbeat por mTLS, cabeceras falsas ignoradas, otro certificado de la red no abre el nodo, sin TLS no hay huella.
+    - Despliegue: reiniciar step-ca crea el provisioner `rid-nodes`. Variables nuevas en `DEPLOYMENT.md §4`.
 - [ ] **M4-03 — Hub WireGuard**: contenedor `wg-hub`, alta de peers por reconciliador, nodo simulado conectándose en Compose.
 - [ ] **M4-04 — Upstream `node` real**: la ruta apunta a la IP del túnel del nodo; el detalle de API muestra el estado del nodo.
 - [ ] **M4-05 — Upstream `xroad`**: según S-5.

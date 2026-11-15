@@ -10,6 +10,7 @@ const yes = (on: boolean) => (on ? '✓' : '·');
 const ACCESS_LABEL: Record<string, string> = {
   public: 'pública (sin sesión; las internas exigen su propio token de servicio)',
   citizen: 'ciudadano (token del realm de ciudadanos)',
+  node: 'nodo del kit (mTLS con su certificado, a través de la ruta de control del gateway)',
   optional: 'sesión opcional (catálogo público según la config del país)',
   signedIn: 'cualquier sesión; solo recursos propios',
 };

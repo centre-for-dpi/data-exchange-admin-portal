@@ -94,6 +94,7 @@ function operation(route: RouteDoc): JsonSchema {
     responses,
     ...(spec.authenticated === false ? { security: [] } : {}),
     ...(spec.authenticated === 'citizen' ? { security: [{ citizenBearer: [] }] } : {}),
+    ...(spec.authenticated === 'node' ? { security: [{ nodeMutualTls: [] }] } : {}),
   };
 }
 
@@ -124,6 +125,13 @@ export function buildOpenApiDocument(routes: RouteDoc[], info: { title: string; 
           description:
             'Access token of the national digital identity, issued to an authorized citizen app ' +
             '(the Carpeta Ciudadana). Development: realm rid-citizens.',
+        },
+        nodeMutualTls: {
+          type: 'mutualTLS',
+          description:
+            'Control channel of kit nodes (ARCHITECTURE.md §10): TLS with the node certificate ' +
+            'issued at enrollment, at the gateway (RID_NODE_CONTROL_URL), which passes the ' +
+            'verified thumbprint to the portal.',
         },
       },
       schemas: { Problem: toSchema(problemDetailsSchema) },

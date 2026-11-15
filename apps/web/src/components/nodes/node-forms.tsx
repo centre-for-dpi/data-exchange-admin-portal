@@ -5,6 +5,7 @@ import { useActionState, useEffect, useId, useRef } from 'react';
 import { initialFormState } from '../../lib/forms';
 import {
   createNodeAction,
+  decommissionNodeAction,
   type IssueTokenState,
   reissueTokenAction,
   revokeTokenAction,
@@ -27,12 +28,7 @@ function IssuedToken({ issued }: { issued: NonNullable<IssueTokenState['issued']
   }, [issued.token]);
   return (
     <section className="space-y-4" aria-labelledby={headingId}>
-      <h3
-        id={headingId}
-        ref={heading}
-        tabIndex={-1}
-        className="text-lg font-semibold"
-      >
+      <h3 id={headingId} ref={heading} tabIndex={-1} className="text-lg font-semibold">
         {t('title', { name: issued.nodeName })}
       </h3>
       <p
@@ -149,6 +145,42 @@ export function RevokeTokenButton({
         aria-label={t('revokeFor', { name: nodeName })}
       >
         {t('revoke')}
+      </Button>
+    </form>
+  );
+}
+
+/** Takes a node out of the network for good (M4-02). */
+export function DecommissionNodeButton({
+  entityId,
+  nodeId,
+  nodeName,
+}: {
+  entityId: string;
+  nodeId: string;
+  nodeName: string;
+}) {
+  const t = useTranslations('nodes');
+  const [state, action, pending] = useActionState(
+    decommissionNodeAction.bind(null, entityId, nodeId),
+    initialFormState,
+  );
+  return (
+    <form
+      action={action}
+      onSubmit={(event) => {
+        if (!window.confirm(t('decommissionConfirm', { name: nodeName }))) event.preventDefault();
+      }}
+    >
+      {state.formError ? <p className={errorTextClass}>{state.formError}</p> : null}
+      <Button
+        type="submit"
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        aria-label={t('decommissionFor', { name: nodeName })}
+      >
+        {t('decommission')}
       </Button>
     </form>
   );

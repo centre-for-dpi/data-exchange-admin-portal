@@ -52,6 +52,12 @@ export interface GatewaySettings {
      */
     clientName: string;
   };
+  /**
+   * Control channel of kit nodes (M4-02): the portal's API as APISIX reaches it
+   * (RID_GATEWAY_PORTAL_API_URL) and the token that proves a request came through the gateway
+   * (RID_NODE_CONTROL_TOKEN). Without both, the gateway has no control route.
+   */
+  nodeControl?: { portalUrl: string; token: string };
 }
 
 /** Headers only the gateway may set: removed if a client sends them (ARCHITECTURE.md §4.1). */
@@ -413,10 +419,21 @@ export function desiredGateway(
   return { upstream, route };
 }
 
+/** Paths of the node control channel that need the node's certificate (M4-02). */
+export const NODE_CONTROL_PATH_PREFIX = '/api/v1/nodes/';
 /**
- * SSL object of the gateway (S-3): its server certificate on the public names and, when the
- * network requires mTLS, `client.ca` with the network CA, so APISIX refuses in the handshake any
- * call without a valid client certificate. No skip_mtls_uri_regex: no route is exempt.
+ * Without network-wide mTLS the certificate is optional everywhere except on the control channel
+ * of kit nodes, whose calls APISIX refuses without a verified certificate (M4-02). Enrollment
+ * stays open: the kit has no certificate yet.
+ */
+export const NODE_ONLY_SKIP_MTLS_REGEX = '^(?!/api/v1/nodes/[^/]+/(heartbeat|renew|config)$)';
+
+/**
+ * SSL object of the gateway (S-3): its server certificate on the public names and `client.ca`
+ * with the network CA. When the network requires mTLS, APISIX refuses in the handshake any call
+ * without a valid client certificate (no skip_mtls_uri_regex: no route is exempt). Otherwise the
+ * certificate is optional but still verified when presented, and required on the node control
+ * channel (M4-02).
  */
 export function desiredSsl(
   certificate: { hosts: string[]; certificatePem: string; keyPem: string; networkCaPem: string },
@@ -431,7 +448,13 @@ export function desiredSsl(
     labels: { 'rid-managed': 'true' },
     status: 1,
     // Leaf, intermediate and root: depth 2.
-    ...(settings.tls.mtlsRequired ? { client: { ca: certificate.networkCaPem, depth: 2 } } : {}),
+    client: settings.tls.mtlsRequired
+      ? { ca: certificate.networkCaPem, depth: 2 }
+      : {
+          ca: certificate.networkCaPem,
+          depth: 2,
+          skip_mtls_uri_regex: [NODE_ONLY_SKIP_MTLS_REGEX],
+        },
   };
 }
 
@@ -498,14 +521,56 @@ export function desiredTokenRoute(settings: GatewaySettings): ApisixObject {
 
 /**
  * APISIX stores the private key encrypted, so the key is not compared: a new key always comes
- * with a new certificate. `client` must be absent when mTLS is off.
+ * with a new certificate. A skip_mtls_uri_regex left behind (mTLS turned on) is a difference.
  */
 export function sslMatches(desired: ApisixObject, actual: ApisixObject): boolean {
   const { key: _key, ...compared } = desired;
-  if (!('client' in desired) && actual.client !== undefined && actual.client !== null) {
-    return false;
-  }
+  const wantSkip = (desired.client as { skip_mtls_uri_regex?: unknown } | undefined)
+    ?.skip_mtls_uri_regex;
+  const hasSkip = (actual.client as { skip_mtls_uri_regex?: unknown } | undefined)
+    ?.skip_mtls_uri_regex;
+  if (wantSkip === undefined && hasSkip !== undefined && hasSkip !== null) return false;
   return matches(compared, actual);
+}
+
+/** The gateway's route for the control channel of kit nodes (M4-02). */
+export const NODE_CONTROL_ROUTE_ID = 'rid-node-control';
+/** Set by the control route: proves to the portal that the request came through the gateway. */
+export const NODE_CONTROL_TOKEN_HEADER = 'X-RID-Node-Control';
+
+/**
+ * The node control route (ARCHITECTURE.md §10, M4-02). Nodes call the portal's control channel
+ * on the gateway's TLS with their certificate; APISIX verifies it in the handshake, rid-client-cert
+ * puts its thumbprint in X-RID-Client-Cert-S256 (always replacing the client's), and proxy-rewrite
+ * adds the control token. rid-header-guard first removes every other X-RID-* the client sent,
+ * the control token included. The portal believes the thumbprint only with the token.
+ */
+export function desiredNodeControlRoute(settings: GatewaySettings): ApisixObject | null {
+  if (!settings.nodeControl) return null;
+  const portal = new URL(settings.nodeControl.portalUrl);
+  const port = portal.port || (portal.protocol === 'https:' ? '443' : '80');
+  return {
+    name: 'kit node control channel',
+    uri: `${NODE_CONTROL_PATH_PREFIX}*`,
+    methods: ['GET', 'POST'],
+    status: 1,
+    labels: { 'rid-managed': 'true' },
+    upstream: {
+      type: 'roundrobin',
+      scheme: portal.protocol.replace(':', ''),
+      nodes: { [`${portal.hostname}:${port}`]: 1 },
+      pass_host: 'node',
+    },
+    plugins: {
+      'request-id': { header_name: 'X-Request-Id', include_in_response: true },
+      'rid-header-guard': {},
+      'rid-client-cert': {},
+      'proxy-rewrite': {
+        headers: { set: { [NODE_CONTROL_TOKEN_HEADER]: settings.nodeControl.token } },
+      },
+      prometheus: { prefer_name: false },
+    },
+  };
 }
 
 /**

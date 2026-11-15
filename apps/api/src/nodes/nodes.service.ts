@@ -17,6 +17,7 @@ import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError } from '../common/errors.js';
 import { hashSecret } from '../common/secrets.js';
 import { assertEntityActive } from '../domain/entity/active.js';
+import { assertTransition } from '../domain/node/state-machine.js';
 import type { NodeEnrollmentToken, Node as NodeRow } from '../generated/prisma/client.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
@@ -57,6 +58,17 @@ export function storedServices(value: unknown): NodeService[] {
   return parsed.success ? parsed.data : [];
 }
 
+const healthSchema = z.object({
+  status: z.enum(['ok', 'degraded', 'failing']),
+  detail: z.string().optional(),
+  checkedAt: z.iso.datetime(),
+});
+
+export function storedHealth(value: unknown): NodeSummary['health'] {
+  const parsed = healthSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 export function nodeView(node: NodeWithTokens): NodeSummary {
   const latest = [...node.enrollmentTokens].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
@@ -71,6 +83,7 @@ export function nodeView(node: NodeWithTokens): NodeSummary {
     enrolledAt: iso(node.enrolledAt),
     certificateNotAfter: iso(node.certificateNotAfter),
     services: storedServices(node.services),
+    health: storedHealth(node.health),
     createdAt: node.createdAt.toISOString(),
     enrollmentToken: latest ? tokenView(latest) : null,
   };
@@ -243,6 +256,41 @@ export class NodesService {
       after: { tokenId: token.id, status: 'revoked', reason },
       requestId,
     });
+  }
+
+  /**
+   * Takes a node out of the network (SPEC.md §4.6). Final: the control channel no longer accepts
+   * its certificate, the hub drops its peer (M4-03) and versions on it stop being served (M4-04).
+   * A token still active is revoked with it.
+   */
+  async decommission(
+    entityId: string,
+    nodeId: string,
+    principal: Principal,
+    reason: string | undefined,
+    requestId?: string,
+  ): Promise<NodeDetail> {
+    await this.prisma.$transaction(async (tx) => {
+      const node = await this.load(entityId, nodeId, tx);
+      assertTransition(node.status, 'decommissioned');
+      for (const token of node.enrollmentTokens.filter((t) => t.status === 'active')) {
+        await this.revokeInTx(tx, node, token, principal, 'revoked', requestId);
+      }
+      const changed = await tx.node.updateMany({
+        where: { id: nodeId, entityId, status: node.status },
+        data: { status: 'decommissioned', decommissionedAt: new Date() },
+      });
+      if (changed.count === 0) throw new ConflictError('The node changed meanwhile');
+      await this.audit.record(tx, {
+        actor: this.actor(principal, entityId),
+        action: 'node.decommissioned',
+        target: { type: 'node', id: nodeId },
+        before: { status: node.status },
+        after: { status: 'decommissioned', ...(reason ? { reason } : {}) },
+        requestId,
+      });
+    });
+    return this.get(entityId, nodeId);
   }
 
   /** Revokes ("anula") a token that was not used: it no longer enrolls anything. */

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  desiredNodeControlRoute,
   desiredTokenRoute,
+  NODE_ONLY_SKIP_MTLS_REGEX,
   deprecationHeaders,
   desiredGateway,
   type GatewaySettings,
@@ -383,10 +385,15 @@ describe('gateway TLS (M3-02)', () => {
     networkCaPem: 'CA',
   };
 
-  it('serves the server certificate on the gateway names; client CA only with mTLS', () => {
+  it('serves the server certificate on the gateway names; the client CA rejects in the handshake only with mTLS', () => {
     const plain = desiredSsl(certificate, settings);
     expect(plain).toMatchObject({ type: 'server', snis: ['gw.example.org', 'localhost'] });
-    expect(plain).not.toHaveProperty('client');
+    // Without network-wide mTLS the certificate is optional, except on the node control channel.
+    expect(plain.client).toEqual({
+      ca: 'CA',
+      depth: 2,
+      skip_mtls_uri_regex: [NODE_ONLY_SKIP_MTLS_REGEX],
+    });
     const mtls = desiredSsl(certificate, {
       ...settings,
       tls: { ...settings.tls, mtlsRequired: true },
@@ -395,12 +402,36 @@ describe('gateway TLS (M3-02)', () => {
     expect(mtls).not.toHaveProperty('client.skip_mtls_uri_regex');
   });
 
-  it('ignores the stored (encrypted) key but notices a client CA left behind', () => {
-    const desired = desiredSsl(certificate, settings);
+  it('ignores the stored (encrypted) key but notices an exemption left behind', () => {
+    const desired = desiredSsl(certificate, {
+      ...settings,
+      tls: { ...settings.tls, mtlsRequired: true },
+    });
     const stored = { ...desired, key: 'encrypted-by-apisix', validity_end: 1 };
     expect(sslMatches(desired, stored)).toBe(true);
-    expect(sslMatches(desired, { ...stored, client: { ca: 'CA', depth: 2 } })).toBe(false);
+    expect(
+      sslMatches(desired, {
+        ...stored,
+        client: { ca: 'CA', depth: 2, skip_mtls_uri_regex: ['.*'] },
+      }),
+    ).toBe(false);
     expect(sslMatches(desired, { ...stored, cert: 'OTHER' })).toBe(false);
+  });
+
+  it('requires the certificate on the node control paths only, enrollment excluded (M4-02)', () => {
+    const skip = new RegExp(NODE_ONLY_SKIP_MTLS_REGEX);
+    const id = '0190d0c4-0000-7000-8000-000000000001';
+    for (const path of ['heartbeat', 'renew', 'config']) {
+      expect(skip.test(`/api/v1/nodes/${id}/${path}`), path).toBe(false);
+    }
+    for (const path of [
+      '/api/v1/nodes/enroll',
+      '/salud/afiliacion/v1/x',
+      '/oauth/token',
+      `/api/v1/nodes/${id}/heartbeat/x`,
+    ]) {
+      expect(skip.test(path), path).toBe(true);
+    }
   });
 
   it('parses the gateway host names', () => {
@@ -410,6 +441,32 @@ describe('gateway TLS (M3-02)', () => {
     ]);
     expect(() => parseHostNames('bad_name')).toThrow();
     expect(() => parseHostNames(' , ')).toThrow();
+  });
+});
+
+describe('node control route (M4-02)', () => {
+  it('is absent until the portal URL and the control token are configured', () => {
+    expect(desiredNodeControlRoute(settings)).toBeNull();
+  });
+
+  it('forwards to the portal with the verified thumbprint and the control token', () => {
+    const route = desiredNodeControlRoute({
+      ...settings,
+      nodeControl: { portalUrl: 'http://api:4000', token: 'control-token' },
+    });
+    expect(route).toMatchObject({
+      uri: '/api/v1/nodes/*',
+      methods: ['GET', 'POST'],
+      upstream: { scheme: 'http', nodes: { 'api:4000': 1 }, pass_host: 'node' },
+    });
+    const plugins = route?.plugins as Record<string, unknown>;
+    // The client's X-RID-* (a forged control token included) go first; then the thumbprint.
+    expect(plugins['rid-header-guard']).toEqual({});
+    expect(plugins['rid-client-cert']).toEqual({});
+    expect(plugins['proxy-rewrite']).toEqual({
+      headers: { set: { 'X-RID-Node-Control': 'control-token' } },
+    });
+    expect(plugins).not.toHaveProperty('openid-connect');
   });
 });
 

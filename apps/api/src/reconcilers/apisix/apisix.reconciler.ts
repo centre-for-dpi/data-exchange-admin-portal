@@ -16,6 +16,7 @@ import { QueueService } from '../../queue/queue.service.js';
 import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apisix-admin.js';
 import {
   desiredGateway,
+  desiredNodeControlRoute,
   desiredSsl,
   desiredTokenRoute,
   GATEWAY_CLIENT_SSL_PREFIX,
@@ -25,6 +26,7 @@ import {
   type GatewaySettings,
   MANAGED_PREFIX,
   matches,
+  NODE_CONTROL_ROUTE_ID,
   needsGatewayPki,
   type UpstreamPki,
   routeId,
@@ -49,6 +51,7 @@ export const gatewaySyncTarget = (apiVersionId: string): string =>
   `apisix:route:${routeId(apiVersionId)}`;
 export const GATEWAY_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_SSL_ID}`;
 export const GATEWAY_TOKEN_SYNC_TARGET = `apisix:route:${TOKEN_ROUTE_ID}`;
+export const NODE_CONTROL_SYNC_TARGET = `apisix:route:${NODE_CONTROL_ROUTE_ID}`;
 export const gatewayClientTlsSyncTarget = (entityId: string): string =>
   `apisix:ssl:${gatewayClientSslId(entityId)}`;
 
@@ -104,6 +107,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       await this.reconcileTokenRoute();
     } catch (error) {
       this.logger.warn(`APISIX token route reconcile failed: ${String(error)}`);
+    }
+    try {
+      await this.reconcileNodeControlRoute();
+    } catch (error) {
+      this.logger.warn(`APISIX node control route reconcile failed: ${String(error)}`);
     }
     const versions = await this.prisma.apiVersion.findMany({
       where: { status: { in: [...SERVED] } },
@@ -236,6 +244,34 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       return result;
     } catch (error) {
       await this.recordError(GATEWAY_TOKEN_SYNC_TARGET, desiredHash, error);
+      throw error;
+    }
+  }
+
+  /**
+   * The control channel of kit nodes (M4-02). Without RID_GATEWAY_PORTAL_API_URL and
+   * RID_NODE_CONTROL_TOKEN the route is removed: nodes cannot reach the portal.
+   */
+  async reconcileNodeControlRoute(): Promise<GatewayResult> {
+    const desired = desiredNodeControlRoute(this.settings);
+    // The token is part of the route: hash it, never store it in sync_state.
+    const desiredHash = hash(desired);
+    try {
+      const actual = await this.admin.get('routes', NODE_CONTROL_ROUTE_ID);
+      let result: GatewayResult = actual ? 'unchanged' : 'absent';
+      if (!desired) {
+        if (actual) {
+          await this.admin.delete('routes', NODE_CONTROL_ROUTE_ID);
+          result = 'deleted';
+        }
+      } else if (!actual || !matches(desired, actual)) {
+        await this.admin.put('routes', NODE_CONTROL_ROUTE_ID, desired);
+        result = actual ? 'updated' : 'created';
+      }
+      await this.recordSuccess(NODE_CONTROL_SYNC_TARGET, desiredHash);
+      return result;
+    } catch (error) {
+      await this.recordError(NODE_CONTROL_SYNC_TARGET, desiredHash, error);
       throw error;
     }
   }

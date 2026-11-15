@@ -63,6 +63,25 @@ export async function reissueTokenAction(
   };
 }
 
+export async function decommissionNodeAction(
+  entityId: string,
+  nodeId: string,
+  _prev: FormState,
+): Promise<FormState> {
+  const result = await apiSend(
+    'POST',
+    `/entities/${entityId}/nodes/${nodeId}/decommission`,
+    {},
+    nodeDetailSchema,
+  );
+  if (!result.ok) {
+    const t = await getTranslations('forms');
+    return problemToFormState(result.problem, t('unexpected'));
+  }
+  revalidatePath('/', 'layout');
+  return { done: true };
+}
+
 export async function revokeTokenAction(
   entityId: string,
   nodeId: string,

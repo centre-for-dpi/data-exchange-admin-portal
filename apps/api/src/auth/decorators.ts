@@ -9,6 +9,7 @@ export const PLATFORM_ACTION = 'rid:platform-action';
 export const OPTIONAL_AUTH = 'rid:optional-auth';
 export const SIGNED_IN = 'rid:signed-in';
 export const CITIZEN = 'rid:citizen';
+export const NODE = 'rid:node';
 
 /** Endpoint that does not require authentication (health checks). Everything else does. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
@@ -66,6 +67,7 @@ export const CurrentEntity = createParamDecorator((_data: unknown, ctx: Executio
 export type RouteAccess =
   | { kind: 'public' }
   | { kind: 'citizen' }
+  | { kind: 'node' }
   | { kind: 'optional' }
   | { kind: 'signedIn' }
   | { kind: 'entity'; action: EntityAction }
@@ -83,6 +85,7 @@ export function routeAccess(reflector: MetadataReader, targets: Array<object>): 
   const platform = reflector.getAllAndOverride<PlatformAction>(PLATFORM_ACTION, targets);
   if (platform) return { kind: 'platform', action: platform };
   if (reflector.getAllAndOverride<boolean>(CITIZEN, targets)) return { kind: 'citizen' };
+  if (reflector.getAllAndOverride<boolean>(NODE, targets)) return { kind: 'node' };
   if (reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return { kind: 'public' };
   if (reflector.getAllAndOverride<boolean>(OPTIONAL_AUTH, targets)) return { kind: 'optional' };
   if (reflector.getAllAndOverride<boolean>(SIGNED_IN, targets)) return { kind: 'signedIn' };

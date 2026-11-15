@@ -118,6 +118,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | GET | `/api/v1/entities/:entityId/nodes` | entidad: `node.read` |
 | POST | `/api/v1/entities/:entityId/nodes` | entidad: `node.write` |
 | GET | `/api/v1/entities/:entityId/nodes/:nodeId` | entidad: `node.read` |
+| POST | `/api/v1/entities/:entityId/nodes/:nodeId/decommission` | entidad: `node.write` |
 | POST | `/api/v1/entities/:entityId/nodes/:nodeId/enrollment-tokens` | entidad: `node.write` |
 | POST | `/api/v1/entities/:entityId/nodes/:nodeId/enrollment-tokens/:tokenId/revoke` | entidad: `node.write` |
 | GET | `/api/v1/entities/:entityId/subscriptions` | entidad: `subscription.read` |
@@ -145,6 +146,10 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | GET | `/api/v1/me/notifications` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/me/notifications/:notificationId/read` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/me/notifications/read-all` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/nodes/:nodeId/config` | nodo del kit (mTLS con su certificado, a través de la ruta de control del gateway) |
+| POST | `/api/v1/nodes/:nodeId/heartbeat` | nodo del kit (mTLS con su certificado, a través de la ruta de control del gateway) |
+| POST | `/api/v1/nodes/:nodeId/renew` | nodo del kit (mTLS con su certificado, a través de la ruta de control del gateway) |
+| POST | `/api/v1/nodes/enroll` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/opa/bundle.tar.gz` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | POST | `/api/v1/opa/status` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/pki/ca` | pública (sin sesión; las internas exigen su propio token de servicio) |

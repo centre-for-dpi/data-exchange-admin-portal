@@ -1,5 +1,6 @@
-import { randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import { makeCsr } from './csr';
 import { signIn } from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
@@ -37,6 +38,42 @@ test.describe('nodes of the kit and enrollment tokens (M4-01)', () => {
     await page.reload();
     await expect(page.getByTestId('enrollment-token')).toHaveCount(0);
     await expect(page.getByText(token)).toHaveCount(0);
+  });
+
+  test('a node enrolls with its token (M4-02) and elena decommissions it', async ({ page }) => {
+    const name = `servidor-${randomUUID().slice(0, 8)}`;
+    await signIn(page, 'elena.admin', '/my-entity/nodes');
+    await page.getByLabel('Nombre del nodo').fill(name);
+    await page.getByRole('button', { name: 'Registrar y emitir token' }).click();
+    const token = (await page.getByTestId('enrollment-token').textContent()) ?? '';
+
+    // The kit enrolls through the contract (ARCHITECTURE.md §10) with the token.
+    const { x } = generateKeyPairSync('x25519').publicKey.export({ format: 'jwk' });
+    const res = await fetch(
+      `${process.env.RID_API_URL ?? 'http://localhost:4000'}/api/v1/nodes/enroll`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          csr: (await makeCsr('rid-node')).csr,
+          wireguardPublicKey: Buffer.from(x ?? '', 'base64url').toString('base64'),
+          kitVersion: '1.0.0',
+        }),
+      },
+    );
+    expect(res.status, await res.clone().text()).toBe(201);
+
+    await page.reload();
+    const row = page.getByRole('row', { name: new RegExp(name) });
+    await expect(row).toContainText('Enrolado');
+    await expect(row).toContainText('1.0.0');
+    await expect(row).toContainText('Usado');
+    await expectNoAccessibilityViolations(page);
+
+    page.once('dialog', (dialog) => void dialog.accept());
+    await row.getByRole('button', { name: `Dar de baja ${name}` }).click();
+    await expect(row).toContainText('Dado de baja');
   });
 
   test('a publisher sees the nodes but cannot issue tokens', async ({ page }) => {

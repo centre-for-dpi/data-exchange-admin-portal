@@ -4,6 +4,7 @@ import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/serve
 import { notFound } from 'next/navigation';
 import {
   CreateNodeForm,
+  DecommissionNodeButton,
   ReissueTokenForm,
   RevokeTokenButton,
 } from '../../../../components/nodes/node-forms';
@@ -71,7 +72,16 @@ export default async function EntityNodesPage({ params }: PageProps) {
                   const token = node.enrollmentToken;
                   return (
                     <tr key={node.id}>
-                      <td className="font-medium">{node.name}</td>
+                      <td>
+                        <span className="block font-medium">{node.name}</span>
+                        {node.services.length ? (
+                          <span className="block text-sm text-muted-foreground">
+                            {t('nodes.services', {
+                              list: node.services.map((s) => s.path).join(', '),
+                            })}
+                          </span>
+                        ) : null}
+                      </td>
                       <td>
                         <StatusBadge status={node.status}>
                           {t(`nodeStatus.${node.status}`)}
@@ -115,6 +125,12 @@ export default async function EntityNodesPage({ params }: PageProps) {
                                 nodeName={node.name}
                               />
                             </div>
+                          ) : node.status !== 'decommissioned' ? (
+                            <DecommissionNodeButton
+                              entityId={active.entity.id}
+                              nodeId={node.id}
+                              nodeName={node.name}
+                            />
                           ) : null}
                         </td>
                       ) : null}

@@ -153,7 +153,7 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
 
 **SSL** `rid-ssl-gateway` (M3-02, S-3)
 - `snis` = `RID_GATEWAY_TLS_HOSTS`. `cert` y `key` son el certificado de servidor del gateway, que emite step-ca con el provisioner `rid-gateway-tls`. El portal genera la clave, la guarda sellada (`gateway_certificate`, `RID_SECRETS_KEY`) y renueva el certificado en el último tercio de su vida. Lo audita (`gateway_certificate.issued`) sin la clave.
-- Con `features.mtls.required`, `client.ca` lleva la intermedia y la raíz de step-ca (`depth: 2`), sin `skip_mtls_uri_regex`: APISIX rechaza en el handshake toda llamada sin un certificado válido de la red. Sin el flag, el objeto sirve TLS sin pedir certificado.
+- `client.ca` lleva la intermedia y la raíz de step-ca (`depth: 2`). Con `features.mtls.required`, sin `skip_mtls_uri_regex`: APISIX rechaza en el handshake toda llamada sin un certificado válido de la red. Sin el flag, el certificado es opcional (si llega, se verifica) salvo en el canal de control de los nodos (`/api/v1/nodes/{id}/heartbeat|renew|config`), donde APISIX lo exige: `skip_mtls_uri_regex` exime todo lo demás (M4-02).
 - Lo aplica el reconciliador de APISIX en cada pasada completa (`sync_state` `apisix:ssl:rid-ssl-gateway`). La clave no se compara, porque APISIX la guarda cifrada: una clave nueva siempre llega con un certificado nuevo.
 
 **Reconciliador (M1-08):** consume `gateway.sync` (aggregate `apiVersion:<id>`) y sirve las versiones `published` y `deprecated`. Compara el estado deseado con lo que guarda APISIX campo por campo (APISIX agrega valores por defecto, que no cuentan como deriva) y solo escribe si algo cambió: upstream antes que ruta, y al borrar, ruta antes que upstream. Hace una pasada completa al arrancar y cada 5 minutos, que también borra los objetos `rid-` que ninguna versión pide. Los objetos sin ese prefijo no se tocan. El resultado queda en `sync_state` (`apisix:route:rid-route-<id>`).
@@ -246,7 +246,7 @@ Reconciliador de aplicaciones: crea/actualiza/deshabilita clientes en `rid-gatew
   - Antes de la CA, el portal revisa el CSR (`pkijs`): un solo bloque PEM, campo de atributos presente, firma propia válida, clave ECDSA P-256/P-384 o RSA 2048-4096, CN = clientId y ningún otro nombre alternativo. Un CSR inválido da 400 con un mensaje estable por causa. Si la CA no responde o rechaza, 503.
   - El certificado que devuelve la CA debe tener ese sujeto y esa clave, y encadenar hasta la raíz. El portal guarda la cadena (pública), la huella RFC 8705 (`x5t#S256`), el serial y las fechas. Una aplicación tiene un solo certificado activo (índice único parcial); la rotación es M3-04.
   - Un trabajo periódico (`RID_LIFECYCLE_INTERVAL_SECONDS`) avisa a los desarrolladores de la entidad `lifecycle.certificateExpiryWarningDays` antes del vencimiento (`credential.expiry_notice_queued` → notificación `certificate_expiring`) y marca `expired` los certificados vencidos.
-- Dos plantillas: `app` (CN = clientId, 90 días) y `node` (CN = `rid-node-<id>`, 90 días, renovación automática por el kit; llega con M4). La de `app` está en `infra/step-ca/app.tpl`: solo el CN del token como sujeto, el clientId como SAN DNS y uso de clave solo para autenticación de cliente TLS.
+- Plantillas. `app` (`infra/step-ca/app.tpl`, provisioner `rid-portal`): CN = clientId, el clientId como SAN DNS, uso de clave solo para autenticación de cliente TLS, 90 días. `node` (`infra/step-ca/node.tpl`, provisioner propio `rid-nodes`, M4-02): `CN=rid-node` fijo y el nombre del nodo, `rid-node-<nodeId>`, como único SAN DNS, los dos del OTT. Autenticación de servidor (el gateway llama al nodo) y de cliente (el nodo llama al canal de control). 90 días, renovados por el kit. step-ca exige que el CN del CSR sea el `sub` del OTT; como el kit no sabe su ID antes de enrolarse, el CSR del nodo lleva siempre `CN=rid-node`, sin nombres, y el SAN lo pone el OTT.
 - Revocación: certificados de vida corta + lista de huellas revocadas en el bundle OPA (requiere SPIKE S-3).
 
 ## 5. Flujo de una llamada
@@ -330,12 +330,24 @@ Objetivo de M5-06. Hoy solo existe el plugin `prometheus` en cada ruta de APISIX
 
 ## 10. Contrato con el kit (nodos)
 
-| Endpoint | Uso |
-| :-- | :-- |
-| `POST /api/v1/nodes/enroll` | Token de enrolamiento + CSR + clave pública WireGuard → certificado, config WireGuard (IP del túnel, peer del hub), `nodeId` |
-| `POST /api/v1/nodes/{id}/heartbeat` | mTLS del nodo; versión, servicios expuestos (nombre, puerto, hash del OpenAPI), salud |
-| `POST /api/v1/nodes/{id}/renew` | Renovación de certificado |
-| `GET /api/v1/nodes/{id}/config` | Configuración deseada (versiones mínimas, avisos) |
+Versión 1. El documento que el kit consume es `docs/contracts/node-contract-v1.openapi.json`, generado desde el API (un test falla si se desactualiza; `RID_UPDATE_NODE_CONTRACT=1` lo regenera).
+
+| Endpoint | Autenticación | Uso |
+| :-- | :-- | :-- |
+| `POST /api/v1/nodes/enroll` | token de enrolamiento (en el cuerpo) | Token + CSR (`CN=rid-node`, sin nombres) + clave pública WireGuard + versión del kit + puerto de servicio → `nodeId`, certificado (`DNS:rid-node-<nodeId>`), raíz de la red, URL del canal de control, intervalo de heartbeat y configuración WireGuard (dirección `/32`, clave y endpoint del hub, dirección del hub como única `AllowedIPs`) |
+| `POST /api/v1/nodes/{id}/heartbeat` | mTLS del nodo | Versión, puerto de servicio, servicios expuestos (nombre, ruta, hash del OpenAPI) y salud. Responde el estado y si toca renovar (último tercio de la vida del certificado) |
+| `POST /api/v1/nodes/{id}/renew` | mTLS del nodo | CSR nuevo → certificado nuevo. El anterior abre el canal de control `RID_NODE_RENEWAL_GRACE_HOURS` (24) más, por si el nodo perdió la respuesta |
+| `GET /api/v1/nodes/{id}/config` | mTLS del nodo | Versiones publicadas que sirve el nodo (ruta pública y `servicePath`), versión mínima del kit (`RID_NODE_MIN_KIT_VERSION`) y avisos |
+
+**Enrolamiento (M4-02).** El token se valida primero (cualquier rechazo es el mismo 401, sin decir por qué), luego el CSR (como el de las aplicaciones, `apps/api/src/credentials/csr.ts`) y que el hub esté configurado (si no, 503). La CA firma antes de la transacción, que marca el token usado solo si nadie lo usó mientras tanto. Un fallo antes del commit deja el token usable. La dirección del túnel es la siguiente a la más alta ya dada en `RID_WG_SUBNET` (`10.77.0.0/16`; el hub en la primera), con un bloqueo consultivo, y nunca se reutiliza. Una clave WireGuard ya enrolada da 409. Queda en la bitácora `node.enrolled` con la huella, el serial y la dirección, nunca una clave privada.
+
+**Canal de control (M4-02).** El TLS del nodo termina en el gateway, en la ruta `rid-node-control` (`/api/v1/nodes/*`) que mantiene el reconciliador de APISIX:
+- `rid-header-guard` borra toda `X-RID-*` del cliente; `rid-client-cert` pone la huella del certificado verificado en el handshake; `proxy-rewrite` agrega `X-RID-Node-Control` con `RID_NODE_CONTROL_TOKEN` y la envía al API (`RID_GATEWAY_PORTAL_API_URL`).
+- El API cree en la huella solo si llega con ese token (comparación en tiempo constante): sin él, la petición no pasó por el gateway y la cabecera no prueba nada. Con él, la huella debe ser la del certificado vigente del nodo (o la del reemplazado durante la gracia), y el nodo debe estar enrolado. Si no, 401.
+- Sin las dos variables, el reconciliador borra la ruta y los nodos no alcanzan el portal.
+- Sin mTLS obligatorio en la red, el objeto SSL igual pide el certificado en estas rutas (§4.1).
+
+**Estados (`SPEC.md §4.6`).** El primer heartbeat pasa el nodo a `online` (`node.online`). Un cambio de servicios declarados queda como `node.services_changed`; los heartbeats que no cambian nada no se auditan. Cada `RID_NODE_LIFECYCLE_INTERVAL_SECONDS` (60) un trabajo pasa a `offline` los nodos sin heartbeat por `RID_NODE_OFFLINE_AFTER_SECONDS` (300), también los enrolados que nunca enviaron uno: `node.offline` avisa (`node_offline`, en el portal y por correo) a los `entity_admin` de la entidad y a los `platform_admin`. El siguiente heartbeat lo devuelve a `online`. `entity_admin` o `platform_admin` dan de baja un nodo (`decommissioned`, definitivo): el canal de control deja de aceptar su certificado y se anula el token vigente.
 
 El kit se especifica en otro repositorio; este contrato es la frontera. En desarrollo, `infra/mock-providers` simula un nodo (servicios Fastify con datos sintéticos, ADR-0009) y un contenedor WireGuard.
 

@@ -274,5 +274,23 @@ export async function resolveNotification(
       recipients: [...new Set([...developers, ...requester])],
     };
   }
+
+  if (event.action === 'node.offline') {
+    const node = await prisma.node.findUnique({
+      where: { id: event.targetId },
+      include: { entity: true },
+    });
+    // Back online (or taken out) before the dispatch: nothing to say any more.
+    if (node?.status !== 'offline') return null;
+    // The entity's admins and the operator, who supports the nodes (SPEC.md §6).
+    const admins = await membersWith(prisma, node.entityId, ['entity_admin']);
+    const operators = await platformUsers(prisma, ['platform_admin']);
+    return {
+      kind: 'node_offline',
+      params: { node: node.name, entity: node.entity.shortName },
+      link: '/my-entity/nodes',
+      recipients: [...new Set([...admins, ...operators])],
+    };
+  }
   return null;
 }

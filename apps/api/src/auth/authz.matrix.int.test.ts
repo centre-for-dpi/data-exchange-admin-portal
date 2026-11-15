@@ -174,7 +174,8 @@ describe('authorization matrix: every endpoint × every role (M2-03)', () => {
     const mismatches: string[] = [];
     for (const route of routes) {
       const { kind } = route.access;
-      if (kind === 'public' || kind === 'citizen' || kind === 'optional') continue;
+      if (kind === 'public' || kind === 'citizen' || kind === 'node' || kind === 'optional')
+        continue;
       const name = `${route.method} ${route.path}`;
 
       const anonymous = await call(route);

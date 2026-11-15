@@ -14,7 +14,12 @@ import { CERTIFICATE_AUTHORITY, StepCaClient } from '../../credentials/step-ca.c
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { HttpApisixAdmin } from './apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler, GATEWAY_TLS_SYNC_TARGET } from './apisix.reconciler.js';
-import { GATEWAY_SSL_ID, type GatewaySettings, parseDevNodes } from './desired-state.js';
+import {
+  GATEWAY_SSL_ID,
+  type GatewaySettings,
+  NODE_ONLY_SKIP_MTLS_REGEX,
+  parseDevNodes,
+} from './desired-state.js';
 import { GatewayCertificates } from './gateway-certificates.js';
 
 const HTTPS_PORT = Number(process.env.APISIX_HTTPS_PORT ?? 9443);
@@ -197,7 +202,11 @@ describe('gateway TLS and client certificates (M3-02)', () => {
   it('without mTLS, the TLS handshake needs no client certificate', async () => {
     settings.tls.mtlsRequired = false;
     expect(await reconciler.reconcileTls()).toBe('updated');
-    expect(await admin.get('ssls', GATEWAY_SSL_ID)).not.toHaveProperty('client');
+    // The CA stays to verify a certificate when one is presented, and the node control channel
+    // still requires one (M4-02).
+    expect((await admin.get('ssls', GATEWAY_SSL_ID))?.client).toMatchObject({
+      skip_mtls_uri_regex: [NODE_ONLY_SKIP_MTLS_REGEX],
+    });
     const outcome = await waitFor(
       () => gatewayCall(root),
       (o) => o.status === 200,

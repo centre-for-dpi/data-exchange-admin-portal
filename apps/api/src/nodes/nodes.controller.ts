@@ -2,6 +2,7 @@ import { Body, Controller, Get, Header, HttpCode, Param, Post, Req } from '@nest
 import {
   type CreateNodeInput,
   createNodeSchema,
+  decommissionNodeSchema,
   enrollmentTokenParamsSchema,
   entityIdParamsSchema,
   issuedEnrollmentTokenSchema,
@@ -107,6 +108,31 @@ export class NodesController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.nodes.reissue(entity.entityId, nodeId, principal, request.id);
+  }
+
+  @Post(':nodeId/decommission')
+  @HttpCode(200)
+  @EntityAccess('node.write')
+  @ApiOperation({
+    operationId: 'decommissionNode',
+    summary: 'Take a node out of the network',
+    description:
+      'Final: the control channel stops accepting its certificate, the hub drops its tunnel ' +
+      'peer and the gateway stops calling it. The reason goes to the audit trail.',
+    tags: ['nodes'],
+    params: nodeIdParamsSchema,
+    body: decommissionNodeSchema,
+    responses: { 200: { description: 'The node', schema: nodeDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  decommission(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('nodeId', uuid) nodeId: string,
+    @Body(new ZodValidationPipe(decommissionNodeSchema)) body: { reason?: string },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.nodes.decommission(entity.entityId, nodeId, principal, body.reason, request.id);
   }
 
   @Post(':nodeId/enrollment-tokens/:tokenId/revoke')

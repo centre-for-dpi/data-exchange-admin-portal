@@ -113,6 +113,7 @@ function requestedAltNames(csr: pkijs.CertificationRequest): string[] {
 export async function checkCsr(
   pem: string,
   clientId: string,
+  options: { altNames?: 'same' | 'none' } = {},
 ): Promise<{ pem: string; publicKey: Buffer }> {
   const der = decodePem(pem);
   const csr = parse(der);
@@ -132,7 +133,13 @@ export async function checkCsr(
   } catch {
     throw new CsrRejected('malformed');
   }
-  if (cns.length !== 1 || cns[0] !== clientId || altNames.some((n) => n !== `dns:${clientId}`)) {
+  // Kit nodes (M4-02) ask with the fixed CN=rid-node and no names: the CA adds the node's own
+  // name, which the kit does not know before enrolling.
+  const badAltNames =
+    options.altNames === 'none'
+      ? altNames.length > 0
+      : altNames.some((n) => n !== `dns:${clientId}`);
+  if (cns.length !== 1 || cns[0] !== clientId || badAltNames) {
     throw new CsrRejected('subject');
   }
   const body = der.toString('base64').replace(/.{1,64}/g, '$&\n');

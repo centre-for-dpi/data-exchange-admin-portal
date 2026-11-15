@@ -57,6 +57,13 @@ import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
             return getCountryConfig().features.mtls.required;
           },
         },
+        nodeControl:
+          process.env.RID_GATEWAY_PORTAL_API_URL && process.env.RID_NODE_CONTROL_TOKEN
+            ? {
+                portalUrl: process.env.RID_GATEWAY_PORTAL_API_URL,
+                token: process.env.RID_NODE_CONTROL_TOKEN,
+              }
+            : undefined,
       }),
     },
     GatewayCertificates,

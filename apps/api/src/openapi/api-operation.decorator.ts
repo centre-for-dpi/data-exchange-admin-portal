@@ -28,9 +28,10 @@ export interface OperationSpec {
   errors?: number[];
   /**
    * false for endpoints that do not require authentication; 'citizen' for endpoints that take a
-   * citizen token of the national identity provider instead of a portal token. Defaults to true.
+   * citizen token of the national identity provider instead of a portal token; 'node' for the
+   * control channel of kit nodes (mTLS with the node's certificate). Defaults to true.
    */
-  authenticated?: boolean | 'citizen';
+  authenticated?: boolean | 'citizen' | 'node';
 }
 
 /** Documents an endpoint in /api/docs (ADR-0013). Every route must have it (checked by a test). */

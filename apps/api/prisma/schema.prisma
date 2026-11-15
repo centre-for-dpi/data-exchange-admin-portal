@@ -1063,30 +1063,39 @@ enum NodeStatus {
 /// A node of the kit installed at a provider entity. Created when its first enrollment token is
 /// issued (M4-01); the kit fills in its keys and certificate when it enrolls (M4-02).
 model Node {
-  id                     String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  entityId               String     @map("entity_id") @db.Uuid
-  entity                 Entity     @relation(fields: [entityId], references: [id])
+  id                             String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  entityId                       String     @map("entity_id") @db.Uuid
+  entity                         Entity     @relation(fields: [entityId], references: [id])
   /// Unique per entity, chosen by whoever issues the token ("servidor-bogota").
-  name                   String
-  status                 NodeStatus @default(enrollment_issued)
+  name                           String
+  status                         NodeStatus @default(enrollment_issued)
   /// Address of the node inside the WireGuard network of the hub (M4-03).
-  tunnelAddress          String?    @unique @map("tunnel_address")
-  wireguardPublicKey     String?    @unique @map("wireguard_public_key")
+  tunnelAddress                  String?    @unique @map("tunnel_address")
+  wireguardPublicKey             String?    @unique @map("wireguard_public_key")
   /// Certificate the network CA issued at enrollment (PEM chain, public).
-  certificatePem         String?    @map("certificate_pem")
-  certificateSerial      String?    @map("certificate_serial")
+  certificatePem                 String?    @map("certificate_pem")
+  certificateSerial              String?    @map("certificate_serial")
   /// RFC 8705 x5t#S256 of the certificate: how the node is recognized on the mTLS channel.
-  certificateFingerprint String?    @unique @map("certificate_fingerprint")
-  certificateNotAfter    DateTime?  @map("certificate_not_after") @db.Timestamptz(3)
-  kitVersion             String?    @map("kit_version")
-  lastHeartbeatAt        DateTime?  @map("last_heartbeat_at") @db.Timestamptz(3)
+  certificateFingerprint         String?    @unique @map("certificate_fingerprint")
+  certificateNotAfter            DateTime?  @map("certificate_not_after") @db.Timestamptz(3)
+  /// The certificate replaced by the last renewal still opens the control channel until this date,
+  /// so a node that lost the renewal answer can try again (M4-02).
+  previousCertificateFingerprint String?    @unique @map("previous_certificate_fingerprint")
+  previousCertificateUntil       DateTime?  @map("previous_certificate_until") @db.Timestamptz(3)
+  /// Port of the node's HTTPS listener on its tunnel address, where the gateway reaches its
+  /// services (from enrollment and heartbeats).
+  servicePort                    Int?       @map("service_port")
+  kitVersion                     String?    @map("kit_version")
+  lastHeartbeatAt                DateTime?  @map("last_heartbeat_at") @db.Timestamptz(3)
   /// What the node declares it exposes, from its last heartbeat (M4-02).
-  services               Json       @default("[]")
-  enrolledAt             DateTime?  @map("enrolled_at") @db.Timestamptz(3)
-  decommissionedAt       DateTime?  @map("decommissioned_at") @db.Timestamptz(3)
-  createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdBy              String     @map("created_by")
+  services                       Json       @default("[]")
+  /// Health the node reported in its last heartbeat: { status, checkedAt }.
+  health                         Json?
+  enrolledAt                     DateTime?  @map("enrolled_at") @db.Timestamptz(3)
+  decommissionedAt               DateTime?  @map("decommissioned_at") @db.Timestamptz(3)
+  createdAt                      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy                      String     @map("created_by")
 
   enrollmentTokens NodeEnrollmentToken[]
 

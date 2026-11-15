@@ -29,6 +29,13 @@ export class NotFoundError extends DomainError {
   }
 }
 
+/** The request carries no valid credential (401). */
+export class UnauthenticatedError extends DomainError {
+  constructor(message = 'Authentication is required') {
+    super(ErrorCode.Unauthenticated, message);
+  }
+}
+
 export class ForbiddenError extends DomainError {
   constructor(message = 'You are not allowed to perform this action') {
     super(ErrorCode.Forbidden, message);

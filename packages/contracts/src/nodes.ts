@@ -75,6 +75,14 @@ export const nodeSummarySchema = z.object({
   enrolledAt: z.iso.datetime().nullable(),
   certificateNotAfter: z.iso.datetime().nullable(),
   services: z.array(nodeServiceSchema),
+  /** Health the node reported in its last heartbeat. */
+  health: z
+    .object({
+      status: z.enum(['ok', 'degraded', 'failing']),
+      detail: z.string().optional(),
+      checkedAt: z.iso.datetime(),
+    })
+    .nullable(),
   createdAt: z.iso.datetime(),
   /** Most recent enrollment token, if any. */
   enrollmentToken: enrollmentTokenSchema.nullable(),
@@ -87,6 +95,11 @@ export const nodeDetailSchema = nodeSummarySchema.extend({
   enrollmentTokens: z.array(enrollmentTokenSchema),
 });
 export type NodeDetail = z.infer<typeof nodeDetailSchema>;
+
+/** Takes a node out of the network: its certificate and tunnel stop working (M4-02). */
+export const decommissionNodeSchema = z.strictObject({
+  reason: z.string().trim().max(500).optional(),
+});
 
 /** Response to issuing a token: the token is shown here once and never again. */
 export const issuedEnrollmentTokenSchema = z.object({
@@ -102,3 +115,129 @@ export const networkNodeSchema = nodeSummarySchema.extend({
 });
 export type NetworkNode = z.infer<typeof networkNodeSchema>;
 export const networkNodeListSchema = z.object({ items: z.array(networkNodeSchema) });
+
+// ---------------------------------------------------------------------------------------------
+// Contract with the kit (ARCHITECTURE.md §10, ADR-0011, M4-02). Versioned: v1.
+// ---------------------------------------------------------------------------------------------
+
+/** Version of the contract between the portal and the kit. */
+export const NODE_CONTRACT_VERSION = '1';
+
+/**
+ * Common name of every node CSR. The kit does not know its node id before enrolling: the CA adds
+ * the node's own name (`rid-node-<nodeId>`) as the certificate's only DNS name.
+ */
+export const NODE_CSR_COMMON_NAME = 'rid-node';
+
+/** DNS name on a node's certificate: what the gateway verifies when it calls the node. */
+export const nodeDnsName = (nodeId: string): string => `rid-node-${nodeId}`;
+
+/** A WireGuard public key: 32 bytes, base64 (44 characters). */
+export const wireguardKeySchema = z
+  .string()
+  .regex(/^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/, 'a WireGuard public key (base64, 32 bytes)');
+
+const kitVersionSchema = z
+  .string()
+  .max(40)
+  .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/, 'semantic version, e.g. 1.4.0');
+
+const servicePortSchema = z.number().int().min(1).max(65_535);
+
+/** POST /nodes/enroll: the kit enrolls once with its token (SPEC.md §4.6 step 2). */
+export const enrollNodeSchema = z.strictObject({
+  token: z.string().min(20).max(200),
+  /** PKCS#10, PEM, with CN=rid-node and no other names. The private key never leaves the node. */
+  csr: z.string().min(100).max(10_000),
+  wireguardPublicKey: wireguardKeySchema,
+  kitVersion: kitVersionSchema,
+  /** Port of the node's HTTPS listener on its tunnel address. */
+  servicePort: servicePortSchema.default(8443),
+});
+export type EnrollNodeInput = z.input<typeof enrollNodeSchema>;
+
+export const nodeWireguardConfigSchema = z.object({
+  /** Interface address of the node, CIDR (/32). */
+  address: z.string(),
+  hubPublicKey: wireguardKeySchema,
+  /** Where the node reaches the hub, host:port (UDP). */
+  hubEndpoint: z.string(),
+  /** The hub's address inside the tunnel: the only peer address the node routes. */
+  hubAddress: z.string(),
+  allowedIps: z.array(z.string()),
+  persistentKeepaliveSeconds: z.number().int(),
+});
+
+export const nodeEnrollmentSchema = z.object({
+  contractVersion: z.literal(NODE_CONTRACT_VERSION),
+  nodeId: z.uuid(),
+  /** DNS name on the certificate; the gateway calls the node with it as SNI and Host. */
+  nodeName: z.string(),
+  /** The node's certificate followed by its issuing chain, PEM. */
+  certificate: z.string(),
+  certificateNotAfter: z.iso.datetime(),
+  /** Root of the network CA, PEM: the node verifies the gateway and the portal with it. */
+  caCertificate: z.string(),
+  /** Base URL of the control channel (mTLS with the node's certificate). */
+  controlUrl: z.url(),
+  heartbeatIntervalSeconds: z.number().int(),
+  wireguard: nodeWireguardConfigSchema,
+});
+export type NodeEnrollment = z.infer<typeof nodeEnrollmentSchema>;
+
+export const nodeHealthSchema = z.strictObject({
+  status: z.enum(['ok', 'degraded', 'failing']),
+  /** Short machine-readable reason, never data of the services. */
+  detail: z.string().max(200).optional(),
+});
+
+/** POST /nodes/{id}/heartbeat, every heartbeatIntervalSeconds (SPEC.md §4.6 step 3). */
+export const nodeHeartbeatSchema = z.strictObject({
+  kitVersion: kitVersionSchema,
+  servicePort: servicePortSchema,
+  services: z.array(nodeServiceSchema).max(100),
+  health: nodeHealthSchema,
+});
+export type NodeHeartbeatInput = z.input<typeof nodeHeartbeatSchema>;
+
+export const nodeHeartbeatResponseSchema = z.object({
+  status: nodeStatusSchema,
+  nextHeartbeatSeconds: z.number().int(),
+  /** The certificate is in the last third of its life: call /renew. */
+  renewCertificate: z.boolean(),
+});
+
+/** POST /nodes/{id}/renew: a new certificate for a new key (same CSR rules as enrollment). */
+export const renewNodeCertificateSchema = z.strictObject({
+  csr: z.string().min(100).max(10_000),
+});
+export const renewedNodeCertificateSchema = z.object({
+  certificate: z.string(),
+  certificateNotAfter: z.iso.datetime(),
+  /** Until when the previous certificate still opens the control channel. */
+  previousValidUntil: z.iso.datetime(),
+});
+
+/** GET /nodes/{id}/config: what the network expects from the node. */
+export const nodeConfigSchema = z.object({
+  contractVersion: z.literal(NODE_CONTRACT_VERSION),
+  nodeId: z.uuid(),
+  heartbeatIntervalSeconds: z.number().int(),
+  /** Oldest kit version the network accepts; null when there is no minimum. */
+  minimumKitVersion: z.string().nullable(),
+  /** Published API versions served by this node: the gateway calls `servicePath` on it. */
+  services: z.array(
+    z.object({
+      apiVersionId: z.uuid(),
+      apiName: z.string(),
+      version: z.string(),
+      /** Public base path at the gateway. */
+      basePath: z.string(),
+      servicePath: z.string(),
+    }),
+  ),
+  notices: z.array(z.object({ code: z.string(), message: z.string() })),
+});
+export type NodeConfig = z.infer<typeof nodeConfigSchema>;
+
+export const nodeControlParamsSchema = z.object({ nodeId: z.uuid() });

@@ -54,6 +54,9 @@ const signingJwk = {
 };
 
 const db = { owner: secret(), app: secret(), keycloak: secret() };
+// WireGuard hub of the kit nodes (M4-03): an X25519 key pair, raw 32 bytes in base64 like `wg`.
+const hub = generateKeyPairSync('x25519');
+const raw = (jwkField) => Buffer.from(jwkField ?? '', 'base64url').toString('base64');
 const webhookSecret = `whsec_${randomBytes(32).toString('base64')}`;
 const set = {
   POSTGRES_PASSWORD: db.owner,
@@ -72,6 +75,13 @@ const set = {
   RID_END_USER_HASH_SALT: secret(32),
   RID_SUBJECT_REF_KEY: secret(32),
   RID_TRANSPARENCY_INGEST_TOKEN: secret(),
+  // Kit nodes (M4): the control route's token, and the hub's keys. Nodes reach the hub on the
+  // gateway's name (or the portal's), UDP 51820, published by docker-compose.deploy.yml.
+  RID_NODE_CONTROL_TOKEN: secret(32),
+  RID_GATEWAY_PORTAL_API_URL: 'http://api:4000',
+  RID_WG_HUB_PRIVATE_KEY: raw(hub.privateKey.export({ format: 'jwk' }).d),
+  RID_WG_HUB_PUBLIC_KEY: raw(hub.publicKey.export({ format: 'jwk' }).x),
+  RID_WG_HUB_ENDPOINT: `${gatewayHost ?? new URL(publicUrl).hostname}:51820`,
   // The dev-style CA initialises its provisioner with this same password (infra/step-ca).
   STEP_CA_PASSWORD: stepCaPassword,
   RID_STEP_CA_PROVISIONER_PASSWORD: stepCaPassword,

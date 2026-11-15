@@ -655,7 +655,13 @@
       "node": {
         "created": "Nodo registrado",
         "enrollment_token_issued": "Token de enrolamiento emitido",
-        "enrollment_token_revoked": "Token de enrolamiento anulado"
+        "enrollment_token_revoked": "Token de enrolamiento anulado",
+        "enrolled": "Nodo enrolado",
+        "online": "Nodo en línea",
+        "offline": "Nodo sin conexión",
+        "services_changed": "Servicios del nodo cambiados",
+        "certificate_renewed": "Certificado del nodo renovado",
+        "decommissioned": "Nodo dado de baja"
       }
     },
     "filters": {
@@ -901,7 +907,8 @@
       "access_suspended": "Se suspendió el acceso de {application} a {api}",
       "access_revoked": "Se revocó el acceso de {application} a {api}",
       "certificate_expiring": "El certificado de cliente de {application} vence el {date}",
-      "entity_status_changed": "{entity} {decision, select, suspended {fue suspendida en la red} reactivated {fue reactivada en la red} other {fue dada de baja de la red}}"
+      "entity_status_changed": "{entity} {decision, select, suspended {fue suspendida en la red} reactivated {fue reactivada en la red} other {fue dada de baja de la red}}",
+      "node_offline": "El nodo {node} de {entity} no envía heartbeat hace 5 minutos"
     },
     "kindNames": {
       "invitation_received": "Invitaciones a una entidad",
@@ -920,7 +927,8 @@
       "access_suspended": "Accesos suspendidos",
       "access_revoked": "Accesos revocados",
       "certificate_expiring": "Certificados por vencer",
-      "entity_status_changed": "Suspensión o baja de tu entidad"
+      "entity_status_changed": "Suspensión o baja de tu entidad",
+      "node_offline": "Nodos sin conexión"
     },
     "unreadSuffix": "{count, plural, one {: uno sin leer} other {: # sin leer}}"
   },
@@ -1084,6 +1092,10 @@
       "title": "Nodos de la red",
       "lead": "Todos los nodos del kit: estado, versión y último heartbeat.",
       "empty": "Todavía no hay nodos en la red."
-    }
+    },
+    "services": "Servicios: {list}",
+    "decommission": "Dar de baja",
+    "decommissionFor": "Dar de baja {name}",
+    "decommissionConfirm": "¿Dar de baja el nodo {name}? Deja de funcionar para siempre: su certificado y su túnel se anulan."
   }
 }

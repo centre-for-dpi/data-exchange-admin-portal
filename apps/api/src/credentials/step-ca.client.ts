@@ -20,9 +20,10 @@ export const CERTIFICATE_AUTHORITY = Symbol('CERTIFICATE_AUTHORITY');
 
 /**
  * Which provisioner signs (infra/step-ca/configure.sh): `application` certificates for TLS client
- * authentication (rid-portal, M3-01) or the gateway's TLS `server` certificate (M3-02).
+ * authentication (rid-portal, M3-01), the gateway's TLS `server` certificate (M3-02), or a kit
+ * `node` certificate, for server and client authentication (rid-nodes, M4-02).
  */
-export type CertificateProfile = 'application' | 'gateway-server';
+export type CertificateProfile = 'application' | 'gateway-server' | 'node';
 
 export interface SignRequest {
   csrPem: string;
@@ -40,6 +41,8 @@ export interface StepCaSettings {
   provisioner: string;
   /** Provisioner of the gateway's server certificate. */
   gatewayProvisioner: string;
+  /** Provisioner of kit node certificates (M4-02). */
+  nodeProvisioner: string;
   password: string;
   /** PEM file with the CA's root certificate. */
   rootFile?: string;
@@ -54,6 +57,7 @@ export function stepCaSettings(env: NodeJS.ProcessEnv = process.env): StepCaSett
     url: (env.RID_STEP_CA_URL ?? 'https://localhost:9000').replace(/\/+$/, ''),
     provisioner: env.RID_STEP_CA_PROVISIONER ?? 'rid-portal',
     gatewayProvisioner: env.RID_STEP_CA_GATEWAY_PROVISIONER ?? 'rid-gateway-tls',
+    nodeProvisioner: env.RID_STEP_CA_NODE_PROVISIONER ?? 'rid-nodes',
     password: env.RID_STEP_CA_PROVISIONER_PASSWORD ?? '',
     rootFile: env.RID_STEP_CA_ROOT_FILE || undefined,
     rootFingerprint: env.RID_STEP_CA_ROOT_FINGERPRINT?.toLowerCase().replace(/:/g, '') || undefined,
@@ -232,7 +236,9 @@ export class StepCaClient implements CertificateAuthority {
       const provisioner =
         input.profile === 'gateway-server'
           ? this.settings.gatewayProvisioner
-          : this.settings.provisioner;
+          : input.profile === 'node'
+            ? this.settings.nodeProvisioner
+            : this.settings.provisioner;
       const { key, kid } = await this.provisionerKey(provisioner);
       const audience = `${this.settings.url}/1.0/sign`;
       const sans = input.sans?.length ? input.sans : [input.commonName];
@@ -286,13 +292,26 @@ export class StepCaClient implements CertificateAuthority {
 export function checkIssued(
   chain: string[],
   rootPem: string,
-  expected: { commonName: string; publicKey?: Buffer },
+  expected: { commonName: string; sans?: string[]; publicKey?: Buffer },
 ): void {
   const certs = chain.map((pem) => new X509Certificate(pem));
   const root = new X509Certificate(rootPem);
   const [leaf] = certs;
   if (!leaf || leaf.subject !== `CN=${expected.commonName}`) {
     throw new ServiceUnavailableError('The certificate authority returned another subject');
+  }
+  // When the names were given (kit nodes, M4-02): exactly those DNS names, nothing else.
+  if (expected.sans?.length) {
+    const names = (leaf.subjectAltName ?? '').split(', ').filter(Boolean).sort();
+    if (
+      names.join(',') !==
+      expected.sans
+        .map((n) => `DNS:${n}`)
+        .sort()
+        .join(',')
+    ) {
+      throw new ServiceUnavailableError('The certificate authority returned other names');
+    }
   }
   if (
     expected.publicKey &&
