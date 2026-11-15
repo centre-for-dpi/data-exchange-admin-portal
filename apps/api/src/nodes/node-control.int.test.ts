@@ -374,38 +374,73 @@ describe('node enrollment and heartbeat (M4-02)', () => {
     expect(await app.get(NodeControlService).markOffline()).toContain(created.node.id);
   });
 
-  it('renews its certificate; the previous one keeps the channel open during the grace', async () => {
+  it('renews its certificate; the replaced one can only repeat that renewal', async () => {
     const { created, fingerprint } = await enrolled();
     const nodeId = created.node.id;
-    const res = await control('POST', nodeId, 'renew', asNode(fingerprint), {
-      csr: await makeCsr('rid-node'),
-    });
+    const csr = await makeCsr('rid-node');
+    const res = await control('POST', nodeId, 'renew', asNode(fingerprint), { csr });
     expect(res.statusCode, res.body).toBe(200);
     const renewed = renewedNodeCertificateSchema.parse(res.json());
     const fresh = thumbprint(renewed.certificate);
     expect(fresh).not.toBe(fingerprint);
     expect(
       new X509Certificate(
-        renewed.certificate.split('-----END CERTIFICATE-----')[0] + '-----END CERTIFICATE-----',
+        `${renewed.certificate.split('-----END CERTIFICATE-----')[0]}-----END CERTIFICATE-----`,
       ).subjectAltName,
     ).toBe(`DNS:rid-node-${nodeId}`);
-    for (const f of [fresh, fingerprint]) {
-      expect(
-        (await control('POST', nodeId, 'heartbeat', asNode(f), heartbeatBody)).statusCode,
-      ).toBe(200);
-    }
+    expect(
+      (await control('POST', nodeId, 'heartbeat', asNode(fresh), heartbeatBody)).statusCode,
+    ).toBe(200);
+    // The replaced certificate no longer sends heartbeats or reads the configuration...
+    expect(
+      (await control('POST', nodeId, 'heartbeat', asNode(fingerprint), heartbeatBody)).statusCode,
+    ).toBe(401);
+    expect((await control('GET', nodeId, 'config', asNode(fingerprint))).statusCode).toBe(401);
+    // ...it only repeats the renewal it lost: same key, the current certificate back.
+    const retry = await control('POST', nodeId, 'renew', asNode(fingerprint), { csr });
+    expect(retry.statusCode, retry.body).toBe(200);
+    expect(renewedNodeCertificateSchema.parse(retry.json()).certificate).toBe(renewed.certificate);
+    // A new key with the replaced certificate is refused: nobody takes the node over with it.
+    const takeover = await control('POST', nodeId, 'renew', asNode(fingerprint), {
+      csr: await makeCsr('rid-node'),
+    });
+    expect(takeover.statusCode).toBe(401);
+    expect((await prisma.node.findUniqueOrThrow({ where: { id: nodeId } })).certificatePem).toBe(
+      renewed.certificate,
+    );
+
     await prisma.node.updateMany({
       where: { id: nodeId },
       data: { previousCertificateUntil: new Date(Date.now() - 1000) },
     });
-    expect(
-      (await control('POST', nodeId, 'heartbeat', asNode(fingerprint), heartbeatBody)).statusCode,
-    ).toBe(401);
+    expect((await control('POST', nodeId, 'renew', asNode(fingerprint), { csr })).statusCode).toBe(
+      401,
+    );
     expect(
       await prisma.auditEvent.count({
         where: { targetId: nodeId, action: 'node.certificate_renewed' },
       }),
     ).toBe(1);
+  });
+
+  it('a suspended entity cannot renew its nodes; an offboarded one loses the channel', async () => {
+    const { created, fingerprint, entityId } = await enrolled();
+    const nodeId = created.node.id;
+    await prisma.entity.updateMany({ where: { id: entityId }, data: { status: 'suspended' } });
+    expect(
+      (await control('POST', nodeId, 'heartbeat', asNode(fingerprint), heartbeatBody)).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await control('POST', nodeId, 'renew', asNode(fingerprint), {
+          csr: await makeCsr('rid-node'),
+        })
+      ).statusCode,
+    ).toBe(409);
+    await prisma.entity.updateMany({ where: { id: entityId }, data: { status: 'offboarded' } });
+    expect(
+      (await control('POST', nodeId, 'heartbeat', asNode(fingerprint), heartbeatBody)).statusCode,
+    ).toBe(401);
   });
 
   it('tells the node which published versions it serves', async () => {

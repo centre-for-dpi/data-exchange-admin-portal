@@ -589,7 +589,8 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Canal de control (mTLS del nodo): ruta `rid-node-control` del gateway hacia el API. La huella del certificado verificado vale solo con el token de control que agrega APISIX, comparado en tiempo constante.
       - Interpretación: el TLS del nodo termina en el gateway, como el de las aplicaciones (ADR-0022), y no en el API.
       - Sin mTLS obligatorio en la red, el objeto SSL igual exige el certificado en el canal de control (`skip_mtls_uri_regex` exime el resto). Así funciona en un país sin `features.mtls.required`.
-    - Renovación con gracia de 24 h para el certificado reemplazado. `GET /config` lista las versiones publicadas que sirve el nodo.
+    - Renovación con el certificado vigente. Durante 24 h, el reemplazado solo repite esa misma renovación: con la misma clave recibe el certificado vigente. Así quien tenga la clave reemplazada no certifica una propia, como señaló la revisión de seguridad. `GET /config` lista las versiones publicadas que sirve el nodo.
+    - Entidad dada de baja: sus nodos pierden el canal de control. Entidad suspendida: sus nodos envían heartbeat, pero no renuevan.
     - `offline` a los 5 min sin heartbeat (también un enrolado que nunca envió uno). La notificación `node_offline` llega a los administradores de la entidad y a los `platform_admin`. Baja definitiva (`decommissioned`) por `entity_admin` o `platform_admin`.
     - Auditoría: `node.enrolled`, `node.online`, `node.offline`, `node.services_changed`, `node.certificate_renewed`, `node.decommissioned`.
     - Probado con step-ca real y la ruta de control en APISIX real (`node-control-route.int.test.ts`): heartbeat por mTLS, cabeceras falsas ignoradas, otro certificado de la red no abre el nodo, sin TLS no hay huella.

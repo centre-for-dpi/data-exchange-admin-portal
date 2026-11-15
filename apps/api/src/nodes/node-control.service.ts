@@ -278,18 +278,30 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
     nodeId: string,
     fingerprint: string,
     now = new Date(),
-  ): Promise<NodeRow | null> {
-    const node = await this.prisma.node.findUnique({ where: { id: nodeId } });
+  ): Promise<AuthenticatedNode | null> {
+    const node = await this.prisma.node.findUnique({
+      where: { id: nodeId },
+      include: { entity: { select: { status: true } } },
+    });
     if (!node || !(ENROLLED_NODE_STATUSES as readonly string[]).includes(node.status)) return null;
-    const current =
+    // An offboarded entity's nodes are out of the network; a suspended one's still report in.
+    if (node.entity.status !== 'active' && node.entity.status !== 'suspended') return null;
+    const { entity, ...row } = node;
+    if (
       node.certificateFingerprint === fingerprint &&
       node.certificateNotAfter !== null &&
-      node.certificateNotAfter > now;
-    const previous =
+      node.certificateNotAfter > now
+    ) {
+      return { node: row, entityStatus: entity.status, credential: 'current' };
+    }
+    if (
       node.previousCertificateFingerprint === fingerprint &&
       node.previousCertificateUntil !== null &&
-      node.previousCertificateUntil > now;
-    return current || previous ? node : null;
+      node.previousCertificateUntil > now
+    ) {
+      return { node: row, entityStatus: entity.status, credential: 'previous' };
+    }
+    return null;
   }
 
   /** Heartbeat (SPEC.md §4.6 step 3): an enrolled or offline node comes online. */
@@ -338,11 +350,34 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
     };
   }
 
-  /** Renewal: a new certificate for a new key; the replaced one keeps working for the grace. */
-  async renew(node: NodeRow, csr: string, requestId?: string) {
+  /**
+   * Renewal: a new certificate for a new key, asked with the current certificate. The one it
+   * replaces only lets the node repeat that same renewal during the grace (it lost the answer):
+   * the same key gets the current certificate back, never a new one. So whoever holds a replaced
+   * key cannot certify a key of their own and take the node over.
+   */
+  async renew(auth: AuthenticatedNode, csr: string, requestId?: string) {
+    const { node } = auth;
     const { csr: pem } = renewNodeCertificateSchema.parse({ csr });
     const settings = nodeControlSettings();
+    if (auth.entityStatus !== 'active') {
+      throw new ConflictError(`The entity is ${auth.entityStatus}: its nodes cannot renew now`);
+    }
     const checked = await this.checkedCsr(pem);
+    if (auth.credential === 'previous') {
+      const current = node.certificatePem ? leafOf(node.certificatePem) : null;
+      const sameKey =
+        current?.publicKey.export({ type: 'spki', format: 'der' }).equals(checked.publicKey) ??
+        false;
+      if (!current || !sameKey || !node.certificateNotAfter || !node.previousCertificateUntil) {
+        throw new UnauthenticatedError('A replaced certificate can only repeat its renewal');
+      }
+      return {
+        certificate: node.certificatePem ?? '',
+        certificateNotAfter: node.certificateNotAfter.toISOString(),
+        previousValidUntil: node.previousCertificateUntil.toISOString(),
+      };
+    }
     const issued = await this.sign(node.id, checked);
     const graceUntil = new Date(Date.now() + settings.renewalGraceHours * HOUR);
     await this.prisma.$transaction(async (tx) => {
@@ -469,6 +504,14 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
     }
     return marked;
   }
+}
+
+/** A node on the control channel, and which of its certificates it presented. */
+export interface AuthenticatedNode {
+  node: NodeRow;
+  entityStatus: string;
+  /** `previous`: the certificate replaced by the last renewal, during its grace. */
+  credential: 'current' | 'previous';
 }
 
 /** Every refusal of an enrollment token: 401, without telling why. */

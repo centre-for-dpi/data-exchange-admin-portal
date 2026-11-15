@@ -13,10 +13,9 @@ import {
 } from '@rid/contracts';
 import { type AuthenticatedRequest, Public } from '../auth/decorators.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
-import type { Node as NodeRow } from '../generated/prisma/client.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
 import { CurrentNode, NodeAccess } from './node-control.guard.js';
-import { NodeControlService } from './node-control.service.js';
+import { type AuthenticatedNode, NodeControlService } from './node-control.service.js';
 
 /**
  * Contract with the kit, v1 (ARCHITECTURE.md §10, ADR-0011). Enrollment takes the single-use
@@ -66,10 +65,10 @@ export class NodeControlController {
     authenticated: 'node',
   })
   heartbeat(
-    @CurrentNode() node: NodeRow,
+    @CurrentNode() auth: AuthenticatedNode,
     @Body(new ZodValidationPipe(nodeHeartbeatSchema)) body: NodeHeartbeatInput,
   ) {
-    return this.control.heartbeat(node, body);
+    return this.control.heartbeat(auth.node, body);
   }
 
   @Post(':nodeId/renew')
@@ -89,11 +88,11 @@ export class NodeControlController {
     authenticated: 'node',
   })
   renew(
-    @CurrentNode() node: NodeRow,
+    @CurrentNode() auth: AuthenticatedNode,
     @Body(new ZodValidationPipe(renewNodeCertificateSchema)) body: { csr: string },
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.control.renew(node, body.csr, request.id);
+    return this.control.renew(auth, body.csr, request.id);
   }
 
   @Get(':nodeId/config')
@@ -107,7 +106,7 @@ export class NodeControlController {
     errors: [401],
     authenticated: 'node',
   })
-  config(@CurrentNode() node: NodeRow) {
-    return this.control.config(node);
+  config(@CurrentNode() auth: AuthenticatedNode) {
+    return this.control.config(auth.node);
   }
 }

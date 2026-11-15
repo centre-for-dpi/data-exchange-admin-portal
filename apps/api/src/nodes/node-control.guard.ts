@@ -11,8 +11,12 @@ import {
 import type { FastifyRequest } from 'fastify';
 import { NODE, Public } from '../auth/decorators.js';
 import { UnauthenticatedError } from '../common/errors.js';
-import type { Node as NodeRow } from '../generated/prisma/client.js';
-import { NodeControlService, nodeControlSettings, sameSecret } from './node-control.service.js';
+import {
+  type AuthenticatedNode,
+  NodeControlService,
+  nodeControlSettings,
+  sameSecret,
+} from './node-control.service.js';
 
 /** Set by the gateway's control route; a client never chooses either value (M4-02). */
 export const NODE_CONTROL_TOKEN_HEADER = 'x-rid-node-control';
@@ -21,7 +25,7 @@ export const CLIENT_CERT_HEADER = 'x-rid-client-cert-s256';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface NodeRequest {
-  node?: NodeRow;
+  node?: AuthenticatedNode;
 }
 
 /**
@@ -58,6 +62,10 @@ export class NodeControlGuard implements CanActivate {
     if (!fingerprint || !UUID.test(nodeId)) throw new UnauthenticatedError();
     const node = await this.control.authenticate(nodeId, fingerprint);
     if (!node) throw new UnauthenticatedError('The certificate does not open this node');
+    // A replaced certificate only repeats a renewal (see NodeControlService.renew).
+    if (node.credential === 'previous' && !request.url.split('?')[0]?.endsWith('/renew')) {
+      throw new UnauthenticatedError('The certificate was replaced: use the current one');
+    }
     request.node = node;
     return true;
   }
