@@ -12,6 +12,8 @@ import {
 import { GatewayCertificates } from './apisix/gateway-certificates.js';
 import { HttpKeycloakGatewayAdmin, KEYCLOAK_ADMIN } from './keycloak/keycloak-admin.js';
 import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
+import { HUB_AGENT, HttpHubAgent } from './wireguard/hub-agent.js';
+import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
 
 /** Reconcilers: the only code that writes to Keycloak / APISIX / OPA (ADR-0007). */
 @Module({
@@ -68,7 +70,26 @@ import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
     },
     GatewayCertificates,
     ApisixReconciler,
+    {
+      provide: HUB_AGENT,
+      useFactory: () =>
+        process.env.RID_WG_HUB_AGENT_URL && process.env.RID_WG_HUB_AGENT_TOKEN
+          ? new HttpHubAgent({
+              baseUrl: process.env.RID_WG_HUB_AGENT_URL,
+              token: process.env.RID_WG_HUB_AGENT_TOKEN,
+            })
+          : null,
+    },
+    WireguardReconciler,
   ],
-  exports: [KeycloakReconciler, KEYCLOAK_ADMIN, ApisixReconciler, APISIX_ADMIN, APISIX_SETTINGS],
+  exports: [
+    KeycloakReconciler,
+    KEYCLOAK_ADMIN,
+    ApisixReconciler,
+    APISIX_ADMIN,
+    APISIX_SETTINGS,
+    WireguardReconciler,
+    HUB_AGENT,
+  ],
 })
 export class ReconcilersModule {}

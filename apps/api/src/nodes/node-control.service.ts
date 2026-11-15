@@ -35,7 +35,9 @@ import { canTransition, ENROLLED_NODE_STATUSES } from '../domain/node/state-mach
 import type { Node as NodeRow } from '../generated/prisma/client.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
+import { OutboxService } from '../outbox/outbox.service.js';
 import { QueueService } from '../queue/queue.service.js';
+import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconciler.js';
 import { hubAddress, nextNodeAddress, tunnelSubnet } from './tunnel.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -64,6 +66,8 @@ export function nodeControlSettings(env: NodeJS.ProcessEnv = process.env) {
     hubPublicKey: env.RID_WG_HUB_PUBLIC_KEY || undefined,
     hubEndpoint: env.RID_WG_HUB_ENDPOINT || undefined,
     minimumKitVersion: env.RID_NODE_MIN_KIT_VERSION || null,
+    /** Same prefix as the gateway's client certificates (RID_GATEWAY_CLIENT_NAME, M3-03). */
+    gatewayClientPrefix: (env.RID_GATEWAY_CLIENT_NAME ?? 'rid-gateway').trim().toLowerCase(),
     /** Shared with the gateway's control route: proves a request came through APISIX. */
     controlToken: env.RID_NODE_CONTROL_TOKEN || undefined,
   };
@@ -109,6 +113,7 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
     @Inject(CERTIFICATE_AUTHORITY) private readonly ca: CertificateAuthority,
   ) {}
 
@@ -167,7 +172,7 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
     const settings = nodeControlSettings();
     const token = await this.prisma.nodeEnrollmentToken.findUnique({
       where: { tokenHash: hashSecret(data.token) },
-      include: { node: { include: { entity: { select: { status: true } } } } },
+      include: { node: { include: { entity: { select: { status: true, slug: true } } } } },
     });
     const now = new Date();
     if (
@@ -239,6 +244,12 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
           },
           requestId,
         });
+        // The hub gets the new peer and its SNI route (M4-03).
+        await this.outbox.enqueue(tx, {
+          topic: WIREGUARD_SYNC_TOPIC,
+          aggregate: `node:${node.id}`,
+          payload: { reason: 'enrolled' },
+        });
         return next;
       });
     } catch (error) {
@@ -257,6 +268,7 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
       certificateNotAfter: issued.notAfter.toISOString(),
       caCertificate: await this.ca.rootCertificate(),
       controlUrl: settings.controlUrl,
+      gatewayClientName: `${settings.gatewayClientPrefix}.${node.entity.slug}`,
       heartbeatIntervalSeconds: settings.heartbeatIntervalSeconds,
       wireguard: {
         address: `${address}/32`,
@@ -331,6 +343,13 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
           target: { type: 'node', id: node.id },
           before: { status: node.status },
           after: { status: 'online', kitVersion: data.kitVersion },
+        });
+      }
+      if (data.servicePort !== node.servicePort) {
+        await this.outbox.enqueue(tx, {
+          topic: WIREGUARD_SYNC_TOPIC,
+          aggregate: `node:${node.id}`,
+          payload: { reason: 'service_port' },
         });
       }
       if (servicesChanged) {

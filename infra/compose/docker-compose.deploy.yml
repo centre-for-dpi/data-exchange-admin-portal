@@ -104,6 +104,13 @@ services:
     <<: *no-ports
     restart: unless-stopped
 
+  wg-hub:
+    restart: unless-stopped
+    # Nodes reach the hub from the internet (UDP 51820, RID_WG_HUB_ENDPOINT); the agent and the
+    # SNI router stay on the Compose network.
+    ports: !override
+      - ${WG_HUB_UDP_PORT:-51820}:51820/udp
+
   api:
     build:
       context: ../..

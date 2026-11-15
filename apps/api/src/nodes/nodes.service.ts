@@ -20,7 +20,9 @@ import { assertEntityActive } from '../domain/entity/active.js';
 import { assertTransition } from '../domain/node/state-machine.js';
 import type { NodeEnrollmentToken, Node as NodeRow } from '../generated/prisma/client.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
+import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconciler.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
 
 /** Prefix of enrollment tokens: recognizable in a leaked log or a secret scanner. */
@@ -101,6 +103,7 @@ export class NodesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   private actor(principal: Principal, entityId: string): AuditActor {
@@ -288,6 +291,12 @@ export class NodesService {
         before: { status: node.status },
         after: { status: 'decommissioned', ...(reason ? { reason } : {}) },
         requestId,
+      });
+      // The hub drops its peer and its SNI route (M4-03).
+      await this.outbox.enqueue(tx, {
+        topic: WIREGUARD_SYNC_TOPIC,
+        aggregate: `node:${nodeId}`,
+        payload: { reason: 'decommissioned' },
       });
     });
     return this.get(entityId, nodeId);

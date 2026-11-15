@@ -553,6 +553,9 @@
                       "type": "string",
                       "format": "uri"
                     },
+                    "gatewayClientName": {
+                      "type": "string"
+                    },
                     "heartbeatIntervalSeconds": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -604,6 +607,7 @@
                     "certificateNotAfter",
                     "caCertificate",
                     "controlUrl",
+                    "gatewayClientName",
                     "heartbeatIntervalSeconds",
                     "wireguard"
                   ]

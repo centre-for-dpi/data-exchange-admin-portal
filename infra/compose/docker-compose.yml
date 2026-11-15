@@ -315,6 +315,55 @@ services:
       - 127.0.0.1:${MOCK_SOCIOECONOMICO_PORT:-8102}:8000
     healthcheck: *mock-healthcheck
 
+  wg-hub:
+    # WireGuard hub of the kit nodes (M4-03, ADR-0023): the tunnel, an SNI router to the nodes
+    # (APISIX calls wg-hub:8443) and the agent the portal's reconciler drives (:8090). It never
+    # forwards packets: nodes only answer the connections it opens.
+    build:
+      context: ../wg-hub
+    image: rid/wg-hub:dev
+    cap_add: [NET_ADMIN]
+    devices: ['/dev/net/tun:/dev/net/tun']
+    sysctls:
+      net.ipv4.ip_forward: '0'
+    environment:
+      RID_WG_SUBNET: ${RID_WG_SUBNET:-10.77.0.0/16}
+      RID_WG_HUB_PRIVATE_KEY: ${RID_WG_HUB_PRIVATE_KEY:?set RID_WG_HUB_PRIVATE_KEY in .env}
+      RID_WG_HUB_AGENT_TOKEN: ${RID_WG_HUB_AGENT_TOKEN:?set RID_WG_HUB_AGENT_TOKEN in .env}
+    ports:
+      - 127.0.0.1:${WG_HUB_UDP_PORT:-51820}:51820/udp
+      # The agent, for the portal API that runs on the host during development.
+      - 127.0.0.1:${WG_HUB_AGENT_PORT:-8095}:8090
+    volumes:
+      - wg-hub-data:/var/lib/wg-hub
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8090/health']
+
+  mock-node:
+    # Simulated kit node (M4-03): a test fixture, not the kit (ADR-0011). Profile `nodes`. It
+    # waits for an enrollment token in /var/lib/mock-node/token (or RID_ENROLLMENT_TOKEN), then
+    # enrolls, joins the hub and serves mock-salud over mTLS on its tunnel address.
+    profiles: [nodes]
+    build:
+      context: ../mock-node
+    image: rid/mock-node:dev
+    cap_add: [NET_ADMIN]
+    devices: ['/dev/net/tun:/dev/net/tun']
+    environment:
+      RID_PORTAL_URL: ${MOCK_NODE_PORTAL_URL:-http://host.docker.internal:4000}
+      # The gateway's TLS name stays the controlUrl's (localhost in development).
+      MOCK_NODE_CONTROL_HOST: apisix
+      MOCK_NODE_BACKEND: http://mock-salud:8000
+      MOCK_NODE_SERVICES: afiliacion=/salud
+      MOCK_NODE_HEARTBEAT_SECONDS: ${MOCK_NODE_HEARTBEAT_SECONDS:-15}
+    # Its state lives in an anonymous volume: `up --force-recreate -V` gives a fresh node.
+    depends_on:
+      wg-hub:
+        condition: service_healthy
+      mock-salud:
+        condition: service_healthy
+
 volumes:
   pg-data:
   etcd-data:
@@ -322,3 +371,4 @@ volumes:
   opensearch-data:
   transparency-buffer:
   tsa-data:
+  wg-hub-data:

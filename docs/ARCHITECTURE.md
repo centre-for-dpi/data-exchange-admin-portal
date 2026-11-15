@@ -65,7 +65,7 @@ Dos planos separados:
 | Fluent Bit | Recibe logs de APISIX, aplica enmascarado, envía a OpenSearch | Segunda barrera de privacidad |
 | OpenSearch | Logs de acceso (metadatos) y analítica | El navegador nunca habla con OpenSearch |
 | Prometheus + Alertmanager | Métricas y alertas | Grafana opcional para operadores |
-| WireGuard hub | Extremo central de los túneles de los nodos | Contenedor `wg-hub` en la red del gateway (M4-03, todavía no existe) |
+| WireGuard hub | Extremo central de los túneles de los nodos y enrutador TLS por SNI hacia ellos | Contenedor `wg-hub` en la red del gateway (M4-03, ADR-0023); no reenvía paquetes |
 
 ## 3. Identidad y autenticación
 
@@ -349,7 +349,13 @@ Versión 1. El documento que el kit consume es `docs/contracts/node-contract-v1.
 
 **Estados (`SPEC.md §4.6`).** El primer heartbeat pasa el nodo a `online` (`node.online`). Un cambio de servicios declarados queda como `node.services_changed`; los heartbeats que no cambian nada no se auditan. Cada `RID_NODE_LIFECYCLE_INTERVAL_SECONDS` (60) un trabajo pasa a `offline` los nodos sin heartbeat por `RID_NODE_OFFLINE_AFTER_SECONDS` (300), también los enrolados que nunca enviaron uno: `node.offline` avisa (`node_offline`, en el portal y por correo) a los `entity_admin` de la entidad y a los `platform_admin`. El siguiente heartbeat lo devuelve a `online`. `entity_admin` o `platform_admin` dan de baja un nodo (`decommissioned`, definitivo): el canal de control deja de aceptar su certificado y se anula el token vigente.
 
-El kit se especifica en otro repositorio; este contrato es la frontera. En desarrollo, `infra/mock-providers` simula un nodo (servicios Fastify con datos sintéticos, ADR-0009) y un contenedor WireGuard.
+**Hub WireGuard (M4-03, ADR-0023).** Contenedor `wg-hub`: la interfaz `wg0` en la primera dirección de `RID_WG_SUBNET`, un nginx `stream` con `ssl_preread` en el 8443 y un agente HTTP interno (8090, `RID_WG_HUB_AGENT_TOKEN`).
+- El reconciliador del portal (`reconcilers/wireguard`, tema `wireguard.sync` al enrolar, dar de baja o cambiar el puerto, y una pasada por minuto) calcula desde PostgreSQL un peer por nodo `enrolled`, `online` u `offline` de una entidad activa o suspendida (su clave y su `/32`). También calcula una ruta SNI `rid-node-<id>` → `<dirección>:<servicePort>`.
+- Le entrega el estado completo al agente cuando difiere del que reporta, y el agente lo aplica con `wg syncconf` y una recarga de nginx. El resultado queda en `sync_state` (`wg-hub:state`).
+- El agente rechaza claves mal formadas, direcciones fuera de la subred y rutas a algo que no es un peer.
+- El hub no reenvía paquetes (`ip_forward=0`) y descarta todo lo nuevo que llega por `wg0`. Probado con contenedores desechables (`tests/infra/src/wg-hub.int.test.ts`): handshake, enrutamiento por SNI, nombres desconocidos sin destino y nodos sin acceso al hub.
+
+El kit se especifica en otro repositorio; este contrato es la frontera. En desarrollo, `infra/mock-node` (perfil `nodes`) simula un nodo. Es utilería de pruebas (ADR-0011): espera un token, se enrola con `openssl` y `wg`, levanta su túnel, sirve `mock-salud` por mTLS en su dirección del túnel (solo al certificado del gateway para su entidad, `gatewayClientName`) y envía heartbeats. Los servicios de ejemplo siguen en `infra/mock-providers` (ADR-0009).
 
 **Camino X-Road (SPIKE S-5, `docs/spikes/S-5.md`):** el gateway usa un Security Server del operador como cliente X-Road (PR-REST `r1`). El upstream apunta al Security Server, la ruta reescribe a `/r1/{serviceId}/…` y fija `X-Road-Client` (subsistema del operador). La identidad del consumidor real viaja en las cabeceras `X-RID-*` (cabeceras definidas por el usuario, que X-Road pasa intactas), y OPA pone `X-Road-UserId` (hash del funcionario) y `X-Road-Issue` (la suscripción). El miembro del `serviceId` debe ser el de la entidad que publica (M4-05).
 

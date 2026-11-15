@@ -82,6 +82,8 @@ const set = {
   RID_WG_HUB_PRIVATE_KEY: raw(hub.privateKey.export({ format: 'jwk' }).d),
   RID_WG_HUB_PUBLIC_KEY: raw(hub.publicKey.export({ format: 'jwk' }).x),
   RID_WG_HUB_ENDPOINT: `${gatewayHost ?? new URL(publicUrl).hostname}:51820`,
+  RID_WG_HUB_AGENT_URL: 'http://wg-hub:8090',
+  RID_WG_HUB_AGENT_TOKEN: secret(32),
   // The dev-style CA initialises its provisioner with this same password (infra/step-ca).
   STEP_CA_PASSWORD: stepCaPassword,
   RID_STEP_CA_PROVISIONER_PASSWORD: stepCaPassword,

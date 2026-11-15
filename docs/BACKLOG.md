@@ -595,7 +595,19 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Auditoría: `node.enrolled`, `node.online`, `node.offline`, `node.services_changed`, `node.certificate_renewed`, `node.decommissioned`.
     - Probado con step-ca real y la ruta de control en APISIX real (`node-control-route.int.test.ts`): heartbeat por mTLS, cabeceras falsas ignoradas, otro certificado de la red no abre el nodo, sin TLS no hay huella.
     - Despliegue: reiniciar step-ca crea el provisioner `rid-nodes`. Variables nuevas en `DEPLOYMENT.md §4`.
-- [ ] **M4-03 — Hub WireGuard**: contenedor `wg-hub`, alta de peers por reconciliador, nodo simulado conectándose en Compose.
+- [x] **M4-03 — Hub WireGuard**: contenedor `wg-hub`, alta de peers por reconciliador, nodo simulado conectándose en Compose.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §10` y `DEPLOYMENT.md §3.14`.
+    - Interpretación (ADR-0023): el hub enruta las conexiones TLS hacia los nodos **por SNI** (nginx `stream` con `ssl_preread`) y no reenvía paquetes. APISIX no necesita una ruta IP hacia el túnel ni privilegios de red, y el TLS sigue de punta a punta entre el gateway y el nodo.
+    - Aislamiento: `ip_forward=0` y descarte de todo lo nuevo que llega por `wg0`. Un nodo no alcanza otros nodos, el hub ni la plataforma.
+    - El agente del hub recibe el estado completo (peers y rutas SNI) y lo aplica con `wg syncconf`. Guarda el último estado en su volumen.
+    - El reconciliador del portal (`wireguard.sync` y una pasada por minuto) incluye los nodos enrolados, en línea o sin conexión de entidades activas o suspendidas. Agrega o quita el peer en menos de un segundo después de enrolar o dar de baja.
+    - El contrato v1 suma `gatewayClientName`: el nombre del certificado con el que el gateway llama al nodo (M3-03). El nodo acepta solo ese.
+    - Nodo simulado `mock-node` (perfil `nodes`, utilería de pruebas, ADR-0011): espera el token, se enrola con `openssl` y `wg`, levanta el túnel, sirve `mock-salud` por mTLS y envía heartbeats por el gateway.
+    - Pruebas:
+      - hub en contenedores desechables (`tests/infra`): handshake, enrutamiento por SNI, nombres desconocidos sin destino, nodos sin acceso al hub, estados inválidos rechazados;
+      - reconciliador contra PostgreSQL;
+      - e2e: elena emite el token, el nodo simulado se enrola, se une al hub y queda "En línea".
+    - Despliegue: el piloto publica UDP 51820 del hub (`docker-compose.deploy.yml`), y el firewall del host debe dejarlo pasar. Variables nuevas: `RID_WG_HUB_AGENT_URL` y `RID_WG_HUB_AGENT_TOKEN`.
 - [ ] **M4-04 — Upstream `node` real**: la ruta apunta a la IP del túnel del nodo; el detalle de API muestra el estado del nodo.
 - [ ] **M4-05 — Upstream `xroad`**: según S-5.
 - [ ] **M4-06 — Validaciones al enviar a revisión**: healthcheck a través del gateway y prueba de contrato con Schemathesis en sandbox; resultados adjuntos a la revisión.

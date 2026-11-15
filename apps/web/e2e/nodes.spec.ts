@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { makeCsr } from './csr';
 import { signIn } from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
+import { mockNodeLogs, startMockNode, stopMockNode } from './mock-node';
 
 // M4-01: the entity admin registers a node and gets its single-use enrollment token once; tokens
 // are listed without the token and can be revoked; the operator sees every node of the network.
@@ -74,6 +75,38 @@ test.describe('nodes of the kit and enrollment tokens (M4-01)', () => {
     page.once('dialog', (dialog) => void dialog.accept());
     await row.getByRole('button', { name: `Dar de baja ${name}` }).click();
     await expect(row).toContainText('Dado de baja');
+  });
+
+  test('a simulated node joins the hub and reports in through the gateway (M4-03)', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    const name = `nodo-simulado-${randomUUID().slice(0, 8)}`;
+    await signIn(page, 'elena.admin', '/my-entity/nodes');
+    await page.getByLabel('Nombre del nodo').fill(name);
+    await page.getByRole('button', { name: 'Registrar y emitir token' }).click();
+    const token = (await page.getByTestId('enrollment-token').textContent()) ?? '';
+
+    // The kit is installed with the token: it enrolls, brings up its WireGuard tunnel to the hub
+    // (whose peer the portal's reconciler adds) and sends heartbeats over mTLS.
+    startMockNode(token);
+    const row = page.getByRole('row', { name: new RegExp(name) });
+    try {
+      await expect(async () => {
+        await page.reload();
+        await expect(row).toContainText('En línea', { timeout: 2_000 });
+      }).toPass({ timeout: 120_000, intervals: [3_000] });
+    } catch (error) {
+      console.error(mockNodeLogs());
+      throw error;
+    }
+    await expect(row).toContainText('0.1.0-mock');
+    await expect(row).toContainText('Servicios: /salud');
+
+    page.once('dialog', (dialog) => void dialog.accept());
+    await row.getByRole('button', { name: `Dar de baja ${name}` }).click();
+    await expect(row).toContainText('Dado de baja');
+    stopMockNode();
   });
 
   test('a publisher sees the nodes but cannot issue tokens', async ({ page }) => {

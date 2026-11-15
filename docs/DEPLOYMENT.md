@@ -59,13 +59,15 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `tsa` | `ghcr.io/sigstore/timestamp-server:v2.1.4` | 3004 | `RID_TSA_PORT` 3004 | `tsa-data` (lectura) | base | ninguno (imagen distroless) |
 | `mailpit` | `axllent/mailpit:v1.32.0` | 8025 (UI), 1025 (SMTP) | 8025, 1025 | — | base | `mailpit readyz` |
 | `mock-salud`, `mock-socioeconomico` | `rid/mock-providers:dev` (build local) | 8000 | 8101, 8102 | — | base | `GET /health` |
+| `wg-hub` | `rid/wg-hub:dev` (build local, `infra/wg-hub`) | 51820/udp (túnel), 8443 (enrutador SNI), 8090 (agente) | 51820/udp y 8095 (agente) en `127.0.0.1` | `wg-hub-data` | base | `GET /health` en 8090 |
+| `mock-node` | `rid/mock-node:dev` (build local, `infra/mock-node`) | 8443 en su dirección del túnel | no se publica | anónimo | `nodes` | — |
 | `opensearch` | `opensearchproject/opensearch:3.9.0` | 9200 | `OPENSEARCH_PORT` 9200 | `opensearch-data` | `observability` | `_cluster/health` amarillo |
 | `fluent-bit` | `fluent/fluent-bit:5.1.5-debug` | 9880 (HTTP), 2020 | no se publica | — | `observability` | `GET /api/v1/health` en 2020 |
 | `api` | `rid/portal-api:deploy` (`apps/api/Dockerfile`) | 4000 | — (en dev corre en el host) | `api-documents`, `step-ca-data` (solo `certs/`, lectura) | solo piloto | `GET /api/v1/health` |
 | `web` | `rid/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (en dev corre en el host) | — | solo piloto | `GET /api/auth/providers` |
 | `carpeta` | `rid/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (en dev corre en el host) | `carpeta-data` | solo piloto | — |
 
-Prometheus, Alertmanager y Grafana **no** están en el Compose todavía (M5-06). Tampoco el hub WireGuard `wg-hub` (M4-03).
+Prometheus, Alertmanager y Grafana **no** están en el Compose todavía (M5-06).
 
 ### 3.2 PostgreSQL
 
@@ -162,7 +164,7 @@ Además calcula el hash del funcionario y el seudónimo del titular, y devuelve 
 - el certificado de servidor TLS del gateway (M3-02);
 - los certificados de cliente del gateway hacia los proveedores con mTLS, uno por entidad (M3-03).
 
-En M4 también firmará los de los nodos del kit. Solo el API habla con ella; las entidades nunca la llaman directamente.
+También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Solo el API habla con ella: las entidades y los nodos nunca la llaman directamente.
 
 - En el primer arranque la imagen inicializa la CA con `DOCKER_STEPCA_INIT_*`: nombre `RID Dev CA`, DNS `localhost,step-ca`, provisioner JWK `rid-portal`, contraseña `STEP_CA_PASSWORD`. **El piloto usa esta misma CA de desarrollo**; la raíz fuera de línea y la intermedia en HSM son de producción (M6).
 - En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `rid-portal` (plantilla `app.tpl`, solo autenticación de cliente, 90 días por defecto, 397 como máximo). También crea, si no existe, el provisioner `rid-gateway-tls` con la contraseña de la CA (plantilla `gateway.tpl`, solo autenticación de servidor, 90 días) y el provisioner `rid-nodes` de los nodos del kit (plantilla `node.tpl`, autenticación de servidor y de cliente, 90 días, M4-02). Luego inicia la CA. Es idempotente: una CA existente recibe un provisioner nuevo al reiniciar el contenedor.
@@ -248,6 +250,17 @@ Muestra lo que debe implementar una carpeta real; no es un producto.
 
 - Una sola imagen (`rid/mock-providers:dev`); `PROVIDER` elige el servicio y sus datos (`salud` o `socioeconomico`), con su OpenAPI en `infra/mock-providers/<proveedor>/openapi.yaml`.
 - Escuchan en 8000 dentro de la red de Compose; en desarrollo se publican en 8101 y 8102.
+
+### 3.14 Hub WireGuard (`infra/wg-hub`, M4-03, ADR-0023)
+
+**Función en el despliegue.** Es el extremo central de los túneles de los nodos del kit, que corren en las redes de las entidades, detrás de su firewall. El gateway llama a un nodo a través del hub: APISIX abre TLS hacia `wg-hub:8443` con el nombre del nodo (`rid-node-<id>`) como SNI, y el nginx `stream` del hub pasa la conexión, sin abrirla, a la dirección del nodo dentro del túnel. El TLS es de punta a punta entre el gateway y el nodo. Sin el hub, las versiones servidas por nodos no responden.
+
+- Al arrancar, el agente (`hub-agent.mjs`) levanta `wg0` en la primera dirección de `RID_WG_SUBNET` con `RID_WG_HUB_PRIVATE_KEY`. Usa WireGuard del kernel si el host lo tiene; si no, `wireguard-go`.
+- El contenedor necesita `NET_ADMIN` y `/dev/net/tun`. Corre con `net.ipv4.ip_forward=0`: el hub no reenvía paquetes, y su firewall descarta todo lo nuevo que llega por `wg0`. Un nodo no alcanza otros nodos, el hub ni la plataforma.
+- El agente (puerto 8090, `RID_WG_HUB_AGENT_TOKEN`, solo red interna) recibe del reconciliador del portal el estado completo (peers y rutas SNI) y lo aplica con `wg syncconf` y una recarga de nginx. Guarda el último estado en `wg-hub-data`, así un reinicio vuelve a servir a los nodos antes de la siguiente pasada.
+- Los nodos llegan al hub por UDP 51820 desde internet. En el piloto, `docker-compose.deploy.yml` publica ese puerto (`WG_HUB_UDP_PORT`), y `RID_WG_HUB_ENDPOINT` es el nombre público con ese puerto. El firewall del host debe dejarlo pasar.
+- La clave privada del hub está en `.env` (`make-deploy-env.mjs` la genera). Cambiarla obliga a reenrolar todos los nodos, porque la clave pública va en su configuración.
+- `mock-node` (perfil `nodes`) es un nodo simulado para pruebas: espera un token en `/var/lib/mock-node/token`, se enrola, se une al hub y sirve `mock-salud` por mTLS. No es el kit (ADR-0011).
 
 ## 4. Variables de entorno
 

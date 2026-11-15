@@ -180,6 +180,11 @@ export const nodeEnrollmentSchema = z.object({
   caCertificate: z.string(),
   /** Base URL of the control channel (mTLS with the node's certificate). */
   controlUrl: z.url(),
+  /**
+   * Common name of the client certificate the gateway presents when it calls the node (one per
+   * provider entity, M3-03): the node accepts only that one, from the network CA.
+   */
+  gatewayClientName: z.string(),
   heartbeatIntervalSeconds: z.number().int(),
   wireguard: nodeWireguardConfigSchema,
 });
