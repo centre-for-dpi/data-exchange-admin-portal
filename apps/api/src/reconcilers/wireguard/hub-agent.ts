@@ -36,18 +36,23 @@ export type HubActualState = z.infer<typeof actualSchema>;
 
 /** The hub agent (infra/wg-hub/hub-agent.mjs). Injected so tests can use a fake hub. */
 export interface HubAgent {
-  state(): Promise<HubActualState>;
-  apply(desired: HubDesiredState): Promise<HubActualState>;
+  state(signal?: AbortSignal): Promise<HubActualState>;
+  apply(desired: HubDesiredState, signal?: AbortSignal): Promise<HubActualState>;
 }
 
 export const HUB_AGENT = Symbol('HUB_AGENT');
 
-const TIMEOUT_MS = 10_000;
+export const HUB_TIMEOUT_MS = 10_000;
+const TIMEOUT_MS = HUB_TIMEOUT_MS;
 
 export class HttpHubAgent implements HubAgent {
   constructor(private readonly options: { baseUrl: string; token: string }) {}
 
-  private async call(method: 'GET' | 'PUT', body?: unknown): Promise<HubActualState> {
+  private async call(
+    method: 'GET' | 'PUT',
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<HubActualState> {
     const res = await fetch(`${this.options.baseUrl.replace(/\/+$/, '')}/v1/state`, {
       method,
       headers: {
@@ -55,7 +60,9 @@ export class HttpHubAgent implements HubAgent {
         ...(body ? { 'content-type': 'application/json' } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)])
+        : AbortSignal.timeout(TIMEOUT_MS),
     });
     const text = await res.text();
     // The agent's answers carry no secret; its errors name what was invalid.
@@ -63,11 +70,11 @@ export class HttpHubAgent implements HubAgent {
     return actualSchema.parse(JSON.parse(text));
   }
 
-  state(): Promise<HubActualState> {
-    return this.call('GET');
+  state(signal?: AbortSignal): Promise<HubActualState> {
+    return this.call('GET', undefined, signal);
   }
 
-  apply(desired: HubDesiredState): Promise<HubActualState> {
-    return this.call('PUT', desired);
+  apply(desired: HubDesiredState, signal?: AbortSignal): Promise<HubActualState> {
+    return this.call('PUT', desired, signal);
   }
 }

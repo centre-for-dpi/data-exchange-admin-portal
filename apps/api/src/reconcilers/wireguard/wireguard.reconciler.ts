@@ -10,7 +10,7 @@ import { nodeDnsName } from '@rid/contracts';
 import { ENROLLED_NODE_STATUSES } from '../../domain/node/state-machine.js';
 import { PrismaService, type Tx } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
-import { HUB_AGENT, type HubAgent, type HubDesiredState } from './hub-agent.js';
+import { HUB_AGENT, type HubAgent, type HubDesiredState, HUB_TIMEOUT_MS } from './hub-agent.js';
 
 /** Outbox topic for changes to the tunnel peers (aggregate node:<id>). */
 export const WIREGUARD_SYNC_TOPIC = 'wireguard.sync';
@@ -18,6 +18,10 @@ export const WIREGUARD_SYNC_TARGET = 'wg-hub:state';
 const FULL_RECONCILE_MS = 60 * 1000;
 /** Serializes passes across API replicas ("rid_wgsy"): see reconcile(). */
 const RECONCILE_LOCK = 0x7269645f77677379n;
+/** Lifetime of a pass's transaction, which holds the lock. */
+const PASS_TIMEOUT_MS = 60_000;
+/** Kept between the last hub call and the end of the transaction. */
+const PASS_MARGIN_MS = 5_000;
 /** Port of the nodes' TLS listener when a node has not declared one. */
 const DEFAULT_SERVICE_PORT = 8443;
 
@@ -100,13 +104,19 @@ export class WireguardReconciler implements OnApplicationBootstrap, OnApplicatio
     const hub = this.hub;
     if (!hub) throw new Error('The WireGuard hub agent is not configured');
     let desiredHash = hash(null);
+    // The lock lives as long as the transaction: no hub call may outlast it. Each call is cut
+    // before the transaction's end, and the write only starts with a full hub timeout left and the
+    // transaction (so the lock) still alive.
+    const deadline = Date.now() + PASS_TIMEOUT_MS - PASS_MARGIN_MS;
+    const left = () => deadline - Date.now();
+    const signal = () => AbortSignal.timeout(Math.max(1, Math.min(HUB_TIMEOUT_MS, left())));
     try {
       return await this.prisma.$transaction(
         async (tx) => {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(${RECONCILE_LOCK})`;
           const desired = await this.desired(tx);
           desiredHash = hash(desired);
-          const actual = await hub.state();
+          const actual = await hub.state(signal());
           const current: HubDesiredState = {
             peers: actual.peers
               .map((p) => ({ publicKey: p.publicKey, address: p.address }))
@@ -115,7 +125,11 @@ export class WireguardReconciler implements OnApplicationBootstrap, OnApplicatio
           };
           let result: 'updated' | 'unchanged' = 'unchanged';
           if (hash(current) !== desiredHash) {
-            await hub.apply(desired);
+            if (left() < HUB_TIMEOUT_MS) {
+              throw new Error('The pass ran out of time before writing the hub; the next one will');
+            }
+            await tx.$queryRaw`SELECT 1`;
+            await hub.apply(desired, signal());
             result = 'updated';
             this.logger.log(
               `WireGuard hub: ${desired.peers.length} peers, ${desired.routes.length} routes`,
@@ -124,8 +138,8 @@ export class WireguardReconciler implements OnApplicationBootstrap, OnApplicatio
           await this.record(desiredHash, null, tx);
           return result;
         },
-        // Two calls to the hub (10 s timeout each) inside; the lock waits for a running pass.
-        { timeout: 30_000, maxWait: 30_000 },
+        // The lock wait and two hub calls (HUB_TIMEOUT_MS each) fit inside, with the margin.
+        { timeout: PASS_TIMEOUT_MS, maxWait: 10_000 },
       );
     } catch (error) {
       await this.record(desiredHash, error);

@@ -17,7 +17,7 @@ class FakeHub implements HubAgent {
   current: HubDesiredState = { peers: [], routes: [] };
   failing = false;
 
-  state(): Promise<HubActualState> {
+  state(_signal?: AbortSignal): Promise<HubActualState> {
     if (this.failing) return Promise.reject(new Error('hub unreachable'));
     return Promise.resolve({
       publicKey: wireguardKey(),
@@ -28,7 +28,7 @@ class FakeHub implements HubAgent {
     });
   }
 
-  apply(desired: HubDesiredState): Promise<HubActualState> {
+  apply(desired: HubDesiredState, _signal?: AbortSignal): Promise<HubActualState> {
     this.applied.push(desired);
     this.current = desired;
     return this.state();
