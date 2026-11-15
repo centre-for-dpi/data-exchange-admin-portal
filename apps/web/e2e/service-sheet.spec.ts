@@ -13,6 +13,7 @@ test.describe('printable service sheet (M4-09)', () => {
     await signIn(page, 'carlos.dev', '/catalog');
     await openCatalogApi(page, name);
     await page.getByRole('link', { name: /^Ficha del servicio 1\.0/ }).click();
+    await page.waitForURL(/\/sheet\//);
     const title = page.getByRole('heading', { level: 1, name: new RegExp(name) });
     await expect(title).toBeVisible();
     await expect(page.getByText(`/salud/${slug}/v1`).first()).toBeVisible();
