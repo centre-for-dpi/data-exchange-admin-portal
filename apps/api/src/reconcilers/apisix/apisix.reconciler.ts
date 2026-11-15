@@ -604,10 +604,14 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       const upstream = await this.apply('upstreams', upstreamId(apiVersionId), desired.upstream);
       const route = await this.apply('routes', routeId(apiVersionId), desired.route);
       await this.recordSuccess(target, desiredHash);
-      // The version's sandbox (M4-08), on its own: it never blocks the real route.
-      await this.reconcileSandbox(version).catch((error: unknown) =>
-        this.logger.warn(`APISIX sandbox route of version ${apiVersionId}: ${String(error)}`),
-      );
+      // The version's sandbox (M4-08), on its own: it never blocks the real route, but a sandbox
+      // the gateway must not serve loses its route (fail closed, like the real one).
+      await this.reconcileSandbox(version).catch(async (error: unknown) => {
+        this.logger.warn(`APISIX sandbox route of version ${apiVersionId}: ${String(error)}`);
+        if (error instanceof UnsupportedUpstreamError || error instanceof ZodError) {
+          await this.removeSandbox(apiVersionId).catch(() => undefined);
+        }
+      });
       if (upstream === 'created' || route === 'created') return 'created';
       if (upstream === 'updated' || route === 'updated') return 'updated';
       return 'unchanged';
@@ -615,6 +619,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       // A version the gateway must not serve (invalid or internal upstream) loses whatever it had
       // in APISIX: fail closed instead of leaving an older route working.
       if (error instanceof UnsupportedUpstreamError || error instanceof ZodError) {
+        await this.removeSandbox(apiVersionId).catch(() => undefined);
         await this.removeVersion(apiVersionId).catch((cleanup: unknown) =>
           this.logger.error(
             `Could not remove version ${apiVersionId} from APISIX: ${String(cleanup)}`,
