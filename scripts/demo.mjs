@@ -212,7 +212,11 @@ const tls = { client: undefined, ca: undefined };
 
 /** fetch() for the gateway: over HTTPS, trusting the network CA and with the client certificate. */
 async function gatewayFetch(url, { method = 'GET', headers = {}, body } = {}) {
-  if (!url.startsWith('https://')) return fetch(url, { method, headers, body });
+  // Only the gateway's own name uses the network CA (and the client certificate); other HTTPS
+  // URLs, such as a proxy's public /gw, have ordinary certificates.
+  if (!url.startsWith(GATEWAY) || !GATEWAY.startsWith('https://')) {
+    return fetch(url, { method, headers, body });
+  }
   tls.ca ??= await (await fetch(`${API}/pki/ca`)).text();
   const target = new URL(url);
   return new Promise((resolveCall, reject) => {
@@ -442,7 +446,15 @@ async function main() {
       `Token pedido al gateway (${GATEWAY}/oauth/token), ligado al certificado: x5t#S256 ${thumbprint.slice(0, 12)}…`,
     );
   }
-  const noSubscription = await callGateway(token, { 'x-rid-purpose': 'eligibility_check' });
+  // A just-issued certificate reaches OPA with the next bundle (10-20 s): until then the call is
+  // denied as certificate_revoked.
+  const noSubscription = await waitFor(
+    async () => {
+      const r = await callGateway(token, { 'x-rid-purpose': 'eligibility_check' });
+      return r.reason === 'certificate_revoked' ? undefined : r;
+    },
+    { timeoutMs: 60_000, what: 'the gateway did not learn the new client certificate' },
+  );
   expect(
     noSubscription.status === 403 && noSubscription.reason === 'no_subscription',
     `expected 403 no_subscription, got ${noSubscription.status} ${noSubscription.reason}`,
