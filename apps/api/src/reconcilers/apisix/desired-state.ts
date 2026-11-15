@@ -5,6 +5,7 @@ import {
   type Upstream,
   xroadPartSchema,
   xroadServicePath,
+  xroadServicePathSchema,
 } from '@rid/contracts';
 import type { ApisixObject } from './apisix-admin.js';
 
@@ -346,8 +347,15 @@ function xroadUpstream(
     serviceId.subsystemCode,
     serviceId.serviceCode,
   ].filter((p): p is string => p !== undefined);
-  if (parts.some((part) => !xroadPartSchema.safeParse(part).success)) {
-    throw new UnsupportedUpstreamError('The X-Road service identifier has invalid characters');
+  if (
+    parts.some((part) => !xroadPartSchema.safeParse(part).success) ||
+    !xroadServicePathSchema.safeParse(servicePath).success
+  ) {
+    throw new UnsupportedUpstreamError('The X-Road service identifier or path is not valid');
+  }
+  // The operator's instance only: its Security Server serves no other (no federation here).
+  if (serviceId.instance !== settings.xroad.client.split('/')[0]) {
+    throw new UnsupportedUpstreamError('The service is not in the operator’s X-Road instance');
   }
   const member = v.xroadMember;
   if (

@@ -67,6 +67,20 @@ export const xroadPartSchema = z
   .regex(
     /^[\p{L}\p{N}._~:-](?:[\p{L}\p{N} ._~:-]*[\p{L}\p{N}._~:-])?$/u,
     'letters, digits, spaces and . _ - : ~ only',
+  )
+  // Only dots would be a path segment the Security Server could resolve as `.` or `..`.
+  .refine((part) => !/^\.+$/.test(part), { error: 'cannot be only dots' });
+
+/**
+ * Path after an X-Road serviceId: empty, or segments of letters, digits and `. _ ~ -`, none empty
+ * and none `.` or `..` (they could leave the serviceId on the Security Server).
+ */
+export const xroadServicePathSchema = z
+  .string()
+  .max(500)
+  .regex(
+    /^(?:\/(?!\.{1,2}(?:\/|$))[A-Za-z0-9._~-]+)*$/,
+    'empty, or an absolute path without empty, . or .. segments',
   );
 
 /** X-Road member: class and code (e.g. GOV / 8999999999). */
@@ -122,10 +136,7 @@ export const upstreamSchema = z.discriminatedUnion('type', [
      */
     serviceId: xroadServiceIdSchema,
     /** Path of the service after the serviceId, e.g. /v1; empty by default. */
-    servicePath: z
-      .string()
-      .regex(/^(\/[A-Za-z0-9._~\-/]*)?$/, 'must be empty or an absolute path')
-      .default(''),
+    servicePath: xroadServicePathSchema.default(''),
   }),
 ]);
 export type Upstream = z.infer<typeof upstreamSchema>;

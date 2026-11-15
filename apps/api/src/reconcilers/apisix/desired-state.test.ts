@@ -266,6 +266,20 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       ).toThrow(UnsupportedUpstreamError);
     });
 
+    it('fails closed for a path that could leave the serviceId, or another instance', () => {
+      const member = { memberClass: 'GOV', memberCode: '8999999999' };
+      for (const upstream of [
+        { type: 'xroad' as const, serviceId, servicePath: '/../../OTRO' },
+        { type: 'xroad' as const, serviceId: { ...serviceId, serviceCode: '..' }, servicePath: '' },
+        { type: 'xroad' as const, serviceId: { ...serviceId, instance: 'EE' }, servicePath: '' },
+      ]) {
+        expect(
+          () => desiredGateway(version({ upstream, xroadMember: member }), xroadSettings),
+          JSON.stringify(upstream),
+        ).toThrow(UnsupportedUpstreamError);
+      }
+    });
+
     it('other routes carry no X-Road header', () => {
       const plugins = desiredGateway(version(), settings).route.plugins as Plugins;
       expect(JSON.stringify(plugins)).not.toContain('X-Road');

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { upstreamSchema, xroadPartSchema, xroadServicePath } from './apis.js';
+import {
+  upstreamSchema,
+  xroadPartSchema,
+  xroadServicePath,
+  xroadServicePathSchema,
+} from './apis.js';
 
 describe('X-Road identifiers (M4-05, SPIKE S-5)', () => {
   it('accepts letters, digits, spaces inside and . _ - : ~', () => {
@@ -9,8 +14,19 @@ describe('X-Road identifiers (M4-05, SPIKE S-5)', () => {
   });
 
   it('refuses what could change the URL the gateway builds', () => {
-    for (const part of ['a/b', '%2F', 'a?b', 'a#b', '$1', ' lead', 'trail ', '', 'tab\tx']) {
+    const refused = ['a/b', '%2F', 'a?b', 'a#b', '$1', ' lead', 'trail ', '', 'tab\tx'];
+    // Only dots would be a `.` or `..` segment on the Security Server.
+    for (const part of [...refused, '.', '..', '...']) {
       expect(xroadPartSchema.safeParse(part).success, JSON.stringify(part)).toBe(false);
+    }
+  });
+
+  it('a path after the service never leaves it: no empty, . or .. segments', () => {
+    for (const path of ['', '/v1', '/v1/hogares', '/a.b/c_d~e']) {
+      expect(xroadServicePathSchema.safeParse(path).success, path).toBe(true);
+    }
+    for (const path of ['/..', '/../OTRO', '/v1/../..', '/.', '//x', '/v1/', 'v1', '/a%2F']) {
+      expect(xroadServicePathSchema.safeParse(path).success, path).toBe(false);
     }
   });
 

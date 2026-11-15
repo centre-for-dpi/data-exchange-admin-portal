@@ -299,6 +299,12 @@ export class ApisService {
           },
         ]);
       }
+      const instance = process.env.RID_XROAD_CLIENT?.split('/')[0];
+      if (instance && data.upstream.serviceId.instance !== instance) {
+        throw new ValidationError([
+          { path: 'upstream.serviceId', message: `The X-Road instance must be ${instance}` },
+        ]);
+      }
       if (memberClass !== entity.xroadMemberClass || memberCode !== entity.xroadMemberCode) {
         throw new ValidationError([
           {
