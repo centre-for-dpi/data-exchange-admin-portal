@@ -28,7 +28,7 @@ export async function SiteHeader() {
       : 0;
 
   return (
-    <header className="border-b border-border bg-background">
+    <header className="border-b border-border bg-background print:hidden">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 pt-4 pb-3 sm:px-6">
         <Link
           href="/"

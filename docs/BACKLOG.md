@@ -649,9 +649,31 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - La separación vive en OPA: la suscripción de una aplicación sandbox apunta a la ruta del sandbox, y la política niega con `environment_mismatch` cruzar de un lado al otro (3 tests de política).
     - La suscripción de una aplicación sandbox muestra la ruta `/sandbox/…`, y el catálogo, la URL del sandbox de cada versión.
     - e2e: el cierre de M4 (`bootcamp-closing.spec.ts`) consume una API del nodo en sandbox: aprobada al instante, llamada por el túnel del nodo, y negada en la ruta real.
-- [ ] **M4-09 — Ficha del servicio imprimible**: vista e impresión/PDF desde el navegador.
+- [x] **M4-09 — Ficha del servicio imprimible**: vista e impresión/PDF desde el navegador.
+  - _Notas de implementación:_
+    - Página `/catalog/{api}/sheet/{versión}`, enlazada desde cada versión del catálogo. Muestra:
+      - proveedor, responsable, sector, clasificación, estado y fechas;
+      - estado del nodo;
+      - URL en el gateway y del sandbox;
+      - finalidades, límite y base legal;
+      - datos expuestos (personales y sensibles);
+      - operaciones con su titular;
+      - descripción.
+    - Sale de los datos del catálogo, así que nunca muestra nada del upstream y respeta quién puede ver la API.
+    - Interpretación: el PDF lo hace el navegador ("Imprimir o guardar como PDF"), sin generar PDFs en el servidor. Los estilos de impresión ocultan el encabezado, el pie y el botón, y evitan cortar las tarjetas.
+    - El nivel de servicio (SLA) de `SPEC.md §3` todavía no se captura en el formulario de versión: la ficha lo mostrará cuando exista.
+    - e2e: ficha desde el catálogo, axe, emulación de impresión y PDF de Chromium.
 
 **Cierre M4:** simulación de bootcamp: una entidad nueva enrola un nodo, publica una API instantánea y otra entidad la consume en sandbox el mismo día.
+
+- _Hecho (`apps/web/e2e/bootcamp-closing.spec.ts`, verde, 1,2 min):_
+  1. el operador registra una entidad nueva;
+  2. su administradora crea su cuenta, acepta y toma el rol de publicación;
+  3. emite el token del nodo, y el nodo simulado se enrola, se une al hub y queda en línea;
+  4. publica una API sobre el nodo, con sandbox en el mismo nodo;
+  5. las validaciones pasan (healthcheck por el hub, Schemathesis en el sandbox) y el operador la aprueba;
+  6. `carlos.dev`, de otra entidad, la pide con una aplicación sandbox: se aprueba al instante y se activa;
+  7. la llamada con mTLS y token ligado pasa por el túnel del nodo, y la misma aplicación es negada en la ruta real (`environment_mismatch`).
 
 ---
 

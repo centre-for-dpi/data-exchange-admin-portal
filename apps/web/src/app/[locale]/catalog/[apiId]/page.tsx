@@ -190,6 +190,9 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
               <p className="text-sm text-muted-foreground">
                 {t('catalog.detail.rateLimit', { limit: version.defaultRateLimit })}
               </p>
+              <Link href={`/catalog/${detail.api.id}/sheet/${version.id}`} className="link text-sm">
+                {t('serviceSheet.open', { version: version.version })}
+              </Link>
             </Card>
 
             <h3 className="pt-2 text-lg font-semibold">{t('catalog.detail.exposedFields')}</h3>
