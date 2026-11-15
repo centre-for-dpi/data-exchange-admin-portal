@@ -416,7 +416,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
 ## M3 — Seguridad de credenciales y del tráfico
 
-- [ ] **SPIKE S-3 — Huella del certificado de cliente en APISIX y comparación con `cnf.x5t#S256`**
+- [x] **SPIKE S-3 — Huella del certificado de cliente en APISIX y comparación con `cnf.x5t#S256`**
+  - _Conclusión_ (`docs/spikes/S-3.md`, prototipo reproducible): funciona, comprobado con tráfico real en APISIX 3.19.
+    - Un objeto SSL con `client.ca` rechaza en el handshake las llamadas sin certificado y las de otra CA.
+    - Un plugin en la fase rewrite calcula la huella RFC 8705 desde `ssl_client_raw_cert` (no `$ssl_client_fingerprint`, que es SHA-1) y la pasa a OPA en una cabecera. La cabecera del cliente se reemplaza y la del gateway no llega al proveedor.
+    - OPA niega con `certificate_mismatch`, `token_not_bound` y `certificate_revoked`.
+    - Se revoca con datos del bundle: una lista de huellas vigentes por aplicación, sin CRL ni OCSP.
+    - El TLS debe terminar en APISIX: en el VPS hace falta un nombre o puerto propio con paso directo TLS (ver M3-10).
 - [ ] **SPIKE S-4 — Keycloak `tls_client_auth` y tokens ligados a certificado**
 - [ ] **SPIKE S-2 — Límite por suscripción**
 - [ ] **M3-01 — Integración con step-ca**: firma de CSR de aplicaciones con OTT del provisioner JWK; certificado descargable; aviso a 15 días del vencimiento.
@@ -429,6 +435,7 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 - [ ] **M3-08 — MFA para roles críticos**: roles de plataforma y `data_steward` exigen MFA en Keycloak.
 - [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
 - [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
+  - Despliegue (S-3): Traefik termina hoy el TLS del VPS y enruta `/gw` por ruta, así que no puede pasar el certificado del cliente. El gateway necesita un nombre propio con `HostSNI` y `tls.passthrough` hacia el 9443 de APISIX, o un puerto propio.
   - Pendiente de la revisión de seguridad de M1-08: mTLS hacia upstreams `direct`, y fijar en el upstream la IP que verificó el reconciliador (con `upstream_host`/SNI con el nombre original) para cerrar el DNS rebinding.
 
 **Cierre M3:** llamada con mTLS + token ligado al certificado + límite por suscripción, y revocación de certificado efectiva en < 60 s.
