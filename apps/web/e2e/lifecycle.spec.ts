@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { parse } from 'yaml';
 import { openapiFile, signIn, submitNewApi } from './flows';
-import { gateway } from './gateway-flows';
+import { gateway, probeGateway } from './gateway-flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 // M2-05 (ADR-0019): a published version gets a compatible revision (1.0 -> 1.1, same route),
@@ -71,7 +71,7 @@ test.describe('API version lifecycle (M2-05)', () => {
     await expect
       .poll(
         async () => {
-          const res = await fetch(`${gateway}/salud/${slug}/v1/afiliados/1000000001`);
+          const res = await probeGateway(`${gateway}/salud/${slug}/v1/afiliados/1000000001`);
           return [res.headers.get('deprecation') ?? '', res.headers.get('sunset') ?? ''];
         },
         { timeout: 60_000, intervals: [2_000] },

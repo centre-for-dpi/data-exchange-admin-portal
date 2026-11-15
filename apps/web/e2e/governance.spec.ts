@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
 import { expect, type Page, test } from '@playwright/test';
-import { createApplication, publishNewApi, requestAccess, signIn } from './flows';
-import { approveAsSteward, gateway, gatewayToken } from './gateway-flows';
+import { publishNewApi, requestAccess, signIn } from './flows';
+import {
+  approveAsSteward,
+  createGatewayApplication,
+  gateway,
+  gatewayFetch,
+  gatewayToken,
+} from './gateway-flows';
 import { expectNoAccessibilityViolations } from './helpers';
 import { newPerson, registerAccount, waitForMail } from './onboarding';
 
@@ -81,9 +87,7 @@ test.describe('M2 governance end to end', () => {
       slug: `gobierno-${id}`,
     });
     const appName = `Ventanilla ${id}`;
-    const clientId = await createApplication(member, appName);
-    const clientSecret = (await member.getByTestId('client-secret').textContent()) ?? '';
-    await member.getByRole('link', { name: 'Ir a la aplicación' }).click();
+    const { clientId, clientSecret } = await createGatewayApplication(member, appName);
     await expect(member.getByTestId('provisioning')).toHaveText('Lista', { timeout: 60_000 });
     const subscriptionId = await requestAccess(member, apiName, appName);
     await member.getByLabel('Acuerdo de intercambio (PDF)').setInputFiles({
@@ -111,7 +115,7 @@ test.describe('M2 governance end to end', () => {
     // 5. The call goes through the gateway.
     const url = `${gateway}/salud/${apiSlug}/v1/afiliados/1000000001`;
     const call = async () => {
-      const res = await fetch(url, {
+      const res = await gatewayFetch(url, {
         headers: {
           authorization: `Bearer ${await gatewayToken(clientId, clientSecret)}`,
           'x-rid-purpose': 'eligibility_check',

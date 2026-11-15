@@ -539,7 +539,24 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - e2e (`security-headers.spec.ts`), que comprueba las cabeceras y que cada script lleva el nonce de su respuesta;
       - la página corre sin ninguna violación de CSP: componentes cliente, catálogo y documentación con Scalar;
       - las cookies después del inicio de sesión.
-- [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
+- [x] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
+  - _Notas de implementación:_
+    - Interpretación (ADR-0022): la aplicación se autentica con **su secreto**, y el token queda **ligado al certificado** que APISIX verificó (`tls.client.certificate.bound.access.tokens`). No se usa `client-x509`, que recomendaba S-4. Con él, una cabecera `SSL_CLIENT_CERT` inventada hacia Keycloak autenticaría a la aplicación con solo su certificado público. Además, la rotación del secreto (M3-04) dejaría de servir.
+    - Ruta de token del gateway `rid-oauth-token` (`POST /oauth/token`), del reconciliador de APISIX. Lleva a Keycloak el certificado verificado en `SSL_CLIENT_CERT` y `ssl-client-verify`, siempre reescritos, y borra sus otras grafías. Keycloak arranca con el proveedor x509 `nginx` y `trust-proxy-verification`.
+    - El `tokenUrl` de las aplicaciones es esa ruta. La raíz de la red es pública (`GET /api/v1/pki/ca`), y la guía de la aplicación muestra los comandos con `--cert`, `--key` y `--cacert`.
+    - Pruebas contra APISIX, Keycloak y step-ca reales (`token-route.int.test.ts`):
+      - el token sale ligado a la huella del certificado del handshake;
+      - una cabecera de certificado inventada no cambia cuál es;
+      - por HTTP o directo a Keycloak sin certificado, no hay token;
+      - un certificado válido no reemplaza al secreto;
+      - sin certificado no hay sesión TLS.
+    - `DEMO.md`, `pnpm demo` y los e2e usan certificado y token ligado. Las sondas sin token ("¿ya existe la ruta?") van al puerto HTTP local.
+    - Cierre de M3 en el e2e del gateway y en `pnpm demo`: llamada con mTLS y token ligado, límite por suscripción (M3-05) y revocación del certificado efectiva en menos de 60 s (`403 certificate_revoked`).
+    - Despliegue: nombre propio del gateway con router TCP `HostSNI` y paso directo TLS hacia el 9443, y `/auth` borra las cabeceras del certificado (`DEPLOYMENT.md §5.2`, `make-deploy-env.mjs --gateway-host`).
+    - Al correr por primera vez los e2e de M3-04 aparecieron dos bugs de la ficha de la aplicación. Ambos están corregidos: los formularios quedan montados y deciden qué mostrar.
+      - Al rotar el secreto, la página se volvía a renderizar con la rotación en curso y desmontaba el formulario. El secreto nuevo, que se muestra una sola vez, no llegaba a verse.
+      - Al revocar una credencial pasaba lo mismo con el aviso "Credencial revocada.".
+    - Un certificado recién emitido llega al gateway con el siguiente bundle de OPA (10–20 s); hasta entonces la llamada se niega como `certificate_revoked`. Los e2e lo esperan (`untilCertificateKnown`).
   - Despliegue (S-3): Traefik termina hoy el TLS del VPS y enruta `/gw` por ruta, así que no puede pasar el certificado del cliente. El gateway necesita un nombre propio con `HostSNI` y `tls.passthrough` hacia el 9443 de APISIX. El nombre DNS del gateway ya existe en el VPS de demo (2026-11-14). Allí el certificado de servidor del gateway lo emite step-ca, y la ruta del token va por el mismo nombre.
   - Lo pendiente de la revisión de seguridad de M1-08 (mTLS hacia upstreams `direct` y fijar la IP verificada) quedó hecho en M3-03.
 

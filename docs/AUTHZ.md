@@ -138,6 +138,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | POST | `/api/v1/me/notifications/read-all` | cualquier sesión; solo recursos propios |
 | GET | `/api/v1/opa/bundle.tar.gz` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | POST | `/api/v1/opa/status` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/pki/ca` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/purposes` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/regulator/api-versions/:versionId/approve` | plataforma: `regulator.decide` |
 | POST | `/api/v1/regulator/api-versions/:versionId/request-changes` | plataforma: `regulator.decide` |

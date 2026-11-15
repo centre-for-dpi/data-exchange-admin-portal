@@ -211,7 +211,7 @@ describe('OPA bundle and activation (M1-09)', () => {
         subjectRefKey: process.env.RID_SUBJECT_REF_KEY,
         country: 'CO',
         documentTypes: ['CC', 'CE', 'TI', 'PEP', 'PPT', 'PA'],
-        mtlsRequired: false,
+        mtlsRequired: true,
         gatewayNodes: 1,
       });
     });

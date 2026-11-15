@@ -3,11 +3,17 @@ import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { makeCsr } from './csr';
 import { signIn } from './flows';
-import { expectNoAccessibilityViolations } from './helpers';
+import {
+  certificateOf,
+  gatewayToken,
+  gatewayTokenResponse,
+  issueCertificate,
+} from './gateway-flows';
+import { country, expectNoAccessibilityViolations } from './helpers';
 
 // M1-06: an app developer creates an application, sees the secret once and gets a real
-// client_credentials token from the gateway realm once the Keycloak reconciler has run.
-const keycloakUrl = process.env.KEYCLOAK_URL ?? 'http://localhost:8080';
+// client_credentials token from the gateway once the Keycloak reconciler has run. With mTLS
+// (M3-10) the token comes from the gateway's token route, bound to the application's certificate.
 
 const decodeJwt = (token: string): Record<string, unknown> =>
   JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')) as Record<
@@ -46,21 +52,17 @@ test.describe('applications and OAuth2 credentials', () => {
     await expect(page.locator('pre').getByText(/TU_SECRETO/)).toBeVisible();
     await expectNoAccessibilityViolations(page);
 
-    const response = await fetch(
-      `${keycloakUrl}/realms/rid-gateway/protocol/openid-connect/token`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded',
-          authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-        },
-        body: 'grant_type=client_credentials',
-      },
-    );
-    expect(response.status).toBe(200);
-    const claims = decodeJwt(((await response.json()) as { access_token: string }).access_token);
+    await issueCertificate(page, clientId);
+    const claims = decodeJwt(await gatewayToken(clientId, clientSecret));
     expect(claims.azp).toBe(clientId);
     expect([claims.aud].flat()).toContain('rid-gateway');
+    if (country().features.mtls.required) {
+      // Bound to the certificate (RFC 8705): the thumbprint of the leaf the portal issued.
+      const leaf = new X509Certificate(certificateOf(clientId)?.cert ?? '');
+      expect((claims.cnf as Record<string, string> | undefined)?.['x5t#S256']).toBe(
+        createHash('sha256').update(leaf.raw).digest('base64url'),
+      );
+    }
 
     await page.goto('/my-apps');
     const row = page.getByRole('row', { name: new RegExp(name) });
@@ -140,25 +142,22 @@ test.describe('applications and OAuth2 credentials', () => {
     expect(newSecret.length).toBeGreaterThanOrEqual(43);
     expect(newSecret).not.toBe(oldSecret);
     await expectNoAccessibilityViolations(page);
+    // With mTLS the token route also needs the application's certificate (M3-10).
+    await page.reload();
+    await issueCertificate(page, clientId);
 
-    const token = (secret: string) =>
-      fetch(`${keycloakUrl}/realms/rid-gateway/protocol/openid-connect/token`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded',
-          authorization: `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}`,
-        },
-        body: 'grant_type=client_credentials',
-      }).then((r) => r.status);
+    const token = (secret: string) => gatewayTokenResponse(clientId, secret).then((r) => r.status);
     // The reconciler applies the rotation in Keycloak within seconds.
     await expect.poll(() => token(newSecret), { timeout: 60_000 }).toBe(200);
     expect(await token(oldSecret)).toBe(200);
 
     await page.reload();
     await expect(page.getByTestId('works-until')).toBeVisible();
-    await page.getByText('Revocar el secreto anterior').click();
-    await page.getByLabel(/^Motivo/).fill('El sistema ya usa el secreto nuevo');
-    await page.getByRole('button', { name: 'Revocar ahora' }).click();
+    // The certificate has a revoke form too: only the previous secret's.
+    const revokeSecret = page.getByRole('group').filter({ hasText: 'Revocar el secreto anterior' });
+    await revokeSecret.getByText('Revocar el secreto anterior').click();
+    await revokeSecret.getByLabel(/^Motivo/).fill('El sistema ya usa el secreto nuevo');
+    await revokeSecret.getByRole('button', { name: 'Revocar ahora' }).click();
     await expect(
       page.getByRole('status').filter({ hasText: 'Credencial revocada.' }),
     ).toBeVisible();

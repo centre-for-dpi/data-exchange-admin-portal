@@ -3,9 +3,11 @@
 // Prerequisites: `pnpm infra:up` and the portal running (`pnpm dev`). Exits 1 at the first step
 // that does not behave as the script promises the audience.
 import { spawnSync } from 'node:child_process';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { createHash, randomBytes, randomUUID, X509Certificate } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { request as httpsRequest } from 'node:https';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DEFAULT_DEMO_TOTP_SECRET, totp } from './totp.mjs';
 
@@ -15,7 +17,11 @@ if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env')
 const env = (name, fallback) => process.env[name] ?? fallback;
 const API = `${env('RID_API_URL', 'http://localhost:4000')}/api/v1`;
 const KEYCLOAK = env('KEYCLOAK_URL', 'http://localhost:8080');
-const GATEWAY = env('RID_GATEWAY_PUBLIC_URL', 'http://localhost:9080');
+const GATEWAY = env('RID_GATEWAY_PUBLIC_URL', 'https://localhost:9443');
+// The plain-HTTP listener of the local gateway: only for "does the route exist yet?" (no token).
+const GATEWAY_HTTP = env('RID_GATEWAY_HTTP_URL', 'http://localhost:9080');
+// With mTLS (M3-10) the gateway is HTTPS and every call presents the application's certificate.
+const MTLS = GATEWAY.startsWith('https://');
 const WEB = env('RID_WEB_URL', 'http://localhost:3000');
 const PASSWORD = env('RID_DEMO_USER_PASSWORD', 'demo');
 const TOTP_SECRET = env('RID_DEMO_TOTP_SECRET', DEFAULT_DEMO_TOTP_SECRET);
@@ -201,8 +207,86 @@ async function as(username) {
 
 // --- Gateway -----------------------------------------------------------------------------------
 
+/** The application's key and certificate, once carlos has one (M3-10), and the network root. */
+const tls = { client: undefined, ca: undefined };
+
+/** fetch() for the gateway: over HTTPS, trusting the network CA and with the client certificate. */
+async function gatewayFetch(url, { method = 'GET', headers = {}, body } = {}) {
+  if (!url.startsWith('https://')) return fetch(url, { method, headers, body });
+  tls.ca ??= await (await fetch(`${API}/pki/ca`)).text();
+  const target = new URL(url);
+  return new Promise((resolveCall, reject) => {
+    const req = httpsRequest(
+      {
+        host: target.hostname,
+        port: target.port || 443,
+        path: `${target.pathname}${target.search}`,
+        method,
+        headers,
+        ca: tls.ca,
+        agent: false,
+        ...(tls.client ?? {}),
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const h = new Headers();
+          for (const [k, v] of Object.entries(res.headers)) {
+            for (const one of [v].flat()) if (one !== undefined) h.append(k, one);
+          }
+          resolveCall(new Response(Buffer.concat(chunks), { status: res.statusCode, headers: h }));
+        });
+      },
+    );
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+/**
+ * carlos's client certificate (M3-10): the key and the CSR are made on "his server" (openssl,
+ * here a temporary folder); the portal has the network CA sign it. The key never leaves.
+ */
+async function clientCertificate(carlos, entityId, applicationId, clientId) {
+  const dir = mkdtempSync(join(tmpdir(), 'rid-demo-'));
+  try {
+    const run = spawnSync(
+      'openssl',
+      [
+        'req',
+        '-new',
+        '-newkey',
+        'ec',
+        '-pkeyopt',
+        'ec_paramgen_curve:P-256',
+        '-nodes',
+        '-keyout',
+        join(dir, 'app.key'),
+        '-out',
+        join(dir, 'app.csr'),
+        '-subj',
+        `/CN=${clientId}`,
+      ],
+      { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } },
+    );
+    expect(run.status === 0, `openssl could not make the CSR: ${run.stderr || run.error}`);
+    const issued = await carlos.call(
+      'POST',
+      `/entities/${entityId}/applications/${applicationId}/certificates`,
+      { csr: readFileSync(join(dir, 'app.csr'), 'utf8') },
+    );
+    tls.client = { cert: issued.certificatePem, key: readFileSync(join(dir, 'app.key'), 'utf8') };
+    tls.credentialId = issued.credential.id;
+    return new X509Certificate(issued.certificatePem);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** client_credentials at the gateway's token route: with mTLS, bound to the certificate. */
 async function gatewayToken(clientId, clientSecret) {
-  const res = await fetch(`${KEYCLOAK}/realms/rid-gateway/protocol/openid-connect/token`, {
+  const res = await gatewayFetch(`${GATEWAY}/oauth/token`, {
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
@@ -210,7 +294,7 @@ async function gatewayToken(clientId, clientSecret) {
     },
     body: 'grant_type=client_credentials',
   });
-  expect(res.ok, `client_credentials token failed: ${res.status}`);
+  expect(res.ok, `client_credentials token failed: ${res.status} ${await res.clone().text()}`);
   return (await res.json()).access_token;
 }
 
@@ -218,7 +302,9 @@ const PERSON = '1000000001';
 const URL_PATH = `/salud/${SLUG}/v1/afiliados/${PERSON}`;
 
 async function callGateway(token, headers = {}) {
-  const res = await fetch(`${GATEWAY}${URL_PATH}`, {
+  // Without a token there is nothing to authenticate: the plain-HTTP listener says whether the
+  // route exists (with mTLS, HTTPS without a certificate has no TLS session at all).
+  const res = await gatewayFetch(`${token ? GATEWAY : GATEWAY_HTTP}${URL_PATH}`, {
     headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },
   });
   const text = await res.text();
@@ -254,7 +340,7 @@ async function preflight() {
   const checks = [
     ['portal API', `${API}/health`],
     ['Keycloak', `${KEYCLOAK}/realms/rid-portal`],
-    ['gateway', `${GATEWAY}/`],
+    ['gateway', `${GATEWAY_HTTP}/`],
   ];
   for (const [name, url] of checks) {
     const reachable = await fetch(url).then(
@@ -312,7 +398,7 @@ async function main() {
     timeoutMs: 60_000,
     what: 'the APISIX route did not appear',
   });
-  ok(`La ruta ya existe en APISIX: sin token, ${GATEWAY}${URL_PATH} → 401`);
+  ok(`La ruta ya existe en APISIX: sin token, ${GATEWAY_HTTP}${URL_PATH} → 401`);
 
   step('Descubrir en el catálogo', 'carlos.dev');
   const carlos = await as('carlos.dev');
@@ -341,7 +427,21 @@ async function main() {
         .provisioning === 'ready',
     { timeoutMs: 60_000, what: 'the Keycloak client was not created' },
   );
+  if (MTLS) {
+    const leaf = await clientCertificate(carlos, programas, created.application.id, clientId);
+    ok(`Certificado de cliente ${leaf.subject} emitido por la CA de la red, vence ${leaf.validTo}`);
+  }
   const token = await gatewayToken(clientId, clientSecret);
+  if (MTLS) {
+    const cnf = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).cnf;
+    const thumbprint = createHash('sha256')
+      .update(new X509Certificate(tls.client.cert).raw)
+      .digest('base64url');
+    expect(cnf?.['x5t#S256'] === thumbprint, 'the token is not bound to the client certificate');
+    ok(
+      `Token pedido al gateway (${GATEWAY}/oauth/token), ligado al certificado: x5t#S256 ${thumbprint.slice(0, 12)}…`,
+    );
+  }
   const noSubscription = await callGateway(token, { 'x-rid-purpose': 'eligibility_check' });
   expect(
     noSubscription.status === 403 && noSubscription.reason === 'no_subscription',
@@ -431,6 +531,26 @@ async function main() {
   const seconds = (Date.now() - revokedAt) / 1000;
   expect(seconds < 60, `revocation took ${seconds} s`);
   ok(`403 no_subscription a los ${seconds.toFixed(1)} s de revocar`);
+
+  if (MTLS) {
+    // M3 closing criterion: a revoked certificate stops working within 60 s, whatever the token.
+    step('Revocar el certificado de la aplicación', 'carlos.dev');
+    await carlos.call(
+      'POST',
+      `/entities/${programas}/applications/${created.application.id}/credentials/${tls.credentialId}/revoke`,
+      { reason: 'La clave privada quedó expuesta.' },
+    );
+    const certificateRevokedAt = Date.now();
+    await waitFor(
+      async () =>
+        (await callGateway(token, { 'x-rid-purpose': 'eligibility_check' })).reason ===
+        'certificate_revoked',
+      { timeoutMs: 60_000, what: 'the revoked certificate kept working' },
+    );
+    const after = (Date.now() - certificateRevokedAt) / 1000;
+    expect(after < 60, `certificate revocation took ${after} s`);
+    ok(`403 certificate_revoked a los ${after.toFixed(1)} s de revocar el certificado`);
+  }
 
   step('Auditar', 'marta.regulador');
   const marta = await as('marta.regulador');

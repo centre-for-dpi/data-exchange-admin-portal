@@ -12,7 +12,16 @@ import { CopyButton } from './app-forms';
  * Rotates the client secret (M3-04). The new secret is shown once, here; the previous one keeps
  * working until the date shown, so the consumer can switch without downtime.
  */
-export function RotateSecretForm({ applicationId, days }: { applicationId: string; days: number }) {
+export function RotateSecretForm({
+  applicationId,
+  days,
+  inProgress,
+}: {
+  applicationId: string;
+  days: number;
+  /** A rotation is already under way: no new one until it ends (one at a time, M3-04). */
+  inProgress: boolean;
+}) {
   const t = useTranslations('myApps.rotation');
   const ts = useTranslations('myApps.secret');
   const format = useFormatter();
@@ -52,6 +61,8 @@ export function RotateSecretForm({ applicationId, days }: { applicationId: strin
     );
   }
 
+  if (inProgress) return <p className="text-sm">{t('secretInProgress')}</p>;
+
   return (
     <form action={action} className="space-y-3">
       <ErrorSummary state={state} />
@@ -69,11 +80,14 @@ export function RevokeCredentialForm({
   applicationId,
   credentialId,
   label,
+  available,
 }: {
   applicationId: string;
   credentialId: string;
   /** What is revoked, for the accessible names ("certificado 1a2b…"). */
   label: string;
+  /** The credential can be revoked now (a working certificate, or the previous secret). */
+  available: boolean;
 }) {
   const t = useTranslations('myApps.rotation');
   const [state, action, pending] = useActionState(revokeCredentialAction, {});
@@ -84,6 +98,7 @@ export function RevokeCredentialForm({
       </Notice>
     );
   }
+  if (!available) return null;
   return (
     <details className="w-full text-sm">
       <summary className="cursor-pointer font-medium text-danger-fg">

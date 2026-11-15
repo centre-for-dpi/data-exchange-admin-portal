@@ -17,6 +17,7 @@ import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apis
 import {
   desiredGateway,
   desiredSsl,
+  desiredTokenRoute,
   GATEWAY_CLIENT_SSL_PREFIX,
   GATEWAY_SSL_ID,
   gatewayClientName,
@@ -28,6 +29,7 @@ import {
   type UpstreamPki,
   routeId,
   sslMatches,
+  TOKEN_ROUTE_ID,
   UnsupportedUpstreamError,
   upstreamId,
 } from './desired-state.js';
@@ -46,6 +48,7 @@ export type GatewayResult = 'created' | 'updated' | 'unchanged' | 'deleted' | 'a
 export const gatewaySyncTarget = (apiVersionId: string): string =>
   `apisix:route:${routeId(apiVersionId)}`;
 export const GATEWAY_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_SSL_ID}`;
+export const GATEWAY_TOKEN_SYNC_TARGET = `apisix:route:${TOKEN_ROUTE_ID}`;
 export const gatewayClientTlsSyncTarget = (entityId: string): string =>
   `apisix:ssl:${gatewayClientSslId(entityId)}`;
 
@@ -96,6 +99,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       await this.reconcileTls();
     } catch (error) {
       this.logger.warn(`APISIX TLS reconcile failed: ${String(error)}`);
+    }
+    try {
+      await this.reconcileTokenRoute();
+    } catch (error) {
+      this.logger.warn(`APISIX token route reconcile failed: ${String(error)}`);
     }
     const versions = await this.prisma.apiVersion.findMany({
       where: { status: { in: [...SERVED] } },
@@ -206,6 +214,28 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       return result;
     } catch (error) {
       await this.recordError(GATEWAY_TLS_SYNC_TARGET, desiredHash, error);
+      throw error;
+    }
+  }
+
+  /**
+   * The gateway's route to the rid-gateway token endpoint (S-4, M3-10): applications get their
+   * token over the TLS where APISIX verified their certificate, and Keycloak binds it to it.
+   */
+  async reconcileTokenRoute(): Promise<'created' | 'updated' | 'unchanged'> {
+    const desired = desiredTokenRoute(this.settings);
+    const desiredHash = hash(desired);
+    try {
+      const actual = await this.admin.get('routes', TOKEN_ROUTE_ID);
+      let result: 'created' | 'updated' | 'unchanged' = 'unchanged';
+      if (!actual || !matches(desired, actual)) {
+        await this.admin.put('routes', TOKEN_ROUTE_ID, desired);
+        result = actual ? 'updated' : 'created';
+      }
+      await this.recordSuccess(GATEWAY_TOKEN_SYNC_TARGET, desiredHash);
+      return result;
+    } catch (error) {
+      await this.recordError(GATEWAY_TOKEN_SYNC_TARGET, desiredHash, error);
       throw error;
     }
   }

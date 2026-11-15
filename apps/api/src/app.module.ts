@@ -22,6 +22,7 @@ import { CatalogService } from './catalog/catalog.service.js';
 import { CoreModule } from './core.module.js';
 import { CertificateLifecycleService } from './credentials/certificate-lifecycle.service.js';
 import { CertificatesController } from './credentials/certificates.controller.js';
+import { NetworkCaController } from './credentials/network-ca.controller.js';
 import { CertificatesService } from './credentials/certificates.service.js';
 import { CredentialsController } from './credentials/credentials.controller.js';
 import { CredentialsService } from './credentials/credentials.service.js';
@@ -88,6 +89,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     CatalogController,
     ApplicationsController,
     CertificatesController,
+    NetworkCaController,
     CredentialsController,
     SubscriptionsController,
     AccessRequestsController,

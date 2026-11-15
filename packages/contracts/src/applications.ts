@@ -93,7 +93,7 @@ export const PEM_CHAIN_MEDIA_TYPE = 'application/pem-certificate-chain';
 export const applicationDetailSchema = applicationSummarySchema.extend({
   description: z.string(),
   technicalContact: z.string(),
-  /** Keycloak token endpoint of the rid-gateway realm (client_credentials). */
+  /** The gateway's token route (client_credentials; bound to the certificate with mTLS, M3-10). */
   tokenUrl: z.string(),
   credentials: z.array(credentialSchema),
 });

@@ -10,7 +10,13 @@ import {
 import { hashSecret, open } from '../../common/secrets.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
-import { type GatewayClient, KEYCLOAK_ADMIN, type KeycloakGatewayAdmin } from './keycloak-admin.js';
+import { getCountryConfig } from '@rid/config';
+import {
+  BOUND_TOKENS_ATTRIBUTE,
+  type GatewayClient,
+  KEYCLOAK_ADMIN,
+  type KeycloakGatewayAdmin,
+} from './keycloak-admin.js';
 
 /** Outbox topic for changes that affect Keycloak clients of the rid-gateway realm. */
 export const KEYCLOAK_SYNC_TOPIC = 'keycloak.sync';
@@ -113,6 +119,11 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
         'rid.environment': app.environment,
         // Puts the client under the realm's secret rotation policy (M3-04).
         'rid.managed': 'true',
+        // With features.mtls.required, tokens are bound to the certificate APISIX verified on the
+        // token route (S-4, M3-10). The application still authenticates with its secret: a forged
+        // certificate header cannot authenticate anyone, and a bound token only works with the
+        // private key of that certificate.
+        [BOUND_TOKENS_ATTRIBUTE]: String(getCountryConfig().features.mtls.required),
       },
     };
     const desiredHash = createHash('sha256')

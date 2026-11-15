@@ -107,6 +107,7 @@ Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen toke
   - Llega con el realm en una instalación nueva. En un Keycloak que ya importó el realm se aplica con `node scripts/keycloak-portal-mfa.mjs` (`OPERATIONS.md §5.3`).
   - Sin el flujo, Keycloak no puede dar `acr=mfa`, y esos roles reciben 403 `mfa_required` en todo el portal.
   - Los usuarios semilla con rol crítico traen el código de `RID_DEMO_TOTP_SECRET`. En producción no hay usuarios semilla: cada persona enrola su app la primera vez.
+- **Certificado de cliente de las aplicaciones (M3-10, ADR-0022).** Arranca con el proveedor x509 `nginx` y `trust-proxy-verification` (`--spi-x509cert-lookup--…`, en el compose): lee de `SSL_CLIENT_CERT` el certificado que APISIX ya verificó en la ruta de token del gateway. Por eso ninguna otra vía hacia Keycloak debe dejar pasar esa cabecera ni `ssl-client-verify` (§5.2).
 - Detalle de los tres realms y los usuarios semilla: `infra/keycloak/README.md`.
 
 ### 3.4 etcd + APISIX
@@ -286,7 +287,7 @@ Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX 
 | `RID_STEP_CA_URL` | `https://localhost:9000` | `https://step-ca:9000` |
 | `RID_STEP_CA_ROOT_FILE` | vacío | `/var/lib/rid/step-ca/root_ca.crt` |
 | `RID_WEB_URL`, `AUTH_URL` | `http://localhost:3000` | `${RID_PUBLIC_URL}` |
-| `RID_GATEWAY_PUBLIC_URL` | `http://localhost:9080` | `${RID_PUBLIC_URL}/gw` |
+| `RID_GATEWAY_PUBLIC_URL` | `https://localhost:9443` | `https://<nombre del gateway>` con mTLS (`--gateway-host`); `${RID_PUBLIC_URL}/gw` sin mTLS |
 | `RID_CITIZEN_ISSUER` | `http://localhost:8080/realms/rid-citizens` | `${RID_PUBLIC_URL}/auth/realms/rid-citizens` |
 | `RID_CARPETA_URL` | `http://localhost:3100` | `${RID_PUBLIC_URL}/carpeta` |
 | `RID_CITIZEN_APPS` (webhook) | `http://localhost:3100/api/rid/alerts` | `http://carpeta:3100/carpeta/api/rid/alerts` |
@@ -346,13 +347,37 @@ http:
 
 Traefik da más prioridad a la regla más larga, así que `/api/v1`, `/auth`, etc. ganan sobre `/`.
 
-> **mTLS (M3).** Con `features.mtls.required` el TLS del gateway debe terminar en APISIX (SPIKE S-3): `/gw` detrás de un proxy que termina TLS no sirve. El gateway necesita un nombre propio con un router TCP `HostSNI(<nombre>)` y `tls.passthrough: true` hacia `rid-apisix:9443`. Se documenta al cerrar M3-10.
+**mTLS (M3-10, `features.mtls.required`).** El TLS del gateway debe terminar en APISIX (SPIKE S-3): detrás de un proxy que termina TLS, `/gw` no puede pasar el certificado del cliente. Hacen falta tres cosas:
+
+1. **Un nombre propio para el gateway**, por ejemplo `gw.example.org`, con paso directo TLS hacia el 9443 de APISIX. APISIX presenta allí su certificado de servidor, emitido por step-ca para `RID_GATEWAY_TLS_HOSTS`. En `.env`: `RID_GATEWAY_PUBLIC_URL=https://gw.example.org` y `RID_GATEWAY_TLS_HOSTS=gw.example.org` (`make-deploy-env.mjs --gateway-host gw.example.org`). Las aplicaciones piden ahí también su token: `https://gw.example.org/oauth/token`.
+2. **Que `/auth` borre `SSL_CLIENT_CERT` y `ssl-client-verify`** antes de llegar a Keycloak. Keycloak cree en esas cabeceras (S-4), y solo la ruta de token del gateway puede ponerlas (ADR-0022).
+3. Que el puerto 9443 de APISIX esté en la red del proxy. Ya lo está, por el alias `rid-apisix`.
+
+```yaml
+tcp:
+  routers:
+    rid-gateway-mtls:
+      rule: 'HostSNI(`gw.example.org`)'
+      service: rid-apisix-tls
+      tls: { passthrough: true }
+  services:
+    rid-apisix-tls: { loadBalancer: { servers: [{ address: 'rid-apisix:9443' }] } }
+http:
+  middlewares:
+    rid-no-client-cert-headers:
+      headers: { customRequestHeaders: { SSL_CLIENT_CERT: '', ssl-client-verify: '' } }
+  routers:
+    rid-auth: { rule: 'Host(`portal.example.org`) && PathPrefix(`/auth`)', service: rid-keycloak, middlewares: [rid-no-client-cert-headers], tls: { certResolver: le } }
+```
+
+El router TCP necesita que el punto de entrada `websecure` (443) de Traefik sea el mismo de los routers HTTP: Traefik resuelve primero los TCP por SNI. El certificado de `gw.example.org` no lo pide Traefik: lo presenta APISIX. Las aplicaciones confían en él con la raíz de la red (`/api/v1/pki/ca`).
+
 
 ### 5.3 Primer despliegue
 
 ```bash
 git clone <repo> && cd <repo>
-node scripts/make-deploy-env.mjs https://portal.example.org [--traefik-network <red>] [--demo-password <pw>]
+node scripts/make-deploy-env.mjs https://portal.example.org --gateway-host gw.example.org [--traefik-network <red>] [--demo-password <pw>]
 # → escribe .env (modo 600) con secretos aleatorios, una clave de firma nueva y los nombres internos.
 #   Se niega a sobrescribir un .env existente.
 docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
@@ -381,7 +406,13 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
   2. Recrear `step-ca` (crea el provisioner `rid-gateway-tls`) y `apisix` (carga `rid-client-cert`) antes que el API.
   3. Aplicar la política de rotación al realm existente: `node scripts/keycloak-client-policies.mjs` con `KEYCLOAK_URL` y el administrador de `master` (`OPERATIONS.md §5.3`).
   4. **M3-08 (segundo factor).** Agregar a `.env` un `RID_DEMO_TOTP_SECRET` aleatorio, por ejemplo con `openssl rand -hex 20`. Luego aplicar el flujo y los códigos de demo al realm existente: `node scripts/keycloak-portal-mfa.mjs --demo-otp`. Hazlo antes de arrancar el API nuevo: desde ese momento, los usuarios con rol crítico necesitan el código.
-  5. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-RID-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
+  5. **M3-10 (mTLS).**
+     - DNS del nombre del gateway hacia la máquina.
+     - Router TCP con paso directo y middleware en `/auth`, como en el ejemplo de §5.2.
+     - En `.env`: `RID_GATEWAY_PUBLIC_URL=https://<nombre>` y `RID_GATEWAY_TLS_HOSTS=<nombre>`.
+     - Recrear `keycloak` (arranca con el proveedor x509 `nginx`), luego `apisix` y el API. El API reemite el certificado de servidor del gateway para el nombre nuevo, agrega `client.ca` al objeto SSL, crea la ruta `rid-oauth-token` y liga los tokens de cada aplicación al certificado.
+     - Desde ese momento, una aplicación sin certificado vigente no puede llamar: cada desarrollador emite el suyo desde la ficha de su aplicación (M3-01).
+  6. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-RID-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
 ## 6. Desarrollo local

@@ -34,8 +34,10 @@ const MFA_USERS = new Set(
 );
 
 /** RFC 6238 TOTP like the realm's OTP policy (6 digits, 30 s, HMAC-SHA1, UTF-8 key). */
-export function totp(at = Date.now()): string {
-  const secret = process.env.RID_DEMO_TOTP_SECRET ?? 'rid-demo-totp-secret';
+export function totp(
+  at = Date.now(),
+  secret = process.env.RID_DEMO_TOTP_SECRET ?? 'rid-demo-totp-secret',
+): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
   const mac = createHmac('sha1', Buffer.from(secret, 'utf8')).update(counter).digest();
@@ -91,6 +93,32 @@ export async function watchCspViolations(page: Page): Promise<() => Promise<stri
   });
   return () =>
     page.evaluate(() => (window as unknown as { cspViolations?: string[] }).cspViolations ?? []);
+}
+
+/**
+ * First second factor of a new account (M3-08): the portal asked for acr=mfa and Keycloak shows
+ * CONFIGURE_TOTP. Like an authenticator app, the test reads the key from the page and answers
+ * with the current code.
+ */
+export async function enrollOneTimeCode(page: Page, password: string): Promise<void> {
+  const secret = page.locator('#totpSecret');
+  // A session opened by self-registration has no password level yet: Keycloak asks for it first.
+  const asked = await Promise.race([
+    secret.waitFor({ state: 'attached' }).then(() => 'code' as const),
+    page
+      .locator('#password')
+      .waitFor()
+      .then(() => 'password' as const),
+  ]);
+  if (asked === 'password') {
+    await page.locator('#password').fill(password);
+    await page.locator('#kc-login').click();
+    await secret.waitFor({ state: 'attached' });
+  }
+  await page.locator('#totp').fill(totp(Date.now(), await secret.inputValue()));
+  await page.locator('#userLabel').fill('App de la prueba');
+  await page.locator('#saveTOTPBtn').click();
+  await page.waitForURL((url) => !url.pathname.includes('/realms/'));
 }
 
 /** Fills Keycloak's login form (realm rid-portal), and the one-time code for critical roles. */

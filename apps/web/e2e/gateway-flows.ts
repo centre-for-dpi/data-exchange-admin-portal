@@ -1,10 +1,130 @@
 import { spawnSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { request as httpsRequest } from 'node:https';
 import { type Browser, expect, type Page } from '@playwright/test';
+import { makeCsr } from './csr';
 import { createApplication, openRequestForm, publishNewApi, signIn } from './flows';
+import { country } from './helpers';
 
-/** Calls through the real gateway (M1-09 onwards). */
-export const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
-const keycloak = process.env.KEYCLOAK_URL ?? 'http://localhost:8080';
+/** Calls through the real gateway (M1-09 onwards): over TLS with mTLS since M3-10. */
+export const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443';
+/**
+ * The gateway's plain-HTTP listener (local stack and CI only). Probes that only ask whether a
+ * route exists, or which headers it adds, use it: they have no client certificate to present.
+ */
+const gatewayHttp = process.env.RID_GATEWAY_HTTP_URL ?? 'http://localhost:9080';
+const apiUrl = process.env.RID_API_URL ?? 'http://localhost:4000';
+
+const mtlsRequired = () => country().features.mtls.required;
+
+interface ClientTls {
+  cert: string;
+  key: string;
+}
+/** Each application's certificate and private key, by client id (the token's azp). */
+const certificates = new Map<string, ClientTls>();
+let networkCa: Promise<string> | undefined;
+
+/** The same path on the plain-HTTP listener, for probes without a client certificate. */
+export const overHttp = (url: string): string =>
+  url.startsWith(gateway) ? `${gatewayHttp}${url.slice(gateway.length)}` : url;
+
+/** A call that only checks a route's existence or its headers: no token, no certificate. */
+export const probeGateway = (url: string): Promise<Response> => fetch(overHttp(url));
+
+const clientIdOf = (authorization: string | undefined): string | undefined => {
+  const token = /^Bearer (.+)$/.exec(authorization ?? '')?.[1];
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token?.split('.')[1] ?? '', 'base64url').toString('utf8'),
+    ) as { azp?: string };
+    return payload.azp;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * fetch() for the gateway (M3-10). Over HTTPS it trusts the network CA and presents the
+ * certificate of the application whose token goes in the Authorization header (a bound token
+ * only works with it), or of the application `as` names.
+ */
+export async function gatewayFetch(
+  url: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string } = {},
+  as?: string,
+): Promise<Response> {
+  if (!url.startsWith('https://')) return fetch(url, init);
+  networkCa ??= fetch(`${apiUrl}/api/v1/pki/ca`).then((r) => r.text());
+  const ca = await networkCa;
+  const client = certificates.get(as ?? clientIdOf(init.headers?.authorization) ?? '');
+  const target = new URL(url);
+  return new Promise<Response>((resolve, reject) => {
+    const req = httpsRequest(
+      {
+        host: target.hostname,
+        port: target.port || 443,
+        path: `${target.pathname}${target.search}`,
+        method: init.method ?? 'GET',
+        headers: init.headers,
+        ca,
+        agent: false,
+        ...(client ?? {}),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          const headers = new Headers();
+          for (const [name, value] of Object.entries(res.headers)) {
+            for (const v of Array.isArray(value) ? value : [value ?? '']) headers.append(name, v);
+          }
+          resolve(new Response(Buffer.concat(chunks), { status: res.statusCode ?? 0, headers }));
+        });
+      },
+    );
+    req.on('error', reject);
+    req.end(init.body);
+  });
+}
+
+/**
+ * carlos creates an application and, when the network requires mTLS, gets its client certificate
+ * through the portal (CSR made here, private key kept here): the gateway helpers then use it.
+ */
+export async function createGatewayApplication(
+  page: Page,
+  name: string,
+): Promise<{ clientId: string; clientSecret: string }> {
+  const clientId = await createApplication(page, name);
+  const clientSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
+  // Always ends on the application's page, with the certificate when the network asks for one.
+  await page.getByRole('link', { name: 'Ir a la aplicación' }).click();
+  await issueCertificate(page, clientId);
+  return { clientId, clientSecret };
+}
+
+/** The certificate of an application, as the gateway helpers present it. */
+export const certificateOf = (clientId: string): ClientTls | undefined =>
+  certificates.get(clientId);
+
+/**
+ * On the application's page: a CSR made here (the key never leaves the test), signed by the
+ * network CA through the portal, and the chain downloaded. Nothing to do without mTLS.
+ */
+export async function issueCertificate(page: Page, clientId: string): Promise<void> {
+  if (!mtlsRequired()) return;
+  const section = page.getByRole('region', { name: 'Certificado de cliente (mTLS)' });
+  const { csr, keyPem } = await makeCsr(clientId);
+  await section.getByLabel(/^Solicitud de certificado \(CSR\)/).fill(csr);
+  await section.getByRole('button', { name: 'Solicitar certificado' }).click();
+  const issued = section.getByRole('status');
+  await expect(issued).toContainText('El certificado está listo');
+  const downloading = page.waitForEvent('download');
+  await issued.getByRole('link', { name: 'Descargar' }).click();
+  const chain = await readFile((await (await downloading).path()) ?? '', 'utf8');
+  certificates.set(clientId, { cert: chain, key: keyPem });
+}
 
 /** Headers the salud mock logged for a request (it logs X-RID-* and X-Request-Id only). */
 export function providerSaw(requestId: string, since: string): Record<string, string> | undefined {
@@ -19,18 +139,52 @@ export function providerSaw(requestId: string, since: string): Record<string, st
   return undefined;
 }
 
-/** client_credentials token of an application in the gateway realm. */
+/**
+ * client_credentials token of an application, from the gateway's token route (M3-10): with mTLS
+ * it is bound to the application's certificate (cnf.x5t#S256).
+ */
 export async function gatewayToken(clientId: string, clientSecret: string): Promise<string> {
-  const res = await fetch(`${keycloak}/realms/rid-gateway/protocol/openid-connect/token`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded',
-      authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-    },
-    body: 'grant_type=client_credentials',
-  });
-  expect(res.status).toBe(200);
+  const res = await gatewayTokenResponse(clientId, clientSecret);
+  expect(res.status, await res.clone().text()).toBe(200);
   return ((await res.json()) as { access_token: string }).access_token;
+}
+
+/** The token route's answer, whatever it is (secret rotation and revocation tests). */
+export function gatewayTokenResponse(clientId: string, clientSecret: string): Promise<Response> {
+  return gatewayFetch(
+    `${gateway}/oauth/token`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      },
+      body: 'grant_type=client_credentials',
+    },
+    clientId,
+  );
+}
+
+/**
+ * Waits until the gateway knows a just-issued certificate: OPA gets it with the next bundle (every
+ * 10-20 s); until then the call is denied as certificate_revoked. Returns the deny reason it
+ * settled on, or null if the call was allowed.
+ */
+export async function untilCertificateKnown(url: string, token: string): Promise<string | null> {
+  let reason: string | null = 'certificate_revoked';
+  await expect
+    .poll(
+      async () => {
+        const res = await gatewayFetch(url, {
+          headers: { authorization: `Bearer ${token}`, 'x-rid-purpose': 'eligibility_check' },
+        });
+        reason = res.headers.get('x-rid-deny-reason');
+        return reason;
+      },
+      { timeout: 60_000, intervals: [1_000] },
+    )
+    .not.toBe('certificate_revoked');
+  return reason;
 }
 
 /** lucia (data steward of salud) approves a request for 6 months, as requested otherwise. */
@@ -52,8 +206,7 @@ export async function activeAffiliationSubscription(browser: Browser, page: Page
   await publishNewApi(browser, { slug, name: apiName });
   await signIn(page, 'carlos.dev', '/my-apps');
   const appName = `Verificador ${slug}`;
-  const clientId = await createApplication(page, appName);
-  const clientSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
+  const { clientId, clientSecret } = await createGatewayApplication(page, appName);
   await openRequestForm(page, apiName);
   await page.getByLabel(/^Aplicación que hará las llamadas/).selectOption({ label: appName });
   await page.getByLabel(/^Finalidad/).selectOption('eligibility_check');

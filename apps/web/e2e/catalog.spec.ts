@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { publishNewApi, signIn } from './flows';
+import { gateway } from './gateway-flows';
 import { expectNoAccessibilityViolations, watchCspViolations } from './helpers';
 
 // M1-05: consumers discover published APIs and read their service sheet and documentation.
@@ -42,7 +43,7 @@ test.describe('catalogue (M1-05)', () => {
     // The service sheet (the Scalar documentation repeats some of it from the OpenAPI document).
     const main = page.locator('#main-content');
     await expect(main.locator('dl').first()).toContainText('Entidad de Salud (ficticia)');
-    await expect(main.locator('dl').nth(1)).toContainText(`http://localhost:9080/salud/${slug}/v1`);
+    await expect(main.locator('dl').nth(1)).toContainText(`${gateway}/salud/${slug}/v1`);
     await expect(main.locator('dl').nth(1)).toContainText(
       'Verificación de requisitos de un trámite',
     );

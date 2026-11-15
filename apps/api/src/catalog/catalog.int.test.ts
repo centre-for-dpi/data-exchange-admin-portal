@@ -16,6 +16,12 @@ const openapi = readFileSync(
   'utf8',
 );
 
+// The gateway the catalogue advertises: RID_GATEWAY_PUBLIC_URL (https://localhost:9443 with mTLS).
+const gatewayBase = (process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(
+  /\/$/,
+  '',
+);
+
 describe('catalogue (M1-05)', () => {
   const prisma = new PrismaService();
   const realmUsers = readRealmUsers();
@@ -154,7 +160,7 @@ describe('catalogue (M1-05)', () => {
     expect(detail.entity.legalName).toBe('Entidad de Salud (ficticia)');
     expect(detail.versions).toHaveLength(1);
     expect(detail.versions[0]).toMatchObject({
-      gatewayUrl: `http://localhost:9080/salud/catalogo-${run}/v1`,
+      gatewayUrl: `${gatewayBase}/salud/catalogo-${run}/v1`,
       allowedPurposes: [{ code: 'eligibility_check' }],
       operations: [{ operationId: 'getAfiliado' }, { operationId: 'verificarAfiliacion' }],
     });
@@ -169,7 +175,7 @@ describe('catalogue (M1-05)', () => {
     expect(res.statusCode).toBe(200);
     const spec = res.json<{ servers: Array<{ url: string }>; paths: Record<string, unknown> }>();
     expect(spec.servers).toEqual([
-      { url: `http://localhost:9080/salud/catalogo-${run}/v1`, description: 'RID gateway' },
+      { url: `${gatewayBase}/salud/catalogo-${run}/v1`, description: 'RID gateway' },
     ]);
     expect(Object.keys(spec.paths)).toEqual([
       '/afiliados/{numeroIdentificacion}',

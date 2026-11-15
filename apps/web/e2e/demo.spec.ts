@@ -1,7 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { createApplication, openCatalogApi, publishNewApi, requestAccess, signIn } from './flows';
-import { approveAsSteward, gateway, gatewayToken, providerSaw } from './gateway-flows';
+import { openCatalogApi, publishNewApi, requestAccess, signIn } from './flows';
+import {
+  approveAsSteward,
+  createGatewayApplication,
+  gateway,
+  gatewayFetch,
+  gatewayToken,
+  probeGateway,
+  providerSaw,
+  untilCertificateKnown,
+} from './gateway-flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 // M1-12: the whole of docs/DEMO.md in the UI, steps 1-10 (pnpm demo runs the same script from the
@@ -20,7 +29,7 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     await publishNewApi(browser, { slug, name: apiName });
     const base = `${gateway}/salud/${slug}/v1/afiliados`;
     await expect
-      .poll(async () => (await fetch(`${base}/1000000001`)).status, { timeout: 60_000 })
+      .poll(async () => (await probeGateway(`${base}/1000000001`)).status, { timeout: 60_000 })
       .toBe(401);
 
     // Step 3: carlos discovers it in the catalogue, with its interactive documentation.
@@ -30,18 +39,12 @@ test.describe('DEMO.md end to end (M1-12)', () => {
 
     // Step 4: credentials. With a token but no subscription the gateway says why.
     const appName = `Validador de subsidios ${slug}`;
-    const clientId = await createApplication(page, appName);
-    const clientSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
-    await page.getByRole('link', { name: 'Ir a la aplicación' }).click();
+    // With mTLS (M3-10) carlos also gets the application's client certificate.
+    const { clientId, clientSecret } = await createGatewayApplication(page, appName);
     await expect(page.getByTestId('provisioning')).toHaveText('Lista', { timeout: 60_000 });
-    const early = await fetch(`${base}/1000000001`, {
-      headers: {
-        authorization: `Bearer ${await gatewayToken(clientId, clientSecret)}`,
-        'x-rid-purpose': 'eligibility_check',
-      },
-    });
-    expect(early.status).toBe(403);
-    expect(early.headers.get('x-rid-deny-reason')).toBe('no_subscription');
+    expect(
+      await untilCertificateKnown(`${base}/1000000001`, await gatewayToken(clientId, clientSecret)),
+    ).toBe('no_subscription');
 
     // Steps 5-6: request with a purpose; lucia approves for 6 months.
     const subscriptionId = await requestAccess(page, apiName, appName);
@@ -66,7 +69,7 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     // Allowed, even with forged gateway headers: the provider sees only OPA's values.
     const since = new Date(Date.now() - 2_000).toISOString();
     const requestId = `e2e-${randomUUID()}`;
-    const ok = await fetch(`${base}/1000000001`, {
+    const ok = await gatewayFetch(`${base}/1000000001`, {
       headers: headers({
         'x-request-id': requestId,
         'x-rid-subscription': 'sub-SPOOFED',
@@ -92,8 +95,12 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     expect(seen).not.toHaveProperty('x-rid-end-user');
 
     // Denials with stable reasons (DEMO.md step 8).
-    const deny = async (url: string, init: RequestInit, reason: string) => {
-      const res = await fetch(url, init);
+    const deny = async (
+      url: string,
+      init: { method?: string; headers: Record<string, string>; body?: string },
+      reason: string,
+    ) => {
+      const res = await gatewayFetch(url, init);
       expect(res.status, reason).toBe(403);
       expect(res.headers.get('x-rid-deny-reason')).toBe(reason);
       expect(res.headers.get('content-type')).toMatch(/problem\+json/);
@@ -137,7 +144,7 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     await expect
       .poll(
         async () => {
-          const res = await fetch(`${base}/1000000001`, { headers: headers() });
+          const res = await gatewayFetch(`${base}/1000000001`, { headers: headers() });
           return res.status === 403 ? res.headers.get('x-rid-deny-reason') : String(res.status);
         },
         { timeout: 60_000, intervals: [1_000] },

@@ -68,13 +68,23 @@ export default async function ApplicationPage({ params }: PageProps) {
     `  -subj "/CN=${app.clientId}"`,
   ].join('\n');
   const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
+  // With mTLS (M3-10) both calls present the application's certificate, and trust the gateway's
+  // certificate through the network CA: the token comes bound to that certificate.
+  const tls = mtlsRequired
+    ? [
+        `  --cert ${app.clientId}.crt --key ${app.clientId}.key \\`,
+        '  --cacert rid-network-ca.pem \\',
+      ]
+    : [];
   const tokenCommand = [
     `TOKEN=$(curl -s -u "${app.clientId}:TU_SECRETO" \\`,
+    ...tls,
     '  -d grant_type=client_credentials \\',
     `  ${app.tokenUrl} | jq -r .access_token)`,
   ].join('\n');
   const callCommand = [
     `curl ${gateway}/{entidad}/{api}/v1/... \\`,
+    ...tls,
     '  -H "Authorization: Bearer $TOKEN" \\',
     '  -H "X-RID-Purpose: {finalidad}" \\',
     '  -H "X-RID-End-User: {funcionario}"',
@@ -184,10 +194,13 @@ export default async function ApplicationPage({ params }: PageProps) {
                     </Button>
                   ) : null}
                 </span>
-                {revocable(c) ? (
+                {app.canWrite ? (
+                  // Mounted for every credential: once revoked, the page re-renders and the
+                  // form must stay to confirm it ("Credencial revocada.").
                   <RevokeCredentialForm
                     applicationId={app.id}
                     credentialId={c.id}
+                    available={revocable(c)}
                     label={
                       c.certificate
                         ? t('rotation.certificateLabel', { serial: c.certificate.serial })
@@ -199,11 +212,13 @@ export default async function ApplicationPage({ params }: PageProps) {
             ))}
           </ul>
           {writable ? (
-            rotatingSecret ? (
-              <p className="text-sm">{t('rotation.secretInProgress')}</p>
-            ) : (
-              <RotateSecretForm applicationId={app.id} days={rotationDays} />
-            )
+            // Always mounted: after a rotation the page re-renders with the rotation in
+            // progress, and the form must keep showing the new secret it just received.
+            <RotateSecretForm
+              applicationId={app.id}
+              days={rotationDays}
+              inProgress={Boolean(rotatingSecret)}
+            />
           ) : null}
         </Section>
       </div>
@@ -262,6 +277,14 @@ export default async function ApplicationPage({ params }: PageProps) {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{t('detail.guideNote')}</p>
+        {mtlsRequired ? (
+          <p className="text-sm text-muted-foreground">
+            {t('detail.guideMtls')}{' '}
+            <a href="/files/network-ca" className="link font-semibold" download>
+              {t('detail.guideCa')}
+            </a>
+          </p>
+        ) : null}
         <p className="text-sm text-muted-foreground">{t('detail.guideEndUser')}</p>
         <p className="text-sm text-muted-foreground">{t('detail.guideLimit')}</p>
       </Section>

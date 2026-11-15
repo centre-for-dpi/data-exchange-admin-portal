@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  desiredTokenRoute,
   deprecationHeaders,
   desiredGateway,
   type GatewaySettings,
@@ -409,5 +410,40 @@ describe('gateway TLS (M3-02)', () => {
     ]);
     expect(() => parseHostNames('bad_name')).toThrow();
     expect(() => parseHostNames(' , ')).toThrow();
+  });
+});
+
+describe('token route (S-4, M3-10)', () => {
+  it('forwards to the rid-gateway token endpoint with the verified certificate', () => {
+    const route = desiredTokenRoute(settings);
+    expect(route).toMatchObject({
+      uri: '/oauth/token',
+      methods: ['POST'],
+      upstream: { scheme: 'http', nodes: { 'keycloak:8080': 1 }, pass_host: 'node' },
+    });
+    const plugins = route.plugins as Record<string, Record<string, unknown>>;
+    expect(plugins['proxy-rewrite']).toEqual({
+      uri: '/realms/rid-gateway/protocol/openid-connect/token',
+      headers: {
+        // The other spellings of the two headers go; the exact names are always overwritten.
+        remove: ['SSL-CLIENT-CERT', 'ssl_client_verify'],
+        set: {
+          SSL_CLIENT_CERT: '$ssl_client_escaped_cert',
+          'ssl-client-verify': '$ssl_client_verify',
+        },
+      },
+    });
+    expect(plugins).toHaveProperty('rid-header-guard');
+  });
+
+  it('keeps the base path of a Keycloak served under one (the pilot: /auth)', () => {
+    const route = desiredTokenRoute({
+      ...settings,
+      keycloakDiscoveryUrl:
+        'http://keycloak:8080/auth/realms/rid-gateway/.well-known/openid-configuration',
+    });
+    expect((route.plugins as Record<string, { uri?: string }>)['proxy-rewrite']?.uri).toBe(
+      '/auth/realms/rid-gateway/protocol/openid-connect/token',
+    );
   });
 });

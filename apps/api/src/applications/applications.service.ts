@@ -22,9 +22,13 @@ import { KEYCLOAK_SYNC_TOPIC, syncTarget } from '../reconcilers/keycloak/keycloa
 
 type AppRow = Prisma.ApplicationGetPayload<{ include: { credentials: true } }>;
 
-/** Token endpoint consumers use (client_credentials) in the realm rid-gateway. */
+/**
+ * Where consumers get their token (client_credentials): the gateway's own token route, on the same
+ * name and TLS as their calls (S-4, M3-10). With mTLS, that is where the token gets bound to the
+ * client certificate; Keycloak itself is not published for applications.
+ */
 export const gatewayTokenUrl = (): string =>
-  `${process.env.KEYCLOAK_URL ?? 'http://localhost:8080'}/realms/rid-gateway/protocol/openid-connect/token`;
+  `${(process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(/\/$/, '')}/oauth/token`;
 
 /**
  * Consumer applications and their OAuth2 credentials (SPEC.md §4.3, M1-06). The Keycloak client is

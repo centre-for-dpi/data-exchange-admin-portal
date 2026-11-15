@@ -36,6 +36,12 @@ services:
       # The email event listener (realm rid-portal) tells the account owner when a password or a
       # second factor is set or removed (M3-08): a first-use OTP enrollment does not go unnoticed.
       - --spi-events-listener--email--include-events=UPDATE_CREDENTIAL,REMOVE_CREDENTIAL
+      # The client certificate of applications arrives from the gateway's token route, which
+      # APISIX verified in the handshake (S-4, M3-10): Keycloak reads it from SSL_CLIENT_CERT and
+      # trusts ssl-client-verify. Every other way to Keycloak must strip both headers.
+      - --spi-x509cert-lookup--provider=nginx
+      - --spi-x509cert-lookup--nginx--ssl-client-cert=SSL_CLIENT_CERT
+      - --spi-x509cert-lookup--nginx--trust-proxy-verification=true
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak

@@ -435,6 +435,67 @@ export function desiredSsl(
   };
 }
 
+/** The gateway's own route to the token endpoint of rid-gateway (S-4, M3-10). */
+export const TOKEN_ROUTE_ID = 'rid-oauth-token';
+/** Where applications ask for their token: the same name and TLS as their calls. */
+export const GATEWAY_TOKEN_PATH = '/oauth/token';
+
+/**
+ * Headers Keycloak's x509 lookup (provider nginx, trust-proxy-verification) reads: the client
+ * certificate APISIX verified in the handshake and the outcome of that verification (S-4).
+ */
+export const CLIENT_CERT_HEADERS = { cert: 'SSL_CLIENT_CERT', verify: 'ssl-client-verify' };
+
+/**
+ * The token route (S-4 mount B, M3-10). Applications ask the gateway for their token, over the
+ * TLS where APISIX verified their certificate; APISIX forwards to Keycloak's token endpoint with
+ * the verified certificate in SSL_CLIENT_CERT and ssl-client-verify, always replacing whatever
+ * the client sent under those names (spelled with hyphens or underscores, in any case). Keycloak
+ * then binds the token to that certificate (cnf.x5t#S256). Without a verified certificate (plain
+ * HTTP, or a network without mTLS) the headers carry nothing.
+ */
+export function desiredTokenRoute(settings: GatewaySettings): ApisixObject {
+  // The discovery URL is <keycloak>/realms/rid-gateway/.well-known/openid-configuration.
+  const discovery = new URL(settings.keycloakDiscoveryUrl);
+  const realmPath = discovery.pathname.replace(/\/\.well-known\/openid-configuration$/, '');
+  const port = discovery.port || (discovery.protocol === 'https:' ? '443' : '80');
+  // The other spelling of each header (hyphens for underscores and back) is removed; the exact
+  // names are set, which replaces a client's value in any letter case.
+  const names = Object.values(CLIENT_CERT_HEADERS);
+  const spellings = names
+    .flatMap((name) => [name.replaceAll('_', '-'), name.replaceAll('-', '_')])
+    .filter((spelling) => !names.includes(spelling));
+  return {
+    name: 'rid-gateway token endpoint',
+    uri: GATEWAY_TOKEN_PATH,
+    methods: ['POST'],
+    status: 1,
+    labels: { 'rid-managed': 'true' },
+    upstream: {
+      type: 'roundrobin',
+      scheme: discovery.protocol.replace(':', ''),
+      nodes: { [`${discovery.hostname}:${port}`]: 1 },
+      // Keycloak sees its own internal name, as for every backchannel call.
+      pass_host: 'node',
+    },
+    plugins: {
+      'request-id': { header_name: 'X-Request-Id', include_in_response: true },
+      'rid-header-guard': {},
+      'proxy-rewrite': {
+        uri: `${realmPath}/protocol/openid-connect/token`,
+        headers: {
+          remove: [...new Set(spellings)],
+          set: {
+            [CLIENT_CERT_HEADERS.cert]: '$ssl_client_escaped_cert',
+            [CLIENT_CERT_HEADERS.verify]: '$ssl_client_verify',
+          },
+        },
+      },
+      prometheus: { prefer_name: false },
+    },
+  };
+}
+
 /**
  * APISIX stores the private key encrypted, so the key is not compared: a new key always comes
  * with a new certificate. `client` must be absent when mTLS is off.

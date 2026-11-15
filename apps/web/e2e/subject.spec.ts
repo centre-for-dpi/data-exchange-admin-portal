@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { citizenToken, myAccesses } from './citizen';
-import { createApplication, openRequestForm, publishNewApi, signIn } from './flows';
+import { openRequestForm, publishNewApi, signIn } from './flows';
 import {
   approveAsSteward,
+  createGatewayApplication,
   gateway,
+  gatewayFetch,
   gatewayToken,
   placesHolding,
   providerSaw,
@@ -28,8 +30,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     // carlos asks for both operations: the GET (subject in the path) and the POST (in the body).
     await signIn(page, 'carlos.dev', '/my-apps');
     const appName = `Verificador ${slug}`;
-    const clientId = await createApplication(page, appName);
-    const clientSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
+    const { clientId, clientSecret } = await createGatewayApplication(page, appName);
     await openRequestForm(page, apiName);
     await page.getByLabel(/^Aplicación que hará las llamadas/).selectOption({ label: appName });
     await page.getByLabel(/^Finalidad/).selectOption('eligibility_check');
@@ -55,9 +56,12 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     const token = await gatewayToken(clientId, clientSecret);
     const base = `${gateway}/salud/${slug}/v1/afiliados`;
     const since = new Date(Date.now() - 2_000).toISOString();
-    const call = async (path: string, init: RequestInit = {}) => {
+    const call = async (
+      path: string,
+      init: { method?: string; headers?: Record<string, string>; body?: string } = {},
+    ) => {
       const requestId = `mt02-${randomUUID()}`;
-      const res = await fetch(`${base}${path}`, {
+      const res = await gatewayFetch(`${base}${path}`, {
         ...init,
         headers: {
           authorization: `Bearer ${token}`,
@@ -66,7 +70,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
           'x-request-id': requestId,
           // A client cannot choose its own reference: the gateway overwrites it.
           'x-rid-subject-ref': 'forged-reference',
-          ...(init.headers as Record<string, string>),
+          ...init.headers,
         },
       });
       return { res, requestId };

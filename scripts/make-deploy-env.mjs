@@ -20,11 +20,20 @@ const { positionals, values } = parseArgs({
     out: { type: 'string', default: '.env' },
     'demo-password': { type: 'string' },
     'traefik-network': { type: 'string', default: 'lab-router_default' },
+    // The gateway's own name (M3-10): its TLS ends in APISIX, behind a TLS passthrough.
+    'gateway-host': { type: 'string' },
   },
 });
 const [publicUrl] = positionals;
 if (!publicUrl || !/^https:\/\/[a-z0-9.-]+$/i.test(publicUrl)) {
-  console.error('Usage: make-deploy-env.mjs https://<host> [--out .env] [--demo-password <pw>]');
+  console.error(
+    'Usage: make-deploy-env.mjs https://<host> --gateway-host <gateway name> [--out .env] [--demo-password <pw>]',
+  );
+  process.exit(2);
+}
+const gatewayHost = values['gateway-host'];
+if (gatewayHost !== undefined && !/^[a-z0-9.-]+$/i.test(gatewayHost)) {
+  console.error('--gateway-host is a host name, such as gw.example.org');
   process.exit(2);
 }
 const root = resolve(import.meta.dirname, '..');
@@ -75,7 +84,10 @@ const set = {
   RID_WEB_URL: publicUrl,
   AUTH_URL: publicUrl,
   KEYCLOAK_URL: `${publicUrl}/auth`,
-  RID_GATEWAY_PUBLIC_URL: `${publicUrl}/gw`,
+  // With mTLS (features.mtls.required) applications reach the gateway on its own name, whose TLS
+  // APISIX terminates; /gw on the portal's name only works without mTLS (DEPLOYMENT.md §5.2).
+  RID_GATEWAY_PUBLIC_URL: gatewayHost ? `https://${gatewayHost}` : `${publicUrl}/gw`,
+  ...(gatewayHost ? { RID_GATEWAY_TLS_HOSTS: gatewayHost } : {}),
   RID_CITIZEN_ISSUER: `${publicUrl}/auth/realms/rid-citizens`,
   RID_CARPETA_URL: `${publicUrl}/carpeta`,
   // Internal service names on the Compose network.

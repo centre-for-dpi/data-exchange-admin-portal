@@ -78,9 +78,8 @@ describe('applications and OAuth2 credentials (M1-06)', () => {
     expect(created.application.clientId).toBe(`rid-app-${created.application.id}`);
     expect(created.application.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7/);
     expect(created.application.provisioning).toBe('pending');
-    expect(created.application.tokenUrl).toMatch(
-      /\/realms\/rid-gateway\/protocol\/openid-connect\/token$/,
-    );
+    // The gateway's token route (M3-10), not Keycloak itself.
+    expect(created.application.tokenUrl).toMatch(/^https?:\/\/[^/]+(\/[^/]+)*\/oauth\/token$/);
     expect(created.clientSecret.length).toBeGreaterThanOrEqual(43);
 
     const again = await call(

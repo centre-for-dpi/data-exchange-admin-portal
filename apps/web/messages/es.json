@@ -331,7 +331,9 @@
       "guideCall": "2. Llama a una API con el token y la finalidad de tu solicitud aprobada:",
       "guideNote": "Reemplaza TU_SECRETO por el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada.",
       "guideLimit": "Cada suscripción tiene un límite de peticiones por minuto. Al superarlo, el gateway responde 429 en application/problem+json (código rate_limited); las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset dicen el límite, lo que queda y en cuántos segundos se reinicia.",
-      "guideEndUser": "X-RID-End-User identifica al funcionario que hace la consulta. Es obligatorio en las APIs con datos personales o sensibles: de 1 a 128 caracteres visibles, sin espacios (por ejemplo, su usuario o su correo institucional). El gateway lo convierte en un hash con la sal de la red: ni el proveedor ni los registros ven el valor."
+      "guideEndUser": "X-RID-End-User identifica al funcionario que hace la consulta. Es obligatorio en las APIs con datos personales o sensibles: de 1 a 128 caracteres visibles, sin espacios (por ejemplo, su usuario o su correo institucional). El gateway lo convierte en un hash con la sal de la red: ni el proveedor ni los registros ven el valor.",
+      "guideMtls": "La red exige mTLS: las dos llamadas presentan el certificado de la aplicación (sección Certificado de cliente) y su clave privada. El token queda ligado a ese certificado y solo sirve con él. El certificado del gateway lo emite la autoridad de certificación de la red:",
+      "guideCa": "descargar la raíz de la red (rid-network-ca.pem)"
     },
     "certificates": {
       "title": "Certificado de cliente (mTLS)",

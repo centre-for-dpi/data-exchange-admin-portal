@@ -22,6 +22,12 @@ export interface GatewayClient {
   secret?: string;
 }
 
+/**
+ * Keycloak binds the client's tokens to the certificate of the request (RFC 8705, cnf.x5t#S256).
+ * The reconciler manages it, like the rid.* attributes (M3-10).
+ */
+export const BOUND_TOKENS_ATTRIBUTE = 'tls.client.certificate.bound.access.tokens';
+
 export interface KeycloakGatewayAdmin {
   findClient(clientId: string): Promise<GatewayClient | undefined>;
   createClient(client: GatewayClient): Promise<void>;
@@ -127,8 +133,8 @@ export class HttpKeycloakGatewayAdmin implements KeycloakGatewayAdmin {
       name: typeof found.name === 'string' ? found.name : '',
       description: typeof found.description === 'string' ? found.description : '',
       attributes: Object.fromEntries(
-        Object.entries((found.attributes ?? {}) as Record<string, string>).filter(([k]) =>
-          k.startsWith('rid.'),
+        Object.entries((found.attributes ?? {}) as Record<string, string>).filter(
+          ([k]) => k.startsWith('rid.') || k === BOUND_TOKENS_ATTRIBUTE,
         ),
       ),
     };

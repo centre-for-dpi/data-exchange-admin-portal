@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { signIn } from './flows';
-import { expectNoAccessibilityViolations } from './helpers';
+import { enrollOneTimeCode, expectNoAccessibilityViolations } from './helpers';
+import { mailsTo } from './citizen';
 import { newPerson, registerAccount, waitForMail } from './onboarding';
 
 // M2-01: a new official self-registers (ADR-0018), asks for their entity to join with the
@@ -108,6 +109,21 @@ test.describe('entity onboarding (M2-01)', () => {
       .getByRole('button', { name: `Aceptar la invitación de ${shortName}` })
       .click();
     await stewardPage.waitForURL((url) => !url.pathname.includes('/invitations'));
+    // data_steward needs a second factor (M3-08): the portal asks for it right away, and a new
+    // account sets one up in Keycloak; its owner gets a notice by e-mail.
+    await enrollOneTimeCode(stewardPage, steward.password);
     await expect(stewardPage.getByRole('link', { name: 'Solicitudes' }).first()).toBeVisible();
+    // Two credential notices: the password set at registration, then the new second factor.
+    await expect
+      .poll(
+        async () =>
+          (await mailsTo(steward.email)).filter((m) => /credential|credencial/i.test(m.Subject))
+            .length,
+        {
+          timeout: 60_000,
+          intervals: [1_000],
+        },
+      )
+      .toBe(2);
   });
 });

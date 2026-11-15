@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:https';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { loadCountryConfig } from '@rid/config';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeKeyAndCsr } from '../../../test/csr.js';
 import { createTestApp, createTestIssuer } from '../../../test/test-auth.js';
@@ -111,8 +112,8 @@ describe('gateway TLS and client certificates (M3-02)', () => {
 
   afterAll(async () => {
     await admin.delete('routes', ECHO_ROUTE);
-    // Leave the development default: TLS without client certificates.
-    settings.tls.mtlsRequired = false;
+    // Leave what the country configuration says (co.yaml requires mTLS since M3-10).
+    settings.tls.mtlsRequired = loadCountryConfig({ code: 'co' }).features.mtls.required;
     await reconciler.reconcileTls();
     await app.close();
     await prisma.$disconnect();

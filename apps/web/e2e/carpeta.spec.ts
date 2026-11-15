@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { carpeta, mailsTo, mailText } from './citizen';
-import { activeAffiliationSubscription, gateway, gatewayToken } from './gateway-flows';
+import {
+  activeAffiliationSubscription,
+  gateway,
+  gatewayFetch,
+  gatewayToken,
+} from './gateway-flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 // MT-07, closing the transparency milestone: the demo citizen sees in the reference folder the
@@ -39,7 +44,7 @@ test.describe('reference citizen folder (MT-07)', () => {
     await expect(citizen.getByRole('status')).toHaveText('Avisos guardados.');
 
     // carlos's app consults her affiliation through the gateway.
-    const res = await fetch(`${gateway}/salud/${slug}/v1/afiliados/1000000001`, {
+    const res = await gatewayFetch(`${gateway}/salud/${slug}/v1/afiliados/1000000001`, {
       headers: {
         authorization: `Bearer ${await gatewayToken(clientId, clientSecret)}`,
         'x-rid-purpose': 'eligibility_check',

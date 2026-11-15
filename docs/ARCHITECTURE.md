@@ -89,12 +89,16 @@ Dos planos separados:
 
 - Una `Application` = un cliente confidencial con `serviceAccountsEnabled`, solo grant `client_credentials`, `clientId = rid-app-<uuid>`.
 - Mapper de audiencia `rid-gateway`. Vida del access token: 5 min.
-- Con `features.mtls.required`: autenticación del cliente por `tls_client_auth` o secreto + **tokens ligados al certificado** (RFC 8705, claim `cnf.x5t#S256`). Cómo lo comprueba el gateway (SPIKE S-3, `docs/spikes/S-3.md`):
+- Con `features.mtls.required` (activo en `co.yaml` desde M3-10): la aplicación se autentica con su **secreto**, y sus **tokens quedan ligados al certificado** (RFC 8705, claim `cnf.x5t#S256`, atributo `tls.client.certificate.bound.access.tokens` del cliente). No se usa `tls_client_auth` (ADR-0022). Cómo lo comprueba el gateway (SPIKE S-3, `docs/spikes/S-3.md`):
   - un objeto SSL de APISIX con `client.ca` (cadena de step-ca) rechaza en el handshake a quien no presenta un certificado válido;
   - el plugin propio `rid-client-cert` pone en `X-RID-Client-Cert-S256` la huella (base64url del SHA-256 del DER) del certificado verificado, tras borrar la que mande el cliente. No sirve `$ssl_client_fingerprint`, que es SHA-1;
   - OPA la compara con `cnf.x5t#S256` y con las huellas vigentes de la aplicación en el bundle (`data.clients[id].certificates`). Revocar es quitar la huella. La cabecera nunca llega al proveedor;
   - el TLS del gateway debe terminar en APISIX: delante solo puede haber un balanceador de capa 4 con paso directo TLS.
-  - el token también se pide al gateway (SPIKE S-4, `docs/spikes/S-4.md`). Una ruta de APISIX lleva al endpoint de tokens de `rid-gateway` el certificado ya verificado, en `SSL_CLIENT_CERT` (`$ssl_client_escaped_cert`) y `ssl-client-verify`, reemplazando las del cliente. Keycloak usa el proveedor x509 `nginx` con `trust-proxy-verification`, y cada cliente usa `client-x509`, con sujeto `CN=rid-app-<uuid>`, la CA emisora fijada y tokens ligados. Como Keycloak cree en esa cabecera, toda otra vía hacia él debe borrarla.
+  - el token también se pide al gateway, en `POST <gateway>/oauth/token` (SPIKE S-4, ADR-0022).
+    - La ruta `rid-oauth-token` (reconciliador de APISIX) lleva al endpoint de tokens de `rid-gateway` el certificado ya verificado, en `SSL_CLIENT_CERT` (`$ssl_client_escaped_cert`) y `ssl-client-verify` (`$ssl_client_verify`). Siempre reescribe esas cabeceras y borra sus otras grafías.
+    - Keycloak usa el proveedor x509 `nginx` con `trust-proxy-verification`. `tokenUrl` de la aplicación es esa ruta.
+    - Como Keycloak cree en esa cabecera, toda otra vía hacia él debe borrarla. Aun así, una cabecera inventada no autentica a nadie (hace falta el secreto), y un token ligado a un certificado ajeno no sirve sin su clave privada.
+  - la raíz de la red, que también emite el certificado del gateway, es pública: `GET /api/v1/pki/ca`. La guía de la aplicación la ofrece.
 - El portal usa una cuenta de servicio con permiso `manage-clients` **solo** en `rid-gateway`.
 
 ## 4. Patrón de reconciliación
