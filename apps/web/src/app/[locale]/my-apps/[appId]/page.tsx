@@ -76,7 +76,8 @@ export default async function ApplicationPage({ params }: PageProps) {
   const callCommand = [
     `curl ${gateway}/{entidad}/{api}/v1/... \\`,
     '  -H "Authorization: Bearer $TOKEN" \\',
-    '  -H "X-RID-Purpose: {finalidad}"',
+    '  -H "X-RID-Purpose: {finalidad}" \\',
+    '  -H "X-RID-End-User: {funcionario}"',
   ].join('\n');
 
   return (
@@ -261,6 +262,7 @@ export default async function ApplicationPage({ params }: PageProps) {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{t('detail.guideNote')}</p>
+        <p className="text-sm text-muted-foreground">{t('detail.guideEndUser')}</p>
         <p className="text-sm text-muted-foreground">{t('detail.guideLimit')}</p>
       </Section>
     </Page>

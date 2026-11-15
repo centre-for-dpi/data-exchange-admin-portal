@@ -168,9 +168,28 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       // Analytics never learn whose data was consulted (ADR-0015).
       '$http_x_rid_subject_ref',
       '$http_x_rid_data_subject',
+      '$http_x_rid_body_subject',
+      // The official only as its salted hash (M3-06).
+      '$http_x_rid_end_user',
     ]) {
       expect(values).not.toContain(forbidden);
     }
+    expect(values).toContain('$http_x_rid_end_user_hash');
+  });
+
+  it('the transparency record carries the official only as its salted hash (M3-06)', () => {
+    const values = Object.values(TRANSPARENCY_LOG_FORMAT);
+    for (const forbidden of [
+      '$http_x_rid_end_user',
+      '$http_x_rid_body_subject',
+      '$http_x_rid_data_subject',
+      '$uri',
+      '$request_uri',
+      '$args',
+    ]) {
+      expect(values).not.toContain(forbidden);
+    }
+    expect(values).toContain('$http_x_rid_end_user_hash');
   });
 
   it('reaches a direct upstream over verified HTTPS, pinned to the addresses checked', () => {

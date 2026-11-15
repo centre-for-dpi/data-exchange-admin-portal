@@ -183,7 +183,7 @@ pending_provider → info_requested → pending_provider (pregunta del responsab
 El sistema consumidor obtiene un token de Keycloak con sus credenciales y llama al gateway con:
 - `Authorization: Bearer <token>`
 - `X-RID-Purpose: <código de finalidad>` (obligatorio)
-- `X-RID-End-User: <identificador del funcionario>` (obligatorio si la suscripción lo exige; se registra con hash)
+- `X-RID-End-User: <identificador del funcionario>`: obligatorio en APIs con datos personales o sensibles. Es un identificador de 1 a 128 caracteres visibles, sin espacios, como el usuario o el correo institucional. Solo se registra como hash con la sal del despliegue.
 - `X-Request-Id` (opcional; si no viene el gateway lo genera)
 
 El gateway permite la llamada solo si existe una suscripción `active` para ese cliente, esa versión, esa operación y esa finalidad. El proveedor recibe cabeceras de trazabilidad (ver `ARCHITECTURE.md §6`).

@@ -488,7 +488,14 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - cambiar el límite no reinicia el contador;
       - el 429 del proveedor pasa intacto.
     - CI levanta además `opa` y `mock-salud` para la integración del API.
-- [ ] **M3-06 — Funcionario final**: `X-RID-End-User` obligatorio según clasificación; hash con sal por despliegue; nunca se guarda en claro.
+- [x] **M3-06 — Funcionario final**: `X-RID-End-User` obligatorio según clasificación; hash con sal por despliegue; nunca se guarda en claro.
+  - _Notas de implementación:_ la base existía desde M1-09: la suscripción marca `endUserIdentificationRequired` por la clasificación, OPA exige la cabecera y la convierte en HMAC con `RID_END_USER_HASH_SALT`, y no la reenvía. Esta historia la completa:
+    - La política exige también el funcionario si la clasificación **actual** de la ruta es `personal` o `sensitive`: una API reclasificada lo exige a las suscripciones anteriores.
+    - El valor debe ser un identificador (1 a 128 caracteres ASCII visibles, sin espacios). Si no, se niega con `end_user_invalid`, una razón nueva, y no se calcula su hash.
+    - En producción, el bundle rechaza la sal y la clave del seudónimo de ejemplo de `.env.example`: cada despliegue tiene las suyas.
+    - Pruebas de que el valor en claro no sale: los formatos de log del gateway y una prueba estática de las listas permitidas de Fluent Bit (`tests/infra`). El e2e de la demo ya comprobaba que al proveedor solo llega el hash.
+    - Al escribir esa prueba se encontró que el filtro del log de acceso descartaba `deny_reason`, así que la analítica perdía la razón de las negaciones. Se corrigió.
+    - La guía de integración de la aplicación muestra la cabecera y explica qué valor va.
 - [ ] **M3-07 — Anti-suplantación de cabeceras**: test que envía `X-RID-*` falsas desde el cliente y verifica que el proveedor recibe las correctas.
 - [ ] **M3-08 — MFA para roles críticos**: roles de plataforma y `data_steward` exigen MFA en Keycloak.
 - [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.

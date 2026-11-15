@@ -269,7 +269,7 @@ Haz el respaldo **antes de cada actualización con migraciones**, y guarda los a
 
 | Síntoma | Causa probable | Qué hacer |
 | :-- | :-- | :-- |
-| El gateway responde `403` a todo, incluso con suscripción | OPA sin bundle: el API no puede construirlo (falta o es corta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`) o OPA no alcanza `OPA_PORTAL_URL` | `dc logs opa`, `dc logs api`; revisar esas variables y `OPA_BUNDLE_TOKEN` |
+| El gateway responde `403` a todo, incluso con suscripción | OPA sin bundle: el API no puede construirlo (falta, es corta o es el valor de ejemplo `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`) o OPA no alcanza `OPA_PORTAL_URL` | `dc logs opa`, `dc logs api`; revisar esas variables y `OPA_BUNDLE_TOKEN` |
 | Suscripción "Aprobada (activándose)" que no pasa a "Activa" | OPA no descargó ni reportó la revisión nueva | `health?bundles` de OPA; SQL 1 con `system = 'opa'` |
 | API publicada que no aparece en el gateway (`404`) | Error del reconciliador de APISIX | SQL 1 con `system = 'apisix'`; `dc logs api`; revisar `APISIX_ADMIN_URL` y `APISIX_ADMIN_KEY` |
 | La aplicación no pasa a "Lista" | Error del reconciliador de Keycloak | SQL 1 con `system = 'keycloak'`; revisar `KEYCLOAK_URL` y `RID_GATEWAY_PROVISIONER_SECRET` (debe coincidir con el del realm) |

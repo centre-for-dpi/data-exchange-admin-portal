@@ -114,10 +114,25 @@ subscription_data := s if {
 	s.id == subscription
 }
 
-# Rule 5: personal data needs the official behind the call.
+# Rule 5: personal data needs the official behind the call (M3-06). The subscription says so
+# when it was requested; the route's classification says so now, in case the API became personal
+# or sensitive afterwards.
+end_user_required if subscription_data.endUserRequired
+
+end_user_required if route.classification in {"personal", "sensitive"}
+
 end_user_missing if {
-	subscription_data.endUserRequired
+	end_user_required
 	not end_user
+}
+
+# An identifier of the official, not free text: 1 to 128 visible ASCII characters (no spaces or
+# control characters). Anything else is refused rather than hashed.
+end_user_valid if regex.match(`^[\x21-\x7E]{1,128}$`, end_user)
+
+end_user_invalid if {
+	end_user
+	not end_user_valid
 }
 
 # --- Data subject (ADR-0015) ----------------------------------------------------------------
@@ -197,6 +212,8 @@ deny_reason := "no_subscription" if {
 	count(current) == 0
 } else := "end_user_required" if {
 	end_user_missing
+} else := "end_user_invalid" if {
+	end_user_invalid
 } else := "data_subject_required" if {
 	declares_subject
 	not subject_ref
@@ -207,7 +224,7 @@ default allow := false
 allow if not deny_reason
 
 # Rule 6, allow: headers for the upstream.
-end_user_hash := crypto.hmac.sha256(end_user, data.config.endUserHashSalt) if end_user
+end_user_hash := crypto.hmac.sha256(end_user, data.config.endUserHashSalt) if end_user_valid
 
 # Per-subscription limit (SPIKE S-2, ADR-0020, M3-05): APISIX's limit-count counts on each gateway
 # node, so each node gets its share of the subscription's requests per minute, rounded up.
@@ -258,6 +275,7 @@ details := {
 	"purpose_not_allowed": "Send X-RID-Purpose with a purpose approved for this subscription.",
 	"subscription_expired": "The subscription is not valid at this time.",
 	"end_user_required": "This API requires X-RID-End-User with the official making the request.",
+	"end_user_invalid": "X-RID-End-User must identify the official: 1 to 128 visible ASCII characters, no spaces.",
 	"data_subject_required": "The request does not say whose data it asks for, in the path or in the body as the API documents.",
 	"client_certificate_required": "Call the gateway over TLS with the application's client certificate.",
 	"token_not_bound": "Get the access token with the client certificate: it must be bound to it (cnf x5t#S256).",

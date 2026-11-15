@@ -177,7 +177,8 @@ test_client_credentials_tokens_without_azp_use_client_id if {
 }
 
 test_end_user_not_required_omits_the_hash if {
-	b := with_subscription({"endUserRequired": false})
+	# Neither the subscription nor the classification asks for it.
+	b := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"}])
 	h := authz.headers with input as without_header("x-rid-end-user")
 		with data.routes as b.routes
 		with data.clients as b.clients
@@ -502,4 +503,49 @@ test_a_denied_call_carries_no_limit if {
 test_without_gateway_nodes_one_node_is_assumed if {
 	no_nodes := json.patch(bundle, [{"op": "remove", "path": "/config/gatewayNodes"}])
 	headers_for(request({}), no_nodes)["X-RID-Rate-Limit"] == "600"
+}
+
+# --- Official behind the call (M3-06) ----------------------------------------------------------
+
+test_the_classification_requires_the_official_even_if_the_subscription_did_not if {
+	b := with_subscription({"endUserRequired": false})
+	denied(without_header("x-rid-end-user"), b, "end_user_required")
+	sensitive := json.patch(b, [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "sensitive"}])
+	denied(without_header("x-rid-end-user"), sensitive, "end_user_required")
+}
+
+test_an_internal_api_without_the_flag_needs_no_official if {
+	internal := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"}])
+	authz.allow with input as without_header("x-rid-end-user")
+		with data.routes as internal.routes
+		with data.clients as internal.clients
+		with data.config as internal.config
+		with time.now_ns as june_2026
+}
+
+test_an_official_that_is_not_an_identifier_is_refused if {
+	denied(with_headers({"x-rid-end-user": "Juan Pérez"}), bundle, "end_user_invalid")
+	denied(with_headers({"x-rid-end-user": concat("", [x | some _ in numbers.range(1, 129); x := "a"])}), bundle, "end_user_invalid")
+	denied(with_headers({"x-rid-end-user": "ab\tcd"}), bundle, "end_user_invalid")
+}
+
+test_an_invalid_official_is_refused_even_where_not_required if {
+	internal := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"}])
+	denied(with_headers({"x-rid-end-user": "dos palabras"}), internal, "end_user_invalid")
+}
+
+test_the_official_is_hashed_with_the_deployment_salt_and_never_forwarded if {
+	h := headers_for(with_headers({"x-rid-end-user": "funcionario@entidad.example"}), bundle)
+	h["X-RID-End-User-Hash"] == crypto.hmac.sha256("funcionario@entidad.example", "test-salt")
+	other_salt := object.union(bundle, {"config": {"endUserHashSalt": "another-deployment-salt"}})
+	h2 := headers_for(with_headers({"x-rid-end-user": "funcionario@entidad.example"}), other_salt)
+	h2["X-RID-End-User-Hash"] != h["X-RID-End-User-Hash"]
+	not h["X-RID-End-User"]
+	not h2["X-RID-End-User"]
+}
+
+test_the_longest_valid_official_is_accepted if {
+	long := concat("", [x | some _ in numbers.range(1, 128); x := "a"])
+	h := headers_for(with_headers({"x-rid-end-user": long}), bundle)
+	h["X-RID-End-User-Hash"] == crypto.hmac.sha256(long, "test-salt")
 }

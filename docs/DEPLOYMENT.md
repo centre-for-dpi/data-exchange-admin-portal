@@ -258,7 +258,7 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 | `STEP_CA_PASSWORD` | Cifra las claves de la CA y de los provisioners `rid-portal` y `rid-gateway-tls` ya creadas |
 | `AUTH_SECRET` | Cierra todas las sesiones de la web |
 
-Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, el API no puede construir el bundle de OPA y el gateway niega todo.
+Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
 
 Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX atienden el tráfico, 1 por defecto: cada nodo cuenta las peticiones por su lado y el bundle le da a cada uno su parte del límite de la suscripción, ADR-0020; un valor inválido deja a OPA sin bundle), `RID_GATEWAY_TLS_HOSTS` (nombres del certificado de servidor del gateway, por defecto `localhost`; en el piloto, el nombre propio del gateway de M3-10) y `RID_GATEWAY_CLIENT_NAME` (prefijo del certificado de cliente hacia los proveedores, por defecto `rid-gateway`). La ventana de rotación de credenciales es `lifecycle.credentialRotationDays` en la configuración del país (7 días por defecto).
 

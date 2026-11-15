@@ -16,6 +16,8 @@ local ALLOWED = {
   end_user_hash = true,
   bytes_sent = true,
   gateway_node = true,
+  -- Stable reason of a denial (no_subscription, end_user_required...): analytics of refusals.
+  deny_reason = true,
 }
 
 function allowlist(tag, timestamp, record)

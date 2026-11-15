@@ -107,6 +107,12 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     const withoutOfficial: Record<string, string> = headers();
     delete withoutOfficial['x-rid-end-user'];
     await deny(`${base}/1000000001`, { headers: withoutOfficial }, 'end_user_required');
+    // The official is an identifier, not free text (M3-06).
+    await deny(
+      `${base}/1000000001`,
+      { headers: headers({ 'x-rid-end-user': 'Juan Pérez' }) },
+      'end_user_invalid',
+    );
     // The POST operation exists in the API but was not requested (read-only by default).
     await deny(
       `${base}/verificaciones`,

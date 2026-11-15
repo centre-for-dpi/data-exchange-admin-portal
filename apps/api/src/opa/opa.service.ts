@@ -15,6 +15,7 @@ import {
   bundleSubject,
   pathRegex,
 } from './bundle.js';
+import { deploymentSecret } from './deployment-secret.js';
 import { readPolicies } from './policy-files.js';
 
 /** sync_state target of the OPA bundle: desired = latest revision, applied = active in OPA. */
@@ -47,22 +48,22 @@ export class OpaService implements OnApplicationBootstrap {
     await this.queue.work(POLICY_SYNC_TOPIC, () => this.refreshSyncState());
   }
 
+  /** Key of X-RID-End-User-Hash: without it the official's hash is reversible. Fail closed. */
   private salt(): string {
-    const salt = process.env.RID_END_USER_HASH_SALT ?? '';
-    // Without a salt the hash of an identification number is trivially reversible: fail closed.
-    if (salt.length < 16) {
-      throw new BundleUnavailableError('RID_END_USER_HASH_SALT is missing or shorter than 16');
+    try {
+      return deploymentSecret('RID_END_USER_HASH_SALT', process.env.RID_END_USER_HASH_SALT, 16);
+    } catch (error) {
+      throw new BundleUnavailableError((error as Error).message);
     }
-    return salt;
   }
 
+  /** Document numbers are a small space: without a strong key the reference is reversible. */
   private subjectRefKey(): string {
-    const key = process.env.RID_SUBJECT_REF_KEY ?? '';
-    // Document numbers are a small space: without a strong key the reference is reversible.
-    if (key.length < 32) {
-      throw new BundleUnavailableError('RID_SUBJECT_REF_KEY is missing or shorter than 32');
+    try {
+      return deploymentSecret('RID_SUBJECT_REF_KEY', process.env.RID_SUBJECT_REF_KEY, 32);
+    } catch (error) {
+      throw new BundleUnavailableError((error as Error).message);
     }
-    return key;
   }
 
   /** RID_GATEWAY_NODES (ADR-0020), 1 by default; a malformed value is not guessed (fail closed). */
