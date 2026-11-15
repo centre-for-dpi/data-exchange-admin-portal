@@ -17,8 +17,10 @@ import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apis
 import {
   desiredGateway,
   desiredSsl,
-  GATEWAY_CLIENT_SSL_ID,
+  GATEWAY_CLIENT_SSL_PREFIX,
   GATEWAY_SSL_ID,
+  gatewayClientName,
+  gatewayClientSslId,
   type GatewaySettings,
   MANAGED_PREFIX,
   matches,
@@ -44,8 +46,8 @@ export type GatewayResult = 'created' | 'updated' | 'unchanged' | 'deleted' | 'a
 export const gatewaySyncTarget = (apiVersionId: string): string =>
   `apisix:route:${routeId(apiVersionId)}`;
 export const GATEWAY_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_SSL_ID}`;
-export const GATEWAY_CLIENT_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_CLIENT_SSL_ID}`;
-const GATEWAY_SSL_IDS = new Set([GATEWAY_SSL_ID, GATEWAY_CLIENT_SSL_ID]);
+export const gatewayClientTlsSyncTarget = (entityId: string): string =>
+  `apisix:ssl:${gatewayClientSslId(entityId)}`;
 
 const hash = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -97,7 +99,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     }
     const versions = await this.prisma.apiVersion.findMany({
       where: { status: { in: [...SERVED] } },
-      select: { id: true },
+      select: { id: true, api: { select: { entityId: true } } },
     });
     for (const v of versions) {
       try {
@@ -107,14 +109,20 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       }
     }
     try {
-      await this.removeOrphans(new Set(versions.map((v) => v.id)));
+      await this.removeOrphans(
+        new Set(versions.map((v) => v.id)),
+        new Set(versions.map((v) => v.api.entityId)),
+      );
     } catch (error) {
       this.logger.warn(`APISIX orphan cleanup failed: ${String(error)}`);
     }
   }
 
   /** Deletes managed routes and upstreams whose version is not served (route first). */
-  private async removeOrphans(served: ReadonlySet<string>): Promise<void> {
+  private async removeOrphans(
+    served: ReadonlySet<string>,
+    providers: ReadonlySet<string>,
+  ): Promise<void> {
     const managed = (ids: string[], prefix: string) =>
       ids
         .filter((id) => id.startsWith(`${MANAGED_PREFIX}${prefix}-`))
@@ -128,21 +136,36 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       this.logger.log(`Removed orphan APISIX upstream ${id}`);
     }
     for (const id of await this.admin.list('ssls')) {
-      if (!id.startsWith(MANAGED_PREFIX) || GATEWAY_SSL_IDS.has(id)) continue;
+      if (!id.startsWith(MANAGED_PREFIX) || id === GATEWAY_SSL_ID) continue;
+      // A provider's client identity stays while the provider serves some version.
+      if (
+        id.startsWith(GATEWAY_CLIENT_SSL_PREFIX) &&
+        providers.has(id.slice(GATEWAY_CLIENT_SSL_PREFIX.length))
+      ) {
+        continue;
+      }
       await this.admin.delete('ssls', id);
       this.logger.log(`Removed orphan APISIX SSL object ${id}`);
     }
   }
 
   /**
-   * The gateway's client certificate towards upstreams (M3-03), as an SSL object of type client
-   * that upstreams with mTLS reference by id: renewing it updates one object, not every upstream.
-   * Returns the network CA, which verifies kit nodes.
+   * The gateway's client certificate towards the upstreams of one provider entity (M3-03), as an
+   * SSL object of type client that its upstreams with mTLS reference by id: renewing it updates
+   * one object, not every upstream. Returns the network CA, which verifies kit nodes.
    */
-  async reconcileClientTls(now = new Date()): Promise<UpstreamPki> {
+  async reconcileClientTls(
+    entity: { id: string; slug: string },
+    now = new Date(),
+  ): Promise<UpstreamPki> {
+    const sslId = gatewayClientSslId(entity.id);
+    const target = gatewayClientTlsSyncTarget(entity.id);
     let desiredHash = hash(null);
     try {
-      const certificate = await this.certificates.upstreamClient(this.settings.tls.clientName, now);
+      const certificate = await this.certificates.upstreamClient(
+        gatewayClientName(this.settings, entity.slug),
+        now,
+      );
       const desired = {
         type: 'client',
         cert: certificate.certificatePem,
@@ -151,14 +174,14 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
         status: 1,
       };
       desiredHash = hash({ ...desired, key: certificate.fingerprint });
-      const actual = await this.admin.get('ssls', GATEWAY_CLIENT_SSL_ID);
+      const actual = await this.admin.get('ssls', sslId);
       if (!actual || !sslMatches(desired, actual)) {
-        await this.admin.put('ssls', GATEWAY_CLIENT_SSL_ID, desired);
+        await this.admin.put('ssls', sslId, desired);
       }
-      await this.recordSuccess(GATEWAY_CLIENT_TLS_SYNC_TARGET, desiredHash);
+      await this.recordSuccess(target, desiredHash);
       return { networkCaPem: certificate.networkCaPem };
     } catch (error) {
-      await this.recordError(GATEWAY_CLIENT_TLS_SYNC_TARGET, desiredHash, error);
+      await this.recordError(target, desiredHash, error);
       throw error;
     }
   }
@@ -208,11 +231,12 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       const addresses = await this.assertPublicUpstream(upstreamConfig);
       // Only upstreams with mTLS depend on step-ca: the others keep working if the CA is down.
       const pki = needsGatewayPki(upstreamConfig, version.api.entity.slug, this.settings)
-        ? await this.reconcileClientTls()
+        ? await this.reconcileClientTls(version.api.entity)
         : undefined;
       const desired = desiredGateway(
         {
           id: version.id,
+          entityId: version.api.entityId,
           basePath: version.basePath,
           upstream: upstreamConfig,
           ...(addresses ? { addresses } : {}),

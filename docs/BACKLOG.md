@@ -458,12 +458,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Revocar un certificado desde el portal llega con M3-04. La salida del bundle ya está probada con el estado `revoked`.
 - [x] **M3-03 — mTLS hacia upstreams**: certificado del gateway emitido por step-ca y configurado en upstreams `node` y `direct` con mTLS.
   - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1`.
-    - El gateway tiene un certificado de cliente propio, `CN=rid-gateway` (`RID_GATEWAY_CLIENT_NAME`). Lo emite step-ca con el provisioner `rid-portal` (solo autenticación de cliente). El portal guarda la clave sellada y lo renueva en el último tercio de su vida.
-    - Va en el objeto SSL de tipo `client` `rid-ssl-gateway-client`, que los upstreams con mTLS referencian por id. El reconciliador lo asegura solo cuando una versión lo necesita: los upstreams sin mTLS no dependen de step-ca.
+    - El gateway tiene un certificado de cliente por entidad proveedora, `CN=rid-gateway.<slug>` (prefijo `RID_GATEWAY_CLIENT_NAME`). Lo emite step-ca con el provisioner `rid-portal` (solo autenticación de cliente). El portal guarda la clave sellada y lo renueva en el último tercio de su vida.
+    - Es por proveedor y no compartido por una revisión de seguridad: con una sola identidad, una entidad podía apuntar su versión `direct` a la API mTLS de otra entidad y llegar a ella como el gateway (diputado confundido). Cada proveedor acepta solo su nombre.
+    - Va en el objeto SSL de tipo `client` `rid-ssl-gateway-client-<entityId>`, que los upstreams de la entidad referencian por id. El reconciliador lo asegura solo cuando una versión lo necesita: los upstreams sin mTLS no dependen de step-ca.
     - `direct` con `mtls` presenta ese certificado. Todo `direct` verifica ahora el certificado del proveedor (`tls.verify`), algo que antes no se hacía.
     - `node` sobre TLS (los nodos de M4; en desarrollo, `RID_DEV_NODES` con `https://host:puerto`) presenta el certificado y verifica el del nodo contra la CA de la red, para el nombre del nodo.
     - Cierra también el DNS rebinding pendiente de M1-08: el upstream `direct` apunta a las direcciones que el reconciliador resolvió y encontró públicas, con el nombre como Host y SNI (`pass_host: rewrite`, `upstream_host`).
-    - Probado con tráfico real (APISIX, step-ca y un servicio mTLS en el host): el nodo recibe `CN=rid-gateway` y el Host correcto. Sin el certificado del gateway, o con un nodo de otra CA, la llamada da 502.
+    - Probado con tráfico real (APISIX, step-ca y un servicio mTLS en el host): el nodo recibe `CN=rid-gateway.salud` y el Host correcto. Sin el certificado del gateway, o con un nodo de otra CA, la llamada da 502.
     - En desarrollo APISIX alcanza el host (`host.docker.internal`, solo para estas pruebas); el despliegue lo quita.
 - [ ] **M3-04 — Rotación**: segunda credencial (secreto o certificado) con ventana de rotación; revocación de la anterior.
 - [ ] **M3-05 — Límites por suscripción**: `limit-count` según el resultado de S-2; 429 con problem+json; límite visible en la suscripción.

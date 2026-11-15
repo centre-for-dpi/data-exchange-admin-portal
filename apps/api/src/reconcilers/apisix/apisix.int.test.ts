@@ -13,7 +13,7 @@ import { deleteUpstreamWhenUnused, HttpApisixAdmin } from './apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler, gatewaySyncTarget } from './apisix.reconciler.js';
 import {
   type DevNode,
-  GATEWAY_CLIENT_SSL_ID,
+  gatewayClientSslId,
   type GatewaySettings,
   parseDevNodes,
   routeId,
@@ -301,11 +301,19 @@ describe('APISIX reconciler (M1-08)', () => {
         mtls: true,
       });
       expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+      const salud = await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } });
       expect(await admin.get('upstreams', upstreamId(versionId))).toMatchObject({
         scheme: 'https',
-        tls: { verify: true, client_cert_id: GATEWAY_CLIENT_SSL_ID },
+        tls: { verify: true, client_cert_id: gatewayClientSslId(salud.id) },
       });
-      expect(await admin.get('ssls', GATEWAY_CLIENT_SSL_ID)).toMatchObject({ type: 'client' });
+      expect(await admin.get('ssls', gatewayClientSslId(salud.id))).toMatchObject({
+        type: 'client',
+      });
+      // The certificate names the provider: CN=rid-gateway.salud.
+      const row = await prisma.gatewayCertificate.findFirstOrThrow({
+        where: { purpose: 'upstream_client', hosts: { equals: ['rid-gateway.salud'] } },
+      });
+      expect(row.hosts).toEqual(['rid-gateway.salud']);
     });
 
     it('a node served over TLS gets mTLS and is verified against the network CA', async () => {
@@ -320,7 +328,12 @@ describe('APISIX reconciler (M1-08)', () => {
           scheme: 'https',
           upstream_host: 'mock-salud',
           nodes: { 'mock-salud:8443': 1 },
-          tls: { client_cert_id: GATEWAY_CLIENT_SSL_ID, verify: true },
+          tls: {
+            client_cert_id: gatewayClientSslId(
+              (await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } })).id,
+            ),
+            verify: true,
+          },
         });
         const caCerts = (upstream?.tls as { ca_certs: string[] }).ca_certs;
         expect(caCerts.length).toBeGreaterThanOrEqual(2);

@@ -7,8 +7,16 @@ export const routeId = (apiVersionId: string): string => `rid-route-${apiVersion
 export const upstreamId = (apiVersionId: string): string => `rid-upstream-${apiVersionId}`;
 /** The gateway's TLS (server certificate and, with mTLS, the client CA) on its public names. */
 export const GATEWAY_SSL_ID = 'rid-ssl-gateway';
-/** The gateway's client certificate towards upstreams with mTLS (M3-03). */
-export const GATEWAY_CLIENT_SSL_ID = 'rid-ssl-gateway-client';
+/**
+ * The gateway's client certificates towards upstreams with mTLS (M3-03): one per provider entity,
+ * CN=<clientName>.<entity slug>. A provider accepts only its own name, so a route of another
+ * entity pointed at its API cannot borrow the gateway's identity (confused deputy).
+ */
+export const GATEWAY_CLIENT_SSL_PREFIX = 'rid-ssl-gateway-client-';
+export const gatewayClientSslId = (entityId: string): string =>
+  `${GATEWAY_CLIENT_SSL_PREFIX}${entityId}`;
+export const gatewayClientName = (settings: GatewaySettings, entitySlug: string): string =>
+  `${settings.tls.clientName}.${entitySlug}`;
 /** Only objects with this prefix belong to the portal; anything else in APISIX is left alone. */
 export const MANAGED_PREFIX = 'rid-';
 
@@ -38,7 +46,10 @@ export interface GatewaySettings {
   tls: {
     hosts: string[];
     mtlsRequired: boolean;
-    /** CN of the client certificate the gateway presents to upstreams (RID_GATEWAY_CLIENT_NAME). */
+    /**
+     * Prefix of the CN the gateway presents to upstreams (RID_GATEWAY_CLIENT_NAME), followed by the
+     * provider entity's slug.
+     */
     clientName: string;
   };
 }
@@ -128,6 +139,8 @@ export interface VersionForGateway {
   id: string;
   basePath: string;
   upstream: Upstream;
+  /** Provider entity: the gateway presents that entity's client certificate (M3-03). */
+  entityId: string;
   /** Public addresses the reconciler resolved for a direct upstream's host name. */
   addresses?: readonly string[];
   /** HTTP methods declared in the OpenAPI document. */
@@ -220,7 +233,7 @@ function resolveUpstream(
         tls: {
           verify: true,
           // mTLS towards the provider's existing API (M3-03): the gateway's client certificate.
-          ...(v.upstream.mtls ? { client_cert_id: GATEWAY_CLIENT_SSL_ID } : {}),
+          ...(v.upstream.mtls ? { client_cert_id: gatewayClientSslId(v.entityId) } : {}),
         },
       },
       pathPrefix: url.pathname.replace(/\/$/, ''),
@@ -256,7 +269,7 @@ function resolveUpstream(
       pass_host: 'rewrite',
       upstream_host: node.host,
       nodes: { [node.hostPort]: 1 },
-      tls: { client_cert_id: GATEWAY_CLIENT_SSL_ID, verify: true, ca_certs: ca },
+      tls: { client_cert_id: gatewayClientSslId(v.entityId), verify: true, ca_certs: ca },
     },
     pathPrefix,
   };
@@ -280,8 +293,9 @@ export function needsGatewayPki(
 
 /** True when the upstream presents the gateway's client certificate (it needs that SSL object). */
 export const usesGatewayClientCertificate = (upstream: ApisixObject): boolean =>
-  (upstream.tls as { client_cert_id?: string } | undefined)?.client_cert_id ===
-  GATEWAY_CLIENT_SSL_ID;
+  (upstream.tls as { client_cert_id?: string } | undefined)?.client_cert_id?.startsWith(
+    GATEWAY_CLIENT_SSL_PREFIX,
+  ) ?? false;
 
 export interface DesiredGateway {
   upstream: ApisixObject;

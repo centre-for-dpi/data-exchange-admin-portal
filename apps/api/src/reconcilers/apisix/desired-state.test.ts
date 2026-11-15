@@ -10,7 +10,8 @@ import {
   UnsupportedUpstreamError,
   type VersionForGateway,
   desiredSsl,
-  GATEWAY_CLIENT_SSL_ID,
+  gatewayClientName,
+  gatewayClientSslId,
   needsGatewayPki,
   parseHostNames,
   usesGatewayClientCertificate,
@@ -28,8 +29,11 @@ const settings: GatewaySettings = {
   tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
 };
 
+const PROVIDER = '0190d0c4-0000-7000-8000-00000000e001';
+
 const version = (overrides: Partial<VersionForGateway> = {}): VersionForGateway => ({
   id: '0190d0c4-0000-7000-8000-000000000001',
+  entityId: PROVIDER,
   basePath: '/salud/afiliacion/v1',
   upstream: { type: 'node', servicePath: '/salud' },
   methods: ['get', 'POST', 'GET'],
@@ -190,9 +194,23 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     );
     expect(upstream).toMatchObject({
       nodes: { '93.184.215.14:8443': 1 },
-      tls: { verify: true, client_cert_id: GATEWAY_CLIENT_SSL_ID },
+      tls: { verify: true, client_cert_id: gatewayClientSslId(PROVIDER) },
     });
     expect(usesGatewayClientCertificate(upstream)).toBe(true);
+    // Each provider gets its own gateway identity: another entity's route pointed at this API
+    // presents another name (no confused deputy).
+    const other = desiredGateway(
+      version({
+        entityId: '0190d0c4-0000-7000-8000-00000000e002',
+        upstream: { type: 'direct', url: 'https://api.salud.example:8443', mtls: true },
+        addresses: ['93.184.215.14'],
+      }),
+      settings,
+    ).upstream;
+    expect((other.tls as { client_cert_id: string }).client_cert_id).not.toBe(
+      gatewayClientSslId(PROVIDER),
+    );
+    expect(gatewayClientName(settings, 'salud')).toBe('rid-gateway.salud');
     expect(
       needsGatewayPki({ type: 'direct', url: 'https://a.example', mtls: true }, 'salud', settings),
     ).toBe(true);
@@ -210,7 +228,7 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       pass_host: 'rewrite',
       upstream_host: 'mock-salud',
       nodes: { 'mock-salud:8443': 1 },
-      tls: { client_cert_id: GATEWAY_CLIENT_SSL_ID, verify: true, ca_certs: [ca, ca] },
+      tls: { client_cert_id: gatewayClientSslId(PROVIDER), verify: true, ca_certs: [ca, ca] },
     });
     expect(needsGatewayPki({ type: 'node', servicePath: '/s' }, 'salud', tlsSettings)).toBe(true);
     expect(needsGatewayPki({ type: 'node', servicePath: '/s' }, 'salud', settings)).toBe(false);

@@ -128,10 +128,10 @@ export class GatewayCertificates {
   }
 
   /**
-   * The client certificate the gateway presents to upstreams that require mTLS (M3-03): subject
-   * CN=<name> (RID_GATEWAY_CLIENT_NAME, rid-gateway by default), issued like the applications'
-   * (TLS client authentication only, provisioner rid-portal). Providers trust the network CA and
-   * that name.
+   * A client certificate the gateway presents to upstreams that require mTLS (M3-03): subject
+   * CN=<name>, one per provider entity (rid-gateway.<slug>), issued like the applications' (TLS
+   * client authentication only, provisioner rid-portal). Each provider trusts the network CA and
+   * its own name only.
    */
   upstreamClient(name: string, now = new Date()): Promise<IssuedGatewayCertificate> {
     return this.ensure('upstream_client', [name], now);
@@ -143,7 +143,7 @@ export class GatewayCertificates {
     now: Date,
   ): Promise<IssuedGatewayCertificate> {
     const current = await this.prisma.gatewayCertificate.findFirst({
-      where: { purpose, notAfter: { gt: now } },
+      where: { purpose, hosts: { equals: [...hosts] }, notAfter: { gt: now } },
       orderBy: { createdAt: 'desc' },
     });
     if (current && sameHosts(current.hosts, hosts) && !renewalDue(current, now)) {

@@ -16,7 +16,7 @@ import { HttpApisixAdmin } from './apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler } from './apisix.reconciler.js';
 import {
   desiredGateway,
-  GATEWAY_CLIENT_SSL_ID,
+  gatewayClientSslId,
   type GatewaySettings,
   parseDevNodes,
 } from './desired-state.js';
@@ -28,6 +28,8 @@ const UPSTREAM = 'test-m3-03-upstream';
 const PATH = '/__rid_m3_03__';
 // How APISIX, in its container, reaches a server on the host.
 const HOST = 'host.docker.internal';
+// The provider entity whose upstream it is: the gateway presents CN=rid-gateway.<slug>.
+const PROVIDER = { id: '0190d0c4-0000-7000-8000-00000000e003', slug: 'salud' };
 
 interface Seen {
   cn?: string;
@@ -89,10 +91,11 @@ describe('mTLS towards upstreams (M3-03)', () => {
   /** Puts the upstream the reconciler would build for a node at `port`, and a route to it. */
   const route = async (port: number, change?: (upstream: Record<string, unknown>) => void) => {
     const nodeSettings = { ...settings, devNodes: parseDevNodes(`salud=https://${HOST}:${port}`) };
-    const pki = await reconciler.reconcileClientTls();
+    const pki = await reconciler.reconcileClientTls(PROVIDER);
     const { upstream } = desiredGateway(
       {
         id: randomUUID(),
+        entityId: PROVIDER.id,
         basePath: '/salud/m3-03/v1',
         upstream: { type: 'node', servicePath: '/servicio' },
         methods: ['GET'],
@@ -148,7 +151,7 @@ describe('mTLS towards upstreams (M3-03)', () => {
     ]);
     reconciler = app.get(ApisixReconciler);
     root = await ca.rootCertificate();
-    const { networkCaPem } = await reconciler.reconcileClientTls();
+    const { networkCaPem } = await reconciler.reconcileClientTls(PROVIDER);
     chain = networkCaPem;
     expect(chain).toContain(root.trim());
   });
@@ -162,14 +165,14 @@ describe('mTLS towards upstreams (M3-03)', () => {
   });
 
   it('keeps the gateway client certificate in an SSL object of type client', async () => {
-    await reconciler.reconcileClientTls();
-    const ssl = await admin.get('ssls', GATEWAY_CLIENT_SSL_ID);
+    await reconciler.reconcileClientTls(PROVIDER);
+    const ssl = await admin.get('ssls', gatewayClientSslId(PROVIDER.id));
     expect(ssl).toMatchObject({ type: 'client' });
     const row = await prisma.gatewayCertificate.findFirstOrThrow({
-      where: { purpose: 'upstream_client' },
+      where: { purpose: 'upstream_client', hosts: { equals: ['rid-gateway.salud'] } },
       orderBy: { createdAt: 'desc' },
     });
-    expect(row.hosts).toEqual(['rid-gateway']);
+    expect(row.hosts).toEqual(['rid-gateway.salud']);
     expect(
       await prisma.auditEvent.count({
         where: { targetId: row.id, action: 'gateway_certificate.issued' },
@@ -177,14 +180,14 @@ describe('mTLS towards upstreams (M3-03)', () => {
     ).toBe(1);
   });
 
-  it('presents CN=rid-gateway to a node that requires mTLS, with the node name as Host', async () => {
+  it('presents CN=rid-gateway.<provider> to a node that requires mTLS, with its name as Host', async () => {
     const server = await mtlsServer({ ...(await serverCertificate()), ca: chain });
     servers.push(server);
     await route(portOf(server));
     const outcome = await call();
     expect(outcome.status).toBe(200);
     expect(outcome.seen).toEqual({
-      cn: 'rid-gateway',
+      cn: 'rid-gateway.salud',
       host: HOST,
       path: '/servicio/consulta',
     });
