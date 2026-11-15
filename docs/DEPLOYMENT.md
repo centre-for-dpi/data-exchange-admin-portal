@@ -222,6 +222,9 @@ Además sirve la API del titular que consume la carpeta ciudadana.
 - Imagen: `apps/web/Dockerfile`. Se compila con secretos de relleno; los reales llegan en tiempo de ejecución.
 - Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `RID_PORTAL_WEB_CLIENT_ID`, `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_API_URL` (interno, `http://api:4000`), `RID_WEB_URL`, `RID_GATEWAY_PUBLIC_URL`, opcional `RID_AUTH_REFRESH_BEFORE_SECONDS`. En el piloto, `AUTH_TRUST_HOST=true` (está detrás del proxy).
 - Corre con `next start` en 3000.
+- **Cabeceras de seguridad (M3-09).** La web pone ella misma la CSP con nonce, HSTS y el resto de las cabeceras (`ARCHITECTURE.md §12`). El proxy de delante no debe quitarlas ni reemplazarlas; tampoco debe agregar otra `Content-Security-Policy`, porque el navegador aplicaría las dos.
+  - HSTS va siempre, con `includeSubDomains`: publica la web en un nombre cuyos subdominios también se sirvan por HTTPS.
+  - Si Keycloak está en otro origen, `KEYCLOAK_URL` lo autoriza en `form-action`.
 
 ### 3.12 Carpeta ciudadana de referencia (`infra/mock-citizen-app`)
 

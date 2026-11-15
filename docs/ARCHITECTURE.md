@@ -355,7 +355,15 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 - Admin API de APISIX y etcd solo en red interna, con clave de administrador y mTLS.
 - El bundle OPA se sirve con token de servicio y por red interna.
 - Secretos por variables de entorno en dev; en producción, OpenBao (MPL-2.0).
-- Web: CSP estricta, cookies `HttpOnly` `SameSite=Lax`, CSRF por Auth.js.
+- **Web (M3-09).**
+  - CSP con un nonce nuevo por respuesta, que pone el proxy de Next (`src/proxy.ts`, `src/lib/security-headers.ts`). Next lo lee de la CSP de la petición y lo pone en sus scripts.
+    - `script-src 'self' 'nonce-…' 'strict-dynamic'`, sin `unsafe-inline` ni `unsafe-eval` (este último solo en `next dev`).
+    - `style-src` admite estilos en línea: los colores de la marca y los de Scalar. Los estilos no ejecutan código.
+    - `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'` y `connect-src 'self'`.
+    - `form-action` solo permite el propio origen y el de Keycloak, porque el navegador aplica la directiva también a la redirección de inicio y cierre de sesión. Sobre HTTPS se agrega `upgrade-insecure-requests`.
+  - Las rutas que no son páginas (Auth.js, el logo) llevan una CSP que no carga nada. Las descargas de `/files` llevan su `sandbox`.
+  - Toda respuesta lleva HSTS de dos años con `includeSubDomains`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, COOP/CORP `same-origin` y una `Permissions-Policy` cerrada. Sin `X-Powered-By`.
+  - Cookies: las de Auth.js son `HttpOnly`, `SameSite=Lax`, de un solo host y, sobre HTTPS, `Secure` con prefijo `__Secure-` o `__Host-`. Las propias del portal (entidad activa, escalado de sesión) siguen las mismas reglas. CSRF por Auth.js y por las server actions (comprobación de `Origin`).
 - API: rate limit por usuario, tamaño máximo de cuerpo, validación zod en todas las entradas, problem+json sin trazas internas.
 - Dependencias: `pnpm audit` y verificación de licencias en CI.
 

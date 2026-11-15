@@ -77,6 +77,22 @@ export async function enterOneTimeCode(page: Page, username: string): Promise<vo
   throw new Error(`Keycloak refused the one-time codes of ${username}`);
 }
 
+/**
+ * Records every Content-Security-Policy violation of the page from before its first script
+ * (M3-09). Call before navigating; the returned function reads what was blocked so far.
+ */
+export async function watchCspViolations(page: Page): Promise<() => Promise<string[]>> {
+  await page.addInitScript(() => {
+    const list: string[] = [];
+    (window as unknown as { cspViolations: string[] }).cspViolations = list;
+    document.addEventListener('securitypolicyviolation', (e) =>
+      list.push(`${e.violatedDirective} ${e.blockedURI}`),
+    );
+  });
+  return () =>
+    page.evaluate(() => (window as unknown as { cspViolations?: string[] }).cspViolations ?? []);
+}
+
 /** Fills Keycloak's login form (realm rid-portal), and the one-time code for critical roles. */
 export async function keycloakLogin(page: Page, username: string): Promise<void> {
   await page.waitForURL(/\/realms\/rid-portal\//);

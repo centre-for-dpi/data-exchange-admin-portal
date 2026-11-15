@@ -525,7 +525,20 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
       Cerrar del todo la ventana (enrolar al activar la cuenta o fuera de banda) queda como opción del despliegue (`ARCHITECTURE.md §3.1`).
     - Fuera de alcance: WebAuthn como segundo factor alternativo. Puede agregarse en Keycloak en el nivel 2 sin cambiar el portal.
-- [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
+- [x] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
+  - _Notas de implementación:_
+    - CSP con nonce por respuesta, que pone el proxy de Next: `script-src 'self' 'nonce-…' 'strict-dynamic'`, sin `unsafe-inline` ni `unsafe-eval` en producción.
+      - `frame-ancestors`, `object-src` y `base-uri` en `'none'`.
+      - `form-action` admite el propio origen y el de Keycloak: el navegador aplica la directiva a la redirección del inicio de sesión.
+      - `style-src` admite estilos en línea (colores de la marca, Scalar).
+    - HSTS (dos años, `includeSubDomains`) y el resto de las cabeceras en toda respuesta, desde `next.config`. HSTS va siempre, porque `next.config` se compila sin la URL pública y los navegadores lo ignoran sobre http.
+    - Las rutas que no son páginas llevan una CSP que no carga nada.
+    - Cookies: se verifica que las de Auth.js son `HttpOnly`, `SameSite=Lax` y de un solo host (`Secure` sobre HTTPS). Las propias ya lo eran.
+    - Tests:
+      - unitarios de la política;
+      - e2e (`security-headers.spec.ts`), que comprueba las cabeceras y que cada script lleva el nonce de su respuesta;
+      - la página corre sin ninguna violación de CSP: componentes cliente, catálogo y documentación con Scalar;
+      - las cookies después del inicio de sesión.
 - [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
   - Despliegue (S-3): Traefik termina hoy el TLS del VPS y enruta `/gw` por ruta, así que no puede pasar el certificado del cliente. El gateway necesita un nombre propio con `HostSNI` y `tls.passthrough` hacia el 9443 de APISIX. El nombre DNS del gateway ya existe en el VPS de demo (2026-11-14). Allí el certificado de servidor del gateway lo emite step-ca, y la ruta del token va por el mismo nombre.
   - Lo pendiente de la revisión de seguridad de M1-08 (mTLS hacia upstreams `direct` y fijar la IP verificada) quedó hecho en M3-03.

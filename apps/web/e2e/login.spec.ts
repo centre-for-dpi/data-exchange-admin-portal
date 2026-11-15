@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { enterOneTimeCode, expectNoAccessibilityViolations, keycloakLogin, totp } from './helpers';
 
+/** The web's own address, wherever the suite runs (RID_WEB_URL). */
+const webOrigin = (process.env.RID_WEB_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+const at = (path: string) => `${webOrigin}${path}`;
+
 // M0 closing criterion: the web shows login working against Keycloak.
 test.describe('login with Keycloak', () => {
   test('a seed user signs in, sees the signed-in home and signs out of both sessions', async ({
@@ -11,7 +15,7 @@ test.describe('login with Keycloak', () => {
     await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
     await keycloakLogin(page, 'carlos.dev');
 
-    await expect(page).toHaveURL(/localhost:3000\/$/);
+    await expect(page).toHaveURL(at('/'));
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('Hola, Carlos Desarrollador');
     await expect(page.getByText('Sesión iniciada como Carlos Desarrollador')).toBeVisible();
     // Signed in without roles yet (they come from the API in M1-02): catalogue is visible.
@@ -33,7 +37,7 @@ test.describe('login with Keycloak', () => {
     expect(sessionCookie?.httpOnly).toBe(true);
 
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
-    await expect(page).toHaveURL(/localhost:3000\/$/);
+    await expect(page).toHaveURL(at('/'));
     await expect(page.getByRole('button', { name: 'Iniciar sesión' }).first()).toBeVisible();
 
     // Keycloak's SSO session is closed too: signing in again asks for credentials.
@@ -46,7 +50,7 @@ test.describe('login with Keycloak', () => {
     await page.goto('/en');
     await page.getByRole('button', { name: 'Sign in' }).first().click();
     await keycloakLogin(page, 'lucia.datos');
-    await expect(page).toHaveURL(/localhost:3000\/en$/);
+    await expect(page).toHaveURL(at('/en'));
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('Hello, Lucía Datos');
   });
 
@@ -67,7 +71,7 @@ test.describe('login with Keycloak', () => {
     await expect(page.locator('#input-error-otp')).not.toBeEmpty();
 
     await enterOneTimeCode(page, 'lucia.datos');
-    await expect(page).toHaveURL(/localhost:3000\/$/);
+    await expect(page).toHaveURL(at('/'));
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('Hola, Lucía Datos');
     await expect(page.getByText('Entidad: ')).toBeVisible();
     await expect(page.getByRole('alert').filter({ hasText: 'segundo factor' })).toHaveCount(0);

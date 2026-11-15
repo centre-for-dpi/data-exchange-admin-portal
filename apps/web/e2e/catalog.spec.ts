@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { publishNewApi, signIn } from './flows';
-import { expectNoAccessibilityViolations } from './helpers';
+import { expectNoAccessibilityViolations, watchCspViolations } from './helpers';
 
 // M1-05: consumers discover published APIs and read their service sheet and documentation.
 test.describe('catalogue (M1-05)', () => {
@@ -11,6 +11,8 @@ test.describe('catalogue (M1-05)', () => {
     const unique = `Afiliación ${Date.now().toString(36)}`;
     const { slug } = await publishNewApi(browser, { name: unique });
 
+    // Scalar runs under the portal's CSP (M3-09): nothing it does may be blocked.
+    const cspViolations = await watchCspViolations(page);
     // Nothing may be loaded from third-party hosts (Scalar fonts, telemetry, CDNs).
     const external = new Set<string>();
     page.on('request', (request) => {
@@ -56,6 +58,7 @@ test.describe('catalogue (M1-05)', () => {
     await expect(page.getByRole('button', { name: /Test Request/i })).toHaveCount(0);
     await expectNoAccessibilityViolations(page);
     expect([...external]).toEqual([]);
+    expect(await cspViolations()).toEqual([]);
   });
 
   test('anonymous visitors are asked to sign in when the catalogue is not public', async ({

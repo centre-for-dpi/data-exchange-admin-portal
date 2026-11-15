@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { STATIC_CSP, securityHeaders } from './src/lib/security-headers';
 
 /**
  * Loads the repo-root .env (the same file Docker Compose uses) when present, so `pnpm dev` and
@@ -26,6 +27,17 @@ loadRootEnv(process.cwd());
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Security headers on every response (M3-09). Pages get their CSP with a nonce in the proxy;
+  // the routes it does not see (Auth.js, the logo) a static one. File downloads set their own.
+  headers() {
+    return Promise.resolve([
+      { source: '/:path*', headers: securityHeaders() },
+      {
+        source: '/:prefix(api|branding)/:path*',
+        headers: [{ key: 'Content-Security-Policy', value: STATIC_CSP }],
+      },
+    ]);
+  },
   experimental: {
     // Designation documents (PDF, up to the API's RID_DOCUMENT_MAX_BYTES of 10 MiB) go through a
     // server action, which first passes the proxy; both default to smaller limits.

@@ -2,6 +2,7 @@ import type { NextFetchEvent, NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { auth } from './auth';
 import { routing } from './i18n/routing';
+import { contentSecurityPolicy, newNonce, originOf } from './lib/security-headers';
 
 const intl = createMiddleware(routing);
 
@@ -16,7 +17,20 @@ const withAuth = auth((request) => intl(request));
  * redirect loop. Rewrites are pinned to the origin of the request this server received.
  */
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
+  // A fresh nonce for this page (M3-09). Next.js reads it from the request's CSP header and puts
+  // it on its scripts; next-intl and Auth.js forward the request headers they receive.
+  const csp = contentSecurityPolicy({
+    nonce: newNonce(),
+    development: process.env.NODE_ENV === 'development',
+    formTargets: [originOf(process.env.KEYCLOAK_URL ?? 'http://localhost:8080')].filter(
+      (origin): origin is string => origin !== undefined && origin !== request.nextUrl.origin,
+    ),
+    https: (process.env.AUTH_URL ?? '').startsWith('https://'),
+  });
+  request.headers.set('content-security-policy', csp);
+
   const response = await withAuth(request, event as never);
+  response?.headers.set('content-security-policy', csp);
   const rewrite = response?.headers.get('x-middleware-rewrite');
   if (response && rewrite) {
     const target = new URL(rewrite, request.url);
