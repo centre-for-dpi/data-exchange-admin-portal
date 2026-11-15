@@ -17,10 +17,13 @@ import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apis
 import {
   desiredGateway,
   desiredSsl,
+  GATEWAY_CLIENT_SSL_ID,
   GATEWAY_SSL_ID,
   type GatewaySettings,
   MANAGED_PREFIX,
   matches,
+  needsGatewayPki,
+  type UpstreamPki,
   routeId,
   sslMatches,
   UnsupportedUpstreamError,
@@ -41,6 +44,8 @@ export type GatewayResult = 'created' | 'updated' | 'unchanged' | 'deleted' | 'a
 export const gatewaySyncTarget = (apiVersionId: string): string =>
   `apisix:route:${routeId(apiVersionId)}`;
 export const GATEWAY_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_SSL_ID}`;
+export const GATEWAY_CLIENT_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_CLIENT_SSL_ID}`;
+const GATEWAY_SSL_IDS = new Set([GATEWAY_SSL_ID, GATEWAY_CLIENT_SSL_ID]);
 
 const hash = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -123,9 +128,38 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       this.logger.log(`Removed orphan APISIX upstream ${id}`);
     }
     for (const id of await this.admin.list('ssls')) {
-      if (!id.startsWith(MANAGED_PREFIX) || id === GATEWAY_SSL_ID) continue;
+      if (!id.startsWith(MANAGED_PREFIX) || GATEWAY_SSL_IDS.has(id)) continue;
       await this.admin.delete('ssls', id);
       this.logger.log(`Removed orphan APISIX SSL object ${id}`);
+    }
+  }
+
+  /**
+   * The gateway's client certificate towards upstreams (M3-03), as an SSL object of type client
+   * that upstreams with mTLS reference by id: renewing it updates one object, not every upstream.
+   * Returns the network CA, which verifies kit nodes.
+   */
+  async reconcileClientTls(now = new Date()): Promise<UpstreamPki> {
+    let desiredHash = hash(null);
+    try {
+      const certificate = await this.certificates.upstreamClient(this.settings.tls.clientName, now);
+      const desired = {
+        type: 'client',
+        cert: certificate.certificatePem,
+        key: certificate.keyPem,
+        labels: { 'rid-managed': 'true' },
+        status: 1,
+      };
+      desiredHash = hash({ ...desired, key: certificate.fingerprint });
+      const actual = await this.admin.get('ssls', GATEWAY_CLIENT_SSL_ID);
+      if (!actual || !sslMatches(desired, actual)) {
+        await this.admin.put('ssls', GATEWAY_CLIENT_SSL_ID, desired);
+      }
+      await this.recordSuccess(GATEWAY_CLIENT_TLS_SYNC_TARGET, desiredHash);
+      return { networkCaPem: certificate.networkCaPem };
+    } catch (error) {
+      await this.recordError(GATEWAY_CLIENT_TLS_SYNC_TARGET, desiredHash, error);
+      throw error;
     }
   }
 
@@ -171,12 +205,17 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
 
       const upstreamConfig = upstreamSchema.parse(version.upstream);
       const operations = listOperations(version.openapiSpec as Record<string, unknown>);
-      await this.assertPublicUpstream(upstreamConfig);
+      const addresses = await this.assertPublicUpstream(upstreamConfig);
+      // Only upstreams with mTLS depend on step-ca: the others keep working if the CA is down.
+      const pki = needsGatewayPki(upstreamConfig, version.api.entity.slug, this.settings)
+        ? await this.reconcileClientTls()
+        : undefined;
       const desired = desiredGateway(
         {
           id: version.id,
           basePath: version.basePath,
           upstream: upstreamConfig,
+          ...(addresses ? { addresses } : {}),
           methods: operations.map((o) => o.method),
           hasDataSubjects: operations.some(
             (o) => o.dataSubject?.in === 'path' || o.dataSubject?.in === 'body',
@@ -203,6 +242,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
             : {}),
         },
         this.settings,
+        pki,
       );
       desiredHash = hash(desired);
 
@@ -233,10 +273,10 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * public (the name itself was checked at registration). A lookup failure is not evidence of an
    * attack, so it is reported without removing a working route.
    */
-  private async assertPublicUpstream(upstream: Upstream): Promise<void> {
-    if (upstream.type !== 'direct') return;
+  private async assertPublicUpstream(upstream: Upstream): Promise<string[] | undefined> {
+    if (upstream.type !== 'direct') return undefined;
     const host = new URL(upstream.url).hostname.replace(/^\[|\]$/g, '');
-    if (isIP(host)) return; // literal IPs are fully judged by isPublicHostname
+    if (isIP(host)) return [host]; // literal IPs are fully judged by isPublicHostname
     const addresses = await this.settings.resolveHost(host);
     const internal = addresses.filter((address) => !isPublicAddress(address));
     if (addresses.length === 0 || internal.length > 0) {
@@ -244,6 +284,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
         `Upstream host ${host} resolves to non-public addresses (${internal.join(', ') || 'none'})`,
       );
     }
+    return addresses;
   }
 
   private async apply(

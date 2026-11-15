@@ -1014,6 +1014,9 @@ model AuditAnchor {
 enum GatewayCertificatePurpose {
   /// TLS server certificate of the gateway's public names (APISIX SSL object rid-ssl-gateway).
   server
+  /// TLS client certificate the gateway presents to upstreams (SSL object rid-ssl-gateway-client,
+  /// M3-03).
+  upstream_client
 
   @@map("gateway_certificate_purpose")
 }

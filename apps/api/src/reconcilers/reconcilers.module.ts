@@ -51,6 +51,7 @@ import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
           (await lookup(host, { all: true, verbatim: true })).map((a) => a.address),
         tls: {
           hosts: parseHostNames(process.env.RID_GATEWAY_TLS_HOSTS ?? 'localhost'),
+          clientName: parseHostNames(process.env.RID_GATEWAY_CLIENT_NAME ?? 'rid-gateway')[0] ?? '',
           // Read when used: the country configuration is loaded at startup (main.ts).
           get mtlsRequired() {
             return getCountryConfig().features.mtls.required;

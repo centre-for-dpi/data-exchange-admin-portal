@@ -10,7 +10,10 @@ import {
   UnsupportedUpstreamError,
   type VersionForGateway,
   desiredSsl,
+  GATEWAY_CLIENT_SSL_ID,
+  needsGatewayPki,
   parseHostNames,
+  usesGatewayClientCertificate,
   sslMatches,
 } from './desired-state.js';
 
@@ -22,7 +25,7 @@ const settings: GatewaySettings = {
   transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes('salud=mock-salud:8000'),
   resolveHost: () => Promise.resolve(['93.184.215.14']),
-  tls: { hosts: ['localhost'], mtlsRequired: false },
+  tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
 };
 
 const version = (overrides: Partial<VersionForGateway> = {}): VersionForGateway => ({
@@ -154,25 +157,69 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     }
   });
 
-  it('reaches a direct upstream over HTTPS with its path prefix', () => {
+  it('reaches a direct upstream over verified HTTPS, pinned to the addresses checked', () => {
     const { route, upstream } = desiredGateway(
-      version({ upstream: { type: 'direct', url: 'https://api.salud.example/v2/', mtls: false } }),
+      version({
+        upstream: { type: 'direct', url: 'https://api.salud.example/v2/', mtls: false },
+        addresses: ['93.184.215.14', '2606:2800:21f:cb07::1', '93.184.215.14'],
+      }),
       settings,
     );
     expect(upstream).toMatchObject({
       scheme: 'https',
-      pass_host: 'node',
-      nodes: { 'api.salud.example:443': 1 },
+      // The name stays as Host and SNI; the certificate must be valid for it.
+      pass_host: 'rewrite',
+      upstream_host: 'api.salud.example',
+      nodes: { '[2606:2800:21f:cb07::1]:443': 1, '93.184.215.14:443': 1 },
+      tls: { verify: true },
     });
+    expect(upstream.tls).not.toHaveProperty('client_cert_id');
     expect((route.plugins as Plugins)['proxy-rewrite']?.regex_uri).toEqual([
       '^/salud/afiliacion/v1/(.*)$',
       '/v2/$1',
     ]);
   });
 
+  it('presents the gateway client certificate to a direct upstream that requires mTLS (M3-03)', () => {
+    const { upstream } = desiredGateway(
+      version({
+        upstream: { type: 'direct', url: 'https://api.salud.example:8443', mtls: true },
+        addresses: ['93.184.215.14'],
+      }),
+      settings,
+    );
+    expect(upstream).toMatchObject({
+      nodes: { '93.184.215.14:8443': 1 },
+      tls: { verify: true, client_cert_id: GATEWAY_CLIENT_SSL_ID },
+    });
+    expect(usesGatewayClientCertificate(upstream)).toBe(true);
+    expect(
+      needsGatewayPki({ type: 'direct', url: 'https://a.example', mtls: true }, 'salud', settings),
+    ).toBe(true);
+    expect(
+      needsGatewayPki({ type: 'direct', url: 'https://a.example', mtls: false }, 'salud', settings),
+    ).toBe(false);
+  });
+
+  it('calls a TLS node with mTLS, verifying it against the network CA (M3-03)', () => {
+    const tlsSettings = { ...settings, devNodes: parseDevNodes('salud=https://mock-salud:8443') };
+    const ca = '-----BEGIN CERTIFICATE-----\nAAA\n-----END CERTIFICATE-----\n';
+    const { upstream } = desiredGateway(version(), tlsSettings, { networkCaPem: `${ca}${ca}` });
+    expect(upstream).toMatchObject({
+      scheme: 'https',
+      pass_host: 'rewrite',
+      upstream_host: 'mock-salud',
+      nodes: { 'mock-salud:8443': 1 },
+      tls: { client_cert_id: GATEWAY_CLIENT_SSL_ID, verify: true, ca_certs: [ca, ca] },
+    });
+    expect(needsGatewayPki({ type: 'node', servicePath: '/s' }, 'salud', tlsSettings)).toBe(true);
+    expect(needsGatewayPki({ type: 'node', servicePath: '/s' }, 'salud', settings)).toBe(false);
+    // Without the network CA it cannot verify the node: no half-configured upstream.
+    expect(() => desiredGateway(version(), tlsSettings)).toThrow(UnsupportedUpstreamError);
+  });
+
   it('fails closed on what the gateway cannot do yet', () => {
     const cases: Array<Partial<VersionForGateway>> = [
-      { upstream: { type: 'direct', url: 'https://api.salud.example', mtls: true } },
       { upstream: { type: 'node', servicePath: '/salud', nodeId: crypto.randomUUID() } },
       { entitySlug: 'socioeconomico' },
       // Never proxy towards the platform's own network (SSRF).
@@ -244,9 +291,11 @@ describe('matches', () => {
 
 describe('parseDevNodes', () => {
   it('reads slug=host:port pairs and ignores malformed ones', () => {
-    expect([...parseDevNodes('salud=mock-salud:8000, x=bad, =a:1,socio=mock-socio:8001')]).toEqual([
-      ['salud', 'mock-salud:8000'],
-      ['socio', 'mock-socio:8001'],
+    expect([
+      ...parseDevNodes('salud=mock-salud:8000, x=bad, =a:1,socio=https://Mock-Socio:8443'),
+    ]).toEqual([
+      ['salud', { host: 'mock-salud', hostPort: 'mock-salud:8000', tls: false }],
+      ['socio', { host: 'mock-socio', hostPort: 'mock-socio:8443', tls: true }],
     ]);
   });
 });
@@ -279,7 +328,7 @@ describe('gateway TLS (M3-02)', () => {
     hosts: ['gw.example.org', 'localhost'],
     certificatePem: 'CERT',
     keyPem: 'KEY',
-    clientCaPem: 'CA',
+    networkCaPem: 'CA',
   };
 
   it('serves the server certificate on the gateway names; client CA only with mTLS', () => {

@@ -75,7 +75,7 @@ describe('gateway TLS and client certificates (M3-02)', () => {
     transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     resolveHost: () => Promise.resolve(['93.184.215.14']),
-    tls: { hosts: ['localhost'], mtlsRequired: true },
+    tls: { hosts: ['localhost'], mtlsRequired: true, clientName: 'rid-gateway' },
   };
   const ca = new StepCaClient();
   let app: NestFastifyApplication;

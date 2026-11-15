@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { isPublicHostname, type Upstream } from '@rid/contracts';
 import type { ApisixObject } from './apisix-admin.js';
 
@@ -6,6 +7,8 @@ export const routeId = (apiVersionId: string): string => `rid-route-${apiVersion
 export const upstreamId = (apiVersionId: string): string => `rid-upstream-${apiVersionId}`;
 /** The gateway's TLS (server certificate and, with mTLS, the client CA) on its public names. */
 export const GATEWAY_SSL_ID = 'rid-ssl-gateway';
+/** The gateway's client certificate towards upstreams with mTLS (M3-03). */
+export const GATEWAY_CLIENT_SSL_ID = 'rid-ssl-gateway-client';
 /** Only objects with this prefix belong to the portal; anything else in APISIX is left alone. */
 export const MANAGED_PREFIX = 'rid-';
 
@@ -25,14 +28,19 @@ export interface GatewaySettings {
    * Development stand-in for kit nodes until M4: entity slug -> host:port of its mock provider
    * (RID_DEV_NODES). Nodes enrolled through the portal replace it.
    */
-  devNodes: ReadonlyMap<string, string>;
+  devNodes: ReadonlyMap<string, DevNode>;
   /** Every address a host name resolves to (A and AAAA); injectable for tests. */
   resolveHost: (host: string) => Promise<string[]>;
   /**
    * TLS of the gateway (M3-02): its public host names (RID_GATEWAY_TLS_HOSTS) and whether every
    * call must present a client certificate of the network CA (features.mtls.required).
    */
-  tls: { hosts: string[]; mtlsRequired: boolean };
+  tls: {
+    hosts: string[];
+    mtlsRequired: boolean;
+    /** CN of the client certificate the gateway presents to upstreams (RID_GATEWAY_CLIENT_NAME). */
+    clientName: string;
+  };
 }
 
 /** Headers only the gateway may set: removed if a client sends them (ARCHITECTURE.md §4.1). */
@@ -120,6 +128,8 @@ export interface VersionForGateway {
   id: string;
   basePath: string;
   upstream: Upstream;
+  /** Public addresses the reconciler resolved for a direct upstream's host name. */
+  addresses?: readonly string[];
   /** HTTP methods declared in the OpenAPI document. */
   methods: readonly string[];
   /** Operations whose data subject is in the JSON body (x-rid-data-subject in: body). */
@@ -163,28 +173,55 @@ interface ResolvedUpstream {
   pathPrefix: string;
 }
 
-function resolveUpstream(v: VersionForGateway, settings: GatewaySettings): ResolvedUpstream {
+/** The network CA as APISIX takes it for upstream verification: one PEM per certificate. */
+const certificatesOf = (pem: string): string[] =>
+  (pem.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) ?? []).map(
+    (c) => `${c}\n`,
+  );
+
+const nodeKey = (address: string, port: string): string =>
+  `${isIP(address) === 6 ? `[${address}]` : address}:${port}`;
+
+/** What the gateway needs from its own PKI to build an upstream (M3-03). */
+export interface UpstreamPki {
+  /** The network CA (intermediates and root, PEM): verifies kit nodes. */
+  networkCaPem: string;
+}
+
+function resolveUpstream(
+  v: VersionForGateway,
+  settings: GatewaySettings,
+  pki?: UpstreamPki,
+): ResolvedUpstream {
   const base = {
     type: 'roundrobin',
     timeout: { connect: 5, send: 30, read: 30 },
     labels: { 'rid-managed': 'true', 'rid-api-version': v.id },
   };
   if (v.upstream.type === 'direct') {
-    if (v.upstream.mtls) {
-      // Fail closed rather than reach the provider without the mTLS it asked for (ADR-0010).
-      throw new UnsupportedUpstreamError('mTLS towards upstreams arrives with M3 (ADR-0010)');
-    }
     const url = new URL(v.upstream.url);
     // Also checked when the version is registered; repeated here for rows written before.
     if (!isPublicHostname(url.hostname)) {
       throw new UnsupportedUpstreamError(`Upstream host ${url.hostname} is not a public address`);
     }
+    const host = url.hostname.replace(/^\[|\]$/g, '');
+    const port = url.port || '443';
+    // The addresses the reconciler resolved and found public: APISIX connects to those and not
+    // to whatever the name resolves to later (no DNS rebinding between passes). The name stays
+    // as Host and as SNI, and the provider's certificate must be valid for it.
+    const addresses = [...new Set(v.addresses?.length ? v.addresses : [host])].sort();
     return {
       upstream: {
         ...base,
         scheme: 'https',
-        pass_host: 'node',
-        nodes: { [`${url.hostname}:${url.port || '443'}`]: 1 },
+        pass_host: 'rewrite',
+        upstream_host: url.hostname,
+        nodes: Object.fromEntries(addresses.map((a) => [nodeKey(a, port), 1])),
+        tls: {
+          verify: true,
+          // mTLS towards the provider's existing API (M3-03): the gateway's client certificate.
+          ...(v.upstream.mtls ? { client_cert_id: GATEWAY_CLIENT_SSL_ID } : {}),
+        },
       },
       pathPrefix: url.pathname.replace(/\/$/, ''),
     };
@@ -198,11 +235,53 @@ function resolveUpstream(v: VersionForGateway, settings: GatewaySettings): Resol
       `No development node for entity "${v.entitySlug}" (set RID_DEV_NODES)`,
     );
   }
+  const pathPrefix = v.upstream.servicePath.replace(/\/$/, '');
+  if (!node.tls) {
+    return {
+      upstream: { ...base, scheme: 'http', pass_host: 'pass', nodes: { [node.hostPort]: 1 } },
+      pathPrefix,
+    };
+  }
+  // A node served over TLS (kit nodes from M4; development nodes declared https://): mTLS with
+  // the gateway's client certificate, and the node's certificate verified against the network CA
+  // for the node's name.
+  const ca = pki ? certificatesOf(pki.networkCaPem) : [];
+  if (ca.length === 0) {
+    throw new UnsupportedUpstreamError('The network CA is not available to verify the node');
+  }
   return {
-    upstream: { ...base, scheme: 'http', pass_host: 'pass', nodes: { [node]: 1 } },
-    pathPrefix: v.upstream.servicePath.replace(/\/$/, ''),
+    upstream: {
+      ...base,
+      scheme: 'https',
+      pass_host: 'rewrite',
+      upstream_host: node.host,
+      nodes: { [node.hostPort]: 1 },
+      tls: { client_cert_id: GATEWAY_CLIENT_SSL_ID, verify: true, ca_certs: ca },
+    },
+    pathPrefix,
   };
 }
+
+/**
+ * Whether building this upstream needs the gateway's PKI (its client certificate and the network
+ * CA): direct upstreams with mTLS and nodes served over TLS.
+ */
+export function needsGatewayPki(
+  upstream: Upstream,
+  entitySlug: string,
+  settings: GatewaySettings,
+): boolean {
+  if (upstream.type === 'direct') return upstream.mtls;
+  if (upstream.type === 'node' && !upstream.nodeId) {
+    return settings.devNodes.get(entitySlug)?.tls ?? false;
+  }
+  return false;
+}
+
+/** True when the upstream presents the gateway's client certificate (it needs that SSL object). */
+export const usesGatewayClientCertificate = (upstream: ApisixObject): boolean =>
+  (upstream.tls as { client_cert_id?: string } | undefined)?.client_cert_id ===
+  GATEWAY_CLIENT_SSL_ID;
 
 export interface DesiredGateway {
   upstream: ApisixObject;
@@ -213,8 +292,12 @@ export interface DesiredGateway {
  * Upstream and route of a published API version (ARCHITECTURE.md §4.1). `limit-count` arrives with
  * SPIKE S-2 (M3) and mTLS with M3; until OPA's policy exists (M1-09) the route denies every call.
  */
-export function desiredGateway(v: VersionForGateway, settings: GatewaySettings): DesiredGateway {
-  const { upstream, pathPrefix } = resolveUpstream(v, settings);
+export function desiredGateway(
+  v: VersionForGateway,
+  settings: GatewaySettings,
+  pki?: UpstreamPki,
+): DesiredGateway {
+  const { upstream, pathPrefix } = resolveUpstream(v, settings, pki);
   const route: ApisixObject = {
     name: `${v.entitySlug} ${v.apiName} ${v.version}`.slice(0, 100),
     uri: `${v.basePath}/*`,
@@ -304,7 +387,7 @@ export function desiredGateway(v: VersionForGateway, settings: GatewaySettings):
  * call without a valid client certificate. No skip_mtls_uri_regex: no route is exempt.
  */
 export function desiredSsl(
-  certificate: { hosts: string[]; certificatePem: string; keyPem: string; clientCaPem: string },
+  certificate: { hosts: string[]; certificatePem: string; keyPem: string; networkCaPem: string },
   settings: GatewaySettings,
 ): ApisixObject {
   return {
@@ -316,7 +399,7 @@ export function desiredSsl(
     labels: { 'rid-managed': 'true' },
     status: 1,
     // Leaf, intermediate and root: depth 2.
-    ...(settings.tls.mtlsRequired ? { client: { ca: certificate.clientCaPem, depth: 2 } } : {}),
+    ...(settings.tls.mtlsRequired ? { client: { ca: certificate.networkCaPem, depth: 2 } } : {}),
   };
 }
 
@@ -352,12 +435,29 @@ export function matches(desired: unknown, actual: unknown): boolean {
   return desired === actual;
 }
 
-/** RID_DEV_NODES="salud=mock-salud:8000,socioeconomico=mock-socioeconomico:8000" */
-export function parseDevNodes(value: string | undefined): Map<string, string> {
-  const nodes = new Map<string, string>();
+/** A development stand-in for a kit node: host:port, over TLS when declared https://. */
+export interface DevNode {
+  host: string;
+  hostPort: string;
+  tls: boolean;
+}
+
+/**
+ * RID_DEV_NODES="salud=mock-salud:8000,socioeconomico=https://mock-socioeconomico:8443": an
+ * https:// node gets mTLS like an enrolled kit node (M3-03).
+ */
+export function parseDevNodes(value: string | undefined): Map<string, DevNode> {
+  const nodes = new Map<string, DevNode>();
   for (const pair of (value ?? '').split(',')) {
-    const [slug, hostPort] = pair.split('=').map((s) => s.trim());
-    if (slug && hostPort && /^[a-z0-9.-]+:\d{1,5}$/i.test(hostPort)) nodes.set(slug, hostPort);
+    const [slug, raw] = pair.split('=').map((s) => s.trim());
+    const match = /^(https:\/\/)?([a-z0-9.-]+):(\d{1,5})$/i.exec(raw ?? '');
+    if (slug && match?.[2] && match[3]) {
+      nodes.set(slug, {
+        host: match[2].toLowerCase(),
+        hostPort: `${match[2].toLowerCase()}:${match[3]}`,
+        tls: Boolean(match[1]),
+      });
+    }
   }
   return nodes;
 }

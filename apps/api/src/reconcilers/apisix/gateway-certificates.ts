@@ -10,22 +10,28 @@ import {
   CERTIFICATE_AUTHORITY,
   type CertificateAuthority,
 } from '../../credentials/step-ca.client.js';
-import type { GatewayCertificate } from '../../generated/prisma/client.js';
+import type {
+  GatewayCertificate,
+  GatewayCertificatePurpose,
+} from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 
-/** The gateway's server certificate lives 90 days (provisioner rid-gateway-tls). */
+/** The gateway's own certificates live 90 days. */
 const VALIDITY_HOURS = 90 * 24;
 const SYSTEM = { type: 'system' as const, id: 'system:apisix-reconciler' };
 const PEM_CERT = /-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g;
 
-export interface ServerCertificate {
+export interface IssuedGatewayCertificate {
   id: string;
   hosts: string[];
   /** Certificate followed by its issuing chain, PEM (what APISIX serves). */
   certificatePem: string;
   keyPem: string;
-  /** CAs that issue client certificates: the intermediate(s) and the root, PEM. */
-  clientCaPem: string;
+  /**
+   * The network CA: the intermediate(s) and the root, PEM. It issues the client certificates the
+   * gateway accepts (client.ca) and the certificates of kit nodes it calls (upstream ca_certs).
+   */
+  networkCaPem: string;
   fingerprint: string;
   notAfter: Date;
 }
@@ -99,7 +105,7 @@ export class GatewayCertificates {
     @Inject(CERTIFICATE_AUTHORITY) private readonly ca: CertificateAuthority,
   ) {}
 
-  private async view(row: GatewayCertificate): Promise<ServerCertificate> {
+  private async view(row: GatewayCertificate): Promise<IssuedGatewayCertificate> {
     const issuers = (row.certificatePem.match(PEM_CERT) ?? []).slice(1);
     const root = await this.ca.rootCertificate();
     return {
@@ -107,7 +113,7 @@ export class GatewayCertificates {
       hosts: row.hosts,
       certificatePem: row.certificatePem,
       keyPem: open(row.sealedKey, row.id),
-      clientCaPem: [...issuers, root.trim()].map((c) => `${c.trim()}\n`).join(''),
+      networkCaPem: [...issuers, root.trim()].map((c) => `${c.trim()}\n`).join(''),
       fingerprint: row.fingerprint,
       notAfter: row.notAfter,
     };
@@ -117,26 +123,47 @@ export class GatewayCertificates {
    * The server certificate for these host names: the current one, or a new one when there is
    * none, it names other hosts or it is due for renewal.
    */
-  async server(hosts: readonly string[], now = new Date()): Promise<ServerCertificate> {
+  server(hosts: readonly string[], now = new Date()): Promise<IssuedGatewayCertificate> {
+    return this.ensure('server', hosts, now);
+  }
+
+  /**
+   * The client certificate the gateway presents to upstreams that require mTLS (M3-03): subject
+   * CN=<name> (RID_GATEWAY_CLIENT_NAME, rid-gateway by default), issued like the applications'
+   * (TLS client authentication only, provisioner rid-portal). Providers trust the network CA and
+   * that name.
+   */
+  upstreamClient(name: string, now = new Date()): Promise<IssuedGatewayCertificate> {
+    return this.ensure('upstream_client', [name], now);
+  }
+
+  private async ensure(
+    purpose: GatewayCertificatePurpose,
+    hosts: readonly string[],
+    now: Date,
+  ): Promise<IssuedGatewayCertificate> {
     const current = await this.prisma.gatewayCertificate.findFirst({
-      where: { purpose: 'server', notAfter: { gt: now } },
+      where: { purpose, notAfter: { gt: now } },
       orderBy: { createdAt: 'desc' },
     });
     if (current && sameHosts(current.hosts, hosts) && !renewalDue(current, now)) {
       return this.view(current);
     }
-    return this.view(await this.issue([...hosts]));
+    return this.view(await this.issue(purpose, [...hosts]));
   }
 
-  private async issue(hosts: string[]): Promise<GatewayCertificate> {
-    if (hosts.length === 0) throw new Error('The gateway has no TLS host names');
+  private async issue(
+    purpose: GatewayCertificatePurpose,
+    hosts: string[],
+  ): Promise<GatewayCertificate> {
+    if (hosts.length === 0) throw new Error('The gateway certificate has no name');
     const { csrPem, keyPem, publicKey } = await keyAndCsr(hosts);
     const chainPem = await this.ca.sign({
       csrPem,
       commonName: hosts[0] ?? '',
       sans: hosts,
       publicKey,
-      profile: 'gateway-server',
+      profile: purpose === 'server' ? 'gateway-server' : 'application',
       validityHours: VALIDITY_HOURS,
     });
     const leaf: X509Certificate = leafOf(chainPem);
@@ -145,7 +172,7 @@ export class GatewayCertificates {
       const row = await tx.gatewayCertificate.create({
         data: {
           id,
-          purpose: 'server',
+          purpose,
           hosts,
           certificatePem: chainPem,
           sealedKey: seal(keyPem, id),
@@ -160,7 +187,7 @@ export class GatewayCertificates {
         target: { type: 'gateway_certificate', id },
         // Public facts only; the key never enters the trail.
         after: {
-          purpose: 'server',
+          purpose,
           hosts,
           fingerprint: row.fingerprint,
           serial: leaf.serialNumber.toLowerCase(),

@@ -11,7 +11,14 @@ import { readRealmUsers } from '../../seed/realm.js';
 import { runSeed } from '../../seed/seed.js';
 import { deleteUpstreamWhenUnused, HttpApisixAdmin } from './apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler, gatewaySyncTarget } from './apisix.reconciler.js';
-import { type GatewaySettings, parseDevNodes, routeId, upstreamId } from './desired-state.js';
+import {
+  type DevNode,
+  GATEWAY_CLIENT_SSL_ID,
+  type GatewaySettings,
+  parseDevNodes,
+  routeId,
+  upstreamId,
+} from './desired-state.js';
 
 const openapi = readFileSync(
   resolve(import.meta.dirname, '../../../../../infra/mock-providers/salud/openapi.yaml'),
@@ -42,7 +49,7 @@ describe('APISIX reconciler (M1-08)', () => {
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     // A fake DNS the tests steer (an Error means the lookup fails).
     resolveHost: () => (dns instanceof Error ? Promise.reject(dns) : Promise.resolve(dns)),
-    tls: { hosts: ['localhost'], mtlsRequired: false },
+    tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
   };
   let dns: string[] | Error = ['93.184.215.14'];
   const created: string[] = [];
@@ -204,13 +211,13 @@ describe('APISIX reconciler (M1-08)', () => {
     expect(state?.lastError).toMatch(/socioeconomico/);
   });
 
-  describe('SSRF guard at reconcile time (security review)', () => {
-    const setUpstream = (versionId: string, upstream: unknown) =>
-      prisma.apiVersion.update({
-        where: { id: versionId },
-        data: { upstream: upstream as object },
-      });
+  const setUpstream = (versionId: string, upstream: unknown) =>
+    prisma.apiVersion.update({
+      where: { id: versionId },
+      data: { upstream: upstream as object },
+    });
 
+  describe('SSRF guard at reconcile time (security review)', () => {
     it('a served version whose stored upstream is internal loses its route (fail closed)', async () => {
       const versionId = await publish('salud', `gw-legacy-${run}`);
       expect(await reconciler.reconcileVersion(versionId)).toBe('created');
@@ -254,9 +261,20 @@ describe('APISIX reconciler (M1-08)', () => {
       try {
         dns = ['93.184.215.14'];
         expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+        // Pinned to the address checked; the name stays as Host and SNI, verified (M3-03).
         expect(await admin.get('upstreams', upstreamId(versionId))).toMatchObject({
-          nodes: { 'api.salud.example:443': 1 },
+          nodes: { '93.184.215.14:443': 1 },
+          pass_host: 'rewrite',
+          upstream_host: 'api.salud.example',
+          tls: { verify: true },
         });
+
+        // The name moves to another public address: the pin follows on the next pass.
+        dns = ['93.184.215.15'];
+        expect(await reconciler.reconcileVersion(versionId)).toBe('updated');
+        expect(
+          (await admin.get('upstreams', upstreamId(versionId)))?.nodes as Record<string, number>,
+        ).toEqual({ '93.184.215.15:443': 1 });
 
         // A DNS failure is reported, but a working route stays.
         dns = new Error('getaddrinfo ENOTFOUND');
@@ -270,6 +288,44 @@ describe('APISIX reconciler (M1-08)', () => {
         expect(await admin.get('upstreams', upstreamId(versionId))).toBeUndefined();
       } finally {
         dns = ['93.184.215.14'];
+      }
+    });
+  });
+
+  describe('mTLS towards upstreams (M3-03)', () => {
+    it('a direct upstream with mTLS presents the gateway client certificate', async () => {
+      const versionId = await publish('salud', `gw-mtls-${run}`);
+      await setUpstream(versionId, {
+        type: 'direct',
+        url: 'https://api.salud.example/v1',
+        mtls: true,
+      });
+      expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+      expect(await admin.get('upstreams', upstreamId(versionId))).toMatchObject({
+        scheme: 'https',
+        tls: { verify: true, client_cert_id: GATEWAY_CLIENT_SSL_ID },
+      });
+      expect(await admin.get('ssls', GATEWAY_CLIENT_SSL_ID)).toMatchObject({ type: 'client' });
+    });
+
+    it('a node served over TLS gets mTLS and is verified against the network CA', async () => {
+      const nodes = settings.devNodes as Map<string, DevNode>;
+      const plain = nodes.get('salud');
+      const versionId = await publish('salud', `gw-node-tls-${run}`);
+      try {
+        nodes.set('salud', { host: 'mock-salud', hostPort: 'mock-salud:8443', tls: true });
+        expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+        const upstream = await admin.get('upstreams', upstreamId(versionId));
+        expect(upstream).toMatchObject({
+          scheme: 'https',
+          upstream_host: 'mock-salud',
+          nodes: { 'mock-salud:8443': 1 },
+          tls: { client_cert_id: GATEWAY_CLIENT_SSL_ID, verify: true },
+        });
+        const caCerts = (upstream?.tls as { ca_certs: string[] }).ca_certs;
+        expect(caCerts.length).toBeGreaterThanOrEqual(2);
+      } finally {
+        if (plain) nodes.set('salud', plain);
       }
     });
   });

@@ -456,7 +456,15 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Probado con APISIX y step-ca reales: rechazo sin certificado y con otra CA, huella RFC 8705 correcta, huella falsificada borrada en HTTP y HTTPS, renovación. La política tiene 48 tests (cobertura 100 %).
     - Pendiente para M3-10: la ruta del token en el gateway hacia Keycloak (S-4), el cliente `client-x509` con tokens ligados, y la prueba de punta a punta con token ligado. Sin ellos, activar el flag niega todo el tráfico (`token_not_bound`). Por eso `co.yaml` sigue con `mtls.required: false`.
     - Revocar un certificado desde el portal llega con M3-04. La salida del bundle ya está probada con el estado `revoked`.
-- [ ] **M3-03 — mTLS hacia upstreams**: certificado del gateway emitido por step-ca y configurado en upstreams `node` y `direct` con mTLS.
+- [x] **M3-03 — mTLS hacia upstreams**: certificado del gateway emitido por step-ca y configurado en upstreams `node` y `direct` con mTLS.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1`.
+    - El gateway tiene un certificado de cliente propio, `CN=rid-gateway` (`RID_GATEWAY_CLIENT_NAME`). Lo emite step-ca con el provisioner `rid-portal` (solo autenticación de cliente). El portal guarda la clave sellada y lo renueva en el último tercio de su vida.
+    - Va en el objeto SSL de tipo `client` `rid-ssl-gateway-client`, que los upstreams con mTLS referencian por id. El reconciliador lo asegura solo cuando una versión lo necesita: los upstreams sin mTLS no dependen de step-ca.
+    - `direct` con `mtls` presenta ese certificado. Todo `direct` verifica ahora el certificado del proveedor (`tls.verify`), algo que antes no se hacía.
+    - `node` sobre TLS (los nodos de M4; en desarrollo, `RID_DEV_NODES` con `https://host:puerto`) presenta el certificado y verifica el del nodo contra la CA de la red, para el nombre del nodo.
+    - Cierra también el DNS rebinding pendiente de M1-08: el upstream `direct` apunta a las direcciones que el reconciliador resolvió y encontró públicas, con el nombre como Host y SNI (`pass_host: rewrite`, `upstream_host`).
+    - Probado con tráfico real (APISIX, step-ca y un servicio mTLS en el host): el nodo recibe `CN=rid-gateway` y el Host correcto. Sin el certificado del gateway, o con un nodo de otra CA, la llamada da 502.
+    - En desarrollo APISIX alcanza el host (`host.docker.internal`, solo para estas pruebas); el despliegue lo quita.
 - [ ] **M3-04 — Rotación**: segunda credencial (secreto o certificado) con ventana de rotación; revocación de la anterior.
 - [ ] **M3-05 — Límites por suscripción**: `limit-count` según el resultado de S-2; 429 con problem+json; límite visible en la suscripción.
 - [ ] **M3-06 — Funcionario final**: `X-RID-End-User` obligatorio según clasificación; hash con sal por despliegue; nunca se guarda en claro.
@@ -465,7 +473,7 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 - [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
 - [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
   - Despliegue (S-3): Traefik termina hoy el TLS del VPS y enruta `/gw` por ruta, así que no puede pasar el certificado del cliente. El gateway necesita un nombre propio con `HostSNI` y `tls.passthrough` hacia el 9443 de APISIX. El nombre DNS del gateway ya existe en el VPS de demo (2026-11-14). Allí el certificado de servidor del gateway lo emite step-ca, y la ruta del token va por el mismo nombre.
-  - Pendiente de la revisión de seguridad de M1-08: mTLS hacia upstreams `direct`, y fijar en el upstream la IP que verificó el reconciliador (con `upstream_host`/SNI con el nombre original) para cerrar el DNS rebinding.
+  - Lo pendiente de la revisión de seguridad de M1-08 (mTLS hacia upstreams `direct` y fijar la IP verificada) quedó hecho en M3-03.
 
 **Cierre M3:** llamada con mTLS + token ligado al certificado + límite por suscripción, y revocación de certificado efectiva en < 60 s.
 

@@ -91,6 +91,9 @@ services:
     volumes:
       - ../apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ../apisix/plugins:/usr/local/apisix/rid:ro
+    # Development only: tests run upstreams with mTLS on the host (M3-03). The deployment removes it.
+    extra_hosts:
+      - host.docker.internal:host-gateway
     ports:
       - 127.0.0.1:${APISIX_HTTP_PORT:-9080}:9080
       - 127.0.0.1:${APISIX_HTTPS_PORT:-9443}:9443

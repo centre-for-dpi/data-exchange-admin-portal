@@ -50,6 +50,8 @@ services:
   apisix:
     <<: *no-ports
     restart: unless-stopped
+    # The gateway has no business reaching the host (development tests only).
+    extra_hosts: !reset []
     networks:
       default: {}
       edge:

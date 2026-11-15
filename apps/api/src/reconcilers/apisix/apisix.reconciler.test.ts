@@ -50,7 +50,7 @@ const settings: GatewaySettings = {
   transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes(''),
   resolveHost: () => Promise.resolve([]),
-  tls: { hosts: ['localhost'], mtlsRequired: false },
+  tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
 };
 
 /** Only what reconcileVersion touches for a retired version. */
