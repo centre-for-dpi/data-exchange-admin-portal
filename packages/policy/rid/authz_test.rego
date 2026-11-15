@@ -588,3 +588,27 @@ test_other_routes_never_carry_x_road_headers if {
 	not h["X-Road-UserId"]
 	not h["X-Road-Issue"]
 }
+
+# --- Sandbox (M4-08) ----------------------------------------------------------------------------
+
+test_a_sandbox_app_never_reaches_a_production_route if {
+	b := json.patch(bundle, [{"op": "add", "path": "/clients/rid-app-a/environment", "value": "sandbox"}])
+	denied(request({}), b, "environment_mismatch")
+}
+
+test_a_production_app_never_reaches_a_sandbox_route if {
+	b := json.patch(bundle, [{"op": "add", "path": "/routes/rid-route-v1/sandbox", "value": true}])
+	denied(request({}), b, "environment_mismatch")
+}
+
+test_a_sandbox_app_reaches_its_sandbox_route if {
+	b := json.patch(bundle, [
+		{"op": "add", "path": "/clients/rid-app-a/environment", "value": "sandbox"},
+		{"op": "add", "path": "/routes/rid-route-v1/sandbox", "value": true},
+	])
+	authz.allow with input as request({})
+		with data.routes as b.routes
+		with data.clients as b.clients
+		with data.config as b.config
+		with time.now_ns as june_2026
+}

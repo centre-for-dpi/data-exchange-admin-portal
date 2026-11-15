@@ -306,7 +306,8 @@
       "deprecated": "Obsoleta",
       "operations": "Operaciones",
       "node": "Nodo del proveedor",
-      "nodeStatusHint": "Último heartbeat: {date}"
+      "nodeStatusHint": "Último heartbeat: {date}",
+      "sandboxUrl": "Sandbox (aplicaciones sandbox, datos sintéticos)"
     },
     "signInRequired": "Inicia sesión para ver el catálogo de APIs de la red."
   },

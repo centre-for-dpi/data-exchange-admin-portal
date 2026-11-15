@@ -5,6 +5,7 @@ import { listOperations } from '../apis/lint/openapi-lint.js';
 import { NotFoundError } from '../common/errors.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { nodeIdOf, upstreamNodes } from '../nodes/node-status.js';
+import { sandboxBasePath } from '../reconcilers/apisix/desired-state.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /** Version states visible in the catalogue. */
@@ -155,6 +156,9 @@ export class CatalogService {
         status: v.status as (typeof LISTED)[number],
         basePath: v.basePath,
         gatewayUrl: `${gatewayPublicUrl()}${v.basePath}`,
+        sandboxUrl: v.sandboxUpstream
+          ? `${gatewayPublicUrl()}${sandboxBasePath(v.basePath)}`
+          : null,
         publishedAt: v.publishedAt?.toISOString() ?? null,
         deprecatedAt: v.deprecatedAt?.toISOString() ?? null,
         sunsetAt: v.sunsetAt?.toISOString() ?? null,

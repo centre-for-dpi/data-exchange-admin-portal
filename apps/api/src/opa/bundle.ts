@@ -51,6 +51,8 @@ export interface BundleRoute {
   operations: BundleOperation[];
   /** Served through X-Road (M4-05): the policy also sets X-Road-UserId and X-Road-Issue. */
   xroad?: true;
+  /** The sandbox route of a version (M4-08): only sandbox applications reach it. */
+  sandbox?: true;
 }
 
 /**
@@ -112,6 +114,8 @@ export interface BundleClient {
   entityId: string;
   entitySlug: string;
   applicationId: string;
+  /** sandbox applications only reach sandbox routes (M4-08). */
+  environment: 'sandbox' | 'production';
   subscriptions: BundleSubscription[];
   /**
    * RFC 8705 thumbprints (x5t#S256) of the application's valid client certificates (SPIKE S-3):

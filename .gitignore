@@ -51,3 +51,6 @@ apps/api/src/generated/
 
 # Browser tool artifacts
 .playwright-mcp/
+
+# Schemathesis cache when the contract runner runs on the host (M4-06)
+.schemathesis/

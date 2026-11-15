@@ -177,7 +177,7 @@ pending_provider → info_requested → pending_provider (pregunta del responsab
 
 **Reglas**
 - Una aplicación tiene como máximo una suscripción activa por versión de API y finalidad.
-- Sandbox: las suscripciones de aplicaciones sandbox se aprueban automáticamente si `features.sandbox.autoApprove` y solo apuntan al upstream de pruebas.
+- Sandbox (M4-08): las suscripciones de aplicaciones sandbox se aprueban automáticamente si `features.sandbox.autoApprove` y solo apuntan al upstream de pruebas. Una aplicación sandbox solo puede pedir acceso a versiones que declaran un sandbox, y llama a `/sandbox{basePath}`. El gateway nunca la deja llegar al servicio real, ni a una aplicación de producción llegar al sandbox (`environment_mismatch`). La aprobación automática la decide el sistema y queda en la bitácora.
 - Separación de funciones: quien solicita no puede aprobar, aunque tenga ambos roles en entidades distintas. No aplica a revocar ni a suspender: esas acciones solo quitan acceso, y un responsable de datos debe poder cortar el acceso de una aplicación propia comprometida.
 
 ### 4.5 Llamada a una API (lo que el portal hace posible)

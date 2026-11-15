@@ -41,6 +41,7 @@ import { DocumentsService } from '../documents/documents.service.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
+import { sandboxBasePath } from '../reconcilers/apisix/desired-state.js';
 
 /** Outbox topic consumed by the OPA bundle publisher (M1-09): it turns `approved` into `active`. */
 export const POLICY_SYNC_TOPIC = 'policy.sync';
@@ -168,7 +169,11 @@ export class SubscriptionsService {
       version: {
         id: s.apiVersion.id,
         version: s.apiVersion.version,
-        basePath: s.apiVersion.basePath,
+        // A sandbox application calls the version's sandbox (M4-08).
+        basePath:
+          s.application.environment === 'sandbox'
+            ? sandboxBasePath(s.apiVersion.basePath)
+            : s.apiVersion.basePath,
       },
       requestedAt: s.createdAt.toISOString(),
       validFrom: s.validFrom.toISOString(),
@@ -218,6 +223,55 @@ export class SubscriptionsService {
           }
         : null,
     };
+  }
+
+  /**
+   * Approves a sandbox application's request at once (SPEC.md §4.4, M4-08): what was asked for,
+   * from now, for the months asked. The decision is the system's, recorded as such.
+   */
+  private async autoApproveSandbox(
+    tx: Tx,
+    created: Prisma.SubscriptionGetPayload<object>,
+    openapiSpec: unknown,
+    requestId?: string,
+  ): Promise<void> {
+    const operations =
+      created.requestedOperations.length > 0
+        ? created.requestedOperations
+        : readOnlyOperations(openapiSpec);
+    const now = new Date();
+    const changes = {
+      status: 'approved' as const,
+      approvedOperations: operations,
+      validFrom: now,
+      validUntil: addMonths(now, created.requestedValidityMonths),
+      rateLimitPerMinute: created.requestedRateLimit,
+    };
+    assertTransition(created.status, 'approved');
+    await tx.subscription.updateMany({ where: { id: created.id }, data: changes });
+    await tx.subscriptionDecision.create({
+      data: {
+        subscriptionId: created.id,
+        decision: 'approved',
+        // The request that triggered it; no person of the provider decided.
+        decidedBy: created.requestedBy,
+        decidedByEntityId: null,
+        comment: null,
+      },
+    });
+    await this.audit.record(tx, {
+      actor: { type: 'system', id: 'system:sandbox-auto-approve' },
+      action: 'subscription.approved',
+      target: { type: 'subscription', id: created.id },
+      before: { status: created.status },
+      after: { ...snapshot(changes), autoApproved: true, sandbox: true },
+      requestId,
+    });
+    await this.outbox.enqueue(tx, {
+      topic: POLICY_SYNC_TOPIC,
+      aggregate: `subscription:${created.id}`,
+      payload: { reason: 'approved' },
+    });
   }
 
   private effectiveRequested(s: Row): string[] {
@@ -318,6 +372,14 @@ export class SubscriptionsService {
         message: `at most ${max} months for this classification`,
       });
     }
+    // Sandbox applications (M4-08) only reach a version's sandbox, with synthetic data.
+    const sandbox = application.environment === 'sandbox';
+    if (sandbox && !version.sandboxUpstream) {
+      errors.push({
+        path: 'apiVersionId',
+        message: 'this API version has no sandbox; use a production application',
+      });
+    }
     if (errors.length > 0) throw new ValidationError(errors);
 
     // A renewal (SPEC.md §4.4 step 6) points to an active subscription of the same application,
@@ -365,6 +427,9 @@ export class SubscriptionsService {
 
     const now = new Date();
     const actor = { type: 'user' as const, id: principal.keycloakSub, entityId };
+    // SPEC.md §4.4: sandbox requests are approved at once if features.sandbox.autoApprove; they
+    // only open the synthetic sandbox, never the provider's real service.
+    const autoApprove = sandbox && getCountryConfig().features.sandbox.autoApprove;
     try {
       const id = await this.prisma.$transaction(async (tx) => {
         const created = await tx.subscription.create({
@@ -397,6 +462,7 @@ export class SubscriptionsService {
           after: created,
           requestId,
         });
+        if (autoApprove) await this.autoApproveSandbox(tx, created, version.openapiSpec, requestId);
         return created.id;
       });
       return this.getForConsumer(entityId, id);

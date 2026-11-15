@@ -188,6 +188,21 @@ subject_ref := crypto.hmac.sha256(
 	regex.match(`^[A-Z0-9]{3,20}$`, subject_number)
 }
 
+# Sandbox (M4-08): sandbox applications only reach sandbox routes (synthetic data), and
+# production applications never do. The subscription already names one route; this makes the
+# separation hold even if a subscription named the other one.
+client_environment := object.get(client, "environment", "production")
+
+environment_mismatch if {
+	client_environment == "sandbox"
+	not route.sandbox
+}
+
+environment_mismatch if {
+	client_environment != "sandbox"
+	route.sandbox
+}
+
 # --- Decision -------------------------------------------------------------------------------
 
 # The first failing check names the reason (stable codes, ARCHITECTURE.md §4.2).
@@ -200,6 +215,8 @@ deny_reason := "no_subscription" if {
 	mtls_reason
 } else := "no_subscription" if {
 	not route
+} else := "environment_mismatch" if {
+	environment_mismatch
 } else := "operation_not_allowed" if {
 	not operation
 } else := "no_subscription" if {

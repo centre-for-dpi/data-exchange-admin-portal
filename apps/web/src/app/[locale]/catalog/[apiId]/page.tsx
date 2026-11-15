@@ -150,6 +150,14 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
               <dl className="facts">
                 <dt>{t('catalog.detail.gatewayUrl')}</dt>
                 <dd className="font-mono break-all">{version.gatewayUrl}</dd>
+                {version.sandboxUrl ? (
+                  <>
+                    <dt>{t('catalog.detail.sandboxUrl')}</dt>
+                    <dd className="font-mono break-all" data-testid="catalog-sandbox">
+                      {version.sandboxUrl}
+                    </dd>
+                  </>
+                ) : null}
                 <dt>{t('catalog.detail.purposes')}</dt>
                 <dd>{version.allowedPurposes.map((p) => localize(p.name, locale)).join(', ')}</dd>
                 {version.node ? (

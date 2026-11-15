@@ -39,7 +39,10 @@ import {
   needsGatewayPki,
   type UpstreamPki,
   routeId,
+  SANDBOX_ROUTE_PREFIX,
+  sandboxBasePath,
   sandboxCheckRouteId,
+  sandboxRouteId,
   sslMatches,
   TOKEN_ROUTE_ID,
   UnsupportedUpstreamError,
@@ -146,7 +149,16 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
           this.logger.warn(`APISIX check routes of version ${v.id}: ${String(error)}`),
         );
       }
+      const served = new Set(versions.map((v) => v.id));
       for (const id of await this.admin.list('routes')) {
+        // Sandbox routes (M4-08) of versions no longer served.
+        if (
+          id.startsWith(SANDBOX_ROUTE_PREFIX) &&
+          !served.has(id.slice(SANDBOX_ROUTE_PREFIX.length))
+        ) {
+          await this.admin.delete('routes', id);
+          continue;
+        }
         if (!id.startsWith(CHECK_ROUTE_PREFIX)) continue;
         const versionId = id.slice(CHECK_ROUTE_PREFIX.length).replace(/^sandbox-/, '');
         if (!keep.has(versionId)) await this.admin.delete('routes', id);
@@ -250,6 +262,83 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       pki,
     );
     return { health: main.health, sandbox: withSandbox?.sandbox ?? null };
+  }
+
+  /**
+   * The sandbox route of a served version with a sandbox upstream (M4-08): the published route's
+   * plugin chain (token, policy, limit, logs) under /sandbox, to the sandbox upstream (inline),
+   * without the transparency register: its data is synthetic. Only sandbox applications pass OPA.
+   */
+  async reconcileSandbox(
+    version: NonNullable<Awaited<ReturnType<typeof this.loadVersion>>>,
+  ): Promise<void> {
+    if (!version.sandboxUpstream) {
+      await this.removeSandbox(version.id);
+      return;
+    }
+    const sandbox = upstreamSchema.parse(version.sandboxUpstream);
+    const entity = version.api.entity;
+    const operations = listOperations(version.openapiSpec as Record<string, unknown>);
+    const basePath = sandboxBasePath(version.basePath);
+    const addresses = await this.assertPublicUpstream(sandbox);
+    const node =
+      sandbox.type === 'node' && sandbox.nodeId
+        ? await this.prisma.node.findUnique({
+            where: { id: sandbox.nodeId },
+            select: { id: true, entityId: true, status: true },
+          })
+        : undefined;
+    const pki = needsGatewayPki(sandbox, entity.slug, this.settings)
+      ? await this.reconcileClientTls(entity)
+      : undefined;
+    const desired = desiredGateway(
+      {
+        id: version.id,
+        entityId: entity.id,
+        basePath,
+        upstream: sandbox,
+        ...(addresses ? { addresses } : {}),
+        ...(node !== undefined ? { node } : {}),
+        methods: operations.map((o) => o.method),
+        hasDataSubjects: false,
+        bodySubjects: operations.flatMap((o) =>
+          o.dataSubject?.in === 'body'
+            ? [
+                {
+                  method: o.method,
+                  pathRegex: pathRegex(basePath, o.path),
+                  pointer: o.dataSubject.pointer,
+                  ...(o.dataSubject.documentTypePointer
+                    ? { typePointer: o.dataSubject.documentTypePointer }
+                    : {}),
+                },
+              ]
+            : [],
+        ),
+        entitySlug: entity.slug,
+        apiName: version.api.name,
+        version: version.version,
+        xroadMember:
+          entity.xroadMemberClass && entity.xroadMemberCode
+            ? { memberClass: entity.xroadMemberClass, memberCode: entity.xroadMemberCode }
+            : null,
+      },
+      this.settings,
+      pki,
+    );
+    const { upstream_id: _shared, ...route } = desired.route;
+    await this.apply('routes', sandboxRouteId(version.id), {
+      ...route,
+      name: `sandbox ${typeof route.name === 'string' ? route.name : ''}`.slice(0, 100),
+      labels: { ...(route.labels as Record<string, string>), 'rid-sandbox': 'true' },
+      upstream: desired.upstream,
+    });
+  }
+
+  private async removeSandbox(apiVersionId: string): Promise<void> {
+    if (await this.admin.get('routes', sandboxRouteId(apiVersionId))) {
+      await this.admin.delete('routes', sandboxRouteId(apiVersionId));
+    }
   }
 
   /** Deletes managed routes and upstreams whose version is not served (route first). */
@@ -438,6 +527,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
 
     try {
       if (!served) {
+        await this.removeSandbox(apiVersionId);
         const existed = await this.removeVersion(apiVersionId);
         if (version) await this.recordSuccess(target, desiredHash);
         return existed ? 'deleted' : 'absent';
@@ -514,6 +604,10 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       const upstream = await this.apply('upstreams', upstreamId(apiVersionId), desired.upstream);
       const route = await this.apply('routes', routeId(apiVersionId), desired.route);
       await this.recordSuccess(target, desiredHash);
+      // The version's sandbox (M4-08), on its own: it never blocks the real route.
+      await this.reconcileSandbox(version).catch((error: unknown) =>
+        this.logger.warn(`APISIX sandbox route of version ${apiVersionId}: ${String(error)}`),
+      );
       if (upstream === 'created' || route === 'created') return 'created';
       if (upstream === 'updated' || route === 'updated') return 'updated';
       return 'unchanged';

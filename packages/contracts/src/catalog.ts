@@ -57,6 +57,8 @@ export const catalogVersionSchema = z.object({
   basePath: z.string(),
   /** Public URL of the version on the gateway. */
   gatewayUrl: z.string(),
+  /** Its sandbox for sandbox applications, with synthetic data (M4-08); null without one. */
+  sandboxUrl: z.string().nullable(),
   publishedAt: z.iso.datetime().nullable(),
   deprecatedAt: z.iso.datetime().nullable(),
   sunsetAt: z.iso.datetime().nullable(),

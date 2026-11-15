@@ -642,7 +642,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Ven la lista los miembros, el revisor y el regulador (`bootcamp.read`). La consola del operador muestra el avance de cada entidad activa y lo que falta, las menos avanzadas primero (`bootcamp.list`).
     - Interpretación: los requisitos son del kit, no de un país, así que viven en el código y sus textos en i18n.
     - Web: "Mi entidad → Preparación del bootcamp" y "Consola del operador → Preparación del bootcamp".
-- [ ] **M4-08 — Modo sandbox**: aplicaciones sandbox con aprobación automática hacia upstreams de prueba.
+- [x] **M4-08 — Modo sandbox**: aplicaciones sandbox con aprobación automática hacia upstreams de prueba.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1`.
+    - El upstream de prueba es el `sandboxUpstream` que la versión declara (M4-06). El gateway lo sirve en `/sandbox{basePath}` con la misma cadena de plugins, sin el registro de transparencia: los datos son sintéticos.
+    - Una aplicación sandbox solo pide acceso a versiones con sandbox (400 si no). Con `features.sandbox.autoApprove` su solicitud se aprueba al crearse, sin el responsable de datos ni el regulador. La decisión es del sistema (`subscription.approved` con `autoApproved`) y se activa con el siguiente bundle.
+    - La separación vive en OPA: la suscripción de una aplicación sandbox apunta a la ruta del sandbox, y la política niega con `environment_mismatch` cruzar de un lado al otro (3 tests de política).
+    - La suscripción de una aplicación sandbox muestra la ruta `/sandbox/…`, y el catálogo, la URL del sandbox de cada versión.
+    - e2e: el cierre de M4 (`bootcamp-closing.spec.ts`) consume una API del nodo en sandbox: aprobada al instante, llamada por el túnel del nodo, y negada en la ruta real.
 - [ ] **M4-09 — Ficha del servicio imprimible**: vista e impresión/PDF desde el navegador.
 
 **Cierre M4:** simulación de bootcamp: una entidad nueva enrola un nodo, publica una API instantánea y otra entidad la consume en sandbox el mismo día.

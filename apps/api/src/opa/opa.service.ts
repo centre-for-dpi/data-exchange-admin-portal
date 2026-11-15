@@ -5,7 +5,7 @@ import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { QueueService } from '../queue/queue.service.js';
-import { routeId } from '../reconcilers/apisix/desired-state.js';
+import { routeId, sandboxBasePath, sandboxRouteId } from '../reconcilers/apisix/desired-state.js';
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import {
   type BuiltBundle,
@@ -88,20 +88,34 @@ export class OpaService implements OnApplicationBootstrap {
     const routes: BundleData['routes'] = {};
     const defaultRate = new Map<string, number>();
     for (const v of versions) {
+      const operationsAt = (basePath: string) =>
+        listOperations(v.openapiSpec as Record<string, unknown>).map((o) => {
+          const subject = bundleSubject(basePath, o.path, o.dataSubject);
+          return {
+            id: o.operationId,
+            method: o.method,
+            pathRegex: pathRegex(basePath, o.path),
+            ...(subject ? { subject } : {}),
+          };
+        });
       routes[routeId(v.id)] = {
         apiVersionId: v.id,
         classification: v.api.classification,
         ...(v.upstreamType === 'xroad' ? { xroad: true as const } : {}),
-        operations: listOperations(v.openapiSpec as Record<string, unknown>).map((o) => {
-          const subject = bundleSubject(v.basePath, o.path, o.dataSubject);
-          return {
-            id: o.operationId,
-            method: o.method,
-            pathRegex: pathRegex(v.basePath, o.path),
-            ...(subject ? { subject } : {}),
-          };
-        }),
+        operations: operationsAt(v.basePath),
       };
+      // The version's sandbox (M4-08): same operations under /sandbox, synthetic data.
+      if (v.sandboxUpstream) {
+        routes[sandboxRouteId(v.id)] = {
+          apiVersionId: v.id,
+          classification: v.api.classification,
+          sandbox: true,
+          ...((v.sandboxUpstream as { type?: string }).type === 'xroad'
+            ? { xroad: true as const }
+            : {}),
+          operations: operationsAt(sandboxBasePath(v.basePath)),
+        };
+      }
       defaultRate.set(v.id, v.defaultRateLimit);
     }
 
@@ -144,11 +158,16 @@ export class OpaService implements OnApplicationBootstrap {
         entityId: app.entityId,
         entitySlug: app.entity.slug,
         applicationId: app.id,
+        environment: app.environment,
         subscriptions: app.subscriptions.map((s) => {
           subscriptionIds.push(s.id);
           return {
             id: s.id,
-            route: routeId(s.apiVersionId),
+            // A sandbox application's subscriptions are to the version's sandbox (M4-08).
+            route:
+              app.environment === 'sandbox'
+                ? sandboxRouteId(s.apiVersionId)
+                : routeId(s.apiVersionId),
             operations: s.approvedOperations,
             purposes: [s.purposeCode],
             validFrom: s.validFrom.toISOString(),

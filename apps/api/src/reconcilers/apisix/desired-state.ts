@@ -84,6 +84,15 @@ export interface GatewaySettings {
   validationToken?: string;
 }
 
+/**
+ * Sandbox of a published version (M4-08): its own route, outside rid-route-, under /sandbox, to
+ * the version's sandbox upstream. Only sandbox applications reach it (OPA).
+ */
+export const SANDBOX_ROUTE_PREFIX = 'rid-sandbox-';
+export const sandboxRouteId = (apiVersionId: string): string =>
+  `${SANDBOX_ROUTE_PREFIX}${apiVersionId}`;
+export const sandboxBasePath = (basePath: string): string => `/sandbox${basePath}`;
+
 /** Check routes of a version in review (M4-06): ids outside rid-route-, paths under /__rid/. */
 export const CHECK_ROUTE_PREFIX = 'rid-check-';
 export const checkRouteId = (apiVersionId: string): string =>
