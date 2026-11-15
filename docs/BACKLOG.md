@@ -430,7 +430,12 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Montaje recomendado: APISIX termina el único mTLS, también para el token (ruta en el gateway hacia `rid-gateway`). Le pasa a Keycloak el certificado verificado en `SSL_CLIENT_CERT` y `ssl-client-verify`, con el proveedor `nginx` y `trust-proxy-verification`.
     - Keycloak cree en esa cabecera, así que toda otra vía hacia él (Traefik `/auth`, la red interna) debe borrarla.
     - Las opciones SPI deben ir en el formato nuevo de Keycloak 26.8 (`--spi-x509cert-lookup--provider`).
-- [ ] **SPIKE S-2 — Límite por suscripción**
+- [x] **SPIKE S-2 — Límite por suscripción**
+  - _Conclusión_ (`docs/spikes/S-2.md`, prototipo reproducible): no hace falta plugin propio.
+    - OPA devuelve `X-RID-Subscription` y `X-RID-Rate-Limit` desde el bundle, y `limit-count` usa `count: "$http_x_rid_rate_limit"` y la suscripción como clave.
+    - El cliente no puede subirse el límite ni reiniciar su contador. Cambiar el límite no reinicia el contador.
+    - El 429 del gateway sale en problem+json y el del proveedor pasa intacto (condición sobre `upstream_status`).
+    - Sin Redis, cada nodo cuenta por su lado: ADR-0020 reparte el límite entre los nodos del gateway.
 - [ ] **M3-01 — Integración con step-ca**: firma de CSR de aplicaciones con OTT del provisioner JWK; certificado descargable; aviso a 15 días del vencimiento.
 - [ ] **M3-02 — mTLS de cliente en el gateway**: objeto SSL con `client.ca`; llamadas sin certificado válido rechazadas; certificados revocados rechazados vía bundle OPA.
 - [ ] **M3-03 — mTLS hacia upstreams**: certificado del gateway emitido por step-ca y configurado en upstreams `node` y `direct` con mTLS.
