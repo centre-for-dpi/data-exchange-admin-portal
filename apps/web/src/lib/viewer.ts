@@ -8,6 +8,7 @@ import { cookies } from 'next/headers';
 import { cache } from 'react';
 import { auth } from '../auth';
 import { apiGet } from './api';
+import { redirectToStepUp } from './step-up';
 
 export const ACTIVE_ENTITY_COOKIE = 'rid-active-entity';
 
@@ -24,6 +25,11 @@ export interface Viewer {
   roles: Role[];
   /** The portal API could not be reached or rejected the session. */
   apiUnavailable: boolean;
+  /**
+   * The roles need a second factor this session does not have, and the step-up just tried did
+   * not get it (M3-08): the header offers to try again; the roles are not offered meanwhile.
+   */
+  mfaPending: boolean;
 }
 
 const anonymous: Viewer = {
@@ -32,6 +38,7 @@ const anonymous: Viewer = {
   memberships: [],
   roles: [],
   apiUnavailable: false,
+  mfaPending: false,
 };
 
 export function chooseActiveEntity(
@@ -50,20 +57,9 @@ export const getViewer = cache(async (): Promise<Viewer> => {
   const session = await auth();
   if (!session?.user) return anonymous;
   const name = session.user.name ?? session.user.email ?? undefined;
+  let me;
   try {
-    const me = await apiGet('/me', meResponseSchema);
-    const requested = (await cookies()).get(ACTIVE_ENTITY_COOKIE)?.value;
-    const activeEntity = chooseActiveEntity(me.memberships, requested);
-    return {
-      authenticated: true,
-      userId: me.user.id,
-      name: me.user.fullName,
-      platformRoles: me.platformRoles,
-      memberships: me.memberships,
-      activeEntity,
-      roles: [...me.platformRoles, ...(activeEntity?.roles ?? [])],
-      apiUnavailable: false,
-    };
+    me = await apiGet('/me', meResponseSchema);
   } catch (error) {
     console.error(
       'Could not load the viewer from the portal API',
@@ -71,4 +67,22 @@ export const getViewer = cache(async (): Promise<Viewer> => {
     );
     return { ...anonymous, authenticated: true, name, apiUnavailable: true };
   }
+  if (me.mfa.required && !me.mfa.satisfied) {
+    // Outside the try: redirect() works by throwing.
+    await redirectToStepUp();
+    return { ...anonymous, authenticated: true, userId: me.user.id, name, mfaPending: true };
+  }
+  const requested = (await cookies()).get(ACTIVE_ENTITY_COOKIE)?.value;
+  const activeEntity = chooseActiveEntity(me.memberships, requested);
+  return {
+    authenticated: true,
+    userId: me.user.id,
+    name: me.user.fullName,
+    platformRoles: me.platformRoles,
+    memberships: me.memberships,
+    activeEntity,
+    roles: [...me.platformRoles, ...(activeEntity?.roles ?? [])],
+    apiUnavailable: false,
+    mfaPending: false,
+  };
 });

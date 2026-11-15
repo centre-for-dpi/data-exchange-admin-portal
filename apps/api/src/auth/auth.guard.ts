@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
-import { ForbiddenError, NotFoundError } from '../common/errors.js';
+import { ForbiddenError, MfaRequiredError, NotFoundError } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   type AuthenticatedRequest,
@@ -34,6 +34,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *   1. not a member and no allowed platform role -> 404 (do not reveal that the entity exists);
  *   2. member without an allowed role -> 403;
  *   3. allowed platform role but the entity does not exist -> 404.
+ * Then, for any role-based endpoint: roles that need a second factor and a session without it
+ * -> 403 mfa_required (M3-08).
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -82,6 +84,12 @@ export class AuthGuard implements CanActivate {
     if (action) {
       const entityId = (request.params as Record<string, string | undefined>).entityId;
       request.entityContext = await this.authorizeEntity(principal, action, entityId);
+    }
+    // Second factor (M3-08): checked after the role checks, so an entity the caller does not
+    // belong to is still a 404. @SignedIn routes (/me, own resources) stay reachable: the web
+    // reads /me to know it must sign in again with the one-time code.
+    if ((action || platformAction) && principal.mfaRequired && !principal.mfa) {
+      throw new MfaRequiredError();
     }
     return true;
   }

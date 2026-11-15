@@ -1026,5 +1026,9 @@
     "confirmRequired": "Confirm that you understand the deletion is final.",
     "purgeButton": "Delete content",
     "older": "Older documents"
+  },
+  "session": {
+    "mfaRequired": "Your roles require a second factor. Sign in again with the one-time code from your authenticator app.",
+    "mfaAction": "Verify with the code"
   }
 }

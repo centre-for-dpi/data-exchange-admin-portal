@@ -49,6 +49,8 @@ services:
       RID_CARPETA_CLIENT_SECRET: ${RID_CARPETA_CLIENT_SECRET:?set RID_CARPETA_CLIENT_SECRET in .env}
       RID_CARPETA_URL: ${RID_CARPETA_URL:-http://localhost:3100}
       RID_DEMO_USER_PASSWORD: ${RID_DEMO_USER_PASSWORD:-demo}
+      # TOTP key of the seed users with a critical role (M3-08); random in the pilot.
+      RID_DEMO_TOTP_SECRET: ${RID_DEMO_TOTP_SECRET:-rid-demo-totp-secret}
     volumes:
       - ../keycloak:/opt/keycloak/data/import:ro
     ports:

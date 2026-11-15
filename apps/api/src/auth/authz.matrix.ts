@@ -1,6 +1,6 @@
 import { ENTITY_ROLES, PLATFORM_ROLES } from '@rid/contracts';
 import type { DiscoveredRoute } from '../openapi/openapi.service.js';
-import { ENTITY_PERMISSIONS, PLATFORM_PERMISSIONS } from './authz.policy.js';
+import { ENTITY_PERMISSIONS, MFA_ENTITY_ROLES, PLATFORM_PERMISSIONS } from './authz.policy.js';
 
 /** Where the generated matrix lives, relative to the repo root. */
 export const AUTHZ_DOC = 'docs/AUTHZ.md';
@@ -28,6 +28,10 @@ export function renderAuthzMatrix(routes: DiscoveredRoute[]): string {
     'Reglas del guard global (ADR-0014): sin sesión, 401. En rutas de una entidad: quien no es miembro',
     'ni tiene un rol de plataforma permitido recibe 404; un miembro sin el rol, 403. En rutas de',
     'plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede llamar (403).',
+    '',
+    `Segundo factor (M3-08, ADR-0021): quien tiene un rol de plataforma o ${MFA_ENTITY_ROLES.map((r) => `\`${r}\``).join(', ')}`,
+    'en alguna entidad recibe 403 `mfa_required` en toda ruta de entidad o de plataforma si su sesión',
+    'no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me`) siguen abiertas.',
     '',
     '## Acciones sobre recursos de una entidad',
     '',

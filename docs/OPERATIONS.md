@@ -44,7 +44,7 @@ Compose respeta este orden con `depends_on` y health checks: `api` espera a `pos
 | Componente | Lo hace solo al arrancar | Lo tiene que hacer el operador | Cómo comprobarlo |
 | :-- | :-- | :-- | :-- |
 | `postgres` | Con el volumen vacío: roles `rid_app` y `keycloak`, bases `keycloak` y `rid_test` (`infra/postgres/init`) | Nada. Las contraseñas de `.env` se fijan aquí y solo aquí | `dc exec postgres pg_isready` |
-| `keycloak` | Importa los realms `rid-portal`, `rid-gateway` y `rid-citizens` si no existen, con los secretos de `.env` | Nada en un despliegue nuevo. En uno existente, aplicar los cambios de realm que pida la versión (§5.3), entre ellos la política de rotación de secretos de M3-04 | `curl -fsS $RID_PUBLIC_URL/auth/realms/rid-portal/.well-known/openid-configuration` |
+| `keycloak` | Importa los realms `rid-portal`, `rid-gateway` y `rid-citizens` si no existen, con los secretos de `.env` | Nada en un despliegue nuevo. En uno existente, aplicar los cambios de realm que pida la versión (§5.3), entre ellos la política de rotación de secretos de M3-04 y el segundo factor de M3-08 | `curl -fsS $RID_PUBLIC_URL/auth/realms/rid-portal/.well-known/openid-configuration` |
 | `etcd` | — | Nada | `dc ps etcd` (healthy) |
 | `apisix` | Lee `infra/apisix/config.yaml`; sin rutas ni objetos SSL hasta que el API reconcilie | **Nada a mano**: rutas, upstreams y objetos SSL los crea el API | `dc ps apisix` (healthy); §2.2 |
 | `step-ca` | Primera vez: crea la CA y el provisioner `rid-portal`. Siempre: `configure.sh` fija plantillas y duraciones, y crea `rid-gateway-tls` si falta | Guardar la huella de la raíz si otro sistema la necesita (§5.4) | `dc exec step-ca step ca health --ca-url=https://localhost:9000 --root=/home/step/certs/root_ca.crt` |
@@ -217,6 +217,18 @@ node scripts/keycloak-client-policies.mjs     # KEYCLOAK_URL y el administrador 
 ```
 
 En el piloto, `KEYCLOAK_URL` es la URL pública (`$RID_PUBLIC_URL/auth`). Comprobación: en la consola de Keycloak, realm `rid-gateway` → Client policies, aparece `rid-secret-rotation` activa.
+
+**Segundo factor (M3-08, ADR-0021).** El flujo de login `rid-browser` y el mapa de niveles se aplican también desde el JSON, con un script idempotente:
+
+```bash
+set -a; . ./.env; set +a
+node scripts/keycloak-portal-mfa.mjs              # flujo, mapa acr y política OTP
+node scripts/keycloak-portal-mfa.mjs --demo-otp   # además, los códigos de los usuarios de demo
+```
+
+- `--demo-otp` es solo para desarrollo y el piloto. Reimporta desde el JSON, con el mismo id, cada usuario semilla con rol crítico que aún no tenga código: vuelve a poner la contraseña de `RID_DEMO_USER_PASSWORD` y el código de `RID_DEMO_TOTP_SECRET`.
+- Comprobación: en la consola de Keycloak, realm `rid-portal` → Authentication, `rid-browser` está ligado al navegador. `pnpm demo:otp` imprime el código vigente de los usuarios de demo y la clave para una app autenticadora.
+- **Segundo factor perdido.** El administrador de Keycloak borra la credencial OTP de la persona (Users → la persona → Credentials). La próxima vez que el portal pida el código, Keycloak le pide enrolar una app nueva. Comprueba antes la identidad de quien lo pide, por un canal distinto del correo de la cuenta.
 
 ### 5.4 Huella de la raíz de la CA
 

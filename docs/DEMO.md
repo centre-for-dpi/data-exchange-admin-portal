@@ -15,6 +15,8 @@ Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todo
 | `marta.regulador` | Regulador (MinTIC) | `regulator` |
 | `ciudadana.demo` | Titular de los datos (CC 1000000001), en la Carpeta de referencia; realm `rid-citizens` | — |
 
+**Segundo factor (M3-08).** `ana.operadora`, `lucia.datos` y `marta.regulador`, como todo rol de plataforma y `data_steward`, entran con la contraseña y después con un código de un solo uso. `pnpm demo:otp` imprime el código vigente. Para mostrarlo con un teléfono, agrega en una app autenticadora la clave que imprime el mismo comando (TOTP, SHA-1, 6 dígitos, 30 s). Cada código sirve una sola vez; si ya se usó, espera al siguiente.
+
 ## Pasos
 
 1. **Publicar** (pedro.publicador): crear la API "Consulta de afiliación", identificador en la URL `afiliacion`, subir `infra/mock-providers/salud/openapi.yaml`, upstream = nodo de prueba con ruta del servicio `/salud` (en desarrollo, el mock de salud según `RID_DEV_NODES`), clasificación `personal`, finalidad permitida `eligibility_check`. Enviar a revisión.

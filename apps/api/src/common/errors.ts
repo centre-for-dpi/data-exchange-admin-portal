@@ -70,6 +70,19 @@ export class GoneError extends DomainError {
   }
 }
 
+/**
+ * The caller's roles require a second factor and the token says the session was opened without
+ * one (M3-08, ADR-0021). The web answers by signing in again with acr_values=mfa.
+ */
+export class MfaRequiredError extends DomainError {
+  constructor() {
+    super(
+      ErrorCode.MfaRequired,
+      'Your roles require a second factor: sign in again with your one-time code',
+    );
+  }
+}
+
 /** A service the request depends on did not answer; the client may try again later. */
 export class ServiceUnavailableError extends DomainError {
   constructor(message: string) {

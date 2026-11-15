@@ -294,7 +294,7 @@ branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/log
 - **Latencia agregada por el gateway:** p95 < 50 ms (sin contar el upstream) con OPA local.
 - **Propagación:** aprobación o revocación reflejada en el gateway en < 60 s.
 - **Escala inicial:** 200 entidades, 1.000 APIs, 5.000 suscripciones, 500 peticiones/s sostenidas en el gateway.
-- **Seguridad:** OWASP ASVS L2; MFA obligatorio para roles de plataforma y `data_steward` (configurado en Keycloak).
+- **Seguridad:** OWASP ASVS L2; MFA obligatorio para roles de plataforma y `data_steward` (Keycloak pide el código; el API lo exige en cada petición, ADR-0021).
 - **Privacidad:** sin cuerpos en logs; identificadores en rutas enmascarados; `X-RID-End-User` guardado como hash con sal por despliegue.
 - **Retención:** bitácora de auditoría 5 años (configurable); logs de acceso 1 año (configurable).
 - **Accesibilidad:** WCAG 2.1 AA.

@@ -1,3 +1,4 @@
+import { MFA_ACR } from '@rid/contracts';
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 
 export const TOKEN_VERIFIER = Symbol('TOKEN_VERIFIER');
@@ -9,6 +10,11 @@ export interface VerifiedIdentity {
   /** Keycloak's email_verified claim: the person proved they own the address (ADR-0018). */
   emailVerified: boolean;
   name?: string;
+  /**
+   * The session was opened with the second factor: Keycloak's `acr` claim is MFA_ACR, the level
+   * of authentication realm rid-portal reaches only after the one-time code (M3-08, ADR-0021).
+   */
+  mfa: boolean;
 }
 
 export interface TokenVerifier {
@@ -51,6 +57,7 @@ export function createTokenVerifier(options: {
         email: typeof payload.email === 'string' ? payload.email : undefined,
         emailVerified: payload.email_verified === true,
         name: typeof payload.name === 'string' ? payload.name : undefined,
+        mfa: payload.acr === MFA_ACR,
       };
     },
   };

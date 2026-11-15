@@ -98,11 +98,15 @@ Lo que hay en APISIX, OPA y en los clientes de Keycloak se calcula desde aquí, 
 Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen tokens nuevos.
 
 - Corre con `start-dev --import-realm` (también en el piloto: el override no cambia el comando).
-- Importa al arrancar `infra/keycloak/*-realm.json` (`rid-portal`, `rid-gateway`, `rid-citizens`). Los secretos son marcadores `${VARIABLE}` resueltos con el entorno del contenedor: `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`, `RID_WEB_URL`, `RID_CARPETA_URL`, `RID_DEMO_USER_PASSWORD`.
+- Importa al arrancar `infra/keycloak/*-realm.json` (`rid-portal`, `rid-gateway`, `rid-citizens`). Los secretos son marcadores `${VARIABLE}` resueltos con el entorno del contenedor: `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`, `RID_WEB_URL`, `RID_CARPETA_URL`, `RID_DEMO_USER_PASSWORD`, `RID_DEMO_TOTP_SECRET`.
 - **La importación no actualiza un realm que ya existe** (`IGNORE_EXISTING`). Un cambio en los JSON, en esos secretos o en las URLs no llega a un Keycloak ya inicializado: se aplica con `kcadm.sh` (ver `OPERATIONS.md §5.3`) o borrando la base de Keycloak.
 - Emisor de los tokens: en desarrollo `KC_HOSTNAME=http://localhost:${KEYCLOAK_PORT}`; en el piloto `${RID_PUBLIC_URL}/auth` con `KC_HTTP_RELATIVE_PATH=/auth` y `KC_PROXY_HEADERS=xforwarded`. `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` deja que los contenedores (APISIX) lo alcancen por nombre de servicio.
 - Administrador inicial: `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD` (`KC_BOOTSTRAP_ADMIN_*`).
 - **Política de cliente `rid-secret-rotation`** en `rid-gateway` (M3-04): en los clientes con el atributo `rid.managed = true`, los que crea el portal, regenerar el secreto deja el anterior como secreto rotado durante la ventana de rotación (a lo sumo 30 días). Llega con el realm en una instalación nueva; en un Keycloak que ya importó el realm se aplica con `node scripts/keycloak-client-policies.mjs` (`OPERATIONS.md §5.3`). Sin ella, rotar un secreto deja de aceptar el anterior en cuanto el reconciliador aplica el nuevo.
+- **Segundo factor (M3-08, ADR-0021)** en `rid-portal`. El flujo `rid-browser` pide la contraseña y, cuando la web pide `acr_values=mfa`, un código TOTP. El API exige ese nivel a los roles de plataforma y a `data_steward`.
+  - Llega con el realm en una instalación nueva. En un Keycloak que ya importó el realm se aplica con `node scripts/keycloak-portal-mfa.mjs` (`OPERATIONS.md §5.3`).
+  - Sin el flujo, Keycloak no puede dar `acr=mfa`, y esos roles reciben 403 `mfa_required` en todo el portal.
+  - Los usuarios semilla con rol crítico traen el código de `RID_DEMO_TOTP_SECRET`. En producción no hay usuarios semilla: cada persona enrola su app la primera vez.
 - Detalle de los tres realms y los usuarios semilla: `infra/keycloak/README.md`.
 
 ### 3.4 etcd + APISIX
@@ -284,6 +288,7 @@ Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX 
 | `RID_CARPETA_URL` | `http://localhost:3100` | `${RID_PUBLIC_URL}/carpeta` |
 | `RID_CITIZEN_APPS` (webhook) | `http://localhost:3100/api/rid/alerts` | `http://carpeta:3100/carpeta/api/rid/alerts` |
 | `RID_DEMO_USER_PASSWORD` | `demo` | aleatoria, salvo `--demo-password` |
+| `RID_DEMO_TOTP_SECRET` | `rid-demo-totp-secret` | aleatoria (`pnpm demo:otp` da el código) |
 | `MAILPIT_UI_AUTH`, `TRAEFIK_NETWORK`, `RID_PUBLIC_URL` | — | solo piloto |
 
 El API usa `KEYCLOAK_URL` para validar los tokens y para el Admin API de `rid-gateway`: en el piloto llega a Keycloak por la URL pública, a través del proxy.
@@ -372,7 +377,8 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
   1. Agregar a `.env`: `RID_STEP_CA_URL=https://step-ca:9000`, `RID_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`), `RID_STEP_CA_ROOT_FILE=/var/lib/rid/step-ca/root_ca.crt` y, si cambian sus valores por defecto, `RID_GATEWAY_TLS_HOSTS` y `RID_GATEWAY_CLIENT_NAME`.
   2. Recrear `step-ca` (crea el provisioner `rid-gateway-tls`) y `apisix` (carga `rid-client-cert`) antes que el API.
   3. Aplicar la política de rotación al realm existente: `node scripts/keycloak-client-policies.mjs` con `KEYCLOAK_URL` y el administrador de `master` (`OPERATIONS.md §5.3`).
-  4. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-RID-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
+  4. **M3-08 (segundo factor).** Agregar a `.env` un `RID_DEMO_TOTP_SECRET` aleatorio, por ejemplo con `openssl rand -hex 20`. Luego aplicar el flujo y los códigos de demo al realm existente: `node scripts/keycloak-portal-mfa.mjs --demo-otp`. Hazlo antes de arrancar el API nuevo: desde ese momento, los usuarios con rol crítico necesitan el código.
+  5. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-RID-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
 ## 6. Desarrollo local

@@ -17,11 +17,29 @@ interface RealmFile {
   users?: Array<{
     id?: string;
     username: string;
-    credentials?: Array<{ value: string }>;
+    credentials?: Array<{
+      type: string;
+      value?: string;
+      secretData?: string;
+      credentialData?: string;
+    }>;
     clientRoles?: Record<string, string[]>;
   }>;
   defaultDefaultClientScopes?: string[];
   accessTokenLifespan?: number;
+  attributes?: Record<string, string>;
+  browserFlow?: string;
+  otpPolicyCodeReusable?: boolean;
+  authenticationFlows?: Array<{
+    alias: string;
+    authenticationExecutions: Array<{
+      authenticator?: string;
+      flowAlias?: string;
+      requirement: string;
+      authenticatorConfig?: string;
+    }>;
+  }>;
+  authenticatorConfig?: Array<{ alias: string; config: Record<string, string> }>;
 }
 
 const readRealm = (name: string): RealmFile =>
@@ -54,7 +72,11 @@ describe('realm rid-portal', () => {
     }
     for (const user of realm.users ?? []) {
       for (const credential of user.credentials ?? []) {
-        expect(credential.value).toMatch(/^\$\{[A-Z_]+(:[^}]*)?\}$/);
+        const secret =
+          credential.type === 'otp'
+            ? (JSON.parse(credential.secretData ?? '{}') as { value?: string }).value
+            : credential.value;
+        expect(secret, `${user.username} ${credential.type}`).toMatch(/^\$\{[A-Z_]+(:[^}]*)?\}$/);
       }
     }
   });
@@ -133,5 +155,64 @@ describe('realm rid-citizens (MT-05)', () => {
     }
     // No other attribute the citizen could set and the token could carry.
     expect(profile.unmanagedAttributePolicy).toBeUndefined();
+  });
+});
+
+describe('realm rid-portal: second factor (M3-08, ADR-0021)', () => {
+  const realm = readRealm('rid-portal');
+  const flow = (alias: string) => realm.authenticationFlows?.find((f) => f.alias === alias);
+  const config = (alias?: string) => realm.authenticatorConfig?.find((c) => c.alias === alias);
+
+  it('maps acr=mfa to level of authentication 2', () => {
+    expect(JSON.parse(realm.attributes?.['acr.loa.map'] ?? '{}')).toEqual({ password: 1, mfa: 2 });
+  });
+
+  it('logs in with the password, and asks for the one-time code only at level 2', () => {
+    expect(realm.browserFlow).toBe('rid-browser');
+    expect(flow('rid-browser')?.authenticationExecutions).toEqual([
+      expect.objectContaining({ authenticator: 'auth-cookie', requirement: 'ALTERNATIVE' }),
+      expect.objectContaining({ flowAlias: 'rid-browser-forms', requirement: 'ALTERNATIVE' }),
+    ]);
+    const levels = flow('rid-browser-forms')?.authenticationExecutions.map((e) => {
+      const steps = flow(e.flowAlias ?? '')?.authenticationExecutions ?? [];
+      return {
+        requirement: e.requirement,
+        level: config(steps[0]?.authenticatorConfig)?.config['loa-condition-level'],
+        steps: steps.map((s) => `${s.authenticator} ${s.requirement}`),
+      };
+    });
+    expect(levels).toEqual([
+      {
+        requirement: 'CONDITIONAL',
+        level: '1',
+        steps: [
+          'conditional-level-of-authentication REQUIRED',
+          'auth-username-password-form REQUIRED',
+        ],
+      },
+      {
+        requirement: 'CONDITIONAL',
+        level: '2',
+        steps: ['conditional-level-of-authentication REQUIRED', 'auth-otp-form REQUIRED'],
+      },
+    ]);
+  });
+
+  it('does not let a one-time code be used twice', () => {
+    expect(realm.otpPolicyCodeReusable).not.toBe(true);
+  });
+
+  it('seeds a one-time code only for the demo users with a critical role', () => {
+    const withOtp = (realm.users ?? [])
+      .filter((u) => u.credentials?.some((c) => c.type === 'otp'))
+      .map((u) => u.username)
+      .sort();
+    expect(withOtp).toEqual([
+      'ana.operadora',
+      'lucia.datos',
+      'marta.regulador',
+      'pablo.plataforma',
+      'sofia.auditora',
+    ]);
   });
 });

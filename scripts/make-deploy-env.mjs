@@ -91,6 +91,8 @@ const set = {
   TRAEFIK_NETWORK: values['traefik-network'],
   // Random unless asked: the seed users include platform administrators.
   RID_DEMO_USER_PASSWORD: values['demo-password'] ?? secret(12),
+  // Their one-time code key (M3-08): with the default, anyone could read it in the repo.
+  RID_DEMO_TOTP_SECRET: secret(20),
   MAILPIT_UI_AUTH: `mail:${secret(12)}`,
   // Notices (MT-06) to the reference citizen folder (MT-07), over the Compose network.
   RID_CITIZEN_APPS: `'${JSON.stringify({
@@ -121,5 +123,6 @@ if (extra.length > 0) {
 writeFileSync(out, `${result.join('\n').trimEnd()}\n`, { mode: 0o600 });
 console.log(`Wrote ${out} for ${publicUrl} (kid ${signingJwk.kid}).`);
 console.log(
-  'Demo users password: RID_DEMO_USER_PASSWORD; Mailpit login: MAILPIT_UI_AUTH (in that file).',
+  'Demo users password: RID_DEMO_USER_PASSWORD; one-time codes: pnpm demo:otp (RID_DEMO_TOTP_SECRET); ' +
+    'Mailpit login: MAILPIT_UI_AUTH (in that file).',
 );

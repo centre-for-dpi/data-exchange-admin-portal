@@ -510,7 +510,15 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Se cerraron con el plugin propio `rid-header-guard`, primero en la fase rewrite: borra toda `X-RID-*` del cliente, guiones bajos incluidos, salvo `X-RID-Purpose` y `X-RID-End-User`.
     - Solo `openid-connect` queda fuera de la ruta de prueba: la política decodifica el token, y su firma la cubre el e2e del gateway.
     - La suplantación de `SSL_CLIENT_CERT` hacia Keycloak (S-4) va con M3-10.
-- [ ] **M3-08 — MFA para roles críticos**: roles de plataforma y `data_steward` exigen MFA en Keycloak.
+- [x] **M3-08 — MFA para roles críticos**: roles de plataforma y `data_steward` exigen MFA en Keycloak.
+  - _Notas de implementación:_
+    - Interpretación (ADR-0021): segundo factor por **escalado de sesión**, no por un atributo `requires_mfa` sincronizado (lo que preveía `ARCHITECTURE.md §3.1`). El portal decide con los roles de PostgreSQL y el API lo exige en cada petición, así que el portal no necesita `manage-users` en `rid-portal`.
+    - Keycloak: el flujo `rid-browser` tiene dos niveles, contraseña (`acr=password`) y TOTP (`acr=mfa`). Pedir `acr_values=mfa` en la misma sesión solo agrega el código. Quien no tiene uno pasa por `CONFIGURE_TOTP`. El código no se puede reutilizar y el refresh conserva el nivel. Todo probado contra Keycloak 26.8, también la importación con el marcador del secreto.
+    - API: los roles de plataforma y `data_steward` reciben 403 `mfa_required` en toda ruta de entidad o de plataforma si el token no trae `acr=mfa`. Se comprueba después de los roles (otra entidad sigue siendo 404). `/me` informa `mfa.required` y `mfa.satisfied`. Un rol crítico recién otorgado exige el código desde la siguiente petición.
+    - Web: con `/me` o con un 403 `mfa_required`, vuelve a iniciar sesión con `acr_values=mfa` y conserva el idioma. Una cookie de 2 minutos evita bucles: si no se consiguió el nivel, el encabezado muestra un aviso con un botón para reintentar.
+    - Demo y desarrollo: los usuarios semilla con rol crítico traen la clave TOTP `RID_DEMO_TOTP_SECRET`, aleatoria en el piloto. `pnpm demo:otp`, `pnpm demo`, los e2e y las pruebas de infraestructura generan el código. Como cada código sirve una vez, prueban el del periodo siguiente o el anterior antes de esperar.
+    - Un Keycloak existente recibe el flujo con `scripts/keycloak-portal-mfa.mjs`, y con `--demo-otp` los códigos de demo.
+    - Fuera de alcance: WebAuthn como segundo factor alternativo. Puede agregarse en Keycloak en el nivel 2 sin cambiar el portal.
 - [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
 - [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.
   - Despliegue (S-3): Traefik termina hoy el TLS del VPS y enruta `/gw` por ruta, así que no puede pasar el certificado del cliente. El gateway necesita un nombre propio con `HostSNI` y `tls.passthrough` hacia el 9443 de APISIX. El nombre DNS del gateway ya existe en el VPS de demo (2026-11-14). Allí el certificado de servidor del gateway lo emite step-ca, y la ruta del token va por el mismo nombre.

@@ -25,6 +25,12 @@ export const membershipSummarySchema = z.object({
 });
 export type MembershipSummary = z.infer<typeof membershipSummarySchema>;
 
+/**
+ * The `acr` of a session opened with the second factor: the web asks Keycloak for it with
+ * acr_values, and realm rid-portal maps it to level of authentication 2 (OTP).
+ */
+export const MFA_ACR = 'mfa';
+
 /** GET /api/v1/me: who the caller is, re-evaluated on every request (ADR-0004). */
 export const meResponseSchema = z.object({
   user: z.object({
@@ -35,6 +41,12 @@ export const meResponseSchema = z.object({
   platformRoles: z.array(platformRoleSchema),
   /** Active memberships only. */
   memberships: z.array(membershipSummarySchema),
+  /**
+   * Second factor (M3-08, ADR-0021). `required`: the caller's roles need it (platform roles,
+   * data_steward). `satisfied`: this session was opened with it (token `acr` = MFA_ACR). While
+   * required and not satisfied, every role-based endpoint answers 403 mfa_required.
+   */
+  mfa: z.object({ required: z.boolean(), satisfied: z.boolean() }),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
 

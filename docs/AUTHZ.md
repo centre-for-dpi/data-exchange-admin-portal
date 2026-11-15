@@ -7,6 +7,10 @@ Reglas del guard global (ADR-0014): sin sesión, 401. En rutas de una entidad: q
 ni tiene un rol de plataforma permitido recibe 404; un miembro sin el rol, 403. En rutas de
 plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede llamar (403).
 
+Segundo factor (M3-08, ADR-0021): quien tiene un rol de plataforma o `data_steward`
+en alguna entidad recibe 403 `mfa_required` en toda ruta de entidad o de plataforma si su sesión
+no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me`) siguen abiertas.
+
 ## Acciones sobre recursos de una entidad
 
 | Acción | `entity_admin` | `api_publisher` | `data_steward` | `app_developer` | `entity_viewer` | `platform_admin` | `platform_reviewer` | `regulator` | `auditor` |

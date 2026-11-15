@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectNoAccessibilityViolations, keycloakLogin } from './helpers';
+import { enterOneTimeCode, expectNoAccessibilityViolations, keycloakLogin, totp } from './helpers';
 
 // M0 closing criterion: the web shows login working against Keycloak.
 test.describe('login with Keycloak', () => {
@@ -48,5 +48,29 @@ test.describe('login with Keycloak', () => {
     await keycloakLogin(page, 'lucia.datos');
     await expect(page).toHaveURL(/localhost:3000\/en$/);
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('Hello, Lucía Datos');
+  });
+
+  test('a data steward also types the one-time code, and a wrong one is refused (M3-08)', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
+    await page.locator('#username').fill('lucia.datos');
+    await page.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'demo');
+    await page.locator('#kc-login').click();
+
+    // The portal sees the session lacks the second factor and asks Keycloak for it.
+    await expect(page.locator('#otp')).toBeVisible();
+    const wrong = String((Number(totp()) + 1) % 1_000_000).padStart(6, '0');
+    await page.locator('#otp').fill(wrong);
+    await page.locator('#kc-login').click();
+    await expect(page.locator('#input-error-otp')).not.toBeEmpty();
+
+    await enterOneTimeCode(page, 'lucia.datos');
+    await expect(page).toHaveURL(/localhost:3000\/$/);
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText('Hola, Lucía Datos');
+    await expect(page.getByText('Entidad: ')).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: 'segundo factor' })).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
   });
 });

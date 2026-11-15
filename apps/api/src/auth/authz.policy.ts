@@ -1,4 +1,4 @@
-import { ENTITY_ROLES, type EntityRole, type PlatformRole } from '@rid/contracts';
+import { ENTITY_ROLES, type EntityRole, PLATFORM_ROLES, type PlatformRole } from '@rid/contracts';
 
 /**
  * Who may do what on resources that belong to an entity (SPEC.md §2). Evaluated in the backend on
@@ -127,3 +127,24 @@ export const PLATFORM_PERMISSIONS = {
 } as const satisfies Record<string, readonly PlatformRole[]>;
 
 export type PlatformAction = keyof typeof PLATFORM_PERMISSIONS;
+
+/**
+ * Roles that require a second factor (SPEC.md §8, M3-08, ADR-0021): every platform role, which
+ * acts on the whole network, and the data steward, who decides who gets an entity's data.
+ */
+export const MFA_PLATFORM_ROLES: readonly PlatformRole[] = PLATFORM_ROLES;
+export const MFA_ENTITY_ROLES: readonly EntityRole[] = ['data_steward'];
+
+/**
+ * A user with one of those roles (in any entity) needs the second factor for every role-based
+ * endpoint: the requirement belongs to the person, like the Keycloak session it applies to.
+ */
+export function requiresMfa(
+  platformRoles: readonly PlatformRole[],
+  memberships: ReadonlyArray<{ roles: readonly EntityRole[] }>,
+): boolean {
+  return (
+    platformRoles.some((role) => MFA_PLATFORM_ROLES.includes(role)) ||
+    memberships.some((m) => m.roles.some((role) => MFA_ENTITY_ROLES.includes(role)))
+  );
+}

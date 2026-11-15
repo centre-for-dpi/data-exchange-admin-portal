@@ -3,6 +3,7 @@ import type { EntityRole, PlatformRole } from '@rid/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import { ConflictError, ForbiddenError } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { requiresMfa } from './authz.policy.js';
 import { TOKEN_VERIFIER, type TokenVerifier, type VerifiedIdentity } from './token-verifier.js';
 
 export interface PrincipalMembership {
@@ -26,6 +27,10 @@ export interface Principal {
   platformRoles: PlatformRole[];
   /** Active memberships only: a revoked membership loses access on the next request. */
   memberships: PrincipalMembership[];
+  /** The roles of this request need a second factor (requiresMfa, M3-08). */
+  mfaRequired: boolean;
+  /** This session was opened with the second factor (token acr). */
+  mfa: boolean;
 }
 
 @Injectable()
@@ -56,6 +61,13 @@ export class PrincipalService {
     if (!user) throw new ForbiddenError('The user could not be registered');
     if (user.status !== 'active') throw new ForbiddenError('The user account is disabled');
 
+    const platformRoles = user.platformRoles.map((r) => r.role);
+    const memberships = user.memberships.map((m) => ({
+      entityId: m.entityId,
+      entitySlug: m.entity.slug,
+      entityShortName: m.entity.shortName,
+      roles: m.roles,
+    }));
     return {
       userId: user.id,
       keycloakSub: user.keycloakSub,
@@ -63,13 +75,10 @@ export class PrincipalService {
       emailVerified:
         identity.emailVerified && identity.email?.toLowerCase() === user.email.toLowerCase(),
       fullName: user.fullName,
-      platformRoles: user.platformRoles.map((r) => r.role),
-      memberships: user.memberships.map((m) => ({
-        entityId: m.entityId,
-        entitySlug: m.entity.slug,
-        entityShortName: m.entity.shortName,
-        roles: m.roles,
-      })),
+      platformRoles,
+      memberships,
+      mfaRequired: requiresMfa(platformRoles, memberships),
+      mfa: identity.mfa,
     };
   }
 

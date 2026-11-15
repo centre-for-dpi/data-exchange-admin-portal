@@ -7,6 +7,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { DEFAULT_DEMO_TOTP_SECRET, totp } from './totp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env'));
@@ -17,6 +18,7 @@ const KEYCLOAK = env('KEYCLOAK_URL', 'http://localhost:8080');
 const GATEWAY = env('RID_GATEWAY_PUBLIC_URL', 'http://localhost:9080');
 const WEB = env('RID_WEB_URL', 'http://localhost:3000');
 const PASSWORD = env('RID_DEMO_USER_PASSWORD', 'demo');
+const TOTP_SECRET = env('RID_DEMO_TOTP_SECRET', DEFAULT_DEMO_TOTP_SECRET);
 const RUN = Date.now().toString(36);
 const SLUG = `afiliacion-${RUN}`;
 
@@ -71,6 +73,42 @@ const CITIZEN_CLIENT = {
   redirectUri: `${env('RID_CARPETA_URL', 'http://localhost:3100')}/auth/callback`,
 };
 
+/** Seed users with a critical role: their realm entry has a one-time code (M3-08). */
+const MFA_USERS = new Set(
+  JSON.parse(readFileSync(resolve(root, 'infra/keycloak/rid-portal-realm.json'), 'utf8'))
+    .users.filter((u) => u.credentials?.some((c) => c.type === 'otp'))
+    .map((u) => u.username),
+);
+/** Codes already sent per user: Keycloak accepts each code once. */
+const usedCodes = new Map();
+
+/**
+ * The one-time code step (M3-08). Keycloak accepts the code of this 30 s period and of the ones
+ * on either side; a code is good only once, so a character signing in again tries another.
+ */
+async function submitOtp(username, html, post) {
+  const used = usedCodes.get(username) ?? new Set();
+  usedCodes.set(username, used);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const action = /<form[^>]+id="kc-otp-login-form"[^>]+action="([^"]+)"/.exec(html)?.[1];
+    expect(action, `Keycloak one-time code form not found for ${username}`);
+    const code = [0, 30_000, -30_000]
+      .map((d) => totp(TOTP_SECRET, Date.now() + d))
+      .find((c) => !used.has(c));
+    if (!code) {
+      await sleep(30_000 - (Date.now() % 30_000) + 500);
+      continue;
+    }
+    used.add(code);
+    const res = await post(action, { otp: code });
+    if (res.headers.get('location')) return res;
+    html = await res.text();
+  }
+  throw new DemoError(
+    `Keycloak refused the one-time codes of ${username} (is RID_DEMO_TOTP_SECRET right?)`,
+  );
+}
+
 async function login(username, client = PORTAL_CLIENT) {
   const realm = `${KEYCLOAK}/realms/${client.realm}/protocol/openid-connect`;
   const redirectUri = client.redirectUri;
@@ -84,6 +122,9 @@ async function login(username, client = PORTAL_CLIENT) {
     code_challenge: createHash('sha256').update(verifier).digest('base64url'),
     code_challenge_method: 'S256',
   });
+  // A critical role needs the second factor: ask for it, as the web does after /me (ADR-0021).
+  const mfa = client === PORTAL_CLIENT && MFA_USERS.has(username);
+  if (mfa) params.set('acr_values', 'mfa');
   const cookies = new Map();
   const keep = (res) => {
     for (const c of res.headers.getSetCookie()) {
@@ -96,15 +137,23 @@ async function login(username, client = PORTAL_CLIENT) {
   keep(page);
   const action = /<form[^>]+id="kc-form-login"[^>]+action="([^"]+)"/.exec(await page.text())?.[1];
   expect(action, `Keycloak login form not found for ${username}`);
-  const submitted = await fetch(action.replaceAll('&amp;', '&'), {
-    method: 'POST',
-    redirect: 'manual',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded',
-      cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; '),
-    },
-    body: new URLSearchParams({ username, password: PASSWORD, credentialId: '' }),
-  });
+  const post = async (target, body) => {
+    const res = await fetch(target.replaceAll('&amp;', '&'), {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; '),
+      },
+      body: new URLSearchParams(body),
+    });
+    keep(res);
+    return res;
+  };
+  let submitted = await post(action, { username, password: PASSWORD, credentialId: '' });
+  if (mfa && !submitted.headers.get('location')) {
+    submitted = await submitOtp(username, await submitted.text(), post);
+  }
   const code = new URL(submitted.headers.get('location') ?? 'http://x/').searchParams.get('code');
   expect(code, `Login failed for ${username} (is RID_DEMO_USER_PASSWORD right?)`);
   const { clientId, secret } = client;

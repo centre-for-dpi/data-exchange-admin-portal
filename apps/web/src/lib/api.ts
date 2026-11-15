@@ -1,6 +1,7 @@
 import { getToken } from 'next-auth/jwt';
 import { headers } from 'next/headers';
 import type { z } from 'zod';
+import { isMfaRequired, redirectToStepUp } from './step-up';
 
 export class ApiError extends Error {
   constructor(
@@ -45,7 +46,12 @@ export async function apiGet<S extends z.ZodType>(
     // connection is closed by the API at the moment it is reused).
     res = await fetch(url, { headers, cache: 'no-store' });
   }
-  if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => undefined));
+  if (!res.ok) {
+    const problem: unknown = await res.json().catch(() => undefined);
+    // The session lacks the second factor its roles need (M3-08): sign in again with it.
+    if (res.status === 403 && isMfaRequired(problem)) await redirectToStepUp();
+    throw new ApiError(res.status, problem);
+  }
   return schema.parse(await res.json());
 }
 

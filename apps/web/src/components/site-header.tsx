@@ -1,9 +1,10 @@
 import Image from 'next/image';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { Bell } from 'lucide-react';
 import { notificationPageSchema } from '@rid/contracts';
 import { Link } from '../i18n/navigation';
 import { apiGet } from '../lib/api';
+import { stepUpAction } from '../lib/auth-actions';
 import { visibleNavItems } from '../lib/navigation';
 import { getSite } from '../lib/site';
 import { getViewer } from '../lib/viewer';
@@ -17,6 +18,7 @@ export async function SiteHeader() {
   const site = getSite();
   const t = await getTranslations();
   const items = visibleNavItems(viewer, { publicCatalog: site.publicCatalog });
+  const locale = await getLocale();
   // Unread notices (M2-08); a failure only hides the count.
   const unread =
     viewer.authenticated && !viewer.apiUnavailable
@@ -93,6 +95,23 @@ export async function SiteHeader() {
             ))}
           </ul>
         </nav>
+      ) : null}
+      {viewer.mfaPending ? (
+        // The roles need the second factor and the last try did not get it (M3-08).
+        <div role="alert" className="border-t border-border bg-surface-app">
+          <form
+            action={stepUpAction.bind(null, locale)}
+            className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 text-sm sm:px-6"
+          >
+            <p className="text-foreground-strong">{t('session.mfaRequired')}</p>
+            <button
+              type="submit"
+              className="rounded-full bg-primary px-4 py-1.5 font-semibold text-primary-foreground"
+            >
+              {t('session.mfaAction')}
+            </button>
+          </form>
+        </div>
       ) : null}
     </header>
   );

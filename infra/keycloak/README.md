@@ -22,6 +22,10 @@ Keycloak importa al arrancar (`--import-realm`) los archivos `*-realm.json` de e
 | `sofia.auditora` | `0193a6c0-0000-7000-8000-000000000007` | `auditor` |
 | `elena.admin` | `0193a6c0-0000-7000-8000-000000000008` | `entity_admin` (entidad de salud) |
 
+- **Segundo factor (M3-08, ADR-0021).** El flujo de navegador `rid-browser` tiene dos niveles: contraseña (`acr=password`) y código TOTP (`acr=mfa`, mapa `acr.loa.map`). Keycloak pide el código solo cuando la web pide `acr_values=mfa`, y el API lo exige a los roles de plataforma y a `data_steward`. Quien no tiene un código configurado pasa por `CONFIGURE_TOTP`. Un código sirve una sola vez.
+  - Los usuarios semilla con esos roles (`ana`, `lucia`, `marta`, `pablo`, `sofia`) traen una credencial OTP con la clave `RID_DEMO_TOTP_SECRET`. La clave se usa tal cual, como bytes UTF-8, no en base32. `pnpm demo:otp` da el código vigente y la clave en base32 para una app autenticadora.
+  - En un Keycloak que ya importó el realm, aplícalo sin borrar datos: `node scripts/keycloak-portal-mfa.mjs --demo-otp`.
+
 ## Realm `rid-gateway` (aplicaciones consumidoras)
 
 - Sin aplicaciones: los clientes `rid-app-<uuid>` los crea el reconciliador del portal.
@@ -48,4 +52,4 @@ Son los números que usan las e2e y la demo: `ciudadana.demo` ve en la API del t
 ## Pruebas
 
 - `pnpm test` incluye verificaciones estáticas de estos archivos (`tests/infra`).
-- `pnpm test:integration` (con el stack arriba) hace login real con cada usuario semilla y prueba los permisos del provisionador.
+- `pnpm test:integration` (con el stack arriba) hace login real con cada usuario semilla, prueba el escalado al segundo factor (y el rechazo de un código incorrecto o repetido) y los permisos del provisionador.

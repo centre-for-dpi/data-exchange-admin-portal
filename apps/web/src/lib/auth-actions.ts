@@ -2,6 +2,7 @@
 
 import { getToken } from 'next-auth/jwt';
 import { headers } from 'next/headers';
+import { MFA_ACR } from '@rid/contracts';
 import { redirect } from 'next/navigation';
 import { keycloakIssuer, signIn, signOut } from '../auth';
 import { routing, type AppLocale } from '../i18n/routing';
@@ -16,6 +17,11 @@ const asLocale = (value: string): AppLocale =>
 
 export async function signInAction(locale: string): Promise<void> {
   await signIn('keycloak', { redirectTo: homePath(asLocale(locale)) });
+}
+
+/** Signs in again with the second factor (M3-08): the button of the notice, after a failed try. */
+export async function stepUpAction(locale: string): Promise<void> {
+  await signIn('keycloak', { redirectTo: homePath(asLocale(locale)) }, { acr_values: MFA_ACR });
 }
 
 /**

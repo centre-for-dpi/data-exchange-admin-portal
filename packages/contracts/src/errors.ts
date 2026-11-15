@@ -23,6 +23,11 @@ export const ErrorCode = {
   Internal: 'internal',
   /** A service the request depends on (the certificate authority) did not answer. */
   ServiceUnavailable: 'service_unavailable',
+  /**
+   * The caller's roles require a second factor and the session was opened without one: sign in
+   * again with acr_values=mfa (M3-08, ADR-0021).
+   */
+  MfaRequired: 'mfa_required',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -41,6 +46,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   rate_limited: 429,
   internal: 500,
   service_unavailable: 503,
+  mfa_required: 403,
 };
 
 export function problemType(code: ErrorCode): string {

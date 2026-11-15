@@ -18,6 +18,7 @@ const TITLES: Record<ErrorCode, string> = {
   rate_limited: 'Too many requests',
   internal: 'Internal server error',
   service_unavailable: 'Service unavailable',
+  mfa_required: 'Second factor required',
 };
 
 const CODE_BY_STATUS: Record<number, ErrorCode> = {

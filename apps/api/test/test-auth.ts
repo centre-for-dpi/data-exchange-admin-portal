@@ -1,5 +1,6 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
+import { MFA_ACR } from '@rid/contracts';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { configureApp, createAdapter } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
@@ -26,6 +27,8 @@ export interface TestIssuer {
       name?: string;
       audience?: string;
       expiresIn?: string | number;
+      /** Keycloak's acr: 'mfa' by default (a session with the second factor); null omits it. */
+      acr?: string | null;
     },
   ): Promise<string>;
   /** A token signed with a key the API does not trust. */
@@ -51,9 +54,11 @@ export async function createTestIssuer(): Promise<TestIssuer> {
       name?: string;
       audience?: string;
       expiresIn?: string | number;
+      acr?: string | null;
     } = {},
   ) =>
     new SignJWT({
+      ...(options.acr === null ? {} : { acr: options.acr ?? MFA_ACR }),
       ...(options.email ? { email: options.email } : {}),
       ...(options.emailVerified === undefined ? {} : { email_verified: options.emailVerified }),
       ...(options.name ? { name: options.name } : {}),

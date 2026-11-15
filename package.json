@@ -29,7 +29,8 @@
     "db:migrate": "pnpm --filter @rid/api db:migrate",
     "db:deploy": "pnpm --filter @rid/api db:deploy",
     "db:seed": "pnpm --filter @rid/api db:seed",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "demo:otp": "node scripts/totp.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

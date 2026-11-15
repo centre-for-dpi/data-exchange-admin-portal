@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { env } from './env.js';
 
 export const keycloakUrl = (): string => env('KEYCLOAK_URL', 'http://localhost:8080');
@@ -42,7 +42,7 @@ export async function clientCredentialsToken(
 }
 
 /** Minimal cookie jar: enough to carry Keycloak's login session between requests. */
-class CookieJar {
+export class CookieJar {
   private readonly cookies = new Map<string, string>();
 
   store(res: Response): void {
@@ -58,12 +58,25 @@ class CookieJar {
   }
 }
 
+/** RFC 6238 TOTP like the rid-portal OTP policy: 6 digits, 30 s, HMAC-SHA1, UTF-8 key (M3-08). */
+export function totp(secret: string, at = Date.now()): string {
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
+  const mac = createHmac('sha1', Buffer.from(secret, 'utf8')).update(counter).digest();
+  const offset = (mac.at(-1) ?? 0) & 0x0f;
+  return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
+}
+
+export const demoTotpSecret = (): string => env('RID_DEMO_TOTP_SECRET', 'rid-demo-totp-secret');
+
 export interface AuthorizationCodeResult {
   /** Final redirect back to the web app, or undefined if Keycloak did not redirect. */
   redirect?: URL;
   /** HTML of the last page when Keycloak answered with a page instead of a redirect. */
   page?: string;
-  tokens?: { access_token: string; id_token: string };
+  tokens?: { access_token: string; id_token: string; refresh_token: string };
+  /** Ids of the forms Keycloak showed, in order (kc-form-login, kc-otp-login-form...). */
+  forms: string[];
 }
 
 /**
@@ -96,7 +109,17 @@ export const carpetaClient = (): LoginClient => ({
 export async function loginWithAuthorizationCode(
   username: string,
   password: string,
-  options: { pkce?: boolean; redirectUri?: string; client?: LoginClient } = {},
+  options: {
+    pkce?: boolean;
+    redirectUri?: string;
+    client?: LoginClient;
+    /** acr_values of the request: 'mfa' asks for the second factor (M3-08). */
+    acr?: string;
+    /** The one-time code to type if Keycloak asks for it. */
+    otp?: string;
+    /** Keycloak's session from an earlier login, to step it up. */
+    jar?: CookieJar;
+  } = {},
 ): Promise<AuthorizationCodeResult> {
   const client = options.client ?? portalWebClient();
   const realmUrl = `${keycloakUrl()}/realms/${client.realm}/protocol/openid-connect`;
@@ -113,29 +136,41 @@ export async function loginWithAuthorizationCode(
     params.set('code_challenge', createHash('sha256').update(verifier).digest('base64url'));
     params.set('code_challenge_method', 'S256');
   }
+  if (options.acr) params.set('acr_values', options.acr);
 
-  const jar = new CookieJar();
-  const loginPage = await fetch(`${realmUrl}/auth?${params.toString()}`, { redirect: 'manual' });
-  jar.store(loginPage);
-  if (loginPage.status >= 300 && loginPage.status < 400) {
-    return { redirect: new URL(loginPage.headers.get('location') ?? '') };
-  }
-  const html = await loginPage.text();
-  const action = /<form[^>]+id="kc-form-login"[^>]+action="([^"]+)"/.exec(html)?.[1];
-  if (!action) return { page: html };
-
-  const submitted = await fetch(action.replaceAll('&amp;', '&'), {
-    method: 'POST',
+  const jar = options.jar ?? new CookieJar();
+  const forms: string[] = [];
+  let res = await fetch(`${realmUrl}/auth?${params.toString()}`, {
     redirect: 'manual',
-    headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: jar.header() },
-    body: new URLSearchParams({ username, password, credentialId: '' }),
+    headers: { cookie: jar.header() },
   });
-  const location = submitted.headers.get('location');
-  if (!location) return { page: await submitted.text() };
+  jar.store(res);
+  // Each Keycloak page is a form: the password, then the one-time code when asked for.
+  for (let step = 0; step < 3 && !res.headers.get('location'); step += 1) {
+    const html = await res.text();
+    const form = /<form[^>]+id="([^"]+)"[^>]+action="([^"]+)"/.exec(html);
+    const body: Record<string, string> | undefined =
+      form?.[1] === 'kc-form-login' && !forms.includes('kc-form-login')
+        ? { username, password, credentialId: '' }
+        : form?.[1] === 'kc-otp-login-form' && options.otp && !forms.includes('kc-otp-login-form')
+          ? { otp: options.otp }
+          : undefined;
+    if (!form?.[2] || !body) return { page: html, forms };
+    forms.push(form[1] ?? '');
+    res = await fetch(form[2].replaceAll('&amp;', '&'), {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: jar.header() },
+      body: new URLSearchParams(body),
+    });
+    jar.store(res);
+  }
+  const location = res.headers.get('location');
+  if (!location) return { page: await res.text(), forms };
 
   const redirect = new URL(location);
   const code = redirect.searchParams.get('code');
-  if (!code) return { redirect };
+  if (!code) return { redirect, forms };
 
   const tokenRes = await fetch(`${realmUrl}/token`, {
     method: 'POST',
@@ -151,5 +186,5 @@ export async function loginWithAuthorizationCode(
     }),
   });
   if (!tokenRes.ok) throw new Error(`token exchange failed: ${await tokenRes.text()}`);
-  return { redirect, tokens: (await tokenRes.json()) as AuthorizationCodeResult['tokens'] };
+  return { redirect, tokens: (await tokenRes.json()) as AuthorizationCodeResult['tokens'], forms };
 }

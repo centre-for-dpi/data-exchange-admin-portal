@@ -6,9 +6,12 @@ import {
   audiences,
   carpetaClient,
   clientCredentialsToken,
+  CookieJar,
   decodeJwt,
+  demoTotpSecret,
   keycloakUrl,
   loginWithAuthorizationCode,
+  totp,
   webUrl,
 } from './keycloak.js';
 import { fromRoot } from './paths.js';
@@ -75,6 +78,90 @@ describe('realm rid-portal (M0-03)', () => {
     const discovery = (await res.json()) as { issuer: string };
     expect(discovery.issuer).toBe(`${keycloakUrl()}/realms/rid-portal`);
     expect(webUrl()).toMatch(/^https?:\/\//);
+  });
+});
+
+describe('realm rid-portal: second factor (M3-08)', () => {
+  const password = env('RID_DEMO_USER_PASSWORD', 'demo');
+  const tokenUrl = `${keycloakUrl()}/realms/rid-portal/protocol/openid-connect/token`;
+  /** Keycloak accepts each code once, and the codes of the periods next to this one. */
+  const used = new Set<string>();
+  const nextCode = (username: string) => {
+    for (const offset of [0, 30_000, -30_000]) {
+      const code = totp(demoTotpSecret(), Date.now() + offset);
+      if (!used.has(`${username}:${code}`)) {
+        used.add(`${username}:${code}`);
+        return code;
+      }
+    }
+    throw new Error('no unused one-time code left in this period');
+  };
+
+  it('a password login has acr=password; asking for acr=mfa then only asks the code', async () => {
+    const jar = new CookieJar();
+    const first = await loginWithAuthorizationCode('lucia.datos', password, { jar });
+    expect(first.forms).toEqual(['kc-form-login']);
+    expect(decodeJwt(first.tokens?.access_token ?? '').acr).toBe('password');
+
+    const stepUp = await loginWithAuthorizationCode('lucia.datos', password, {
+      jar,
+      acr: 'mfa',
+      otp: nextCode('lucia.datos'),
+    });
+    expect(stepUp.forms).toEqual(['kc-otp-login-form']);
+    expect(decodeJwt(stepUp.tokens?.access_token ?? '').acr).toBe('mfa');
+
+    // The web refreshes every 5 minutes: the refreshed token keeps the level.
+    const refreshed = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: stepUp.tokens?.refresh_token ?? '',
+        client_id: 'rid-portal-web',
+        client_secret: env('RID_PORTAL_WEB_CLIENT_SECRET'),
+      }),
+    });
+    expect(refreshed.status).toBe(200);
+    const { access_token: accessToken } = (await refreshed.json()) as { access_token: string };
+    expect(decodeJwt(accessToken).acr).toBe('mfa');
+  });
+
+  it('a fresh login with acr=mfa asks the password and then the code', async () => {
+    const result = await loginWithAuthorizationCode('marta.regulador', password, {
+      acr: 'mfa',
+      otp: nextCode('marta.regulador'),
+    });
+    expect(result.forms).toEqual(['kc-form-login', 'kc-otp-login-form']);
+    expect(decodeJwt(result.tokens?.access_token ?? '').acr).toBe('mfa');
+  });
+
+  it('refuses a wrong code and a code already used', async () => {
+    const wrong = String((Number(totp(demoTotpSecret())) + 1) % 1_000_000).padStart(6, '0');
+    const refused = await loginWithAuthorizationCode('sofia.auditora', password, {
+      acr: 'mfa',
+      otp: wrong,
+    });
+    expect(refused.tokens).toBeUndefined();
+    expect(refused.page).toContain('kc-otp-login-form');
+
+    const code = nextCode('sofia.auditora');
+    const first = await loginWithAuthorizationCode('sofia.auditora', password, {
+      acr: 'mfa',
+      otp: code,
+    });
+    expect(first.tokens).toBeDefined();
+    const replay = await loginWithAuthorizationCode('sofia.auditora', password, {
+      acr: 'mfa',
+      otp: code,
+    });
+    expect(replay.tokens).toBeUndefined();
+  });
+
+  it('someone without a second factor is sent to set it up (CONFIGURE_TOTP)', async () => {
+    const result = await loginWithAuthorizationCode('carlos.dev', password, { acr: 'mfa' });
+    expect(result.tokens).toBeUndefined();
+    expect(result.redirect?.searchParams.get('execution')).toBe('CONFIGURE_TOTP');
   });
 });
 

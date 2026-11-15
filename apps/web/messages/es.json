@@ -1026,5 +1026,9 @@
     "confirmRequired": "Confirma que entiendes que la eliminación es definitiva.",
     "purgeButton": "Eliminar contenido",
     "older": "Documentos anteriores"
+  },
+  "session": {
+    "mfaRequired": "Tus roles exigen un segundo factor. Vuelve a entrar con el código de un solo uso de tu app autenticadora.",
+    "mfaAction": "Verificar con el código"
   }
 }
