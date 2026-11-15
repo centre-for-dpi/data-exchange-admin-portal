@@ -21,6 +21,14 @@ need() { command -v "$1" >/dev/null 2>&1 || fail "Falta '$1'. Instálalo y vuelv
 need curl
 need openssl
 
+# One line of a curl config (`key = "value"`), with \ and " escaped as that syntax requires.
+curl_quote() {
+  local key=${1%% = *} value=${1#* = }
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  printf '%s = "%s"\n' "$key" "$value"
+}
+
 network_ca() { # portal → ./rid-network-ca.pem
   [[ -s rid-network-ca.pem ]] && return 0
   curl -fsS --max-time 15 -o rid-network-ca.pem "https://$1/api/v1/pki/ca" ||
@@ -80,15 +88,17 @@ cmd_call() {
   if [[ -z $secret ]]; then read -r -s -p "Secreto de la aplicación $id: " secret; echo; fi
   local tls=(--cert "$id.crt" --key "$id.key" --cacert rid-network-ca.pem)
 
-  body=$(curl -sS --max-time 20 "${tls[@]}" -u "$id:$secret" -d grant_type=client_credentials \
+  # Secret and token go to curl in a config on stdin (-K -): never in argv, where ps shows them.
+  body=$(curl_quote "user = $id:$secret" | curl -sS -K - --max-time 20 "${tls[@]}" -d grant_type=client_credentials \
     "https://$gateway/oauth/token") || fail "No se pudo pedir el token a https://$gateway/oauth/token"
   token=$(sed -n 's/.*"access_token" *: *"\([^"]*\)".*/\1/p' <<<"$body")
   [[ -n $token ]] || fail "El gateway no dio token: $body"
   ok "Token obtenido (5 min, ligado al certificado de $id)"
 
-  local headers=(-H "Authorization: Bearer $token" -H "X-RID-Purpose: $purpose")
+  local headers=(-H "X-RID-Purpose: $purpose")
   [[ -n $end_user ]] && headers+=(-H "X-RID-End-User: $end_user")
-  body=$(curl -sS --max-time 30 "${tls[@]}" "${headers[@]}" -w '\n%{http_code}' "https://$gateway/${path#/}")
+  body=$(curl_quote "header = Authorization: Bearer $token" |
+    curl -sS -K - --max-time 30 "${tls[@]}" "${headers[@]}" -w '\n%{http_code}' "https://$gateway/${path#/}")
   code=${body##*$'\n'}
   body=${body%$'\n'*}
   case $code in

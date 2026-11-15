@@ -136,10 +136,13 @@ check_system() {
 
   # Files cloned with a restrictive umask break the containers that mount them (step-ca).
   local unreadable
-  unreadable=$(find infra config -type f ! -perm -o+r 2>/dev/null | head -n 1 || true)
+  # infra/edge/certs holds the portal's private key: it stays out of this fix.
+  local tracked=(find infra config scripts -path infra/edge/certs -prune -o)
+  unreadable=$("${tracked[@]}" -type f ! -perm -o+r -print 2>/dev/null | head -n 1 || true)
   if [[ -n $unreadable ]]; then
     warn "Hay archivos del repositorio sin permiso de lectura para otros (p. ej. $unreadable)."
-    chmod -R o+rX infra config scripts && ok "Permisos de lectura corregidos en infra/, config/ y scripts/"
+    "${tracked[@]}" \( -type f -o -type d \) -exec chmod o+rX {} + 2>/dev/null
+    ok "Permisos de lectura corregidos en infra/, config/ y scripts/ (sin tocar infra/edge/certs)"
   fi
 }
 
@@ -272,8 +275,8 @@ questions() {
 write_env() {
   step "Paso 7 · Secretos y configuración (.env)"
   local args=("https://$PORTAL_HOST" --gateway-host "$GATEWAY_HOST" --traefik-network "$EDGE_NET" --country "$COUNTRY")
-  [[ -n $DEMO_PASSWORD ]] && args+=(--demo-password "$DEMO_PASSWORD")
-  docker run --rm -v "$ROOT:/w" -w /w "$NODE_IMAGE" node scripts/make-deploy-env.mjs "${args[@]}"
+  # The password goes through the environment, never on a command line (ps would show it).
+  RID_DEPLOY_DEMO_PASSWORD="$DEMO_PASSWORD" docker run --rm -e RID_DEPLOY_DEMO_PASSWORD     -v "$ROOT:/w" -w /w "$NODE_IMAGE" node scripts/make-deploy-env.mjs "${args[@]}"
   cat >>"$ENV_FILE" <<EOF
 
 # Installer (install.sh, docs/INSTALL.md)

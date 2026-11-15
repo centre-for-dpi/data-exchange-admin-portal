@@ -8,7 +8,8 @@
 //
 // install.sh (docs/INSTALL.md) runs it with the answers of the operator.
 //
-// The seed users' password is random unless --demo-password is given.
+// The seed users' password is random unless --demo-password is given, or RID_DEPLOY_DEMO_PASSWORD
+// (install.sh uses the variable: a password on the command line shows in the process list).
 //
 // Refuses to overwrite an existing file: secrets of a running deployment (database passwords,
 // the signing key, the subject key) must not change under it.
@@ -134,7 +135,8 @@ const set = {
   RID_STEP_CA_ROOT_FILE: '/var/lib/rid/step-ca/root_ca.crt',
   TRAEFIK_NETWORK: values['traefik-network'],
   // Random unless asked: the seed users include platform administrators.
-  RID_DEMO_USER_PASSWORD: values['demo-password'] ?? secret(12),
+  RID_DEMO_USER_PASSWORD:
+    values['demo-password'] || process.env.RID_DEPLOY_DEMO_PASSWORD || secret(12),
   // Their one-time code key (M3-08): with the default, anyone could read it in the repo.
   RID_DEMO_TOTP_SECRET: secret(20),
   MAILPIT_UI_AUTH: `mail:${secret(12)}`,
