@@ -339,5 +339,9 @@
         "loa-max-age": "36000"
       }
     }
-  ]
+  ],
+  "eventsEnabled": true,
+  "eventsExpiration": 7776000,
+  "enabledEventTypes": ["UPDATE_CREDENTIAL", "REMOVE_CREDENTIAL", "UPDATE_PASSWORD", "LOGIN_ERROR"],
+  "eventsListeners": ["jboss-logging", "email"]
 }

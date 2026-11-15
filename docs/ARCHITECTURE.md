@@ -82,7 +82,8 @@ Dos planos separados:
   - el flujo `rid-browser` de `rid-portal` tiene dos niveles: contraseña (`acr=password`) y código TOTP (`acr=mfa`). Pedir `acr_values=mfa` solo agrega el código a la sesión; quien no tiene uno pasa por `CONFIGURE_TOTP`;
   - el API responde 403 `mfa_required` en toda ruta de entidad o de plataforma si los roles lo exigen y el `acr` del token no es `mfa`, siempre después de las comprobaciones de rol. `/me` informa `mfa.required` y `mfa.satisfied`;
   - la web, al verlo, vuelve a iniciar sesión con `acr_values=mfa` (`/api/session/step-up`). Una cookie corta evita los bucles y deja un aviso para reintentar;
-  - el portal no escribe en los usuarios de Keycloak: decide quién lo necesita con los roles de PostgreSQL y lo comprueba en cada petición.
+  - el portal no escribe en los usuarios de Keycloak: decide quién lo necesita con los roles de PostgreSQL y lo comprueba en cada petición;
+  - **riesgo residual: el enrolamiento en el primer uso.** Quien tiene la contraseña de una cuenta con rol crítico que aún no enroló su app puede enrolar la suya. Para que no pase inadvertido, Keycloak le avisa por correo al dueño de la cuenta cuando se pone o se quita una credencial (listener `email`, solo `UPDATE_CREDENTIAL` y `REMOVE_CREDENTIAL`), y guarda esos eventos 90 días. Un despliegue que necesite cerrar esa ventana puede exigir el enrolamiento al activar la cuenta (acción requerida `CONFIGURE_TOTP` para todas las cuentas nuevas) o enrolar fuera de banda.
 
 ### 3.2 Aplicaciones consumidoras (realm `rid-gateway`)
 

@@ -518,6 +518,12 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Web: con `/me` o con un 403 `mfa_required`, vuelve a iniciar sesión con `acr_values=mfa` y conserva el idioma. Una cookie de 2 minutos evita bucles: si no se consiguió el nivel, el encabezado muestra un aviso con un botón para reintentar.
     - Demo y desarrollo: los usuarios semilla con rol crítico traen la clave TOTP `RID_DEMO_TOTP_SECRET`, aleatoria en el piloto. `pnpm demo:otp`, `pnpm demo`, los e2e y las pruebas de infraestructura generan el código. Como cada código sirve una vez, prueban el del periodo siguiente o el anterior antes de esperar.
     - Un Keycloak existente recibe el flujo con `scripts/keycloak-portal-mfa.mjs`, y con `--demo-otp` los códigos de demo.
+    - La revisión de seguridad señaló el enrolamiento en el primer uso: con solo la contraseña de una cuenta crítica sin segundo factor, un atacante puede enrolar el suyo. Se mitigó así:
+      - Keycloak le escribe al dueño de la cuenta en cada cambio de credencial, con un solo correo y sin correos por login fallido;
+      - guarda esos eventos 90 días;
+      - el runbook explica cómo responder.
+
+      Cerrar del todo la ventana (enrolar al activar la cuenta o fuera de banda) queda como opción del despliegue (`ARCHITECTURE.md §3.1`).
     - Fuera de alcance: WebAuthn como segundo factor alternativo. Puede agregarse en Keycloak en el nivel 2 sin cambiar el portal.
 - [ ] **M3-09 — Cabeceras de seguridad de la web**: CSP, HSTS, `frame-ancestors`, cookies endurecidas; test automatizado.
 - [ ] **M3-10 — Reactivar mTLS obligatorio** (ADR-0010): `features.mtls.required: true` en `co.yaml`; `DEMO.md` y e2e usan certificado de cliente y token ligado. M3 no se cierra sin esta historia.

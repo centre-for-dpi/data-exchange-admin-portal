@@ -30,6 +30,9 @@ interface RealmFile {
   attributes?: Record<string, string>;
   browserFlow?: string;
   otpPolicyCodeReusable?: boolean;
+  eventsEnabled?: boolean;
+  eventsListeners?: string[];
+  enabledEventTypes?: string[];
   authenticationFlows?: Array<{
     alias: string;
     authenticationExecutions: Array<{
@@ -196,6 +199,14 @@ describe('realm rid-portal: second factor (M3-08, ADR-0021)', () => {
         steps: ['conditional-level-of-authentication REQUIRED', 'auth-otp-form REQUIRED'],
       },
     ]);
+  });
+
+  it('tells the account owner, and keeps an event, when a credential is set or removed', () => {
+    expect(realm.eventsListeners).toContain('email');
+    expect(realm.eventsEnabled).toBe(true);
+    expect(realm.enabledEventTypes).toEqual(
+      expect.arrayContaining(['UPDATE_CREDENTIAL', 'REMOVE_CREDENTIAL']),
+    );
   });
 
   it('does not let a one-time code be used twice', () => {

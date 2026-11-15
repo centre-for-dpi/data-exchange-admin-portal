@@ -24,6 +24,7 @@ Keycloak importa al arrancar (`--import-realm`) los archivos `*-realm.json` de e
 
 - **Segundo factor (M3-08, ADR-0021).** El flujo de navegador `rid-browser` tiene dos niveles: contraseña (`acr=password`) y código TOTP (`acr=mfa`, mapa `acr.loa.map`). Keycloak pide el código solo cuando la web pide `acr_values=mfa`, y el API lo exige a los roles de plataforma y a `data_steward`. Quien no tiene un código configurado pasa por `CONFIGURE_TOTP`. Un código sirve una sola vez.
   - Los usuarios semilla con esos roles (`ana`, `lucia`, `marta`, `pablo`, `sofia`) traen una credencial OTP con la clave `RID_DEMO_TOTP_SECRET`. La clave se usa tal cual, como bytes UTF-8, no en base32. `pnpm demo:otp` da el código vigente y la clave en base32 para una app autenticadora.
+  - Cada vez que se pone o se quita una credencial (contraseña o segundo factor), Keycloak le escribe al dueño de la cuenta y guarda el evento 90 días. El listener `email` se limita a esos eventos con la opción de arranque `--spi-events-listener--email--include-events` (compose), así que un login fallido no genera correo. Es la mitigación del enrolamiento en el primer uso (`ARCHITECTURE.md §3.1`).
   - En un Keycloak que ya importó el realm, aplícalo sin borrar datos: `node scripts/keycloak-portal-mfa.mjs --demo-otp`.
 
 ## Realm `rid-gateway` (aplicaciones consumidoras)

@@ -228,6 +228,7 @@ node scripts/keycloak-portal-mfa.mjs --demo-otp   # además, los códigos de los
 
 - `--demo-otp` es solo para desarrollo y el piloto. Reimporta desde el JSON, con el mismo id, cada usuario semilla con rol crítico que aún no tenga código: vuelve a poner la contraseña de `RID_DEMO_USER_PASSWORD` y el código de `RID_DEMO_TOTP_SECRET`.
 - Comprobación: en la consola de Keycloak, realm `rid-portal` → Authentication, `rid-browser` está ligado al navegador. `pnpm demo:otp` imprime el código vigente de los usuarios de demo y la clave para una app autenticadora.
+- **Aviso de credencial.** Keycloak le escribe al dueño de la cuenta cuando se pone o se quita una contraseña o un segundo factor, y guarda esos eventos 90 días (realm `rid-portal` → Events). Si alguien dice que no enroló el segundo factor que recibió en el aviso, trátalo como un incidente: deshabilita la cuenta en Keycloak, borra la credencial OTP y restablece la contraseña antes de volver a habilitarla.
 - **Segundo factor perdido.** El administrador de Keycloak borra la credencial OTP de la persona (Users → la persona → Credentials). La próxima vez que el portal pida el código, Keycloak le pide enrolar una app nueva. Comprueba antes la identidad de quien lo pide, por un canal distinto del correo de la cuenta.
 
 ### 5.4 Huella de la raíz de la CA

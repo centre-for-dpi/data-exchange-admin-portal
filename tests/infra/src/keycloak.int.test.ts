@@ -163,6 +163,75 @@ describe('realm rid-portal: second factor (M3-08)', () => {
     expect(result.tokens).toBeUndefined();
     expect(result.redirect?.searchParams.get('execution')).toBe('CONFIGURE_TOTP');
   });
+
+  it('setting up a second factor e-mails the account owner and is kept as an event', async () => {
+    // A first-use enrollment is trust on first use: the owner must hear about it (M3-08).
+    const login = await fetch(`${keycloakUrl()}/realms/master/protocol/openid-connect/token`, {
+      method: 'POST',
+      body: new URLSearchParams({
+        grant_type: 'password',
+        client_id: 'admin-cli',
+        username: env('KEYCLOAK_ADMIN_USER'),
+        password: env('KEYCLOAK_ADMIN_PASSWORD'),
+      }),
+    });
+    const { access_token: adminToken } = (await login.json()) as { access_token: string };
+    const admin = (method: string, path: string, body?: unknown) =>
+      fetch(`${keycloakUrl()}/admin/realms/rid-portal${path}`, {
+        method,
+        headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const username = `mfa-probe-${randomUUID().slice(0, 8)}`;
+    const email = `${username}@demo.rid.example`;
+    const created = await admin('POST', '/users', {
+      username,
+      email,
+      emailVerified: true,
+      enabled: true,
+      firstName: 'Prueba',
+      lastName: 'Segundo factor',
+      credentials: [{ type: 'password', value: password, temporary: false }],
+    });
+    expect(created.status).toBe(201);
+    const userId = created.headers.get('location')?.split('/').at(-1) ?? '';
+    try {
+      const jar = new CookieJar();
+      const asked = await loginWithAuthorizationCode(username, password, { jar, acr: 'mfa' });
+      expect(asked.redirect?.searchParams.get('execution')).toBe('CONFIGURE_TOTP');
+      const page = await fetch(asked.redirect ?? '', { headers: { cookie: jar.header() } });
+      jar.store(page);
+      const html = await page.text();
+      const action = /<form[^>]+action="([^"]+)"[^>]+id="kc-totp-settings-form"/.exec(html)?.[1];
+      const secret = /name="totpSecret"[^>]*value="([^"]+)"/.exec(html)?.[1] ?? '';
+      expect(action).toBeDefined();
+      const enrolled = await fetch((action ?? '').replaceAll('&amp;', '&'), {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: jar.header() },
+        body: new URLSearchParams({ totp: totp(secret), totpSecret: secret, userLabel: 'prueba' }),
+      });
+      expect(new URL(enrolled.headers.get('location') ?? '').searchParams.get('code')).toBeTruthy();
+
+      const mailpit = `http://localhost:${env('MAILPIT_UI_PORT', '8025')}/api/v1`;
+      let subjects: string[] = [];
+      for (let i = 0; i < 20 && subjects.length === 0; i += 1) {
+        const found = (await (
+          await fetch(`${mailpit}/search?query=${encodeURIComponent(`to:${email}`)}`)
+        ).json()) as { messages: Array<{ Subject: string }> };
+        subjects = found.messages.map((m) => m.Subject);
+        if (subjects.length === 0) await new Promise((r) => setTimeout(r, 500));
+      }
+      // One notice, for the credential event only (not one per event type, nor login errors).
+      expect(subjects).toHaveLength(1);
+      const events = (await (await admin('GET', `/events?user=${userId}`)).json()) as Array<{
+        type: string;
+      }>;
+      expect(events.map((e) => e.type)).toContain('UPDATE_CREDENTIAL');
+    } finally {
+      await admin('DELETE', `/users/${userId}`);
+    }
+  });
 });
 
 describe('realm rid-gateway (M0-03)', () => {

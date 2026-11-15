@@ -78,10 +78,15 @@ await admin('PUT', '', {
   otpPolicyDigits: realmFile.otpPolicyDigits,
   otpPolicyPeriod: realmFile.otpPolicyPeriod,
   otpPolicyLookAheadWindow: realmFile.otpPolicyLookAheadWindow,
+  // Credential changes are kept 90 days and e-mailed to the account owner.
+  eventsEnabled: realmFile.eventsEnabled,
+  eventsExpiration: realmFile.eventsExpiration,
+  enabledEventTypes: realmFile.enabledEventTypes,
+  eventsListeners: realmFile.eventsListeners,
   // Unbound while the flow is rebuilt: a bound flow cannot be deleted.
   ...(current.browserFlow === flowAlias ? { browserFlow: 'browser' } : {}),
 });
-console.log(`${realm}: acr.loa.map and OTP policy applied`);
+console.log(`${realm}: acr.loa.map, OTP policy and credential events applied`);
 
 // 2. The browser flow, rebuilt from the file (deleting a flow deletes its sub-flows and configs).
 const flows = realmFile.authenticationFlows;

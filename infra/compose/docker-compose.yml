@@ -30,7 +30,12 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.0
-    command: ['start-dev', '--import-realm']
+    command:
+      - start-dev
+      - --import-realm
+      # The email event listener (realm rid-portal) tells the account owner when a password or a
+      # second factor is set or removed (M3-08): a first-use OTP enrollment does not go unnoticed.
+      - --spi-events-listener--email--include-events=UPDATE_CREDENTIAL,REMOVE_CREDENTIAL
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
