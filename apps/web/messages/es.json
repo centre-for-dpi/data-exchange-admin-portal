@@ -330,6 +330,34 @@
       "guideToken": "1. Obtén un token de acceso (dura 5 minutos):",
       "guideCall": "2. Llama a una API con el token y la finalidad de tu solicitud aprobada:",
       "guideNote": "Reemplaza TU_SECRETO por el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada."
+    },
+    "certificates": {
+      "title": "Certificado de cliente (mTLS)",
+      "required": "La red exige mTLS: el gateway solo acepta llamadas de esta aplicación con un certificado vigente emitido por la red.",
+      "optional": "Por ahora el certificado es opcional en esta red. Cuando se exija mTLS, el gateway solo aceptará llamadas con un certificado vigente emitido por la red.",
+      "howTo": "1. En el servidor de tu aplicación, genera la clave privada y la solicitud de certificado (CSR). La clave privada nunca sale de ese servidor:",
+      "paste": "2. Pega aquí el contenido del archivo .csr. El portal lo hace firmar por la autoridad de certificación de la red.",
+      "csr": "Solicitud de certificado (CSR)",
+      "csrHint": "En formato PEM: empieza por -----BEGIN CERTIFICATE REQUEST-----. Debe nombrar solo a esta aplicación (CN = su client ID).",
+      "submit": "Solicitar certificado",
+      "issued": "El certificado está listo. Descárgalo e instálalo en tu servidor junto a la clave privada.",
+      "download": "Descargar",
+      "downloadSerial": "Descargar el certificado {serial}",
+      "validUntil": "Vence",
+      "serial": "Número de serie",
+      "fingerprint": "Huella SHA-256",
+      "expiringSoon": "Vence pronto",
+      "hasActive": "La aplicación ya tiene un certificado vigente.",
+      "conflict": "La aplicación ya tiene un certificado vigente, o no está activa.",
+      "inactive": "Solo una aplicación activa puede obtener un certificado.",
+      "readOnly": "Solo quien tiene el rol de desarrollador puede solicitar certificados.",
+      "unavailable": "La autoridad de certificación no está disponible en este momento. Inténtalo de nuevo en unos minutos.",
+      "errors": {
+        "malformed": "No es una solicitud de certificado (CSR) en formato PEM.",
+        "signature": "La firma del CSR no es válida: genéralo de nuevo.",
+        "subject": "El CSR debe nombrar solo a esta aplicación: CN igual a su client ID y ningún otro nombre.",
+        "key": "La clave debe ser ECDSA P-256 o P-384, o RSA de 2048 a 4096 bits."
+      }
     }
   },
   "subscriptionStatus": {
@@ -517,7 +545,9 @@
         "created": "Aplicación creada"
       },
       "credential": {
-        "created": "Credencial creada"
+        "created": "Credencial creada",
+        "expiry_notice_queued": "Aviso de vencimiento del certificado enviado",
+        "expired": "Certificado vencido"
       },
       "subscription": {
         "requested": "Acceso solicitado",
@@ -838,6 +868,7 @@
       "access_expiring": "El acceso de {application} a {api} vence el {date}",
       "access_suspended": "Se suspendió el acceso de {application} a {api}",
       "access_revoked": "Se revocó el acceso de {application} a {api}",
+      "certificate_expiring": "El certificado de cliente de {application} vence el {date}",
       "entity_status_changed": "{entity} {decision, select, suspended {fue suspendida en la red} reactivated {fue reactivada en la red} other {fue dada de baja de la red}}"
     },
     "kindNames": {
@@ -856,6 +887,7 @@
       "access_expiring": "Accesos por vencer",
       "access_suspended": "Accesos suspendidos",
       "access_revoked": "Accesos revocados",
+      "certificate_expiring": "Certificados por vencer",
       "entity_status_changed": "Suspensión o baja de tu entidad"
     },
     "unreadSuffix": "{count, plural, one {: uno sin leer} other {: # sin leer}}"

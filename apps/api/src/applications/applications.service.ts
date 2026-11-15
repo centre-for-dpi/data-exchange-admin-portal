@@ -13,6 +13,7 @@ import type { Principal } from '../auth/principal.service.js';
 import { NotFoundError } from '../common/errors.js';
 import { generateClientSecret, hashSecret, seal } from '../common/secrets.js';
 import { uuidv7 } from '../common/uuidv7.js';
+import { credentialView } from '../credentials/credential-view.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -78,13 +79,7 @@ export class ApplicationsService {
       // Metadata only: no secret, hash or sealed value leaves the API.
       credentials: app.credentials
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-        .map((c) => ({
-          id: c.id,
-          kind: c.kind,
-          status: c.status,
-          createdAt: c.createdAt.toISOString(),
-          lastUsedAt: c.lastUsedAt?.toISOString() ?? null,
-        })),
+        .map((c) => credentialView(c)),
     };
   }
 

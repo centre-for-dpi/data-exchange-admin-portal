@@ -114,8 +114,18 @@ services:
       RID_SMTP_URL: smtp://mailpit:1025
     volumes:
       - api-documents:/var/lib/rid/documents
+      # Only the certificates of the CA (RID_STEP_CA_ROOT_FILE): the API verifies step-ca's TLS
+      # with its root. The keys (secrets/) stay out of this container. Needs Compose >= 2.26.
+      - type: volume
+        source: step-ca-data
+        target: /var/lib/rid/step-ca
+        read_only: true
+        volume:
+          subpath: certs
     depends_on:
       postgres:
+        condition: service_healthy
+      step-ca:
         condition: service_healthy
       keycloak:
         condition: service_healthy

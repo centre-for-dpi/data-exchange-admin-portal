@@ -69,3 +69,10 @@ export class GoneError extends DomainError {
     super(ErrorCode.Gone, message);
   }
 }
+
+/** A service the request depends on did not answer; the client may try again later. */
+export class ServiceUnavailableError extends DomainError {
+  constructor(message: string) {
+    super(ErrorCode.ServiceUnavailable, message);
+  }
+}

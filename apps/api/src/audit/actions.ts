@@ -54,6 +54,8 @@ export const AUDIT_ACTIONS = [
   // Applications and credentials
   'application.created',
   'credential.created',
+  'credential.expiry_notice_queued',
+  'credential.expired',
   // Subscriptions (M1, M2-04, M2-06, M2-07)
   'subscription.requested',
   'subscription.renewal_requested',

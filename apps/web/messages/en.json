@@ -330,6 +330,34 @@
       "guideToken": "1. Get an access token (valid for 5 minutes):",
       "guideCall": "2. Call an API with the token and the purpose of your approved request:",
       "guideNote": "Replace YOUR_SECRET with the secret you saved when you created the application. You need an approved access request for the gateway to accept the call."
+    },
+    "certificates": {
+      "title": "Client certificate (mTLS)",
+      "required": "The network requires mTLS: the gateway only accepts calls from this application with a valid certificate issued by the network.",
+      "optional": "For now the certificate is optional on this network. Once mTLS is required, the gateway will only accept calls with a valid certificate issued by the network.",
+      "howTo": "1. On your application's server, generate the private key and the certificate signing request (CSR). The private key never leaves that server:",
+      "paste": "2. Paste the content of the .csr file here. The portal has it signed by the network's certificate authority.",
+      "csr": "Certificate signing request (CSR)",
+      "csrHint": "In PEM format: it starts with -----BEGIN CERTIFICATE REQUEST-----. It must name this application only (CN = its client ID).",
+      "submit": "Request certificate",
+      "issued": "The certificate is ready. Download it and install it on your server next to the private key.",
+      "download": "Download",
+      "downloadSerial": "Download certificate {serial}",
+      "validUntil": "Expires",
+      "serial": "Serial number",
+      "fingerprint": "SHA-256 fingerprint",
+      "expiringSoon": "Expires soon",
+      "hasActive": "The application already has a valid certificate.",
+      "conflict": "The application already has a valid certificate, or it is not active.",
+      "inactive": "Only an active application can get a certificate.",
+      "readOnly": "Only members with the developer role can request certificates.",
+      "unavailable": "The certificate authority is not available right now. Try again in a few minutes.",
+      "errors": {
+        "malformed": "This is not a certificate signing request (CSR) in PEM format.",
+        "signature": "The CSR signature is not valid: generate it again.",
+        "subject": "The CSR must name this application only: CN equal to its client ID and no other name.",
+        "key": "The key must be ECDSA P-256 or P-384, or RSA of 2048 to 4096 bits."
+      }
     }
   },
   "subscriptionStatus": {
@@ -517,7 +545,9 @@
         "created": "Application created"
       },
       "credential": {
-        "created": "Credential created"
+        "created": "Credential created",
+        "expiry_notice_queued": "Certificate expiry notice sent",
+        "expired": "Certificate expired"
       },
       "subscription": {
         "requested": "Access requested",
@@ -838,6 +868,7 @@
       "access_expiring": "The access of {application} to {api} expires on {date}",
       "access_suspended": "The access of {application} to {api} was suspended",
       "access_revoked": "The access of {application} to {api} was revoked",
+      "certificate_expiring": "The client certificate of {application} expires on {date}",
       "entity_status_changed": "{entity} {decision, select, suspended {was suspended on the network} reactivated {was reactivated on the network} other {was offboarded from the network}}"
     },
     "kindNames": {
@@ -856,6 +887,7 @@
       "access_expiring": "Access about to expire",
       "access_suspended": "Suspended access",
       "access_revoked": "Revoked access",
+      "certificate_expiring": "Certificates about to expire",
       "entity_status_changed": "Suspension or offboarding of your entity"
     },
     "unreadSuffix": "{count, plural, one {: one unread} other {: # unread}}"

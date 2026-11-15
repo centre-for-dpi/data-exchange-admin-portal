@@ -23,6 +23,7 @@ export const NOTIFICATION_KINDS = {
   access_expiring: { security: false, email: true },
   access_suspended: { security: true, email: true },
   access_revoked: { security: true, email: true },
+  certificate_expiring: { security: false, email: true },
 } as const satisfies Record<string, { security: boolean; email: boolean }>;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;

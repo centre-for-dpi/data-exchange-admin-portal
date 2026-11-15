@@ -89,6 +89,9 @@ importers:
       '@stoplight/spectral-rulesets':
         specifier: ^1.23.1
         version: 1.23.1
+      asn1js:
+        specifier: 4.0.0
+        version: 4.0.0
       fastify:
         specifier: 5.12.8
         version: 5.12.8
@@ -104,6 +107,9 @@ importers:
       pg-boss:
         specifier: ^12.38.1
         version: 12.38.1(@opentelemetry/api@1.10.0)
+      pkijs:
+        specifier: 4.0.1
+        version: 4.0.1(asn1js@4.0.0)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -220,6 +226,12 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^6.3.0
         version: 6.3.0(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      asn1js:
+        specifier: 4.0.0
+        version: 4.0.0
+      pkijs:
+        specifier: 4.0.1
+        version: 4.0.1(asn1js@4.0.0)
       tailwindcss:
         specifier: ^4.3.5
         version: 4.3.5

@@ -48,6 +48,7 @@ export const NOTIFICATION_TEXTS: Record<MailLocale, Record<NotificationKind, Tex
     access_expiring: (p, d) => `El acceso de ${p.application} a ${p.api} vence el ${d}`,
     access_suspended: (p) => `Se suspendió el acceso de ${p.application} a ${p.api}`,
     access_revoked: (p) => `Se revocó el acceso de ${p.application} a ${p.api}`,
+    certificate_expiring: (p, d) => `El certificado de cliente de ${p.application} vence el ${d}`,
   },
   en: {
     invitation_received: (p) => `You were invited to ${p.entity}`,
@@ -75,6 +76,7 @@ export const NOTIFICATION_TEXTS: Record<MailLocale, Record<NotificationKind, Tex
     access_expiring: (p, d) => `The access of ${p.application} to ${p.api} expires on ${d}`,
     access_suspended: (p) => `The access of ${p.application} to ${p.api} was suspended`,
     access_revoked: (p) => `The access of ${p.application} to ${p.api} was revoked`,
+    certificate_expiring: (p, d) => `The client certificate of ${p.application} expires on ${d}`,
   },
 };
 

@@ -1,6 +1,11 @@
 'use server';
 
-import { createdApplicationSchema } from '@rid/contracts';
+import {
+  CSR_ERRORS,
+  type CsrError,
+  createdApplicationSchema,
+  issuedCertificateSchema,
+} from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
@@ -43,6 +48,54 @@ export async function createApplicationAction(
       applicationId: result.data.application.id,
       clientId: result.data.application.clientId,
       clientSecret: result.data.clientSecret,
+    },
+  };
+}
+
+export interface IssueCertificateState extends FormState {
+  /** Present right after the CA signed the certificate. */
+  issued?: { credentialId: string; serial: string };
+}
+
+const CSR_MESSAGE_KEYS = new Map<string, CsrError>(
+  (Object.entries(CSR_ERRORS) as Array<[CsrError, string]>).map(([key, message]) => [message, key]),
+);
+
+/** Sends a CSR for the application; the API checks it and has the network CA sign it (M3-01). */
+export async function issueCertificateAction(
+  _prev: IssueCertificateState,
+  formData: FormData,
+): Promise<IssueCertificateState> {
+  const t = await getTranslations('forms');
+  const tc = await getTranslations('myApps.certificates');
+  const entityId = (await getViewer()).activeEntity?.entity.id;
+  const applicationId = text(formData, 'applicationId');
+  const csr = text(formData, 'csr');
+  if (!entityId || !applicationId) return { formError: t('unexpected') };
+  const result = await apiSend(
+    'POST',
+    `/entities/${entityId}/applications/${applicationId}/certificates`,
+    { csr },
+    issuedCertificateSchema,
+  );
+  if (!result.ok) {
+    if (result.status === 503) return { formError: tc('unavailable'), values: { csr } };
+    if (result.status === 409) return { formError: tc('conflict'), values: { csr } };
+    const state = problemToFormState(result.problem, t('unexpected'));
+    // The API's CSR messages are stable texts (CSR_ERRORS): show them translated.
+    if (state.fieldErrors?.csr) {
+      state.fieldErrors.csr = state.fieldErrors.csr.map((message) => {
+        const key = CSR_MESSAGE_KEYS.get(message);
+        return key ? tc(`errors.${key}`) : message;
+      });
+    }
+    return { ...state, values: { csr } };
+  }
+  revalidatePath('/', 'layout');
+  return {
+    issued: {
+      credentialId: result.data.credential.id,
+      serial: result.data.credential.certificate?.serial ?? '',
     },
   };
 }

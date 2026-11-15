@@ -29,4 +29,5 @@ export const NOTIFYING_ACTIONS: ReadonlySet<string> = new Set([
   'subscription.suspended',
   'subscription.revoked',
   'subscription.renewal_notice_queued',
+  'credential.expiry_notice_queued',
 ]);

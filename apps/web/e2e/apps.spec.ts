@@ -1,4 +1,7 @@
+import { createHash, createPrivateKey, X509Certificate } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { makeCsr } from './csr';
 import { signIn } from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
@@ -62,6 +65,56 @@ test.describe('applications and OAuth2 credentials', () => {
     await page.goto('/my-apps');
     const row = page.getByRole('row', { name: new RegExp(name) });
     await expect(row).toContainText('Lista');
+  });
+
+  test('carlos gets a client certificate signed by the network CA (M3-01)', async ({ page }) => {
+    await signIn(page, 'carlos.dev', '/my-apps/new');
+    const name = `Certificado ${Date.now().toString(36)}`;
+    await page.getByLabel(/^Nombre de la aplicación/).fill(name);
+    await page.getByLabel(/^Para qué la usará/).fill('Consulta con certificado de cliente.');
+    await page.getByLabel(/^Entorno/).selectOption('sandbox');
+    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.rid.example');
+    await page.getByRole('button', { name: 'Crear aplicación' }).click();
+    const clientId = (await page.getByTestId('client-id').textContent()) ?? '';
+    await page.getByRole('link', { name: 'Ir a la aplicación' }).click();
+    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+
+    const section = page.getByRole('region', { name: 'Certificado de cliente (mTLS)' });
+    await expect(section.locator('pre').getByText(`-subj "/CN=${clientId}"`)).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+
+    // A CSR for another application is refused before the CA, with a translated message.
+    const csrField = section.getByLabel(/^Solicitud de certificado \(CSR\)/);
+    await csrField.fill((await makeCsr('rid-app-someone-else')).csr);
+    await section.getByRole('button', { name: 'Solicitar certificado' }).click();
+    await expect(section.getByText(/debe nombrar solo a esta aplicación: CN igual/)).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+
+    const { csr, keyPem } = await makeCsr(clientId);
+    await csrField.fill(csr);
+    await section.getByRole('button', { name: 'Solicitar certificado' }).click();
+    const issued = section.getByRole('status');
+    await expect(issued).toContainText('El certificado está listo');
+
+    const downloading = page.waitForEvent('download');
+    await issued.getByRole('link', { name: 'Descargar' }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toBe(`${clientId}.pem`);
+    const chain = await readFile((await download.path()) ?? '', 'utf8');
+    const leaf = new X509Certificate(chain);
+    expect(leaf.subject).toBe(`CN=${clientId}`);
+    // The certificate carries the key that never left the consumer.
+    expect(leaf.checkPrivateKey(createPrivateKey(keyPem))).toBe(true);
+    expect(chain.match(/BEGIN CERTIFICATE/g)?.length).toBeGreaterThanOrEqual(2);
+
+    // The credentials list shows it with its thumbprint; no second request while it is valid.
+    await page.reload();
+    await expect(page.getByTestId('certificate-fingerprint')).toHaveText(
+      createHash('sha256').update(leaf.raw).digest('base64url'),
+    );
+    await expect(section.getByText('La aplicación ya tiene un certificado vigente.')).toBeVisible();
+    await expect(section.getByRole('button', { name: 'Solicitar certificado' })).toHaveCount(0);
+    await expectNoAccessibilityViolations(page);
   });
 
   test('a member without the developer role sees applications read-only', async ({ page }) => {

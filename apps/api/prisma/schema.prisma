@@ -228,14 +228,14 @@ model Document {
   createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   createdBy     String       @map("created_by")
 
-  designationOf Entity? @relation("EntityDesignation")
+  designationOf Entity?        @relation("EntityDesignation")
   agreementOf   Subscription[] @relation("SubscriptionAgreement")
 
   /// Bytes deleted by legal order (SPEC.md §5): the row and its hash stay as evidence.
-  purgedAt      DateTime?    @map("purged_at") @db.Timestamptz(3)
-  purgedBy      String?      @map("purged_by") @db.Uuid
+  purgedAt   DateTime? @map("purged_at") @db.Timestamptz(3)
+  purgedBy   String?   @map("purged_by") @db.Uuid
   /// Reference to the legal order (court, authority, file number).
-  purgeOrder    String?      @map("purge_order")
+  purgeOrder String?   @map("purge_order")
 
   @@index([ownerEntityId])
   @@map("document")
@@ -299,9 +299,9 @@ model User {
   updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
   createdBy            String     @map("created_by")
 
-  memberships   Membership[]
-  platformRoles UserPlatformRole[]
-  notifications Notification[]
+  memberships             Membership[]
+  platformRoles           UserPlatformRole[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
 
   @@map("app_user")
@@ -609,26 +609,35 @@ enum CredentialStatus {
 
 /// Metadata only: secrets are shown once and never stored by the portal (SPEC.md §3).
 model Credential {
-  id            String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  applicationId String           @map("application_id") @db.Uuid
-  application   Application      @relation(fields: [applicationId], references: [id])
-  kind          CredentialKind
-  status        CredentialStatus @default(active)
-  /// Certificate SHA-256 fingerprint (mTLS), or null for client secrets.
-  fingerprint   String?
+  id                 String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  applicationId      String           @map("application_id") @db.Uuid
+  application        Application      @relation(fields: [applicationId], references: [id])
+  kind               CredentialKind
+  status             CredentialStatus @default(active)
+  /// Certificate thumbprint (mTLS): RFC 8705 x5t#S256, base64url of the SHA-256 of the DER.
+  fingerprint        String?
   /// SHA-256 of a client secret (identifies it; the secret itself is never stored in clear).
-  secretHash    String?          @map("secret_hash")
+  secretHash         String?          @map("secret_hash")
   /// Client secret sealed with AES-256-GCM (RID_SECRETS_KEY) only until the Keycloak reconciler
   /// has set it on the client; then it is erased.
-  sealedSecret  String?          @map("sealed_secret")
-  serial        String?
-  notAfter      DateTime?        @map("not_after") @db.Timestamptz(3)
-  lastUsedAt    DateTime?        @map("last_used_at") @db.Timestamptz(3)
-  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdBy     String           @map("created_by")
+  sealedSecret       String?          @map("sealed_secret")
+  serial             String?
+  /// Issued certificate followed by its issuing chain, PEM (public; M3-01).
+  certificatePem     String?          @map("certificate_pem")
+  notBefore          DateTime?        @map("not_before") @db.Timestamptz(3)
+  notAfter           DateTime?        @map("not_after") @db.Timestamptz(3)
+  /// When the expiry notice (lifecycle.certificateExpiryWarningDays) was queued; once per cert.
+  expiryNoticeSentAt DateTime?        @map("expiry_notice_sent_at") @db.Timestamptz(3)
+  lastUsedAt         DateTime?        @map("last_used_at") @db.Timestamptz(3)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy          String           @map("created_by")
 
+  /// One active client certificate per application; rotation (M3-04) keeps the old one as
+  /// `rotating` while the new one is active.
+  @@unique([applicationId], map: "credential_one_active_certificate", where: raw("((kind = 'mtls_certificate'::credential_kind) AND (status = 'active'::credential_status))"))
   @@index([applicationId, status])
+  @@index([kind, status, notAfter])
   @@map("credential")
 }
 
@@ -686,13 +695,13 @@ model Subscription {
   updatedAt                     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   createdBy                     String             @map("created_by")
 
-  decisions SubscriptionDecision[]
+  decisions            SubscriptionDecision[]
   /// The subscription this request renews (a prefilled new request, SPEC.md §4.4 step 6).
-  renewsSubscriptionId          String?            @map("renews_subscription_id") @db.Uuid
-  renews                        Subscription?      @relation("SubscriptionRenewal", fields: [renewsSubscriptionId], references: [id])
-  renewals                      Subscription[]     @relation("SubscriptionRenewal")
+  renewsSubscriptionId String?                @map("renews_subscription_id") @db.Uuid
+  renews               Subscription?          @relation("SubscriptionRenewal", fields: [renewsSubscriptionId], references: [id])
+  renewals             Subscription[]         @relation("SubscriptionRenewal")
   /// When the renewal notice went out (lifecycle.subscriptionRenewalNoticeDays before validUntil).
-  renewalNoticeSentAt           DateTime?          @map("renewal_notice_sent_at") @db.Timestamptz(3)
+  renewalNoticeSentAt  DateTime?              @map("renewal_notice_sent_at") @db.Timestamptz(3)
 
   /// At most one live subscription per application, API version and purpose (SPEC.md §4.4).
   /// The predicate is written exactly as PostgreSQL normalizes it, so Prisma sees no drift.
@@ -987,13 +996,13 @@ model NotificationPreference {
 /// Deleting the tail of the chain leaves an anchor without its event, which verification reports.
 model AuditAnchor {
   /// YYYY-MM-DD in the country's time zone.
-  day          String   @id
-  lastSeq      BigInt   @map("last_seq")
-  lastHash     String   @map("last_hash")
+  day        String   @id
+  lastSeq    BigInt   @map("last_seq")
+  lastHash   String   @map("last_hash")
   /// DER time-stamp token (RFC 3161) over the bytes of lastHash.
-  tsaToken     Bytes    @map("tsa_token")
-  tsaGenTime   DateTime @map("tsa_gen_time") @db.Timestamptz(3)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  tsaToken   Bytes    @map("tsa_token")
+  tsaGenTime DateTime @map("tsa_gen_time") @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@map("audit_anchor")
 }

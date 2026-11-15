@@ -436,7 +436,17 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - El cliente no puede subirse el límite ni reiniciar su contador. Cambiar el límite no reinicia el contador.
     - El 429 del gateway sale en problem+json y el del proveedor pasa intacto (condición sobre `upstream_status`).
     - Sin Redis, cada nodo cuenta por su lado: ADR-0020 reparte el límite entre los nodos del gateway.
-- [ ] **M3-01 — Integración con step-ca**: firma de CSR de aplicaciones con OTT del provisioner JWK; certificado descargable; aviso a 15 días del vencimiento.
+- [x] **M3-01 — Integración con step-ca**: firma de CSR de aplicaciones con OTT del provisioner JWK; certificado descargable; aviso a 15 días del vencimiento.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.4`.
+    - El `app_developer` pega en la ficha de la aplicación un CSR hecho en su servidor (el portal muestra el comando `openssl`). La clave privada nunca pasa por el portal.
+    - El portal revisa el CSR antes de la CA (`pkijs`): CN = clientId y ningún otro nombre, clave ECDSA P-256/P-384 o RSA 2048-4096, firma válida. Luego lo hace firmar por step-ca con un OTT del provisioner `rid-portal`, por `lifecycle.certificateValidityDays`.
+    - La plantilla `infra/step-ca/app.tpl` emite solo `CN=<clientId>`, con uso de clave solo para autenticación de cliente. `configure.sh` la aplica en cada arranque de la CA.
+    - El portal comprueba que el certificado devuelto tenga ese sujeto y esa clave y que encadene a la raíz. Guarda la cadena (pública), la huella `x5t#S256`, el serial y las fechas, y lo audita (`credential.created`, sin el PEM).
+    - La cadena se descarga en `application/pem-certificate-chain`. Una aplicación tiene un solo certificado activo hasta la rotación de M3-04.
+    - `lifecycle.certificateExpiryWarningDays` antes del vencimiento, los desarrolladores de la entidad reciben la notificación `certificate_expiring` (en el portal y por correo). Al vencer, el certificado pasa a `expired`. Los dos pasos se auditan.
+    - Interpretación: el certificado se puede pedir aunque `features.mtls.required` esté apagado (la ficha dice que es opcional), para que las entidades lo tengan listo antes de M3-10.
+    - Pendiente para M3-02: las huellas vigentes en el bundle de OPA. Pendiente para M3-10: el cliente `client-x509` en Keycloak.
+    - Despliegue: el `.env` del VPS necesita `RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`) y `RID_STEP_CA_ROOT_FILE` (`scripts/make-deploy-env.mjs` ya los genera). El montaje de `certs/` usa `subpath`, que pide Compose 2.26 o posterior.
 - [ ] **M3-02 — mTLS de cliente en el gateway**: objeto SSL con `client.ca`; llamadas sin certificado válido rechazadas; certificados revocados rechazados vía bundle OPA.
 - [ ] **M3-03 — mTLS hacia upstreams**: certificado del gateway emitido por step-ca y configurado en upstreams `node` y `direct` con mTLS.
 - [ ] **M3-04 — Rotación**: segunda credencial (secreto o certificado) con ventana de rotación; revocación de la anterior.

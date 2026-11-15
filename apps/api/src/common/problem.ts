@@ -17,6 +17,7 @@ const TITLES: Record<ErrorCode, string> = {
   unsupported_media_type: 'Unsupported media type',
   rate_limited: 'Too many requests',
   internal: 'Internal server error',
+  service_unavailable: 'Service unavailable',
 };
 
 const CODE_BY_STATUS: Record<number, ErrorCode> = {
@@ -29,6 +30,7 @@ const CODE_BY_STATUS: Record<number, ErrorCode> = {
   413: ErrorCode.PayloadTooLarge,
   415: ErrorCode.UnsupportedMediaType,
   429: ErrorCode.RateLimited,
+  503: ErrorCode.ServiceUnavailable,
 };
 
 const codeForStatus = (status: number): ErrorCode =>

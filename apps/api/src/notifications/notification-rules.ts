@@ -256,5 +256,23 @@ export async function resolveNotification(
         return null;
     }
   }
+
+  if (event.action === 'credential.expiry_notice_queued') {
+    const credential = await prisma.credential.findUnique({
+      where: { id: event.targetId },
+      include: { application: true },
+    });
+    if (!credential?.notAfter) return null;
+    // The entity's app developers, and whoever asked for the certificate while still a member.
+    const app = credential.application;
+    const developers = await membersWith(prisma, app.entityId, ['app_developer']);
+    const requester = await stillMembers(prisma, app.entityId, [credential.createdBy]);
+    return {
+      kind: 'certificate_expiring',
+      params: { application: app.name, date: credential.notAfter.toISOString() },
+      link: `/my-apps/${app.id}`,
+      recipients: [...new Set([...developers, ...requester])],
+    };
+  }
   return null;
 }

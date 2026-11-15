@@ -35,6 +35,7 @@ if (existsSync(out)) {
 }
 
 const secret = (bytes = 24) => randomBytes(bytes).toString('base64url');
+const stepCaPassword = secret();
 const { privateKey } = generateKeyPairSync('ed25519');
 const signingJwk = {
   ...privateKey.export({ format: 'jwk' }),
@@ -62,7 +63,9 @@ const set = {
   RID_END_USER_HASH_SALT: secret(32),
   RID_SUBJECT_REF_KEY: secret(32),
   RID_TRANSPARENCY_INGEST_TOKEN: secret(),
-  STEP_CA_PASSWORD: secret(),
+  // The dev-style CA initialises its provisioner with this same password (infra/step-ca).
+  STEP_CA_PASSWORD: stepCaPassword,
+  RID_STEP_CA_PROVISIONER_PASSWORD: stepCaPassword,
   AUTH_SECRET: randomBytes(32).toString('base64'),
   RID_SECRETS_KEY: randomBytes(32).toString('base64'),
   RID_TRANSPARENCY_SIGNING_JWK: `'${JSON.stringify(signingJwk)}'`,
@@ -82,6 +85,9 @@ const set = {
   OPA_PORTAL_URL: 'http://api:4000/api/v1/opa',
   RID_TRANSPARENCY_COLLECTOR_HOST: 'api',
   RID_TSA_URL: 'http://tsa:3004',
+  RID_STEP_CA_URL: 'https://step-ca:9000',
+  // The step-ca volume is mounted read-only in the API container (docker-compose.deploy.yml).
+  RID_STEP_CA_ROOT_FILE: '/var/lib/rid/step-ca/root_ca.crt',
   TRAEFIK_NETWORK: values['traefik-network'],
   // Random unless asked: the seed users include platform administrators.
   RID_DEMO_USER_PASSWORD: values['demo-password'] ?? secret(12),

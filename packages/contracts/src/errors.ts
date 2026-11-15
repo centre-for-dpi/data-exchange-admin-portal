@@ -21,6 +21,8 @@ export const ErrorCode = {
   UnsupportedMediaType: 'unsupported_media_type',
   RateLimited: 'rate_limited',
   Internal: 'internal',
+  /** A service the request depends on (the certificate authority) did not answer. */
+  ServiceUnavailable: 'service_unavailable',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -38,6 +40,7 @@ export const ERROR_HTTP_STATUS: Record<ErrorCode, number> = {
   unsupported_media_type: 415,
   rate_limited: 429,
   internal: 500,
+  service_unavailable: 503,
 };
 
 export function problemType(code: ErrorCode): string {

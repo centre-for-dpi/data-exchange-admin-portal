@@ -96,6 +96,8 @@ plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede lla
 | GET | `/api/v1/entities/:entityId/applications` | entidad: `application.read` |
 | POST | `/api/v1/entities/:entityId/applications` | entidad: `application.write` |
 | GET | `/api/v1/entities/:entityId/applications/:applicationId` | entidad: `application.read` |
+| POST | `/api/v1/entities/:entityId/applications/:applicationId/certificates` | entidad: `application.write` |
+| GET | `/api/v1/entities/:entityId/applications/:applicationId/credentials/:credentialId/certificate` | entidad: `application.read` |
 | GET | `/api/v1/entities/:entityId/audit/timeline/:kind/:id` | entidad: `audit.entity.read` |
 | GET | `/api/v1/entities/:entityId/invitations` | entidad: `entity.members.read` |
 | POST | `/api/v1/entities/:entityId/invitations` | entidad: `entity.members.write` |
