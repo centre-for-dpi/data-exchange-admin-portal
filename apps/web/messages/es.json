@@ -706,6 +706,9 @@
         "services_changed": "Servicios del nodo cambiados",
         "certificate_renewed": "Certificado del nodo renovado",
         "decommissioned": "Nodo dado de baja"
+      },
+      "bootcamp": {
+        "item_updated": "Requisito del bootcamp actualizado"
       }
     },
     "filters": {
@@ -1149,5 +1152,52 @@
     "decommission": "Dar de baja",
     "decommissionFor": "Dar de baja {name}",
     "decommissionConfirm": "¿Dar de baja el nodo {name}? Deja de funcionar para siempre: su certificado y su túnel se anulan."
+  },
+  "bootcamp": {
+    "title": "Preparación del bootcamp",
+    "lead": "Lo que la entidad debe tener listo para instalar su nodo del kit en el bootcamp.",
+    "ready": "La entidad está lista para el bootcamp.",
+    "notReady": "Todavía faltan requisitos para el bootcamp.",
+    "markDone": "{item}: listo",
+    "note": "Nota para el operador (opcional)",
+    "noteHint": "Por ejemplo, el servidor o el caso de uso. Nunca contraseñas.",
+    "save": "Guardar",
+    "saved": "Guardado.",
+    "updated": "Actualizado el {date}",
+    "automatic": "Se marca solo cuando la entidad tiene miembros con los roles de publicación de APIs y de responsable de datos.",
+    "status": {
+      "pending": "Pendiente",
+      "done": "Listo"
+    },
+    "items": {
+      "server": {
+        "title": "Servidor para el nodo",
+        "hint": "Un servidor Linux de la entidad, con acceso a la base de datos que se expondrá."
+      },
+      "readonly_user": {
+        "title": "Usuario de solo lectura",
+        "hint": "Un usuario de la base de datos con permiso de solo lectura sobre los datos que expondrá la API."
+      },
+      "outbound_443": {
+        "title": "Salida a internet por 443",
+        "hint": "El servidor puede abrir conexiones salientes HTTPS (443) y UDP hacia el hub de la red. No hace falta abrir puertos de entrada."
+      },
+      "designees": {
+        "title": "Responsables designados",
+        "hint": "Miembros de la entidad con los roles de publicación de APIs y de responsable de datos."
+      },
+      "use_case": {
+        "title": "Caso de uso",
+        "hint": "Qué datos se intercambiarán, con qué entidad consumidora y para qué finalidad."
+      }
+    },
+    "network": {
+      "title": "Preparación del bootcamp",
+      "lead": "Qué tiene listo cada entidad activa para su bootcamp.",
+      "empty": "No hay entidades activas.",
+      "progress": "Avance",
+      "missing": "Falta",
+      "count": "{done} de {total}"
+    }
   }
 }

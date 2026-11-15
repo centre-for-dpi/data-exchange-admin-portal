@@ -133,14 +133,15 @@ model Entity {
   xroadMemberClass      String?   @map("xroad_member_class")
   xroadMemberCode       String?   @map("xroad_member_code")
 
-  memberships  Membership[]
-  apis         Api[]
-  applications Application[]
-  designees    EntityDesignee[]
-  reviews      EntityReview[]
-  documents    Document[]       @relation("EntityDocuments")
-  invitations  Invitation[]
-  nodes        Node[]
+  memberships   Membership[]
+  apis          Api[]
+  applications  Application[]
+  designees     EntityDesignee[]
+  reviews       EntityReview[]
+  documents     Document[]              @relation("EntityDocuments")
+  invitations   Invitation[]
+  nodes         Node[]
+  bootcampItems BootcampChecklistItem[]
 
   /// Slug and tax id are claimed only once a request is submitted: drafts (`requested`) the
   /// operator never sees cannot squat them, and a rejection frees them. Among drafts the first to
@@ -1140,4 +1141,42 @@ model NodeEnrollmentToken {
 
   @@index([nodeId, createdAt])
   @@map("node_enrollment_token")
+}
+
+// ---------------------------------------------------------------------------------------------
+// Bootcamp readiness (M4-07)
+// ---------------------------------------------------------------------------------------------
+
+/// Prerequisites an entity confirms before the bootcamp where its node is installed. The
+/// designees item is not stored: it is derived from the entity's members.
+enum BootcampItem {
+  server
+  readonly_user
+  outbound_443
+  use_case
+
+  @@map("bootcamp_item")
+}
+
+enum BootcampItemStatus {
+  pending
+  done
+
+  @@map("bootcamp_item_status")
+}
+
+model BootcampChecklistItem {
+  id        String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  entityId  String             @map("entity_id") @db.Uuid
+  entity    Entity             @relation(fields: [entityId], references: [id])
+  item      BootcampItem
+  status    BootcampItemStatus @default(pending)
+  /// What the entity wants the operator to know (server size, the use case), never a password.
+  note      String?
+  updatedBy String             @map("updated_by") @db.Uuid
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([entityId, item])
+  @@map("bootcamp_checklist_item")
 }

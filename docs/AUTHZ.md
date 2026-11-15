@@ -30,6 +30,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `api.purposes.write` | · | · | ✓ | · | · | · | · | · | · |
 | `node.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
 | `node.write` | ✓ | · | · | · | · | ✓ | · | · | · |
+| `bootcamp.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| `bootcamp.write` | ✓ | · | · | · | · | ✓ | · | · | · |
 | `audit.entity.read` | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · |
 
 ## Acciones de plataforma
@@ -50,12 +52,14 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `document.purge` | ✓ | · | · | · |
 | `document.list` | ✓ | · | · | · |
 | `node.list` | ✓ | ✓ | ✓ | · |
+| `bootcamp.list` | ✓ | ✓ | ✓ | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Rutas
 
 | Método | Ruta | Acceso |
 | :-- | :-- | :-- |
+| GET | `/api/v1/admin/bootcamp` | plataforma: `bootcamp.list` |
 | GET | `/api/v1/admin/entities` | plataforma: `entity_admin.read` |
 | POST | `/api/v1/admin/entities` | plataforma: `entity_admin.create` |
 | POST | `/api/v1/admin/entities/:id/offboard` | plataforma: `entity_admin.decide` |
@@ -111,6 +115,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | POST | `/api/v1/entities/:entityId/applications/:applicationId/credentials/:credentialId/revoke` | entidad: `application.write` |
 | POST | `/api/v1/entities/:entityId/applications/:applicationId/credentials/secret` | entidad: `application.write` |
 | GET | `/api/v1/entities/:entityId/audit/timeline/:kind/:id` | entidad: `audit.entity.read` |
+| GET | `/api/v1/entities/:entityId/bootcamp` | entidad: `bootcamp.read` |
+| PUT | `/api/v1/entities/:entityId/bootcamp/:item` | entidad: `bootcamp.write` |
 | GET | `/api/v1/entities/:entityId/invitations` | entidad: `entity.members.read` |
 | POST | `/api/v1/entities/:entityId/invitations` | entidad: `entity.members.write` |
 | POST | `/api/v1/entities/:entityId/invitations/:invitationId/revoke` | entidad: `entity.members.write` |

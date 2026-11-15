@@ -64,9 +64,14 @@ export default async function MyEntityPage({ params }: PageProps) {
           <StatusBadge status={entity.status}>{t(`entityStatus.${entity.status}`)}</StatusBadge>
         }
         actions={
-          <Link href="/my-entity/nodes" className="link">
-            {t('nodes.title')}
-          </Link>
+          <>
+            <Link href="/my-entity/nodes" className="link">
+              {t('nodes.title')}
+            </Link>
+            <Link href="/my-entity/bootcamp" className="link">
+              {t('bootcamp.title')}
+            </Link>
+          </>
         }
       />
       <Card>

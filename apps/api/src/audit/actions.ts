@@ -81,6 +81,8 @@ export const AUDIT_ACTIONS = [
   'subscription.expired',
   'subscription.renewal_notice_queued',
   'subscription.agreement_attached',
+  // Bootcamp readiness (M4-07)
+  'bootcamp.item_updated',
   // Nodes of the kit (M4)
   'node.created',
   'node.enrollment_token_issued',

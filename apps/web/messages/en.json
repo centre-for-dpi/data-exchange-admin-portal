@@ -706,6 +706,9 @@
         "services_changed": "Node services changed",
         "certificate_renewed": "Node certificate renewed",
         "decommissioned": "Node decommissioned"
+      },
+      "bootcamp": {
+        "item_updated": "Bootcamp prerequisite updated"
       }
     },
     "filters": {
@@ -1149,5 +1152,52 @@
     "decommission": "Decommission",
     "decommissionFor": "Decommission {name}",
     "decommissionConfirm": "Decommission node {name}? It stops working for good: its certificate and tunnel are revoked."
+  },
+  "bootcamp": {
+    "title": "Bootcamp readiness",
+    "lead": "What the entity must have ready to install its kit node at the bootcamp.",
+    "ready": "The entity is ready for the bootcamp.",
+    "notReady": "Some prerequisites for the bootcamp are still missing.",
+    "markDone": "{item}: ready",
+    "note": "Note for the operator (optional)",
+    "noteHint": "For example, the server or the use case. Never passwords.",
+    "save": "Save",
+    "saved": "Saved.",
+    "updated": "Updated on {date}",
+    "automatic": "Checked by itself when the entity has members with the API publisher and data steward roles.",
+    "status": {
+      "pending": "Pending",
+      "done": "Ready"
+    },
+    "items": {
+      "server": {
+        "title": "Server for the node",
+        "hint": "A Linux server of the entity, with access to the database the API will expose."
+      },
+      "readonly_user": {
+        "title": "Read-only user",
+        "hint": "A database user with read-only access to the data the API will expose."
+      },
+      "outbound_443": {
+        "title": "Outbound internet on 443",
+        "hint": "The server can open outgoing HTTPS (443) and UDP connections to the network hub. No inbound ports are needed."
+      },
+      "designees": {
+        "title": "Designated people",
+        "hint": "Members of the entity with the API publisher and data steward roles."
+      },
+      "use_case": {
+        "title": "Use case",
+        "hint": "Which data will be exchanged, with which consumer entity and for which purpose."
+      }
+    },
+    "network": {
+      "title": "Bootcamp readiness",
+      "lead": "What each active entity has ready for its bootcamp.",
+      "empty": "There are no active entities.",
+      "progress": "Progress",
+      "missing": "Missing",
+      "count": "{done} of {total}"
+    }
   }
 }

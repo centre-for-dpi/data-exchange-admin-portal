@@ -52,6 +52,8 @@ import {
   GatewayValidationProbes,
   VersionValidationService,
 } from './apis/version-validation.service.js';
+import { AdminBootcampController, BootcampController } from './bootcamp/bootcamp.controller.js';
+import { BootcampService } from './bootcamp/bootcamp.service.js';
 import { NodeControlController } from './nodes/node-control.controller.js';
 import { NodeControlGuard } from './nodes/node-control.guard.js';
 import { NodeControlService } from './nodes/node-control.service.js';
@@ -111,6 +113,8 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     NodesController,
     AdminNodesController,
     NodeControlController,
+    BootcampController,
+    AdminBootcampController,
   ],
   providers: [
     StorageService,
@@ -144,6 +148,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     DataSubjectsService,
     SubjectAlertsService,
     NodesService,
+    BootcampService,
     VersionValidationService,
     GatewayValidationProbes,
     NodeControlService,

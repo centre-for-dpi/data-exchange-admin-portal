@@ -95,6 +95,16 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['entity_admin'],
     platformRoles: ['platform_admin'],
   },
+  /** The entity's bootcamp readiness (M4-07): members and whoever supports the bootcamp. */
+  'bootcamp.read': {
+    entityRoles: ENTITY_ROLES,
+    platformRoles: ['platform_admin', 'platform_reviewer', 'regulator'],
+  },
+  /** Confirm the prerequisites of the bootcamp (the entity's admin, or the operator with it). */
+  'bootcamp.write': {
+    entityRoles: ['entity_admin'],
+    platformRoles: ['platform_admin'],
+  },
   /** Timeline of the entity's own objects (its APIs, subscriptions it asked for or received). */
   'audit.entity.read': {
     entityRoles: ENTITY_ROLES,
@@ -137,6 +147,8 @@ export const PLATFORM_PERMISSIONS = {
   'document.list': ['platform_admin'],
   /** Every node of the network with its state, version and last heartbeat (SPEC.md §6). */
   'node.list': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** Readiness of every entity for the bootcamp (operator console, M4-07). */
+  'bootcamp.list': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;

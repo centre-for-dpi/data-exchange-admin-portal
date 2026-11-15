@@ -203,6 +203,8 @@ enrollment_issued → enrolled → online ⇄ offline
 4. El nodo renueva su certificado antes de que venza. `entity_admin` o `platform_admin` pueden dar de baja un nodo (`decommissioned`): deja de funcionar para siempre.
 5. Las APIs con upstream `node` muestran el estado del nodo.
 
+**Preparación del bootcamp (M4-07).** Antes del bootcamp, cada entidad confirma cinco requisitos: un servidor para el nodo, un usuario de solo lectura de la base de datos, salida a internet por 443, los responsables designados (se calcula: miembros con `api_publisher` y `data_steward`) y el caso de uso. Los marca el `entity_admin` (o el operador) y el operador ve el avance de todas las entidades.
+
 ### 4.7 Transparencia para el titular (ADR-0015, ADR-0016)
 
 1. Al publicar una versión de una API `personal` o `sensitive`, cada operación declara dónde está el titular (`x-rid-data-subject`) o que no tiene titular (`none`).

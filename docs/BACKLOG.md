@@ -636,7 +636,12 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Web: resultados en la ficha de la versión (proveedor y revisor), botón "Repetir validaciones" y campos del sandbox en el formulario.
     - Pruebas contra APISIX real: rutas de verificación (solo con el token; la real, solo GET a la raíz), healthcheck, prueba de contrato con el runner, borrado al salir de revisión, y el bloqueo de la aprobación. Las pruebas de integración del resto del API corren con `RID_VERSION_VALIDATION=off`.
     - Despliegue: servicio `contract-runner` y variables `RID_VALIDATION_TOKEN`, `RID_GATEWAY_INTERNAL_URL`, `RID_CONTRACT_RUNNER_URL`, `RID_CONTRACT_RUNNER_TOKEN` y `RID_CONTRACT_RUNNER_GATEWAY_URL`.
-- [ ] **M4-07 — Lista de preparación del bootcamp**: por entidad, checklist de prerrequisitos (servidor, usuario de solo lectura, salida 443, responsables designados, caso de uso) con estado visible para el operador.
+- [x] **M4-07 — Lista de preparación del bootcamp**: por entidad, checklist de prerrequisitos (servidor, usuario de solo lectura, salida 443, responsables designados, caso de uso) con estado visible para el operador.
+  - _Notas de implementación:_
+    - Cinco requisitos por entidad. "Responsables designados" se calcula: está listo cuando la entidad tiene miembros activos con `api_publisher` y `data_steward`. Los otros cuatro los marca el `entity_admin`, o el `platform_admin` en el bootcamp, con una nota opcional para el operador (nunca contraseñas). Cada cambio queda auditado (`bootcamp.item_updated`).
+    - Ven la lista los miembros, el revisor y el regulador (`bootcamp.read`). La consola del operador muestra el avance de cada entidad activa y lo que falta, las menos avanzadas primero (`bootcamp.list`).
+    - Interpretación: los requisitos son del kit, no de un país, así que viven en el código y sus textos en i18n.
+    - Web: "Mi entidad → Preparación del bootcamp" y "Consola del operador → Preparación del bootcamp".
 - [ ] **M4-08 — Modo sandbox**: aplicaciones sandbox con aprobación automática hacia upstreams de prueba.
 - [ ] **M4-09 — Ficha del servicio imprimible**: vista e impresión/PDF desde el navegador.
 
