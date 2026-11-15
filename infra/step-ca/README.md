@@ -10,6 +10,7 @@ En cada arranque, `configure.sh` ajusta el provisioner del portal antes de inici
 
 - plantilla `app.tpl`: el sujeto es solo `CN=<clientId>` (el del token), el clientId va como SAN DNS y el uso de clave es solo autenticación de cliente TLS;
 - vigencia: 90 días por defecto y 397 como máximo. El portal pide `lifecycle.certificateValidityDays`.
+- provisioner `rid-gateway-tls` (M3-02), que `configure.sh` crea si no existe, con la contraseña de la CA: emite el certificado de servidor TLS del gateway con la plantilla `gateway.tpl` (los nombres de `RID_GATEWAY_TLS_HOSTS`, solo autenticación de servidor, 90 días). El portal genera la clave, lo pide y lo renueva en el último tercio de su vida.
 
 En el despliegue de una sola máquina, el contenedor del API monta solo `certs/` del volumen (no las claves) y verifica el TLS de la CA con `RID_STEP_CA_ROOT_FILE`. Fuera de esa máquina se fija la raíz con `RID_STEP_CA_ROOT_FINGERPRINT`.
 

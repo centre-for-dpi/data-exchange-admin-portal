@@ -11,7 +11,9 @@ import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError, ValidationError } from '../common/errors.js';
 import { uuidv7 } from '../common/uuidv7.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
 import { credentialView, leafOf, thumbprintOf } from './credential-view.js';
 import { checkCsr, CsrRejected } from './csr.js';
@@ -31,6 +33,7 @@ export class CertificatesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
     @Inject(CERTIFICATE_AUTHORITY) private readonly ca: CertificateAuthority,
   ) {}
 
@@ -113,6 +116,12 @@ export class CertificatesService {
             notAfter: created.notAfter?.toISOString(),
           },
           requestId,
+        });
+        // The thumbprint joins the application's valid certificates in the OPA bundle (M3-02).
+        await this.outbox.enqueue(tx, {
+          topic: POLICY_SYNC_TOPIC,
+          aggregate: `credential:${created.id}`,
+          payload: { reason: 'certificate_issued' },
         });
         return created;
       });

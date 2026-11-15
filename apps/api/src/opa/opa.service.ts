@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { getCountryConfig } from '@rid/config';
+import { USABLE_CREDENTIAL_STATUSES } from '../domain/credential/state-machine.js';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -107,6 +108,16 @@ export class OpaService implements OnApplicationBootstrap {
           },
           orderBy: { id: 'asc' },
         },
+        // Valid client certificates (M3-02): still usable and not past notAfter.
+        credentials: {
+          where: {
+            kind: 'mtls_certificate',
+            status: { in: [...USABLE_CREDENTIAL_STATUSES] },
+            notAfter: { gt: new Date() },
+          },
+          select: { fingerprint: true },
+          orderBy: { fingerprint: 'asc' },
+        },
       },
       orderBy: { id: 'asc' },
     });
@@ -132,8 +143,7 @@ export class OpaService implements OnApplicationBootstrap {
             rateLimitPerMinute: s.rateLimitPerMinute ?? defaultRate.get(s.apiVersionId) ?? 0,
           };
         }),
-        // Client certificates arrive with M3 (SPIKE S-3).
-        revokedCertFingerprints: [],
+        certificates: app.credentials.flatMap((c) => (c.fingerprint ? [c.fingerprint] : [])),
       };
       clients[app.keycloakClientId] = client;
     }
@@ -146,6 +156,7 @@ export class OpaService implements OnApplicationBootstrap {
           subjectRefKey,
           country: country.country.code,
           documentTypes: [...country.identifiers.person],
+          mtlsRequired: country.features.mtls.required,
         },
       },
       subscriptionIds,

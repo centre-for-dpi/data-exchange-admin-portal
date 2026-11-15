@@ -111,7 +111,11 @@ export interface BundleClient {
   entitySlug: string;
   applicationId: string;
   subscriptions: BundleSubscription[];
-  revokedCertFingerprints: string[];
+  /**
+   * RFC 8705 thumbprints (x5t#S256) of the application's valid client certificates (SPIKE S-3):
+   * revoking or expiring a certificate takes it out of this list.
+   */
+  certificates: string[];
 }
 
 /** data.json of the bundle (ARCHITECTURE.md §4.2). */
@@ -126,6 +130,8 @@ export interface BundleData {
     country: string;
     /** Person document types of the country; the first one is the default. */
     documentTypes: string[];
+    /** features.mtls.required: every call needs a client certificate and a bound token. */
+    mtlsRequired: boolean;
   };
 }
 

@@ -12,13 +12,24 @@ export interface CertificateAuthority {
    * certificate followed by its issuing chain, PEM.
    */
   sign(request: SignRequest): Promise<string>;
+  /** The CA's root certificate (PEM), verified against the configured trust anchor. */
+  rootCertificate(): Promise<string>;
 }
 
 export const CERTIFICATE_AUTHORITY = Symbol('CERTIFICATE_AUTHORITY');
 
+/**
+ * Which provisioner signs (infra/step-ca/configure.sh): `application` certificates for TLS client
+ * authentication (rid-portal, M3-01) or the gateway's TLS `server` certificate (M3-02).
+ */
+export type CertificateProfile = 'application' | 'gateway-server';
+
 export interface SignRequest {
   csrPem: string;
   commonName: string;
+  /** Subject alternative names (DNS); the common name alone by default. */
+  sans?: string[];
+  profile?: CertificateProfile;
   /** Public key of the CSR (SPKI, DER): the issued certificate must carry it. */
   publicKey?: Buffer;
   validityHours: number;
@@ -27,6 +38,8 @@ export interface SignRequest {
 export interface StepCaSettings {
   url: string;
   provisioner: string;
+  /** Provisioner of the gateway's server certificate. */
+  gatewayProvisioner: string;
   password: string;
   /** PEM file with the CA's root certificate. */
   rootFile?: string;
@@ -40,6 +53,7 @@ export function stepCaSettings(env: NodeJS.ProcessEnv = process.env): StepCaSett
   return {
     url: (env.RID_STEP_CA_URL ?? 'https://localhost:9000').replace(/\/+$/, ''),
     provisioner: env.RID_STEP_CA_PROVISIONER ?? 'rid-portal',
+    gatewayProvisioner: env.RID_STEP_CA_GATEWAY_PROVISIONER ?? 'rid-gateway-tls',
     password: env.RID_STEP_CA_PROVISIONER_PASSWORD ?? '',
     rootFile: env.RID_STEP_CA_ROOT_FILE || undefined,
     rootFingerprint: env.RID_STEP_CA_ROOT_FINGERPRINT?.toLowerCase().replace(/:/g, '') || undefined,
@@ -121,7 +135,7 @@ interface Provisioner {
 export class StepCaClient implements CertificateAuthority {
   private readonly logger = new Logger(StepCaClient.name);
   private root?: Promise<string>;
-  private key?: Promise<{ key: SigningKey; kid: string }>;
+  private readonly keys = new Map<string, Promise<{ key: SigningKey; kid: string }>>();
 
   constructor(private readonly settings: StepCaSettings = stepCaSettings()) {}
 
@@ -172,16 +186,20 @@ export class StepCaClient implements CertificateAuthority {
     return pem;
   }
 
-  private provisionerKey(): Promise<{ key: SigningKey; kid: string }> {
-    this.key ??= this.loadKey().catch((error: unknown) => {
-      this.key = undefined;
-      throw error;
-    });
-    return this.key;
+  private provisionerKey(name: string): Promise<{ key: SigningKey; kid: string }> {
+    let key = this.keys.get(name);
+    if (!key) {
+      key = this.loadKey(name).catch((error: unknown) => {
+        this.keys.delete(name);
+        throw error;
+      });
+      this.keys.set(name, key);
+    }
+    return key;
   }
 
-  private async loadKey(): Promise<{ key: SigningKey; kid: string }> {
-    const { url, provisioner, password } = this.settings;
+  private async loadKey(provisioner: string): Promise<{ key: SigningKey; kid: string }> {
+    const { url, password } = this.settings;
     if (!password) throw new Error('step-ca: set RID_STEP_CA_PROVISIONER_PASSWORD');
     const ca = await this.rootCertificate();
     let found: Provisioner | undefined;
@@ -211,11 +229,16 @@ export class StepCaClient implements CertificateAuthority {
     let ca: string;
     try {
       ca = await this.rootCertificate();
-      const { key, kid } = await this.provisionerKey();
+      const provisioner =
+        input.profile === 'gateway-server'
+          ? this.settings.gatewayProvisioner
+          : this.settings.provisioner;
+      const { key, kid } = await this.provisionerKey(provisioner);
       const audience = `${this.settings.url}/1.0/sign`;
-      const ott = await new SignJWT({ sans: [input.commonName], sha: fingerprintOf(ca) })
+      const sans = input.sans?.length ? input.sans : [input.commonName];
+      const ott = await new SignJWT({ sans, sha: fingerprintOf(ca) })
         .setProtectedHeader({ alg: 'ES256', kid, typ: 'JWT' })
-        .setIssuer(this.settings.provisioner)
+        .setIssuer(provisioner)
         .setSubject(input.commonName)
         .setAudience(audience)
         .setIssuedAt()

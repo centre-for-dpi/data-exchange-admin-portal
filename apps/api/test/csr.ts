@@ -35,6 +35,14 @@ const pem = (der: ArrayBuffer): string =>
 
 /** Builds a PKCS#10 CSR for tests, the way `openssl req -new -subj /CN=<cn>` would. */
 export async function makeCsr(cn: string, options: CsrOptions = {}): Promise<string> {
+  return (await makeKeyAndCsr(cn, options)).csr;
+}
+
+/** The CSR and its private key (PKCS#8 PEM), to use the issued certificate in TLS tests. */
+export async function makeKeyAndCsr(
+  cn: string,
+  options: CsrOptions = {},
+): Promise<{ csr: string; keyPem: string }> {
   const key = options.key ?? 'P-256';
   const pair = await webcrypto.subtle.generateKey(algorithm(key), true, ['sign', 'verify']);
   const csr = new pkijs.CertificationRequest();
@@ -71,5 +79,9 @@ export async function makeCsr(cn: string, options: CsrOptions = {}): Promise<str
   await csr.sign(pair.privateKey, 'SHA-256');
   const der = new Uint8Array(csr.toSchema().toBER(false));
   if (options.tamper) der[der.length - 5] = (der[der.length - 5] ?? 0) ^ 0xff;
-  return pem(der.buffer);
+  const pkcs8 = await webcrypto.subtle.exportKey('pkcs8', pair.privateKey);
+  const keyPem = `-----BEGIN PRIVATE KEY-----\n${Buffer.from(pkcs8)
+    .toString('base64')
+    .replace(/.{1,64}/g, '$&\n')}-----END PRIVATE KEY-----\n`;
+  return { csr: pem(der.buffer), keyPem };
 }

@@ -7,7 +7,9 @@ import {
 import { getCountryConfig } from '@rid/config';
 import { AuditService } from '../audit/audit.service.js';
 import { canTransition, type CredentialStatus } from '../domain/credential/state-machine.js';
+import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import { QueueService } from '../queue/queue.service.js';
 
 const SYSTEM = { type: 'system' as const, id: 'system:certificate-lifecycle' };
@@ -32,6 +34,7 @@ export class CertificateLifecycleService implements OnApplicationBootstrap, OnAp
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -78,6 +81,11 @@ export class CertificateLifecycleService implements OnApplicationBootstrap, OnAp
           target: { type: 'credential', id: c.id },
           before: { status: c.status },
           after: { status: 'expired', notAfter: c.notAfter?.toISOString() },
+        });
+        await this.outbox.enqueue(tx, {
+          topic: POLICY_SYNC_TOPIC,
+          aggregate: `credential:${c.id}`,
+          payload: { reason: 'certificate_expired' },
         });
         return true;
       });

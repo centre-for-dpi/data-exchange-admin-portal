@@ -55,6 +55,34 @@ operation := op if {
 
 now := time.now_ns()
 
+# --- Client certificate (SPIKE S-3, M3-02) -----------------------------------------------------
+#
+# The gateway's rid-client-cert plugin puts in X-RID-Client-Cert-S256 the RFC 8705 thumbprint of
+# the certificate verified in the TLS handshake, after removing any value the client sent. The
+# token binds to a certificate with cnf["x5t#S256"]. A certificate is valid for the application
+# while its thumbprint is in the bundle (data.clients[id].certificates): revoking it, or its
+# expiry, takes it out of the list.
+
+client_thumbprint := header("x-rid-client-cert-s256")
+
+bound_thumbprint := claims.cnf["x5t#S256"]
+
+# Checked when the network requires mTLS, and always for a token bound to a certificate
+# (RFC 8705 §3: a bound token is only good with that certificate).
+mtls_enforced if data.config.mtlsRequired
+
+mtls_enforced if bound_thumbprint
+
+mtls_reason := "client_certificate_required" if {
+	not client_thumbprint
+} else := "token_not_bound" if {
+	not bound_thumbprint
+} else := "certificate_mismatch" if {
+	bound_thumbprint != client_thumbprint
+} else := "certificate_revoked" if {
+	not client_thumbprint in object.get(client, "certificates", [])
+}
+
 # --- Subscriptions (rule 4) -----------------------------------------------------------------
 
 route_subscriptions contains s if {
@@ -152,6 +180,9 @@ deny_reason := "no_subscription" if {
 	not client
 } else := "app_suspended" if {
 	client.status != "active"
+} else := mtls_reason if {
+	mtls_enforced
+	mtls_reason
 } else := "no_subscription" if {
 	not route
 } else := "operation_not_allowed" if {
@@ -195,8 +226,8 @@ subject_header := {"X-RID-Subject-Ref": subject_ref} if subject_ref
 
 else := {}
 
-# X-RID-End-User and X-RID-Body-Subject are never returned: the opa plugin then removes the
-# clear values the client sent (SPIKE S-1).
+# X-RID-End-User, X-RID-Body-Subject and X-RID-Client-Cert-S256 are never returned: the opa
+# plugin then removes them before the upstream (SPIKE S-1).
 headers := object.union_n([base_headers, end_user_header, subject_header]) if allow
 
 # Rule 6, deny: response headers and a problem+json body.
@@ -223,4 +254,8 @@ details := {
 	"subscription_expired": "The subscription is not valid at this time.",
 	"end_user_required": "This API requires X-RID-End-User with the official making the request.",
 	"data_subject_required": "The request does not say whose data it asks for, in the path or in the body as the API documents.",
+	"client_certificate_required": "Call the gateway over TLS with the application's client certificate.",
+	"token_not_bound": "Get the access token with the client certificate: it must be bound to it (cnf x5t#S256).",
+	"certificate_mismatch": "The access token is bound to another certificate than the one presented.",
+	"certificate_revoked": "The client certificate is not valid for this application (revoked, expired or another application's).",
 }

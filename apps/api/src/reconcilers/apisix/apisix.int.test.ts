@@ -42,6 +42,7 @@ describe('APISIX reconciler (M1-08)', () => {
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     // A fake DNS the tests steer (an Error means the lookup fails).
     resolveHost: () => (dns instanceof Error ? Promise.reject(dns) : Promise.resolve(dns)),
+    tls: { hosts: ['localhost'], mtlsRequired: false },
   };
   let dns: string[] | Error = ['93.184.215.14'];
   const created: string[] = [];

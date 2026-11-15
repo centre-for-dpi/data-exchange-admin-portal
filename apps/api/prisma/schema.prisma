@@ -1006,3 +1006,34 @@ model AuditAnchor {
 
   @@map("audit_anchor")
 }
+
+// ---------------------------------------------------------------------------------------------
+// Certificates of the gateway itself, issued by step-ca (ARCHITECTURE.md §4.4, M3-02)
+// ---------------------------------------------------------------------------------------------
+
+enum GatewayCertificatePurpose {
+  /// TLS server certificate of the gateway's public names (APISIX SSL object rid-ssl-gateway).
+  server
+
+  @@map("gateway_certificate_purpose")
+}
+
+/// The portal generates the key, has step-ca sign it and hands both to APISIX through the
+/// reconciler. The key is sealed with RID_SECRETS_KEY, bound to the row id.
+model GatewayCertificate {
+  id             String                    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  purpose        GatewayCertificatePurpose
+  /// DNS names, sorted; the first is the common name.
+  hosts          String[]
+  /// Certificate followed by its issuing chain, PEM.
+  certificatePem String                    @map("certificate_pem")
+  sealedKey      String                    @map("sealed_key")
+  /// RFC 8705 x5t#S256 of the certificate.
+  fingerprint    String
+  notBefore      DateTime                  @map("not_before") @db.Timestamptz(3)
+  notAfter       DateTime                  @map("not_after") @db.Timestamptz(3)
+  createdAt      DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([purpose, notAfter])
+  @@map("gateway_certificate")
+}

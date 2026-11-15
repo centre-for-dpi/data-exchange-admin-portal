@@ -23,7 +23,6 @@ import { CoreModule } from './core.module.js';
 import { CertificateLifecycleService } from './credentials/certificate-lifecycle.service.js';
 import { CertificatesController } from './credentials/certificates.controller.js';
 import { CertificatesService } from './credentials/certificates.service.js';
-import { CERTIFICATE_AUTHORITY, StepCaClient } from './credentials/step-ca.client.js';
 import { DocumentsController } from './documents/documents.controller.js';
 import { DocumentsService } from './documents/documents.service.js';
 import { StorageService } from './documents/storage.service.js';
@@ -114,7 +113,6 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     ApplicationsService,
     CertificatesService,
     CertificateLifecycleService,
-    { provide: CERTIFICATE_AUTHORITY, useFactory: () => new StepCaClient() },
     SubscriptionsService,
     SubscriptionLifecycleService,
     OpaService,

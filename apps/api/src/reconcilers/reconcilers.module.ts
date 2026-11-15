@@ -2,7 +2,14 @@ import { lookup } from 'node:dns/promises';
 import { Module } from '@nestjs/common';
 import { APISIX_ADMIN, HttpApisixAdmin } from './apisix/apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler } from './apisix/apisix.reconciler.js';
-import { type GatewaySettings, parseDevNodes, parseHostPort } from './apisix/desired-state.js';
+import { getCountryConfig } from '@rid/config';
+import {
+  type GatewaySettings,
+  parseDevNodes,
+  parseHostNames,
+  parseHostPort,
+} from './apisix/desired-state.js';
+import { GatewayCertificates } from './apisix/gateway-certificates.js';
 import { HttpKeycloakGatewayAdmin, KEYCLOAK_ADMIN } from './keycloak/keycloak-admin.js';
 import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
 
@@ -42,8 +49,16 @@ import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
         devNodes: parseDevNodes(process.env.RID_DEV_NODES),
         resolveHost: async (host) =>
           (await lookup(host, { all: true, verbatim: true })).map((a) => a.address),
+        tls: {
+          hosts: parseHostNames(process.env.RID_GATEWAY_TLS_HOSTS ?? 'localhost'),
+          // Read when used: the country configuration is loaded at startup (main.ts).
+          get mtlsRequired() {
+            return getCountryConfig().features.mtls.required;
+          },
+        },
       }),
     },
+    GatewayCertificates,
     ApisixReconciler,
   ],
   exports: [KeycloakReconciler, KEYCLOAK_ADMIN, ApisixReconciler, APISIX_ADMIN, APISIX_SETTINGS],

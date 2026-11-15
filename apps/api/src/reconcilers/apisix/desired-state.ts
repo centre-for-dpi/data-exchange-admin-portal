@@ -4,6 +4,8 @@ import type { ApisixObject } from './apisix-admin.js';
 /** Deterministic ids (ARCHITECTURE.md §4): reconciling needs no extra state. */
 export const routeId = (apiVersionId: string): string => `rid-route-${apiVersionId}`;
 export const upstreamId = (apiVersionId: string): string => `rid-upstream-${apiVersionId}`;
+/** The gateway's TLS (server certificate and, with mTLS, the client CA) on its public names. */
+export const GATEWAY_SSL_ID = 'rid-ssl-gateway';
 /** Only objects with this prefix belong to the portal; anything else in APISIX is left alone. */
 export const MANAGED_PREFIX = 'rid-';
 
@@ -26,6 +28,11 @@ export interface GatewaySettings {
   devNodes: ReadonlyMap<string, string>;
   /** Every address a host name resolves to (A and AAAA); injectable for tests. */
   resolveHost: (host: string) => Promise<string[]>;
+  /**
+   * TLS of the gateway (M3-02): its public host names (RID_GATEWAY_TLS_HOSTS) and whether every
+   * call must present a client certificate of the network CA (features.mtls.required).
+   */
+  tls: { hosts: string[]; mtlsRequired: boolean };
 }
 
 /** Headers only the gateway may set: removed if a client sends them (ARCHITECTURE.md §4.1). */
@@ -53,6 +60,9 @@ export const OPA_UPSTREAM_HEADERS = [
   'X-RID-Subject-Ref',
   'X-RID-End-User',
   'X-RID-Body-Subject',
+  // Thumbprint of the verified client certificate, set by rid-client-cert (S-3): OPA reads it,
+  // the provider never gets it.
+  'X-RID-Client-Cert-S256',
   // Legacy consumer-declared header (before ADR-0017): never forwarded either.
   'X-RID-Data-Subject',
   'X-Request-Id',
@@ -225,6 +235,9 @@ export function desiredGateway(v: VersionForGateway, settings: GatewaySettings):
         // Tokens must be issued for the gateway (aud = rid-gateway), not for another client.
         claim_validator: { audience: { required: true, match_with_client_id: true } },
       },
+      // Thumbprint of the client certificate verified in the handshake, for OPA (S-3). A value the
+      // client sends in that header is always removed, with or without mTLS.
+      'rid-client-cert': {},
       'proxy-rewrite': {
         // Only upstream_uri changes; OPA still sees the full public path.
         regex_uri: [`^${escapeRegex(v.basePath)}/(.*)$`, `${pathPrefix}/$1`],
@@ -286,6 +299,40 @@ export function desiredGateway(v: VersionForGateway, settings: GatewaySettings):
 }
 
 /**
+ * SSL object of the gateway (S-3): its server certificate on the public names and, when the
+ * network requires mTLS, `client.ca` with the network CA, so APISIX refuses in the handshake any
+ * call without a valid client certificate. No skip_mtls_uri_regex: no route is exempt.
+ */
+export function desiredSsl(
+  certificate: { hosts: string[]; certificatePem: string; keyPem: string; clientCaPem: string },
+  settings: GatewaySettings,
+): ApisixObject {
+  return {
+    type: 'server',
+    snis: certificate.hosts,
+    cert: certificate.certificatePem,
+    key: certificate.keyPem,
+    ssl_protocols: ['TLSv1.2', 'TLSv1.3'],
+    labels: { 'rid-managed': 'true' },
+    status: 1,
+    // Leaf, intermediate and root: depth 2.
+    ...(settings.tls.mtlsRequired ? { client: { ca: certificate.clientCaPem, depth: 2 } } : {}),
+  };
+}
+
+/**
+ * APISIX stores the private key encrypted, so the key is not compared: a new key always comes
+ * with a new certificate. `client` must be absent when mTLS is off.
+ */
+export function sslMatches(desired: ApisixObject, actual: ApisixObject): boolean {
+  const { key: _key, ...compared } = desired;
+  if (!('client' in desired) && actual.client !== undefined && actual.client !== null) {
+    return false;
+  }
+  return matches(compared, actual);
+}
+
+/**
  * True when every field of `desired` has the same value in `actual`. APISIX stores defaults for
  * fields we do not set, so `actual` may hold more; arrays must match exactly.
  */
@@ -323,4 +370,20 @@ export function parseHostPort(value: string): { host: string; port: number } {
     throw new Error(`Expected host:port, got "${value}"`);
   }
   return { host: match[1], port };
+}
+
+/**
+ * RID_GATEWAY_TLS_HOSTS="gw.example.org,gateway" -> DNS names of the gateway's certificate, in
+ * order (the first is its common name). A malformed name is a startup error.
+ */
+export function parseHostNames(value: string): string[] {
+  const hosts = [...new Set(value.split(',').map((h) => h.trim().toLowerCase()))].filter(Boolean);
+  const label = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/;
+  for (const host of hosts) {
+    if (host.length > 253 || !host.split('.').every((part) => label.test(part))) {
+      throw new Error(`Invalid gateway host name "${host}"`);
+    }
+  }
+  if (hosts.length === 0) throw new Error('RID_GATEWAY_TLS_HOSTS has no host name');
+  return hosts;
 }

@@ -624,6 +624,9 @@
       "audit": {
         "anchored": "Daily anchor of the audit trail",
         "exported": "Audit trail exported"
+      },
+      "gateway_certificate": {
+        "issued": "Gateway certificate issued"
       }
     },
     "filters": {

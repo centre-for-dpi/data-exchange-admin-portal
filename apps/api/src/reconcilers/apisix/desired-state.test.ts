@@ -9,6 +9,9 @@ import {
   TRANSPARENCY_LOG_FORMAT,
   UnsupportedUpstreamError,
   type VersionForGateway,
+  desiredSsl,
+  parseHostNames,
+  sslMatches,
 } from './desired-state.js';
 
 const settings: GatewaySettings = {
@@ -19,6 +22,7 @@ const settings: GatewaySettings = {
   transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes('salud=mock-salud:8000'),
   resolveHost: () => Promise.resolve(['93.184.215.14']),
+  tls: { hosts: ['localhost'], mtlsRequired: false },
 };
 
 const version = (overrides: Partial<VersionForGateway> = {}): VersionForGateway => ({
@@ -98,7 +102,13 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       'prometheus',
       'proxy-rewrite',
       'request-id',
+      'rid-client-cert',
     ]);
+    // The client never chooses the certificate thumbprint OPA reads, nor the provider sees it.
+    expect(plugins['rid-client-cert']).toEqual({});
+    expect(plugins['proxy-rewrite']?.headers).not.toMatchObject({
+      remove: expect.arrayContaining(['X-RID-Client-Cert-S256']) as unknown,
+    });
     expect(plugins['openid-connect']).toMatchObject({
       client_id: 'rid-gateway',
       bearer_only: true,
@@ -116,7 +126,12 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     expect(removed).not.toContain('X-RID-Body-Subject');
     // OPA decides these; the clear official and data subject are listed and never returned.
     const decided = plugins.opa?.send_headers_upstream as string[];
-    for (const header of ['X-RID-Subject-Ref', 'X-RID-End-User', 'X-RID-Body-Subject']) {
+    for (const header of [
+      'X-RID-Subject-Ref',
+      'X-RID-End-User',
+      'X-RID-Body-Subject',
+      'X-RID-Client-Cert-S256',
+    ]) {
       expect(decided).toContain(header);
     }
   });
@@ -256,5 +271,43 @@ describe('deprecated versions (ADR-0019)', () => {
   it('leave published versions without the headers', () => {
     const { route } = desiredGateway(version(), settings);
     expect(route.plugins).not.toHaveProperty('response-rewrite');
+  });
+});
+
+describe('gateway TLS (M3-02)', () => {
+  const certificate = {
+    hosts: ['gw.example.org', 'localhost'],
+    certificatePem: 'CERT',
+    keyPem: 'KEY',
+    clientCaPem: 'CA',
+  };
+
+  it('serves the server certificate on the gateway names; client CA only with mTLS', () => {
+    const plain = desiredSsl(certificate, settings);
+    expect(plain).toMatchObject({ type: 'server', snis: ['gw.example.org', 'localhost'] });
+    expect(plain).not.toHaveProperty('client');
+    const mtls = desiredSsl(certificate, {
+      ...settings,
+      tls: { ...settings.tls, mtlsRequired: true },
+    });
+    expect(mtls.client).toEqual({ ca: 'CA', depth: 2 });
+    expect(mtls).not.toHaveProperty('client.skip_mtls_uri_regex');
+  });
+
+  it('ignores the stored (encrypted) key but notices a client CA left behind', () => {
+    const desired = desiredSsl(certificate, settings);
+    const stored = { ...desired, key: 'encrypted-by-apisix', validity_end: 1 };
+    expect(sslMatches(desired, stored)).toBe(true);
+    expect(sslMatches(desired, { ...stored, client: { ca: 'CA', depth: 2 } })).toBe(false);
+    expect(sslMatches(desired, { ...stored, cert: 'OTHER' })).toBe(false);
+  });
+
+  it('parses the gateway host names', () => {
+    expect(parseHostNames(' GW.example.org , localhost,gw.example.org')).toEqual([
+      'gw.example.org',
+      'localhost',
+    ]);
+    expect(() => parseHostNames('bad_name')).toThrow();
+    expect(() => parseHostNames(' , ')).toThrow();
   });
 });

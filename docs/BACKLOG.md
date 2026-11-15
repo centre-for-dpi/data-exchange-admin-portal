@@ -447,7 +447,15 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Interpretación: el certificado se puede pedir aunque `features.mtls.required` esté apagado (la ficha dice que es opcional), para que las entidades lo tengan listo antes de M3-10.
     - Pendiente para M3-02: las huellas vigentes en el bundle de OPA. Pendiente para M3-10: el cliente `client-x509` en Keycloak.
     - Despliegue: el `.env` del VPS necesita `RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`) y `RID_STEP_CA_ROOT_FILE` (`scripts/make-deploy-env.mjs` ya los genera). El montaje de `certs/` usa `subpath`, que pide Compose 2.26 o posterior.
-- [ ] **M3-02 — mTLS de cliente en el gateway**: objeto SSL con `client.ca`; llamadas sin certificado válido rechazadas; certificados revocados rechazados vía bundle OPA.
+- [x] **M3-02 — mTLS de cliente en el gateway**: objeto SSL con `client.ca`; llamadas sin certificado válido rechazadas; certificados revocados rechazados vía bundle OPA.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1` y `§4.2`.
+    - El reconciliador de APISIX mantiene el objeto SSL `rid-ssl-gateway` en los nombres de `RID_GATEWAY_TLS_HOSTS`. Su certificado de servidor lo emite step-ca con un provisioner propio, `rid-gateway-tls` (plantilla `gateway.tpl`, solo autenticación de servidor). El portal genera la clave, la guarda sellada y renueva el certificado en el último tercio de su vida.
+    - Con `features.mtls.required`, el objeto lleva `client.ca` con la intermedia y la raíz de la red. Una llamada sin certificado, o con uno de otra CA, no pasa el handshake.
+    - El plugin propio `rid-client-cert` (todas las rutas) borra la huella que mande el cliente y pone la del certificado verificado. OPA la lee y nunca la devuelve, así que no llega al proveedor.
+    - El bundle trae por aplicación sus certificados vigentes (`clients[id].certificates`, en lugar de `revokedCertFingerprints`) y `config.mtlsRequired`. La política niega con `client_certificate_required`, `token_not_bound`, `certificate_mismatch` y `certificate_revoked`. También los aplica a todo token ligado, aunque el mTLS no sea obligatorio. Emitir o vencer un certificado encola `policy.sync`.
+    - Probado con APISIX y step-ca reales: rechazo sin certificado y con otra CA, huella RFC 8705 correcta, huella falsificada borrada en HTTP y HTTPS, renovación. La política tiene 48 tests (cobertura 100 %).
+    - Pendiente para M3-10: la ruta del token en el gateway hacia Keycloak (S-4), el cliente `client-x509` con tokens ligados, y la prueba de punta a punta con token ligado. Sin ellos, activar el flag niega todo el tráfico (`token_not_bound`). Por eso `co.yaml` sigue con `mtls.required: false`.
+    - Revocar un certificado desde el portal llega con M3-04. La salida del bundle ya está probada con el estado `revoked`.
 - [ ] **M3-03 — mTLS hacia upstreams**: certificado del gateway emitido por step-ca y configurado en upstreams `node` y `direct` con mTLS.
 - [ ] **M3-04 — Rotación**: segunda credencial (secreto o certificado) con ventana de rotación; revocación de la anterior.
 - [ ] **M3-05 — Límites por suscripción**: `limit-count` según el resultado de S-2; 429 con problem+json; límite visible en la suscripción.

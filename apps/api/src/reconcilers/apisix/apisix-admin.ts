@@ -1,11 +1,11 @@
 /**
- * Minimal client of the APISIX Admin API (routes and upstreams). Used only by the reconciler,
+ * Minimal client of the APISIX Admin API (routes, upstreams and SSL objects). Used only by the reconciler,
  * never by HTTP handlers (CLAUDE.md). Objects are addressed by deterministic ids, so every write
  * is an idempotent PUT.
  */
 export const APISIX_ADMIN = Symbol('APISIX_ADMIN');
 
-export type ApisixKind = 'routes' | 'upstreams';
+export type ApisixKind = 'routes' | 'upstreams' | 'ssls';
 export type ApisixObject = Record<string, unknown>;
 
 export interface ApisixAdmin {

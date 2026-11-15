@@ -4,6 +4,7 @@ import type { QueueService } from '../../queue/queue.service.js';
 import { type ApisixAdmin, ApisixAdminError, type ApisixKind } from './apisix-admin.js';
 import { ApisixReconciler } from './apisix.reconciler.js';
 import { type GatewaySettings, parseDevNodes, routeId, upstreamId } from './desired-state.js';
+import type { GatewayCertificates } from './gateway-certificates.js';
 
 const VERSION = '0190d0c4-0000-7000-8000-0000000000aa';
 
@@ -49,6 +50,7 @@ const settings: GatewaySettings = {
   transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes(''),
   resolveHost: () => Promise.resolve([]),
+  tls: { hosts: ['localhost'], mtlsRequired: false },
 };
 
 /** Only what reconcileVersion touches for a retired version. */
@@ -58,7 +60,7 @@ const prisma = {
 } as unknown as PrismaService;
 
 const reconciler = (admin: ApisixAdmin) =>
-  new ApisixReconciler(prisma, {} as QueueService, admin, settings);
+  new ApisixReconciler(prisma, {} as QueueService, admin, settings, {} as GatewayCertificates);
 
 describe('APISIX reconciler: removing a version', () => {
   it('retries the upstream while APISIX still sees the deleted route', async () => {

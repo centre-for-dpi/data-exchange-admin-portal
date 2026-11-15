@@ -130,14 +130,19 @@ Reconciliador
 - Plugins. APISIX los ejecuta por fase y, dentro de cada fase, por prioridad (no en el orden en que se listan). Verificado en SPIKE S-1 (`docs/spikes/S-1.md`):
   1. `request-id` (rewrite, 12015): genera `X-Request-Id` si el cliente no lo envía.
   2. `openid-connect` (rewrite, 2599): `client_id: rid-gateway`, `bearer_only: true`, `use_jwks: true`, `discovery` del realm `rid-gateway` (como lo alcanza APISIX: `RID_GATEWAY_KEYCLOAK_URL`), `set_userinfo_header`, `set_access_token_header` y `set_id_token_header` en `false` (el token no viaja al proveedor en otra cabecera), y `claim_validator.audience` con `required` y `match_with_client_id`: solo pasan tokens con `aud = rid-gateway`. El emisor se valida contra el de la discovery.
-  3. `proxy-rewrite` (rewrite, 1008): elimina las cabeceras que solo el gateway puede poner (`X-RID-Consumer-Entity`, `X-RID-Consumer-App`, `X-RID-Subscription`, `X-RID-Operation`, `X-RID-End-User-Hash`, `X-RID-Subject-Ref`) si vienen del cliente, antes de que OPA arme su entrada; conserva `X-RID-Purpose` y `X-RID-End-User`, que OPA necesita leer. Antes, en la misma fase y con prioridad 1020, el plugin propio `rid-data-subject` lee del cuerpo JSON el titular de las operaciones que lo declaran allí y lo pasa como `X-RID-Body-Subject`, después de borrar cualquier valor que haya enviado el cliente (ADR-0017). Reescribe la ruta quitando el prefijo (solo cambia `upstream_uri`; OPA sigue viendo la ruta pública completa).
-  4. `opa` (access, 2001): `host` del OPA local, `policy: rid/authz`, `with_route: true`, `send_headers_upstream: [X-RID-Consumer-Entity, X-RID-Consumer-App, X-RID-Subscription, X-RID-Purpose, X-RID-Operation, X-RID-End-User-Hash, X-RID-Subject-Ref, X-RID-End-User, X-RID-Body-Subject, X-RID-Data-Subject, X-Request-Id]`. Para cada nombre de esa lista el plugin pone el valor que devuelve la política y, **si la política no lo devuelve, borra la cabecera del cliente**. Por eso la política devuelve siempre `X-RID-Purpose` y `X-Request-Id`, y **nunca** `X-RID-End-User` ni `X-RID-Body-Subject` (así los valores en claro del funcionario y del titular no llegan al proveedor; ADR-0015, ADR-0017). `X-RID-Data-Subject`, la cabecera que antes declaraba el consumidor, también se elimina. Si OPA no responde, niega con 403 (falla cerrado).
+  3. `proxy-rewrite` (rewrite, 1008): elimina las cabeceras que solo el gateway puede poner (`X-RID-Consumer-Entity`, `X-RID-Consumer-App`, `X-RID-Subscription`, `X-RID-Operation`, `X-RID-End-User-Hash`, `X-RID-Subject-Ref`) si vienen del cliente, antes de que OPA arme su entrada; conserva `X-RID-Purpose` y `X-RID-End-User`, que OPA necesita leer. Antes, en la misma fase y con prioridad 1020, el plugin propio `rid-data-subject` lee del cuerpo JSON el titular de las operaciones que lo declaran allí y lo pasa como `X-RID-Body-Subject`, después de borrar cualquier valor que haya enviado el cliente (ADR-0017). Con prioridad 1025, el plugin propio `rid-client-cert` borra la `X-RID-Client-Cert-S256` que mande el cliente y, si nginx verificó un certificado de cliente en el handshake, pone su huella RFC 8705 (S-3). Reescribe la ruta quitando el prefijo (solo cambia `upstream_uri`; OPA sigue viendo la ruta pública completa).
+  4. `opa` (access, 2001): `host` del OPA local, `policy: rid/authz`, `with_route: true`, `send_headers_upstream: [X-RID-Consumer-Entity, X-RID-Consumer-App, X-RID-Subscription, X-RID-Purpose, X-RID-Operation, X-RID-End-User-Hash, X-RID-Subject-Ref, X-RID-End-User, X-RID-Body-Subject, X-RID-Client-Cert-S256, X-RID-Data-Subject, X-Request-Id]`. Para cada nombre de esa lista el plugin pone el valor que devuelve la política y, **si la política no lo devuelve, borra la cabecera del cliente**. Por eso la política devuelve siempre `X-RID-Purpose` y `X-Request-Id`, y **nunca** `X-RID-End-User`, `X-RID-Body-Subject` ni `X-RID-Client-Cert-S256` (así los valores en claro del funcionario y del titular no llegan al proveedor; ADR-0015, ADR-0017). `X-RID-Data-Subject`, la cabecera que antes declaraba el consumidor, también se elimina. Si OPA no responde, niega con 403 (falla cerrado).
   5. `limit-count` (access, 1002): límite por suscripción con `key_type: var`, `key: http_x_rid_subscription` y `count: "$http_x_rid_rate_limit"`, las dos cabeceras que puso OPA desde el bundle. Contadores locales en cada nodo, con el límite repartido entre los nodos (ADR-0020). Ver SPIKE S-2.
   6. `response-rewrite` (899): convierte el 429 de `limit-count` en problem+json con `vars: [["status","==",429],["upstream_status","!","~~","[0-9]"]]`. Sin upstream, la variable está vacía, así que el 429 de un proveedor pasa intacto (S-2).
   7. `prometheus` (log, 500).
   8. `http-logger` (log, 410): hacia Fluent Bit con `log_format` de §8.
 
 Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega todo.
+
+**SSL** `rid-ssl-gateway` (M3-02, S-3)
+- `snis` = `RID_GATEWAY_TLS_HOSTS`. `cert` y `key` son el certificado de servidor del gateway, que emite step-ca con el provisioner `rid-gateway-tls`. El portal genera la clave, la guarda sellada (`gateway_certificate`, `RID_SECRETS_KEY`) y renueva el certificado en el último tercio de su vida. Lo audita (`gateway_certificate.issued`) sin la clave.
+- Con `features.mtls.required`, `client.ca` lleva la intermedia y la raíz de step-ca (`depth: 2`), sin `skip_mtls_uri_regex`: APISIX rechaza en el handshake toda llamada sin un certificado válido de la red. Sin el flag, el objeto sirve TLS sin pedir certificado.
+- Lo aplica el reconciliador de APISIX en cada pasada completa (`sync_state` `apisix:ssl:rid-ssl-gateway`). La clave no se compara, porque APISIX la guarda cifrada: una clave nueva siempre llega con un certificado nuevo.
 
 **Reconciliador (M1-08):** consume `gateway.sync` (aggregate `apiVersion:<id>`) y sirve las versiones `published` y `deprecated`. Compara el estado deseado con lo que guarda APISIX campo por campo (APISIX agrega valores por defecto, que no cuentan como deriva) y solo escribe si algo cambió: upstream antes que ruta, y al borrar, ruta antes que upstream. Hace una pasada completa al arrancar y cada 5 minutos, que también borra los objetos `rid-` que ninguna versión pide. Los objetos sin ese prefijo no se tocan. El resultado queda en `sync_state` (`apisix:route:rid-route-<id>`).
 
@@ -182,14 +187,15 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
           "rateLimitPerMinute": 600
         }
       ],
-      "revokedCertFingerprints": []
+      "certificates": ["<x5t#S256 de cada certificado vigente>"]
     }
   },
   "config": {
     "endUserHashSalt": "<RID_END_USER_HASH_SALT>",
     "subjectRefKey": "<RID_SUBJECT_REF_KEY>",
     "country": "CO",
-    "documentTypes": ["CC", "CE", "TI", "PEP", "PPT", "PA"]
+    "documentTypes": ["CC", "CE", "TI", "PEP", "PPT", "PA"],
+    "mtlsRequired": false
   }
 }
 ```
@@ -202,6 +208,7 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
   5. Si `endUserRequired` (clasificaciones `personal` y `sensitive`), exige `X-RID-End-User` y calcula `X-RID-End-User-Hash = HMAC-SHA-256(valor, sal)` con la sal del despliegue (`RID_END_USER_HASH_SALT`, mínimo 16 caracteres; sin ella el bundle no se sirve). La sal va en el bundle, que solo se sirve por red interna.
   6. Devuelve `allow`, cabeceras para el upstream y, al negar, `status_code` + cuerpo problem+json en `reason` con una razón estable (`no_subscription`, `purpose_not_allowed`, `operation_not_allowed`, `subscription_expired`, `end_user_required`, `data_subject_required`, `app_suspended`; con mTLS exigido, también `client_certificate_required`, `token_not_bound`, `certificate_mismatch` y `certificate_revoked`, según S-3). Al negar, `headers` son cabeceras de **respuesta**: `Content-Type: application/problem+json` y `X-RID-Deny-Reason: <razón>`, que el log de acceso registra con `$sent_http_x_rid_deny_reason`.
 - `data.json` incluye las rutas de las versiones `published`/`deprecated` y los clientes no eliminados (las aplicaciones suspendidas aparecen con `status: suspended`). Solo lleva las suscripciones `approved` o `active` de versiones servidas. `pathRegex` se ancla a la ruta pública completa, y un parámetro `{x}` equivale a un segmento o a parte de uno (`[^/]+`).
+- Certificado de cliente (M3-02). Se comprueba cuando `config.mtlsRequired` está activo, y siempre que el token esté ligado a un certificado (`cnf.x5t#S256`, RFC 8705 §3). Va justo después de la aplicación suspendida. Orden: `client_certificate_required` (no hay huella verificada), `token_not_bound`, `certificate_mismatch` (la huella no es la del token) y `certificate_revoked` (la huella no está en `clients[id].certificates`, la lista de certificados vigentes de esa aplicación). Revocar o vencer un certificado lo saca de la lista en la siguiente descarga del bundle (10–20 s).
 - Una cabecera repetida cuenta como ausente. Cuando hay más de una suscripción válida, se elige siempre la misma (orden por id). Las razones se evalúan en este orden: cliente, aplicación suspendida, ruta, operación, suscripción a la ruta, operación concedida, finalidad, vigencia y funcionario.
 - Las políticas tienen tests con `opa test` y cobertura ≥ 90 %, exigida en CI (`--threshold 90`).
 

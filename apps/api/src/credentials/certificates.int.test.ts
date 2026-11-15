@@ -14,7 +14,9 @@ import { AuditService } from '../audit/audit.service.js';
 import { ServiceUnavailableError } from '../common/errors.js';
 import { resolveNotification } from '../notifications/notification-rules.js';
 import { NOTIFICATION_TOPIC } from '../notifications/notifying-actions.js';
+import { OpaService } from '../opa/opa.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import { KEYCLOAK_ADMIN } from '../reconcilers/keycloak/keycloak-admin.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
@@ -317,6 +319,45 @@ describe('client certificates through step-ca (M3-01)', () => {
       await expect(down.sign(request)).rejects.toBeInstanceOf(ServiceUnavailableError);
       const badPassword = new StepCaClient({ ...stepCaSettings(), password: 'not-the-password' });
       await expect(badPassword.sign(request)).rejects.toBeInstanceOf(ServiceUnavailableError);
+    });
+  });
+
+  describe('OPA bundle (M3-02)', () => {
+    const bundleClient = async (clientId: string) =>
+      (await app.get(OpaService).data()).data.clients[clientId];
+
+    it('lists the valid certificates of each application; revoked or expired ones leave it', async () => {
+      const application = await newApp();
+      expect((await bundleClient(application.clientId))?.certificates).toEqual([]);
+      const { issued } = await issue(application.id, application.clientId);
+      const fingerprint = issued.credential.certificate?.fingerprint ?? '';
+      expect((await bundleClient(application.clientId))?.certificates).toEqual([fingerprint]);
+      expect(
+        await prisma.outboxMessage.count({
+          where: { topic: POLICY_SYNC_TOPIC, aggregate: `credential:${issued.credential.id}` },
+        }),
+      ).toBe(1);
+
+      // Revocation (M3-04 will be the way in): out of the bundle on its next build.
+      await prisma.credential.update({
+        where: { id: issued.credential.id },
+        data: { status: 'revoked' },
+      });
+      expect((await bundleClient(application.clientId))?.certificates).toEqual([]);
+
+      // Past notAfter, even before the lifecycle job marks it expired.
+      await prisma.credential.update({
+        where: { id: issued.credential.id },
+        data: { status: 'active', notAfter: new Date(Date.now() - 1000) },
+      });
+      expect((await bundleClient(application.clientId))?.certificates).toEqual([]);
+    });
+
+    it('tells OPA whether the network requires mTLS', async () => {
+      const { data } = await app.get(OpaService).data();
+      expect(data.config.mtlsRequired).toBe(
+        loadCountryConfig({ code: 'co' }).features.mtls.required,
+      );
     });
   });
 

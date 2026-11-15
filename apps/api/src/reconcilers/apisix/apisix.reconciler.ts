@@ -16,13 +16,17 @@ import { QueueService } from '../../queue/queue.service.js';
 import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apisix-admin.js';
 import {
   desiredGateway,
+  desiredSsl,
+  GATEWAY_SSL_ID,
   type GatewaySettings,
   MANAGED_PREFIX,
   matches,
   routeId,
+  sslMatches,
   UnsupportedUpstreamError,
   upstreamId,
 } from './desired-state.js';
+import { GatewayCertificates } from './gateway-certificates.js';
 
 /** Outbox topic for changes that affect an API version's route (aggregate apiVersion:<id>). */
 export const GATEWAY_SYNC_TOPIC = 'gateway.sync';
@@ -36,6 +40,7 @@ export type GatewayResult = 'created' | 'updated' | 'unchanged' | 'deleted' | 'a
 
 export const gatewaySyncTarget = (apiVersionId: string): string =>
   `apisix:route:${routeId(apiVersionId)}`;
+export const GATEWAY_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_SSL_ID}`;
 
 const hash = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -58,6 +63,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     private readonly queue: QueueService,
     @Inject(APISIX_ADMIN) private readonly admin: ApisixAdmin,
     @Inject(APISIX_SETTINGS) private readonly settings: GatewaySettings,
+    private readonly certificates: GatewayCertificates,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -77,8 +83,13 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     if (kind === 'apiVersion' && id) await this.reconcileVersion(id);
   }
 
-  /** Full pass: every served version, then orphans. Errors are recorded per version. */
+  /** Full pass: the gateway's TLS, every served version, then orphans. Errors are recorded. */
   async reconcileAll(): Promise<void> {
+    try {
+      await this.reconcileTls();
+    } catch (error) {
+      this.logger.warn(`APISIX TLS reconcile failed: ${String(error)}`);
+    }
     const versions = await this.prisma.apiVersion.findMany({
       where: { status: { in: [...SERVED] } },
       select: { id: true },
@@ -110,6 +121,35 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     for (const id of managed(await this.admin.list('upstreams'), 'upstream')) {
       await this.deleteUpstream(id);
       this.logger.log(`Removed orphan APISIX upstream ${id}`);
+    }
+    for (const id of await this.admin.list('ssls')) {
+      if (!id.startsWith(MANAGED_PREFIX) || id === GATEWAY_SSL_ID) continue;
+      await this.admin.delete('ssls', id);
+      this.logger.log(`Removed orphan APISIX SSL object ${id}`);
+    }
+  }
+
+  /**
+   * The gateway's SSL object (S-3, M3-02): its server certificate, issued and renewed through
+   * step-ca, and with features.mtls.required the network CA as `client.ca`.
+   */
+  async reconcileTls(now = new Date()): Promise<'created' | 'updated' | 'unchanged'> {
+    let desiredHash = hash(null);
+    try {
+      const certificate = await this.certificates.server(this.settings.tls.hosts, now);
+      const desired = desiredSsl(certificate, this.settings);
+      desiredHash = hash({ ...desired, key: certificate.fingerprint });
+      const actual = await this.admin.get('ssls', GATEWAY_SSL_ID);
+      let result: 'created' | 'updated' | 'unchanged' = 'unchanged';
+      if (!actual || !sslMatches(desired, actual)) {
+        await this.admin.put('ssls', GATEWAY_SSL_ID, desired);
+        result = actual ? 'updated' : 'created';
+      }
+      await this.recordSuccess(GATEWAY_TLS_SYNC_TARGET, desiredHash);
+      return result;
+    } catch (error) {
+      await this.recordError(GATEWAY_TLS_SYNC_TARGET, desiredHash, error);
+      throw error;
     }
   }
 

@@ -51,13 +51,14 @@ bundle := {
 			"endUserRequired": true,
 			"rateLimitPerMinute": 600,
 		}],
-		"revokedCertFingerprints": [],
+		"certificates": ["thumb-a"],
 	}},
 	"config": {
 		"endUserHashSalt": "test-salt",
 		"subjectRefKey": "subject-key-for-tests-0000000000000001",
 		"country": "CO",
 		"documentTypes": ["CC", "CE", "TI"],
+		"mtlsRequired": false,
 	},
 }
 
@@ -378,4 +379,94 @@ test_deny_returns_problem_json_and_the_reason_header if {
 test_denies_everything_without_data if {
 	not authz.allow with input as request({})
 	authz.deny_reason == "no_subscription" with input as request({})
+}
+
+# --- Client certificate (SPIKE S-3, M3-02) ----------------------------------------------------
+
+mtls_bundle := object.union(bundle, {"config": {"mtlsRequired": true}})
+
+bound_token(thumbprint) := concat(" ", ["Bearer", token({"azp": "rid-app-a", "cnf": {"x5t#S256": thumbprint}})])
+
+mtls_call(thumbprint, bound) := with_headers({
+	"authorization": bound_token(bound),
+	"x-rid-client-cert-s256": thumbprint,
+})
+
+test_mtls_allows_the_bound_certificate_of_the_application if {
+	authz.allow with input as mtls_call("thumb-a", "thumb-a")
+		with data.routes as mtls_bundle.routes
+		with data.clients as mtls_bundle.clients
+		with data.config as mtls_bundle.config
+		with time.now_ns as june_2026
+}
+
+test_mtls_never_forwards_the_thumbprint if {
+	h := headers_for(mtls_call("thumb-a", "thumb-a"), mtls_bundle)
+	h["X-RID-Subscription"] == "sub-1"
+	not h["X-RID-Client-Cert-S256"]
+}
+
+test_mtls_requires_a_verified_certificate if {
+	inp := with_headers({"authorization": bound_token("thumb-a")})
+	denied(inp, mtls_bundle, "client_certificate_required")
+}
+
+test_mtls_requires_a_bound_token if {
+	denied(with_headers({"x-rid-client-cert-s256": "thumb-a"}), mtls_bundle, "token_not_bound")
+}
+
+test_mtls_denies_a_token_bound_to_another_certificate if {
+	denied(mtls_call("thumb-a", "thumb-b"), mtls_bundle, "certificate_mismatch")
+}
+
+test_mtls_denies_a_certificate_no_longer_valid_for_the_application if {
+	revoked := json.patch(mtls_bundle, [{"op": "replace", "path": "/clients/rid-app-a/certificates", "value": []}])
+	denied(mtls_call("thumb-a", "thumb-a"), revoked, "certificate_revoked")
+}
+
+test_mtls_denies_the_certificate_of_another_application if {
+	other := json.patch(mtls_bundle, [{"op": "add", "path": "/clients/rid-app-b", "value": object.union(
+		bundle.clients["rid-app-a"],
+		{"applicationId": "b", "certificates": ["thumb-b"]},
+	)}])
+	denied(mtls_call("thumb-b", "thumb-b"), other, "certificate_revoked")
+}
+
+test_mtls_denies_a_repeated_thumbprint_header if {
+	inp := with_headers({"authorization": bound_token("thumb-a"), "x-rid-client-cert-s256": ["thumb-a", "thumb-a"]})
+	denied(inp, mtls_bundle, "client_certificate_required")
+}
+
+test_mtls_reports_a_suspended_application_first if {
+	suspended := object.union(mtls_bundle, {"clients": {"rid-app-a": {"status": "suspended"}}})
+	denied(with_headers({}), suspended, "app_suspended")
+}
+
+test_without_mtls_an_unbound_call_needs_no_certificate if {
+	authz.allow with input as request({})
+		with data.routes as bundle.routes
+		with data.clients as bundle.clients
+		with data.config as bundle.config
+		with time.now_ns as june_2026
+}
+
+test_without_mtls_a_bound_token_still_needs_its_certificate if {
+	denied(with_headers({"authorization": bound_token("thumb-a")}), bundle, "client_certificate_required")
+	denied(mtls_call("thumb-b", "thumb-a"), bundle, "certificate_mismatch")
+	authz.allow with input as mtls_call("thumb-a", "thumb-a")
+		with data.routes as bundle.routes
+		with data.clients as bundle.clients
+		with data.config as bundle.config
+		with time.now_ns as june_2026
+}
+
+test_mtls_deny_reason_has_a_problem_detail if {
+	r := authz.reason with input as with_headers({"authorization": bound_token("thumb-a")})
+		with data.routes as mtls_bundle.routes
+		with data.clients as mtls_bundle.clients
+		with data.config as mtls_bundle.config
+		with time.now_ns as june_2026
+	r.code == "client_certificate_required"
+	r.status == 403
+	contains(r.detail, "client certificate")
 }

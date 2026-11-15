@@ -624,6 +624,9 @@
       "audit": {
         "anchored": "Anclaje diario de la bitácora",
         "exported": "Bitácora exportada"
+      },
+      "gateway_certificate": {
+        "issued": "Certificado del gateway emitido"
       }
     },
     "filters": {
