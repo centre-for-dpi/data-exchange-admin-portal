@@ -566,7 +566,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
 ## M4 — Nodos del kit y onboarding (bootcamp)
 
-- [ ] **SPIKE S-5 — X-Road REST como upstream y propagación del consumidor**
+- [x] **SPIKE S-5 — X-Road REST como upstream y propagación del consumidor**
+  - _Conclusión_ (`docs/spikes/S-5.md`, prototipo reproducible contra un Security Server simulado según PR-REST 1.0.4): funciona sin plugin propio.
+    - El upstream es el Security Server **del operador** (URL de la configuración del despliegue, no de la versión). La ruta reescribe a `/r1/{serviceId}/…`, con las partes del identificador **literales**: APISIX codifica `upstream_uri`, y una parte ya codificada llega doble codificada.
+    - `proxy-rewrite` fija `X-Road-Client` (el subsistema del operador) y borra `X-Road-Security-Server`, `-Represented-Party`, `-Id` y `-Request-Hash` del consumidor.
+    - El consumidor real viaja en las `X-RID-*`, que X-Road pasa como cabeceras definidas por el usuario. OPA pone además `X-Road-UserId` (hash del funcionario) y `X-Road-Issue` (`rid:subscription:<id>`).
+    - Riesgo nuevo, el diputado confundido: todas las rutas `xroad` salen con la identidad del operador. El miembro del `serviceId` debe ser el miembro X-Road de la entidad que publica, y ese miembro lo registra el operador.
+    - Queda por confirmar con un Security Server real (piloto) que las `X-RID-*` llegan intactas al sistema del proveedor.
 - [ ] **M4-01 — Tokens de enrolamiento**: emisión de un solo uso (72 h) por entidad; listado y anulación.
 - [ ] **M4-02 — Enrolamiento y heartbeat**: endpoints de `ARCHITECTURE.md §10`; estados `enrollment_issued → enrolled → online/offline`; alerta a los 5 min sin heartbeat.
 - [ ] **M4-03 — Hub WireGuard**: contenedor `wg-hub`, alta de peers por reconciliador, nodo simulado conectándose en Compose.

@@ -339,7 +339,7 @@ Objetivo de M5-06. Hoy solo existe el plugin `prometheus` en cada ruta de APISIX
 
 El kit se especifica en otro repositorio; este contrato es la frontera. En desarrollo, `infra/mock-providers` simula un nodo (servicios Fastify con datos sintéticos, ADR-0009) y un contenedor WireGuard.
 
-**Camino X-Road:** el gateway usa un Security Server del operador como cliente X-Road. El upstream apunta al Security Server y el reconciliador agrega `X-Road-Client` (subsistema del operador) y el identificador del servicio en la ruta REST. La identidad del consumidor real se propaga en `X-Road-UserId` y en las cabeceras `X-RID-*` (verificar soporte exacto del protocolo REST de X-Road en SPIKE S-5).
+**Camino X-Road (SPIKE S-5, `docs/spikes/S-5.md`):** el gateway usa un Security Server del operador como cliente X-Road (PR-REST `r1`). El upstream apunta al Security Server, la ruta reescribe a `/r1/{serviceId}/…` y fija `X-Road-Client` (subsistema del operador). La identidad del consumidor real viaja en las cabeceras `X-RID-*` (cabeceras definidas por el usuario, que X-Road pasa intactas), y OPA pone `X-Road-UserId` (hash del funcionario) y `X-Road-Issue` (la suscripción). El miembro del `serviceId` debe ser el de la entidad que publica (M4-05).
 
 ## 11. Despliegue
 
@@ -430,5 +430,5 @@ Carpeta Ciudadana ─(token del ciudadano)─▶ API: /data-subjects/me/accesses
 | S-2 | Límite por suscripción con `limit-count` usando la cabecera puesta por OPA; alternativa si no funciona | M3 |
 | S-3 | mTLS de cliente: variable con la huella del certificado en APISIX, comparación con `cnf.x5t#S256` del token y con lista de revocados en OPA | M3 |
 | S-4 | Keycloak: `tls_client_auth` + tokens ligados a certificado en `client_credentials` | M3 |
-| S-5 | X-Road REST: cabeceras para propagar el consumidor real; configuración del gateway como cliente | M5 |
+| S-5 | X-Road REST: cabeceras para propagar el consumidor real; configuración del gateway como cliente (resuelta, `docs/spikes/S-5.md`) | M4 |
 | S-6 | Aserción firmada del gateway hacia el proveedor (JWS) para no repudio | M6 |
