@@ -89,6 +89,7 @@ Dos planos separados:
   - el plugin propio `rid-client-cert` pone en `X-RID-Client-Cert-S256` la huella (base64url del SHA-256 del DER) del certificado verificado, tras borrar la que mande el cliente. No sirve `$ssl_client_fingerprint`, que es SHA-1;
   - OPA la compara con `cnf.x5t#S256` y con las huellas vigentes de la aplicación en el bundle (`data.clients[id].certificates`). Revocar es quitar la huella. La cabecera nunca llega al proveedor;
   - el TLS del gateway debe terminar en APISIX: delante solo puede haber un balanceador de capa 4 con paso directo TLS.
+  - el token también se pide al gateway (SPIKE S-4, `docs/spikes/S-4.md`). Una ruta de APISIX lleva al endpoint de tokens de `rid-gateway` el certificado ya verificado, en `SSL_CLIENT_CERT` (`$ssl_client_escaped_cert`) y `ssl-client-verify`, reemplazando las del cliente. Keycloak usa el proveedor x509 `nginx` con `trust-proxy-verification`, y cada cliente usa `client-x509`, con sujeto `CN=rid-app-<uuid>`, la CA emisora fijada y tokens ligados. Como Keycloak cree en esa cabecera, toda otra vía hacia él debe borrarla.
 - El portal usa una cuenta de servicio con permiso `manage-clients` **solo** en `rid-gateway`.
 
 ## 4. Patrón de reconciliación

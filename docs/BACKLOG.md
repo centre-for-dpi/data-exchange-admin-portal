@@ -423,7 +423,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - OPA niega con `certificate_mismatch`, `token_not_bound` y `certificate_revoked`.
     - Se revoca con datos del bundle: una lista de huellas vigentes por aplicación, sin CRL ni OCSP.
     - El TLS debe terminar en APISIX: en el VPS hace falta un nombre o puerto propio con paso directo TLS (ver M3-10).
-- [ ] **SPIKE S-4 — Keycloak `tls_client_auth` y tokens ligados a certificado**
+- [x] **SPIKE S-4 — Keycloak `tls_client_auth` y tokens ligados a certificado**
+  - _Conclusión_ (`docs/spikes/S-4.md`, prototipo reproducible con Keycloaks desechables): funciona en `client_credentials` con Keycloak 26.8.
+    - Los clientes usan `client-x509`, con el sujeto exacto y la CA emisora fijados, y `tls.client.certificate.bound.access.tokens`.
+    - El token trae `cnf.x5t#S256` con la misma fórmula del gateway (S-3).
+    - Montaje recomendado: APISIX termina el único mTLS, también para el token (ruta en el gateway hacia `rid-gateway`). Le pasa a Keycloak el certificado verificado en `SSL_CLIENT_CERT` y `ssl-client-verify`, con el proveedor `nginx` y `trust-proxy-verification`.
+    - Keycloak cree en esa cabecera, así que toda otra vía hacia él (Traefik `/auth`, la red interna) debe borrarla.
+    - Las opciones SPI deben ir en el formato nuevo de Keycloak 26.8 (`--spi-x509cert-lookup--provider`).
 - [ ] **SPIKE S-2 — Límite por suscripción**
 - [ ] **M3-01 — Integración con step-ca**: firma de CSR de aplicaciones con OTT del provisioner JWK; certificado descargable; aviso a 15 días del vencimiento.
 - [ ] **M3-02 — mTLS de cliente en el gateway**: objeto SSL con `client.ca`; llamadas sin certificado válido rechazadas; certificados revocados rechazados vía bundle OPA.
