@@ -103,5 +103,42 @@
         "realm-management": ["manage-clients"]
       }
     }
-  ]
+  ],
+  "clientProfiles": {
+    "profiles": [
+      {
+        "name": "rid-secret-rotation",
+        "description": "Rotation window of application secrets (M3-04): regenerating keeps the previous secret as rotated, for at most 30 days; the portal ends the window earlier.",
+        "executors": [
+          {
+            "executor": "secret-rotation",
+            "configuration": {
+              "expiration-period": "315360000",
+              "rotated-expiration-period": "2592000",
+              "remaining-rotation-period": "0"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "clientPolicies": {
+    "policies": [
+      {
+        "name": "rid-secret-rotation",
+        "description": "Applications managed by the portal (client attribute rid.managed = true)",
+        "enabled": true,
+        "conditions": [
+          {
+            "condition": "client-attributes",
+            "configuration": {
+              "attributes": "[{\"key\":\"rid.managed\",\"value\":\"true\"}]",
+              "is-negative-logic": false
+            }
+          }
+        ],
+        "profiles": ["rid-secret-rotation"]
+      }
+    ]
+  }
 }

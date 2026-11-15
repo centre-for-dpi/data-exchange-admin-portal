@@ -7,7 +7,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { open } from '../../common/secrets.js';
+import { hashSecret, open } from '../../common/secrets.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
 import { type GatewayClient, KEYCLOAK_ADMIN, type KeycloakGatewayAdmin } from './keycloak-admin.js';
@@ -90,7 +90,12 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
     });
     if (!app) return 'missing';
 
-    const pending = app.credentials.find((c) => c.sealedSecret);
+    const active = app.credentials.find((c) => c.status === 'active');
+    // The previous secret during its rotation window (M3-04).
+    const rotating = app.credentials.find(
+      (c) => c.status === 'rotating' && c.rotationEndsAt && c.rotationEndsAt > new Date(),
+    );
+    const pending = active?.sealedSecret ? active : undefined;
     const desired: GatewayClient = {
       clientId: app.keycloakClientId,
       name: app.name,
@@ -106,10 +111,18 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
         'rid.application': app.id,
         'rid.entity': app.entityId,
         'rid.environment': app.environment,
+        // Puts the client under the realm's secret rotation policy (M3-04).
+        'rid.managed': 'true',
       },
     };
     const desiredHash = createHash('sha256')
-      .update(JSON.stringify({ ...desired, secret: app.credentials[0]?.secretHash ?? null }))
+      .update(
+        JSON.stringify({
+          ...desired,
+          secret: active?.secretHash ?? null,
+          rotated: rotating?.secretHash ?? null,
+        }),
+      )
       .digest('hex');
     const target = syncTarget(app.keycloakClientId);
 
@@ -125,14 +138,32 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
         }
         await this.admin.createClient({ ...desired, secret });
         result = 'created';
-      } else if (secret || COMPARED.some((f) => !isDeepStrictEqual(desired[f], actual[f]))) {
-        await this.admin.updateClient(actual.id ?? '', {
-          ...desired,
-          ...(secret ? { secret } : {}),
-        });
-        result = 'updated';
       } else {
-        result = 'unchanged';
+        const id = actual.id ?? '';
+        let changed = COMPARED.some((f) => !isDeepStrictEqual(desired[f], actual[f]));
+        if (changed) {
+          // Attributes first: the rotation policy applies to clients with rid.managed.
+          await this.admin.updateClient(id, desired);
+        }
+        if (secret) {
+          const current = await this.admin.currentSecret(id);
+          if (!current || hashSecret(current) !== pending?.secretHash) {
+            // A rotation: Keycloak keeps the previous secret as the rotated one (regenerate),
+            // then takes the new secret as the current one. If the previous secret is no longer
+            // the current one (an interrupted pass), it is already the rotated one.
+            if (rotating && current && hashSecret(current) === rotating.secretHash) {
+              await this.admin.regenerateSecret(id);
+            }
+            await this.admin.updateClient(id, { ...desired, secret });
+            changed = true;
+          }
+        }
+        // Without a rotation in progress (revoked, or its window ended) no rotated secret stays.
+        if (!rotating && (await this.admin.rotatedSecret(id)) !== undefined) {
+          await this.admin.deleteRotatedSecret(id);
+          changed = true;
+        }
+        result = changed ? 'updated' : 'unchanged';
       }
 
       // Keycloak has the secret now: the sealed copy is erased (never kept longer than needed).

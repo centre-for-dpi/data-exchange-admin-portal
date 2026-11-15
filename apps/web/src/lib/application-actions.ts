@@ -4,7 +4,9 @@ import {
   CSR_ERRORS,
   type CsrError,
   createdApplicationSchema,
+  credentialSchema,
   issuedCertificateSchema,
+  rotatedSecretSchema,
 } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
@@ -98,4 +100,64 @@ export async function issueCertificateAction(
       serial: result.data.credential.certificate?.serial ?? '',
     },
   };
+}
+
+export interface RotateSecretState extends FormState {
+  /** Present once, right after the rotation: the only time the new secret is shown. */
+  rotated?: { clientSecret: string; previousWorksUntil: string | null };
+}
+
+/** Rotates the client secret (M3-04): a new one now, the previous one for a while. */
+export async function rotateSecretAction(
+  _prev: RotateSecretState,
+  formData: FormData,
+): Promise<RotateSecretState> {
+  const t = await getTranslations('forms');
+  const tr = await getTranslations('myApps.rotation');
+  const entityId = (await getViewer()).activeEntity?.entity.id;
+  const applicationId = text(formData, 'applicationId');
+  if (!entityId || !applicationId) return { formError: t('unexpected') };
+  const result = await apiSend(
+    'POST',
+    `/entities/${entityId}/applications/${applicationId}/credentials/secret`,
+    {},
+    rotatedSecretSchema,
+  );
+  if (!result.ok) {
+    if (result.status === 409) return { formError: tr('conflict') };
+    return problemToFormState(result.problem, t('unexpected'));
+  }
+  revalidatePath('/', 'layout');
+  return {
+    rotated: {
+      clientSecret: result.data.clientSecret,
+      previousWorksUntil: result.data.previous.rotationEndsAt,
+    },
+  };
+}
+
+/** Revokes a credential (M3-04): it stops working at once. */
+export async function revokeCredentialAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const t = await getTranslations('forms');
+  const tr = await getTranslations('myApps.rotation');
+  const entityId = (await getViewer()).activeEntity?.entity.id;
+  const applicationId = text(formData, 'applicationId');
+  const credentialId = text(formData, 'credentialId');
+  const reason = text(formData, 'reason');
+  if (!entityId || !applicationId || !credentialId) return { formError: t('unexpected') };
+  const result = await apiSend(
+    'POST',
+    `/entities/${entityId}/applications/${applicationId}/credentials/${credentialId}/revoke`,
+    reason ? { reason } : {},
+    credentialSchema,
+  );
+  if (!result.ok) {
+    if (result.status === 409) return { formError: tr('conflict') };
+    return { ...problemToFormState(result.problem, t('unexpected')), values: { reason } };
+  }
+  revalidatePath('/', 'layout');
+  return { done: true };
 }

@@ -112,8 +112,58 @@ test.describe('applications and OAuth2 credentials', () => {
     await expect(page.getByTestId('certificate-fingerprint')).toHaveText(
       createHash('sha256').update(leaf.raw).digest('base64url'),
     );
-    await expect(section.getByText('La aplicación ya tiene un certificado vigente.')).toBeVisible();
-    await expect(section.getByRole('button', { name: 'Solicitar certificado' })).toHaveCount(0);
+    // With a valid certificate, a new request renews it (M3-04).
+    await expect(
+      section.getByText(/Puedes pedir un certificado nuevo para renovarlo/),
+    ).toBeVisible();
+    await expect(section.getByRole('button', { name: 'Solicitar certificado' })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+  });
+
+  test('carlos rotates the secret: both work during the window, then he revokes the old one (M3-04)', async ({
+    page,
+  }) => {
+    await signIn(page, 'carlos.dev', '/my-apps/new');
+    const name = `Rotación ${Date.now().toString(36)}`;
+    await page.getByLabel(/^Nombre de la aplicación/).fill(name);
+    await page.getByLabel(/^Para qué la usará/).fill('Prueba la rotación del secreto.');
+    await page.getByLabel(/^Entorno/).selectOption('sandbox');
+    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.rid.example');
+    await page.getByRole('button', { name: 'Crear aplicación' }).click();
+    const clientId = (await page.getByTestId('client-id').textContent()) ?? '';
+    const oldSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
+    await page.getByRole('link', { name: 'Ir a la aplicación' }).click();
+    await expect(page.getByTestId('provisioning')).toHaveText('Lista', { timeout: 60_000 });
+
+    await page.getByRole('button', { name: 'Rotar el secreto' }).click();
+    const newSecret = (await page.getByTestId('rotated-secret').textContent()) ?? '';
+    expect(newSecret.length).toBeGreaterThanOrEqual(43);
+    expect(newSecret).not.toBe(oldSecret);
+    await expectNoAccessibilityViolations(page);
+
+    const token = (secret: string) =>
+      fetch(`${keycloakUrl}/realms/rid-gateway/protocol/openid-connect/token`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          authorization: `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}`,
+        },
+        body: 'grant_type=client_credentials',
+      }).then((r) => r.status);
+    // The reconciler applies the rotation in Keycloak within seconds.
+    await expect.poll(() => token(newSecret), { timeout: 60_000 }).toBe(200);
+    expect(await token(oldSecret)).toBe(200);
+
+    await page.reload();
+    await expect(page.getByTestId('works-until')).toBeVisible();
+    await page.getByText('Revocar el secreto anterior').click();
+    await page.getByLabel(/^Motivo/).fill('El sistema ya usa el secreto nuevo');
+    await page.getByRole('button', { name: 'Revocar ahora' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Credencial revocada.' }),
+    ).toBeVisible();
+    await expect.poll(() => token(oldSecret), { timeout: 60_000 }).toBe(401);
+    expect(await token(newSecret)).toBe(200);
     await expectNoAccessibilityViolations(page);
   });
 

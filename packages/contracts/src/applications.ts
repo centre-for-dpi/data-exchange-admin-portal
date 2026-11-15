@@ -50,6 +50,8 @@ export const credentialSchema = z.object({
   status: z.enum(['active', 'rotating', 'revoked', 'expired']),
   createdAt: z.iso.datetime(),
   lastUsedAt: z.iso.datetime().nullable(),
+  /** While `rotating`: when the rotation window ends and the credential stops working (M3-04). */
+  rotationEndsAt: z.iso.datetime().nullable(),
   /** Present for mtls_certificate credentials. */
   certificate: certificateInfoSchema.nullable(),
 });
@@ -115,3 +117,20 @@ export const credentialParamsSchema = z.strictObject({
   applicationId: z.uuid(),
   credentialId: z.uuid(),
 });
+
+/**
+ * Answer to a secret rotation (M3-04): the new secret, shown once. The previous secret keeps
+ * working until its rotationEndsAt.
+ */
+export const rotatedSecretSchema = z.object({
+  credential: credentialSchema,
+  previous: credentialSchema,
+  clientSecret: z.string(),
+});
+export type RotatedSecret = z.infer<typeof rotatedSecretSchema>;
+
+/** Revoking a credential (M3-04): it stops working at once. The reason goes to the audit trail. */
+export const revokeCredentialSchema = z.strictObject({
+  reason: z.string().trim().max(500).optional(),
+});
+export type RevokeCredentialInput = z.input<typeof revokeCredentialSchema>;

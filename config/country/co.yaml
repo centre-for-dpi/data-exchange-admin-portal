@@ -94,6 +94,8 @@ lifecycle:
   subscriptionRenewalNoticeDays: 30
   certificateValidityDays: 90
   certificateExpiryWarningDays: 15
+  # Days the previous secret or certificate keeps working after a rotation (1-30).
+  credentialRotationDays: 7
   enrollmentTokenValidityHours: 72
   nodeOfflineAfterMinutes: 5
 

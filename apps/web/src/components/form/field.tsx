@@ -24,10 +24,13 @@ export function Field({
   hint,
   required,
   state,
+  idSuffix,
   children,
 }: {
   name: string;
   label: string;
+  /** Tells apart the same field repeated on one page (several forms of the same kind). */
+  idSuffix?: string;
   hint?: string;
   required?: boolean;
   state: FormState;
@@ -40,7 +43,7 @@ export function Field({
   }) => ReactNode;
 }) {
   const t = useTranslations('forms');
-  const id = `field-${name}`;
+  const id = `field-${name}${idSuffix ? `-${idSuffix}` : ''}`;
   const errors = state.fieldErrors?.[name] ?? [];
   const describedBy = [hint ? `${id}-hint` : '', errors.length ? `${id}-error` : '']
     .filter(Boolean)

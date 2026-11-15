@@ -154,6 +154,60 @@ describe('realm rid-gateway (M0-03)', () => {
     }
   });
 
+  it('rotates a portal-managed secret: the previous one works until removed (M3-04)', async () => {
+    const clientId = `rid-app-rotation-${Date.now()}`;
+    const base = {
+      clientId,
+      enabled: true,
+      protocol: 'openid-connect',
+      publicClient: false,
+      serviceAccountsEnabled: true,
+      standardFlowEnabled: false,
+      directAccessGrantsEnabled: false,
+      clientAuthenticatorType: 'client-secret',
+      attributes: { 'rid.managed': 'true' },
+    };
+    const created = await asProvisioner('/rid-gateway/clients', {
+      method: 'POST',
+      body: JSON.stringify({ ...base, secret: 'previous-secret-0123456789abcdef' }),
+    });
+    expect(created.status).toBe(201);
+    const id = created.headers.get('location')?.split('/').pop() ?? '';
+    const works = async (secret: string) =>
+      (await clientCredentialsToken('rid-gateway', clientId, secret)).status === 200;
+    try {
+      // What the portal reconciler does: regenerate (previous -> rotated), then set the new one.
+      expect(
+        (await asProvisioner(`/rid-gateway/clients/${id}/client-secret`, { method: 'POST' }))
+          .status,
+      ).toBe(200);
+      const put = await asProvisioner(`/rid-gateway/clients/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...base, secret: 'new-secret-0123456789abcdef0123' }),
+      });
+      expect(put.status).toBe(204);
+      expect(await works('new-secret-0123456789abcdef0123')).toBe(true);
+      expect(await works('previous-secret-0123456789abcdef')).toBe(true);
+
+      const rotated = await asProvisioner(`/rid-gateway/clients/${id}/client-secret/rotated`);
+      expect(((await rotated.json()) as { value: string }).value).toBe(
+        'previous-secret-0123456789abcdef',
+      );
+      // Revocation, or the end of the window.
+      expect(
+        (
+          await asProvisioner(`/rid-gateway/clients/${id}/client-secret/rotated`, {
+            method: 'DELETE',
+          })
+        ).status,
+      ).toBe(204);
+      expect(await works('previous-secret-0123456789abcdef')).toBe(false);
+      expect(await works('new-secret-0123456789abcdef0123')).toBe(true);
+    } finally {
+      await asProvisioner(`/rid-gateway/clients/${id}`, { method: 'DELETE' });
+    }
+  });
+
   it('confines the provisioner to clients of rid-gateway', async () => {
     expect((await asProvisioner('/rid-gateway/users')).status).toBe(403);
     expect((await asProvisioner('/rid-gateway/roles')).status).toBe(403);

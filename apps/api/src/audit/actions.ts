@@ -56,6 +56,9 @@ export const AUDIT_ACTIONS = [
   'credential.created',
   'credential.expiry_notice_queued',
   'credential.expired',
+  'credential.rotation_started',
+  'credential.rotation_ended',
+  'credential.revoked',
   // Certificates of the gateway itself (M3-02)
   'gateway_certificate.issued',
   // Subscriptions (M1, M2-04, M2-06, M2-07)

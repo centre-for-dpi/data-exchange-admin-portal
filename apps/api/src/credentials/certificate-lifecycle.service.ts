@@ -10,6 +10,7 @@ import { canTransition, type CredentialStatus } from '../domain/credential/state
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
+import { queueCredentialSync } from './credentials.service.js';
 import { QueueService } from '../queue/queue.service.js';
 
 const SYSTEM = { type: 'system' as const, id: 'system:certificate-lifecycle' };
@@ -18,7 +19,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const BATCH = 500;
 
 /**
- * Time-driven steps of a client certificate (SPEC.md §4.3, M3-01), every
+ * Time-driven steps of credentials (SPEC.md §4.3, M3-01, M3-04), every
  * RID_LIFECYCLE_INTERVAL_SECONDS (default 300):
  * - expiry notice: lifecycle.certificateExpiryWarningDays before notAfter, once per certificate.
  *   The audited `credential.expiry_notice_queued` reaches the entity's app developers as a
@@ -54,8 +55,48 @@ export class CertificateLifecycleService implements OnApplicationBootstrap, OnAp
     if (this.timer) clearInterval(this.timer);
   }
 
-  async tick(now = new Date()): Promise<{ expired: string[]; noticed: string[] }> {
-    return { expired: await this.expireDue(now), noticed: await this.queueExpiryNotices(now) };
+  async tick(
+    now = new Date(),
+  ): Promise<{ expired: string[]; noticed: string[]; rotationsEnded: string[] }> {
+    return {
+      rotationsEnded: await this.endRotations(now),
+      expired: await this.expireDue(now),
+      noticed: await this.queueExpiryNotices(now),
+    };
+  }
+
+  /**
+   * Ends rotation windows (M3-04): a previous secret or certificate past its rotationEndsAt
+   * becomes `expired`, and Keycloak or the OPA bundle stop accepting it.
+   */
+  async endRotations(now = new Date()): Promise<string[]> {
+    const due = await this.prisma.credential.findMany({
+      where: { status: 'rotating', rotationEndsAt: { lte: now } },
+      select: { id: true, kind: true, applicationId: true, rotationEndsAt: true },
+      orderBy: { rotationEndsAt: 'asc' },
+      take: BATCH,
+    });
+    const ended: string[] = [];
+    for (const c of due) {
+      const done = await this.prisma.$transaction(async (tx) => {
+        const changed = await tx.credential.updateMany({
+          where: { id: c.id, status: 'rotating', rotationEndsAt: { lte: now } },
+          data: { status: 'expired' },
+        });
+        if (changed.count === 0) return false;
+        await this.audit.record(tx, {
+          actor: SYSTEM,
+          action: 'credential.rotation_ended',
+          target: { type: 'credential', id: c.id },
+          before: { status: 'rotating' },
+          after: { status: 'expired', rotationEndsAt: c.rotationEndsAt?.toISOString() },
+        });
+        await queueCredentialSync(this.outbox, tx, c, 'rotation_ended');
+        return true;
+      });
+      if (done) ended.push(c.id);
+    }
+    return ended;
   }
 
   /** Expires certificates past their validity; idempotent. */

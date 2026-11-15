@@ -4,6 +4,10 @@ import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { CertificateRequestForm } from '../../../../components/apps/certificate-form';
+import {
+  RevokeCredentialForm,
+  RotateSecretForm,
+} from '../../../../components/apps/credential-forms';
 import { AutoRefresh } from '../../../../components/auto-refresh';
 import { Badge, StatusBadge } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
@@ -47,9 +51,17 @@ export default async function ApplicationPage({ params }: PageProps) {
   const app = await load(appId);
   const mtlsRequired = getCountryConfig().features.mtls.required;
   const downloadBase = `/files/entities/${app.entityId}/applications/${app.id}/credentials`;
-  const activeCertificate = app.credentials.some(
-    (c) => c.kind === 'mtls_certificate' && c.status === 'active',
-  );
+  const rotationDays = getCountryConfig().lifecycle.credentialRotationDays;
+  const has = (kind: 'client_secret' | 'mtls_certificate', status: 'active' | 'rotating') =>
+    app.credentials.some((c) => c.kind === kind && c.status === status);
+  const activeCertificate = has('mtls_certificate', 'active');
+  const rotatingCertificate = has('mtls_certificate', 'rotating');
+  const rotatingSecret = has('client_secret', 'rotating');
+  const writable = app.canWrite && app.status === 'active';
+  // A credential that can be revoked: a certificate that still works, or the previous secret.
+  const revocable = (c: (typeof app.credentials)[number]) =>
+    app.canWrite &&
+    (c.status === 'rotating' || (c.status === 'active' && c.kind === 'mtls_certificate'));
   const csrCommand = [
     'openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \\',
     `  -keyout ${app.clientId}.key -out ${app.clientId}.csr \\`,
@@ -123,6 +135,16 @@ export default async function ApplicationPage({ params }: PageProps) {
                       timeStyle: 'short',
                     })}
                   </span>
+                  {c.rotationEndsAt ? (
+                    <span className="block text-muted-foreground" data-testid="works-until">
+                      {t('rotation.worksUntil', {
+                        date: format.dateTime(new Date(c.rotationEndsAt), {
+                          dateStyle: 'long',
+                          timeStyle: 'short',
+                        }),
+                      })}
+                    </span>
+                  ) : null}
                   {c.certificate ? (
                     <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-muted-foreground">
                       <dt>{t('certificates.validUntil')}</dt>
@@ -161,9 +183,27 @@ export default async function ApplicationPage({ params }: PageProps) {
                     </Button>
                   ) : null}
                 </span>
+                {revocable(c) ? (
+                  <RevokeCredentialForm
+                    applicationId={app.id}
+                    credentialId={c.id}
+                    label={
+                      c.certificate
+                        ? t('rotation.certificateLabel', { serial: c.certificate.serial })
+                        : t('rotation.secretLabel')
+                    }
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
+          {writable ? (
+            rotatingSecret ? (
+              <p className="text-sm">{t('rotation.secretInProgress')}</p>
+            ) : (
+              <RotateSecretForm applicationId={app.id} days={rotationDays} />
+            )
+          ) : null}
         </Section>
       </div>
 
@@ -176,10 +216,13 @@ export default async function ApplicationPage({ params }: PageProps) {
             <p className="text-sm">{t('certificates.inactive')}</p>
           ) : !app.canWrite ? (
             <p className="text-sm">{t('certificates.readOnly')}</p>
-          ) : activeCertificate ? (
-            <p className="text-sm">{t('certificates.hasActive')}</p>
+          ) : rotatingCertificate ? (
+            <p className="text-sm">{t('certificates.rotationInProgress')}</p>
           ) : (
             <>
+              {activeCertificate ? (
+                <p className="text-sm">{t('certificates.renewHint', { days: rotationDays })}</p>
+              ) : null}
               <div className="space-y-3">
                 <p className="text-sm">{t('certificates.howTo')}</p>
                 <pre

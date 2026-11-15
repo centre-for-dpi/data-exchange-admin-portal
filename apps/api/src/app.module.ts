@@ -23,6 +23,8 @@ import { CoreModule } from './core.module.js';
 import { CertificateLifecycleService } from './credentials/certificate-lifecycle.service.js';
 import { CertificatesController } from './credentials/certificates.controller.js';
 import { CertificatesService } from './credentials/certificates.service.js';
+import { CredentialsController } from './credentials/credentials.controller.js';
+import { CredentialsService } from './credentials/credentials.service.js';
 import { DocumentsController } from './documents/documents.controller.js';
 import { DocumentsService } from './documents/documents.service.js';
 import { StorageService } from './documents/storage.service.js';
@@ -86,6 +88,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     CatalogController,
     ApplicationsController,
     CertificatesController,
+    CredentialsController,
     SubscriptionsController,
     AccessRequestsController,
     OpaController,
@@ -112,6 +115,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     CatalogService,
     ApplicationsService,
     CertificatesService,
+    CredentialsService,
     CertificateLifecycleService,
     SubscriptionsService,
     SubscriptionLifecycleService,

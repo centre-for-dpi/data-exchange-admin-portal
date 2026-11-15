@@ -466,7 +466,15 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Cierra también el DNS rebinding pendiente de M1-08: el upstream `direct` apunta a las direcciones que el reconciliador resolvió y encontró públicas, con el nombre como Host y SNI (`pass_host: rewrite`, `upstream_host`).
     - Probado con tráfico real (APISIX, step-ca y un servicio mTLS en el host): el nodo recibe `CN=rid-gateway.salud` y el Host correcto. Sin el certificado del gateway, o con un nodo de otra CA, la llamada da 502.
     - En desarrollo APISIX alcanza el host (`host.docker.internal`, solo para estas pruebas); el despliegue lo quita.
-- [ ] **M3-04 — Rotación**: segunda credencial (secreto o certificado) con ventana de rotación; revocación de la anterior.
+- [x] **M3-04 — Rotación**: segunda credencial (secreto o certificado) con ventana de rotación; revocación de la anterior.
+  - _Notas de implementación:_ detalle en `SPEC.md §4.3` y `ARCHITECTURE.md §4.3`.
+    - Rotar el secreto (`POST …/credentials/secret`) da uno nuevo, que se muestra una sola vez, y deja el anterior `rotating` durante `lifecycle.credentialRotationDays` (configuración del país, 7 por defecto, máximo 30).
+    - Pedir un certificado con uno vigente lo renueva del mismo modo. Hay una rotación a la vez por tipo de credencial.
+    - Revocar (`POST …/credentials/{id}/revoke`, con motivo opcional para la bitácora) corta la credencial de inmediato: un certificado sale del bundle de OPA; un secreto deja de valer en Keycloak cuando corre el reconciliador. El secreto actual no se revoca (409): primero se rota.
+    - Al terminar la ventana, el trabajo periódico pasa la credencial anterior a `expired`. El bundle excluye un certificado fuera de su ventana aunque el trabajo no haya corrido.
+    - Keycloak guarda los dos secretos con su política de rotación (`rid-secret-rotation`). Keycloak ignora los atributos de secreto rotado por la Admin API: se comprobó con Keycloak 26.8, y `tests/infra` lo prueba con la cuenta del provisionador.
+    - Todo queda auditado: `credential.rotation_started`, `credential.revoked`, `credential.rotation_ended`.
+    - Despliegue: en el VPS hay que aplicar la política con `node scripts/keycloak-client-policies.mjs`, porque su realm ya existe.
 - [ ] **M3-05 — Límites por suscripción**: `limit-count` según el resultado de S-2; 429 con problem+json; límite visible en la suscripción.
 - [ ] **M3-06 — Funcionario final**: `X-RID-End-User` obligatorio según clasificación; hash con sal por despliegue; nunca se guarda en claro.
 - [ ] **M3-07 — Anti-suplantación de cabeceras**: test que envía `X-RID-*` falsas desde el cliente y verifica que el proveedor recibe las correctas.

@@ -19,6 +19,8 @@ import { credentialView, leafOf, thumbprintOf } from './credential-view.js';
 import { checkCsr, CsrRejected } from './csr.js';
 import { CERTIFICATE_AUTHORITY, type CertificateAuthority } from './step-ca.client.js';
 
+const DAY = 24 * 60 * 60 * 1000;
+
 const isUniqueViolation = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
@@ -57,10 +59,16 @@ export class CertificatesService {
     if (app.status !== 'active') {
       throw new ConflictError('Only an active application can get a certificate');
     }
-    const active = await this.prisma.credential.count({
-      where: { applicationId, kind: 'mtls_certificate', status: 'active' },
+    // Rotation (M3-04): a second certificate while the first one still works, one at a time.
+    const current = await this.prisma.credential.findMany({
+      where: { applicationId, kind: 'mtls_certificate', status: { in: ['active', 'rotating'] } },
     });
-    if (active > 0) throw new ConflictError('The application already has an active certificate');
+    if (current.some((c) => c.status === 'rotating')) {
+      throw new ConflictError(
+        'A certificate rotation is already in progress: let it end or revoke the previous one',
+      );
+    }
+    const previous = current.find((c) => c.status === 'active');
 
     let checked: Awaited<ReturnType<typeof checkCsr>>;
     try {
@@ -73,6 +81,8 @@ export class CertificatesService {
     }
 
     const days = getCountryConfig().lifecycle.certificateValidityDays;
+    // One check before the CA, one inside the transaction (the previous certificate must still be
+    // active when it starts rotating).
     const chainPem = await this.ca.sign({
       csrPem: checked.pem,
       commonName: app.keycloakClientId,
@@ -83,8 +93,27 @@ export class CertificatesService {
     const credentialId = uuidv7();
     const actor = { type: 'user' as const, id: principal.keycloakSub, entityId };
 
+    const lifecycle = getCountryConfig().lifecycle;
     try {
       const credential = await this.prisma.$transaction(async (tx) => {
+        if (previous) {
+          const rotationEndsAt = new Date(Date.now() + lifecycle.credentialRotationDays * DAY);
+          const changed = await tx.credential.updateMany({
+            where: { id: previous.id, status: 'active' },
+            data: { status: 'rotating', rotationEndsAt },
+          });
+          if (changed.count === 0) {
+            throw new ConflictError('The certificates of the application changed meanwhile');
+          }
+          await this.audit.record(tx, {
+            actor,
+            action: 'credential.rotation_started',
+            target: { type: 'credential', id: previous.id },
+            before: { status: 'active' },
+            after: { status: 'rotating', rotationEndsAt: rotationEndsAt.toISOString() },
+            requestId,
+          });
+        }
         const created = await tx.credential.create({
           data: {
             id: credentialId,

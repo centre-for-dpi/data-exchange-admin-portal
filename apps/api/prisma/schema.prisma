@@ -628,6 +628,9 @@ model Credential {
   notAfter           DateTime?        @map("not_after") @db.Timestamptz(3)
   /// When the expiry notice (lifecycle.certificateExpiryWarningDays) was queued; once per cert.
   expiryNoticeSentAt DateTime?        @map("expiry_notice_sent_at") @db.Timestamptz(3)
+  /// While `rotating`: when the rotation window ends (lifecycle.credentialRotationDays) and the
+  /// credential stops working (M3-04).
+  rotationEndsAt     DateTime?        @map("rotation_ends_at") @db.Timestamptz(3)
   lastUsedAt         DateTime?        @map("last_used_at") @db.Timestamptz(3)
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)

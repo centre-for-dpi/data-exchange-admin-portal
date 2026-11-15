@@ -114,6 +114,8 @@ export class OpaService implements OnApplicationBootstrap {
             kind: 'mtls_certificate',
             status: { in: [...USABLE_CREDENTIAL_STATUSES] },
             notAfter: { gt: new Date() },
+            // A previous certificate stops at the end of its rotation window (M3-04).
+            OR: [{ status: 'active' }, { rotationEndsAt: { gt: new Date() } }],
           },
           select: { fingerprint: true },
           orderBy: { fingerprint: 'asc' },

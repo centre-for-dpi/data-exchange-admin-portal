@@ -179,6 +179,7 @@ describe('validation', () => {
       subscriptionRenewalNoticeDays: 30,
       certificateValidityDays: 90,
       certificateExpiryWarningDays: 15,
+      credentialRotationDays: 7,
       enrollmentTokenValidityHours: 72,
       nodeOfflineAfterMinutes: 5,
     });

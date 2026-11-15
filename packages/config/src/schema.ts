@@ -121,6 +121,11 @@ export const countryConfigSchema = z.strictObject({
       subscriptionRenewalNoticeDays: z.number().int().min(1).default(30),
       certificateValidityDays: z.number().int().min(1).max(397).default(90),
       certificateExpiryWarningDays: z.number().int().min(1).default(15),
+      /**
+       * Days the previous credential (secret or certificate) keeps working after a new one is
+       * issued (SPEC.md §4.3). At most 30: the rotated-secret window of the Keycloak policy.
+       */
+      credentialRotationDays: z.number().int().min(1).max(30).default(7),
       enrollmentTokenValidityHours: z.number().int().min(1).max(720).default(72),
       nodeOfflineAfterMinutes: z.number().int().min(1).default(5),
     })
@@ -129,6 +134,7 @@ export const countryConfigSchema = z.strictObject({
       subscriptionRenewalNoticeDays: 30,
       certificateValidityDays: 90,
       certificateExpiryWarningDays: 15,
+      credentialRotationDays: 7,
       enrollmentTokenValidityHours: 72,
       nodeOfflineAfterMinutes: 5,
     }),

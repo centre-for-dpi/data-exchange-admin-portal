@@ -27,6 +27,8 @@ Keycloak importa al arrancar (`--import-realm`) los archivos `*-realm.json` de e
 - Sin aplicaciones: los clientes `rid-app-<uuid>` los crea el reconciliador del portal.
 - Solo tres client scopes: `basic` (`sub`), `service_account` (`client_id`) y `rid-gateway-audience` (`aud = rid-gateway`). Los tokens de aplicación no llevan perfil, correo, roles ni IP del cliente. Duran 5 minutos.
 - Cliente `rid-portal-provisioner` con cuenta de servicio: solo `realm-management/manage-clients` en este realm. No puede ver usuarios ni roles, ni tocar otros realms.
+- Política de cliente `rid-secret-rotation` (M3-04): en los clientes con el atributo `rid.managed = true` (los que crea el portal), regenerar el secreto deja el anterior como secreto rotado, válido a lo sumo 30 días. El portal la usa para la ventana de rotación y la cierra antes al revocar.
+  - En un Keycloak que ya importó el realm, aplícala sin borrar datos: `node scripts/keycloak-client-policies.mjs` (usa `KEYCLOAK_URL` y el administrador de `master` del `.env`).
 
 ## Realm `rid-citizens` (ciudadanos, MT-05)
 

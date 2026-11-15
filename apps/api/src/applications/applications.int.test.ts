@@ -7,43 +7,11 @@ import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/tes
 import { AuditService } from '../audit/audit.service.js';
 import { hashSecret } from '../common/secrets.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import {
-  type GatewayClient,
-  KEYCLOAK_ADMIN,
-  type KeycloakGatewayAdmin,
-} from '../reconcilers/keycloak/keycloak-admin.js';
+import { FakeKeycloak } from '../../test/fake-keycloak.js';
+import { KEYCLOAK_ADMIN } from '../reconcilers/keycloak/keycloak-admin.js';
 import { KeycloakReconciler } from '../reconcilers/keycloak/keycloak.reconciler.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
-
-/** In-memory stand-in for the Keycloak Admin API (realm rid-gateway). */
-class FakeKeycloak implements KeycloakGatewayAdmin {
-  readonly clients = new Map<string, GatewayClient & { id: string }>();
-  readonly calls = { create: 0, update: 0 };
-
-  findClient(clientId: string) {
-    const client = this.clients.get(clientId);
-    // Like Keycloak, the secret is not part of what the reconciler reads back.
-    return Promise.resolve(client ? { ...client, secret: undefined } : undefined);
-  }
-  createClient(client: GatewayClient) {
-    this.calls.create += 1;
-    this.clients.set(client.clientId, { ...client, id: randomUUID() });
-    return Promise.resolve();
-  }
-  updateClient(id: string, client: GatewayClient) {
-    this.calls.update += 1;
-    const existing = [...this.clients.values()].find((c) => c.id === id);
-    if (!existing) return Promise.reject(new Error('not found'));
-    this.clients.set(client.clientId, {
-      ...existing,
-      ...client,
-      id,
-      secret: client.secret ?? existing.secret,
-    });
-    return Promise.resolve();
-  }
-}
 
 describe('applications and OAuth2 credentials (M1-06)', () => {
   const prisma = new PrismaService();

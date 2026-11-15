@@ -347,7 +347,6 @@
       "serial": "Serial number",
       "fingerprint": "SHA-256 fingerprint",
       "expiringSoon": "Expires soon",
-      "hasActive": "The application already has a valid certificate.",
       "conflict": "The application already has a valid certificate, or it is not active.",
       "inactive": "Only an active application can get a certificate.",
       "readOnly": "Only members with the developer role can request certificates.",
@@ -357,7 +356,25 @@
         "signature": "The CSR signature is not valid: generate it again.",
         "subject": "The CSR must name this application only: CN equal to its client ID and no other name.",
         "key": "The key must be ECDSA P-256 or P-384, or RSA of 2048 to 4096 bits."
-      }
+      },
+      "renewHint": "You can request a new certificate to renew it: the current one keeps working for {days, plural, one {# more day} other {# more days}}.",
+      "rotationInProgress": "A certificate renewal is in progress: revoke the previous one once you no longer use it, or wait for its period to end."
+    },
+    "rotation": {
+      "rotateSecret": "Rotate the secret",
+      "rotateSecretHint": "Generates a new secret. The current one keeps working for {days, plural, one {# more day} other {# more days}}, so you can switch your system without downtime.",
+      "newSecretTitle": "Save the new secret now",
+      "newSecretWarning": "This secret is shown only once: copy it and keep it somewhere safe. The previous one keeps working until {date}; revoke it once your system uses the new one.",
+      "secretInProgress": "A secret rotation is in progress. Revoke the previous secret once you no longer use it, or wait for its period to end.",
+      "worksUntil": "Keeps working until {date}",
+      "secretLabel": "the previous secret",
+      "certificateLabel": "certificate {serial}",
+      "revokeLabel": "Revoke {what}",
+      "revokeWarning": "It stops working at once and cannot be undone.",
+      "revokeReason": "Reason (optional, kept in the audit trail)",
+      "revokeConfirm": "Revoke now",
+      "revoked": "Credential revoked.",
+      "conflict": "The credential changed meanwhile or this operation is not possible. Reload the page."
     }
   },
   "subscriptionStatus": {
@@ -547,7 +564,10 @@
       "credential": {
         "created": "Credential created",
         "expiry_notice_queued": "Certificate expiry notice sent",
-        "expired": "Certificate expired"
+        "expired": "Certificate expired",
+        "rotation_started": "Credential rotation started",
+        "rotation_ended": "Rotation window ended",
+        "revoked": "Credential revoked"
       },
       "subscription": {
         "requested": "Access requested",

@@ -10,7 +10,7 @@ import {
 import { ErrorSummary, Field, inputClass } from '../form/field';
 import { Button } from '../ui/button';
 
-function CopyButton({ value, label }: { value: string; label: string }) {
+export function CopyButton({ value, label }: { value: string; label: string }) {
   const t = useTranslations('myApps.secret');
   const [copied, setCopied] = useState(false);
   return (

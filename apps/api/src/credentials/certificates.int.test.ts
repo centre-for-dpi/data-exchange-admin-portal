@@ -197,18 +197,21 @@ describe('client certificates through step-ca (M3-01)', () => {
     ).toBe(404);
   });
 
-  it('keeps one active certificate per application', async () => {
+  it('keeps one active certificate per application: a second one rotates the first (M3-04)', async () => {
     const application = await newApp();
     await issue(application.id, application.clientId);
-    const again = await call('POST', certificatesUrl(application.id), 'carlos.dev', {
+    await issue(application.id, application.clientId);
+    const third = await call('POST', certificatesUrl(application.id), 'carlos.dev', {
       csr: await makeCsr(application.clientId),
     });
-    expect(again.statusCode).toBe(409);
-    expect(
-      await prisma.credential.count({
+    expect(third.statusCode).toBe(409);
+    const statuses = (
+      await prisma.credential.findMany({
         where: { applicationId: application.id, kind: 'mtls_certificate' },
-      }),
-    ).toBe(1);
+        orderBy: { createdAt: 'asc' },
+      })
+    ).map((c) => c.status);
+    expect(statuses).toEqual(['rotating', 'active']);
   });
 
   it('refuses a CSR for another subject, a weak key or a broken request, before the CA', async () => {

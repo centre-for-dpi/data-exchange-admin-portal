@@ -347,7 +347,6 @@
       "serial": "Número de serie",
       "fingerprint": "Huella SHA-256",
       "expiringSoon": "Vence pronto",
-      "hasActive": "La aplicación ya tiene un certificado vigente.",
       "conflict": "La aplicación ya tiene un certificado vigente, o no está activa.",
       "inactive": "Solo una aplicación activa puede obtener un certificado.",
       "readOnly": "Solo quien tiene el rol de desarrollador puede solicitar certificados.",
@@ -357,7 +356,25 @@
         "signature": "La firma del CSR no es válida: genéralo de nuevo.",
         "subject": "El CSR debe nombrar solo a esta aplicación: CN igual a su client ID y ningún otro nombre.",
         "key": "La clave debe ser ECDSA P-256 o P-384, o RSA de 2048 a 4096 bits."
-      }
+      },
+      "renewHint": "Puedes pedir un certificado nuevo para renovarlo: el actual sigue funcionando {days, plural, one {# día} other {# días}} más.",
+      "rotationInProgress": "Hay una renovación de certificado en curso: revoca el anterior cuando ya no lo uses, o espera a que termine su plazo."
+    },
+    "rotation": {
+      "rotateSecret": "Rotar el secreto",
+      "rotateSecretHint": "Genera un secreto nuevo. El actual sigue funcionando {days, plural, one {# día} other {# días}} más, para que cambies tu sistema sin cortes.",
+      "newSecretTitle": "Guarda el secreto nuevo ahora",
+      "newSecretWarning": "Este secreto se muestra una sola vez: cópialo y guárdalo en un lugar seguro. El anterior sigue funcionando hasta el {date}; revócalo cuando tu sistema ya use el nuevo.",
+      "secretInProgress": "Hay una rotación del secreto en curso. Revoca el secreto anterior cuando ya no lo uses, o espera a que termine su plazo.",
+      "worksUntil": "Sigue funcionando hasta el {date}",
+      "secretLabel": "el secreto anterior",
+      "certificateLabel": "el certificado {serial}",
+      "revokeLabel": "Revocar {what}",
+      "revokeWarning": "Deja de funcionar de inmediato y no se puede deshacer.",
+      "revokeReason": "Motivo (opcional, queda en la bitácora)",
+      "revokeConfirm": "Revocar ahora",
+      "revoked": "Credencial revocada.",
+      "conflict": "La credencial cambió mientras tanto o no se puede hacer esta operación. Recarga la página."
     }
   },
   "subscriptionStatus": {
@@ -547,7 +564,10 @@
       "credential": {
         "created": "Credencial creada",
         "expiry_notice_queued": "Aviso de vencimiento del certificado enviado",
-        "expired": "Certificado vencido"
+        "expired": "Certificado vencido",
+        "rotation_started": "Rotación de credencial iniciada",
+        "rotation_ended": "Fin de la ventana de rotación",
+        "revoked": "Credencial revocada"
       },
       "subscription": {
         "requested": "Acceso solicitado",

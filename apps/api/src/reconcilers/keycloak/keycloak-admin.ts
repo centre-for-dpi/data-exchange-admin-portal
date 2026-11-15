@@ -26,6 +26,17 @@ export interface KeycloakGatewayAdmin {
   findClient(clientId: string): Promise<GatewayClient | undefined>;
   createClient(client: GatewayClient): Promise<void>;
   updateClient(id: string, client: GatewayClient): Promise<void>;
+  /**
+   * Secret rotation (M3-04), with the realm's client policy rid-secret-rotation (executor
+   * secret-rotation, clients with rid.managed = true): regenerating moves the current secret to
+   * the client's rotated secret, which keeps working until it expires or is deleted; a later
+   * update with `secret` replaces only the current one. The values only pass through the
+   * reconciler's memory to compare their hashes.
+   */
+  currentSecret(id: string): Promise<string | undefined>;
+  regenerateSecret(id: string): Promise<void>;
+  rotatedSecret(id: string): Promise<string | undefined>;
+  deleteRotatedSecret(id: string): Promise<void>;
 }
 
 export class KeycloakAdminError extends Error {}
@@ -121,6 +132,35 @@ export class HttpKeycloakGatewayAdmin implements KeycloakGatewayAdmin {
         ),
       ),
     };
+  }
+
+  private async secretAt(path: string): Promise<string | undefined> {
+    const res = await this.fetch(
+      `${this.options.baseUrl}/admin/realms/${this.options.realm}${path}`,
+      { headers: { authorization: `Bearer ${await this.accessToken()}` } },
+    );
+    if (res.status === 404) return undefined;
+    if (!res.ok) {
+      throw new KeycloakAdminError(`Keycloak GET client secret failed (${res.status})`);
+    }
+    const value = ((await res.json()) as { value?: unknown }).value;
+    return typeof value === 'string' && value ? value : undefined;
+  }
+
+  currentSecret(id: string): Promise<string | undefined> {
+    return this.secretAt(`/clients/${id}/client-secret`);
+  }
+
+  rotatedSecret(id: string): Promise<string | undefined> {
+    return this.secretAt(`/clients/${id}/client-secret/rotated`);
+  }
+
+  async regenerateSecret(id: string): Promise<void> {
+    await this.request('POST', `/clients/${id}/client-secret`);
+  }
+
+  async deleteRotatedSecret(id: string): Promise<void> {
+    await this.request('DELETE', `/clients/${id}/client-secret/rotated`);
   }
 
   async createClient(client: GatewayClient): Promise<void> {

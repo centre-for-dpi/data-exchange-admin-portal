@@ -218,6 +218,14 @@ Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega t
 
 Reconciliador de aplicaciones: crea/actualiza/deshabilita clientes en `rid-gateway`, rota secretos a pedido, configura `tls_client_auth` y el subject DN esperado cuando hay certificado.
 
+- **Rotación del secreto (M3-04).** El realm tiene la política de cliente `rid-secret-rotation` (ejecutor `secret-rotation`, condición `rid.managed = true`, atributo que el reconciliador pone en sus clientes). Keycloak ignora los atributos de secreto rotado si llegan por la Admin API, así que el reconciliador usa el propio mecanismo de Keycloak:
+  1. Con un secreto nuevo pendiente (sellado) y el anterior en `rotating`, compara por hash el secreto actual de Keycloak con el del anterior.
+  2. Si coinciden, lo regenera (`POST client-secret`), y Keycloak pasa el anterior a secreto rotado.
+  3. Luego fija el secreto nuevo con `PUT`, que cambia solo el actual. Si una pasada se interrumpió entre los dos pasos, el anterior ya es el rotado y solo repite el paso 3.
+  4. Sin rotación en curso (revocado, o fin de la ventana), borra el secreto rotado (`DELETE client-secret/rotated`).
+  
+  Los valores solo pasan por la memoria del reconciliador para comparar hashes. La política deja el rotado a lo sumo 30 días; el portal cierra la ventana a los `lifecycle.credentialRotationDays`. En un Keycloak que ya importó el realm, la política se aplica con `node scripts/keycloak-client-policies.mjs`.
+
 ### 4.4 step-ca
 
 - Provisioner JWK dedicado al portal. El backend firma un token de un solo uso (OTT) y llama a `/1.0/sign` con el CSR. Implementación con `jose`; sin dependencias propietarias. Detalle (M3-01, `apps/api/src/credentials`):

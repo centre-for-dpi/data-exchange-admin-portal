@@ -41,6 +41,7 @@ export function credentialView(c: Credential, now = new Date()): CredentialView 
     status: c.status,
     createdAt: c.createdAt.toISOString(),
     lastUsedAt: c.lastUsedAt?.toISOString() ?? null,
+    rotationEndsAt: c.status === 'rotating' ? (c.rotationEndsAt?.toISOString() ?? null) : null,
     certificate,
   };
 }
