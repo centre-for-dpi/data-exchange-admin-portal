@@ -25,6 +25,10 @@ const openapi = readFileSync(
   'utf8',
 );
 
+// A full pass reconciles every version of rid_test, which keeps those of every earlier run: it
+// takes longer than one version's reconcile, and longer the more the suite has run.
+const FULL_PASS_TIMEOUT = 180_000;
+
 /**
  * Against the real APISIX Admin API (pnpm infra:up locally; etcd + apisix in CI). The reconciler
  * owns every `rid-` object: these tests create, break and repair them.
@@ -155,49 +159,57 @@ describe('APISIX reconciler (M1-08)', () => {
     expect(await reconciler.reconcileVersion(versionId)).toBe('unchanged');
   });
 
-  it('the full pass recreates a route deleted by hand and repairs a tampered one', async () => {
-    const versionId = await publish('salud', `gw-drift-${run}`);
-    await reconciler.reconcileVersion(versionId);
+  it(
+    'the full pass recreates a route deleted by hand and repairs a tampered one',
+    async () => {
+      const versionId = await publish('salud', `gw-drift-${run}`);
+      await reconciler.reconcileVersion(versionId);
 
-    await admin.delete('routes', routeId(versionId));
-    expect(await admin.get('routes', routeId(versionId))).toBeUndefined();
-    await reconciler.reconcileAll();
-    expect(await admin.get('routes', routeId(versionId))).toMatchObject({
-      uri: `/salud/gw-drift-${run}/v1/*`,
-    });
-
-    // Someone removes the OPA plugin by hand: the next pass puts it back.
-    const tampered = (await admin.get('routes', routeId(versionId))) ?? {};
-    const { opa: _removed, ...plugins } = tampered.plugins as Record<string, unknown>;
-    await admin.put('routes', routeId(versionId), { ...tampered, plugins });
-    expect(await reconciler.reconcileVersion(versionId)).toBe('updated');
-    expect((await admin.get('routes', routeId(versionId)))?.plugins).toHaveProperty('opa');
-  });
-
-  it('removes managed orphans and never touches objects it does not own', async () => {
-    const orphan = randomUUID();
-    const foreign = `test-foreign-${run}`;
-    await admin.put('upstreams', upstreamId(orphan), {
-      type: 'roundrobin',
-      nodes: { 'mock-salud:8000': 1 },
-    });
-    await admin.put('routes', routeId(orphan), {
-      uri: `/orphan-${run}/*`,
-      upstream_id: upstreamId(orphan),
-    });
-    await admin.put('routes', foreign, {
-      uri: `/foreign-${run}/*`,
-      upstream_id: upstreamId(orphan),
-    });
-    try {
+      await admin.delete('routes', routeId(versionId));
+      expect(await admin.get('routes', routeId(versionId))).toBeUndefined();
       await reconciler.reconcileAll();
-      expect(await admin.get('routes', routeId(orphan))).toBeUndefined();
-      expect(await admin.get('routes', foreign)).toBeDefined();
-    } finally {
-      await admin.delete('routes', foreign);
-      await admin.delete('upstreams', upstreamId(orphan));
-    }
-  });
+      expect(await admin.get('routes', routeId(versionId))).toMatchObject({
+        uri: `/salud/gw-drift-${run}/v1/*`,
+      });
+
+      // Someone removes the OPA plugin by hand: the next pass puts it back.
+      const tampered = (await admin.get('routes', routeId(versionId))) ?? {};
+      const { opa: _removed, ...plugins } = tampered.plugins as Record<string, unknown>;
+      await admin.put('routes', routeId(versionId), { ...tampered, plugins });
+      expect(await reconciler.reconcileVersion(versionId)).toBe('updated');
+      expect((await admin.get('routes', routeId(versionId)))?.plugins).toHaveProperty('opa');
+    },
+    FULL_PASS_TIMEOUT,
+  );
+
+  it(
+    'removes managed orphans and never touches objects it does not own',
+    async () => {
+      const orphan = randomUUID();
+      const foreign = `test-foreign-${run}`;
+      await admin.put('upstreams', upstreamId(orphan), {
+        type: 'roundrobin',
+        nodes: { 'mock-salud:8000': 1 },
+      });
+      await admin.put('routes', routeId(orphan), {
+        uri: `/orphan-${run}/*`,
+        upstream_id: upstreamId(orphan),
+      });
+      await admin.put('routes', foreign, {
+        uri: `/foreign-${run}/*`,
+        upstream_id: upstreamId(orphan),
+      });
+      try {
+        await reconciler.reconcileAll();
+        expect(await admin.get('routes', routeId(orphan))).toBeUndefined();
+        expect(await admin.get('routes', foreign)).toBeDefined();
+      } finally {
+        await admin.delete('routes', foreign);
+        await admin.delete('upstreams', upstreamId(orphan));
+      }
+    },
+    FULL_PASS_TIMEOUT,
+  );
 
   it('a version the gateway cannot serve is recorded as an error and nothing is written', async () => {
     const versionId = await publish('socioeconomico', `gw-nonode-${run}`);
