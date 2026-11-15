@@ -1,0 +1,100 @@
+{
+  "operation": "POST /afiliados/verificaciones",
+  "method": "POST",
+  "path_template": "/afiliados/verificaciones",
+  "fingerprint": "97f4e3a8",
+  "case_id": "AXwZhX",
+  "code_sample": "curl -X POST -H 'X-RID-Validation: rid-validation-dev-token-change-me' -H 'Content-Type: application/json' -d $'\\x00' http://127.0.0.1:9080/__rid/check-sandbox/01a1e101-bba2-7791-bcbb-eaf4e472d6b3/afiliados/verificaciones",
+  "sequence": [
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:9080/__rid/check-sandbox/01a1e101-bba2-7791-bcbb-eaf4e472d6b3/afiliados/verificaciones",
+      "url_template": "http://127.0.0.1:9080/__rid/check-sandbox/01a1e101-bba2-7791-bcbb-eaf4e472d6b3/afiliados/verificaciones",
+      "headers": {
+        "User-Agent": "schemathesis/4.33.4",
+        "Accept-Encoding": "gzip, deflate",
+        "Accept": "*/*",
+        "Connection": "keep-alive",
+        "X-RID-Validation": "rid-validation-dev-token-change-me",
+        "X-Schemathesis-TestCaseId": "AXwZhX",
+        "Content-Type": "application/json",
+        "Content-Length": "1"
+      },
+      "response": {
+        "status_code": 500,
+        "headers": {
+          "content-type": "application/problem+json; charset=utf-8",
+          "content-length": "59",
+          "connection": "keep-alive",
+          "date": "Sun, 15 Nov 2026 20:59:25 GMT",
+          "server": "APISIX/3.19.0",
+          "x-apisix-upstream-status": "500",
+          "x-request-id": "86b72ef3-7cc3-44b1-991a-1d619d25922d"
+        },
+        "body": "{\"type\":\"about:blank\",\"title\":\"Error interno\",\"status\":500}"
+      },
+      "link": null,
+      "checks": [
+        {
+          "name": "status_code_conformance",
+          "status": "failure",
+          "message": "Undocumented status code\n\nReceived: 500\nDocumented: 200, 400"
+        }
+      ],
+      "meta": {
+        "generation": {
+          "time": 0.07438000000547618,
+          "mode": "negative"
+        },
+        "components": {
+          "BODY": "negative"
+        },
+        "phase": {
+          "name": "fuzzing",
+          "data": {
+            "type": "FuzzingPhaseData",
+            "description": "Invalid syntax: random bytes",
+            "location": null,
+            "parameter": null,
+            "parameter_location": "BODY",
+            "mutations": [
+              {
+                "path": [],
+                "parameter_location": "body",
+                "schema_pointer": "",
+                "channel": "schema",
+                "operator": "syntax_fuzzing",
+                "keywords": [],
+                "parameter": null,
+                "original_value": null,
+                "new_value": null
+              }
+            ]
+          }
+        },
+        "pool_draws": [],
+        "pool_misses": [],
+        "semantic_draws": [],
+        "dictionary_draws": [],
+        "constants_draws": [],
+        "raw_containers": {}
+      },
+      "path": "/afiliados/verificaciones",
+      "path_parameters": {},
+      "query": {},
+      "case_headers": {
+        "X-RID-Validation": "rid-validation-dev-token-change-me"
+      },
+      "cookies": {},
+      "case_body": {
+        "encoding": "base64",
+        "value": "AA=="
+      },
+      "media_type": "application/json",
+      "parent_index": null,
+      "auth_identity": null,
+      "operation": "POST /afiliados/verificaciones"
+    }
+  ],
+  "aliases": ["2v7XaL", "VRROkN", "d7qsXu"]
+}

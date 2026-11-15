@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn, submitNewApi } from './flows';
+import { signIn, submitNewApi, waitForValidations } from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 // M2-10: the operator manages the purpose catalogue; the data steward chooses, among active
@@ -41,6 +41,7 @@ test.describe('purpose catalogue (M2-10)', () => {
       slug: `fin-${stamp}`,
     });
     await operator.goto(`/operator/reviews/${versionIdOf(versionUrl)}`);
+    await waitForValidations(operator);
     await operator.getByRole('button', { name: 'Aprobar' }).click();
     await expect(operator.getByTestId('version-status')).toHaveText('Publicada');
 

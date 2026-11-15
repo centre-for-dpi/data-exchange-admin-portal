@@ -76,7 +76,24 @@ export interface GatewaySettings {
    * internal TLS certificate. Without it, xroad versions stay in sync error.
    */
   xroad?: { securityServerUrl: string; client: string; caPem?: string };
+  /**
+   * Token of the check routes of versions in review (M4-06, RID_VALIDATION_TOKEN): only the
+   * portal's validations reach them. Without it there are no check routes.
+   */
+  validationToken?: string;
 }
+
+/** Check routes of a version in review (M4-06): ids outside rid-route-, paths under /__rid/. */
+export const CHECK_ROUTE_PREFIX = 'rid-check-';
+export const checkRouteId = (apiVersionId: string): string =>
+  `${CHECK_ROUTE_PREFIX}${apiVersionId}`;
+export const sandboxCheckRouteId = (apiVersionId: string): string =>
+  `${CHECK_ROUTE_PREFIX}sandbox-${apiVersionId}`;
+export const checkRoutePath = (apiVersionId: string): string => `/__rid/check/${apiVersionId}`;
+export const sandboxCheckRoutePath = (apiVersionId: string): string =>
+  `/__rid/check-sandbox/${apiVersionId}`;
+/** Only a request with the validation token matches a check route (APISIX `vars`). */
+export const VALIDATION_TOKEN_HEADER = 'X-RID-Validation';
 
 /** The gateway's client certificate towards the operator's Security Server (one for X-Road). */
 export const GATEWAY_XROAD_SSL_ID = 'rid-ssl-gateway-xroad';
@@ -800,4 +817,59 @@ export function parseHostNames(value: string): string[] {
   }
   if (hosts.length === 0) throw new Error('RID_GATEWAY_TLS_HOSTS has no host name');
   return hosts;
+}
+
+/**
+ * Check routes of a version in review (M4-06, SPEC.md §4.2 step 2). They skip the token and the
+ * policy, so they are narrow: a route only matches with the validation token (APISIX `vars`), the
+ * production one only answers GET on the service root (connectivity, never data), and only the
+ * sandbox one, with synthetic data, takes any path for the contract test. The upstream goes inline
+ * in the route, built like the published one (mTLS, hub, Security Server and their checks).
+ */
+export function desiredCheckRoutes(
+  v: VersionForGateway & { sandboxUpstream?: Upstream | null },
+  settings: GatewaySettings,
+  pki?: UpstreamPki,
+): { health: ApisixObject; sandbox: ApisixObject | null } | null {
+  const token = settings.validationToken;
+  if (!token) return null;
+  const vars = [
+    [`http_${VALIDATION_TOKEN_HEADER.toLowerCase().replaceAll('-', '_')}`, '==', token],
+  ];
+  const plugins = (extra: Record<string, unknown>) => ({
+    'request-id': { header_name: 'X-Request-Id', include_in_response: true },
+    'rid-header-guard': {},
+    'proxy-rewrite': { ...extra, headers: { remove: [VALIDATION_TOKEN_HEADER] } },
+  });
+  const label = { 'rid-managed': 'true', 'rid-api-version': v.id, 'rid-check': 'true' };
+  const production = resolveUpstream(v, settings, pki);
+  const health: ApisixObject = {
+    name: `check ${v.entitySlug} ${v.apiName} ${v.version}`.slice(0, 100),
+    uri: checkRoutePath(v.id),
+    methods: ['GET'],
+    vars,
+    status: 1,
+    labels: label,
+    upstream: production.upstream,
+    plugins: plugins({ uri: `${production.pathPrefix}/` }),
+  };
+  if (!v.sandboxUpstream) return { health, sandbox: null };
+  const sandbox = resolveUpstream({ ...v, upstream: v.sandboxUpstream }, settings, pki);
+  return {
+    health,
+    sandbox: {
+      name: `check sandbox ${v.entitySlug} ${v.apiName} ${v.version}`.slice(0, 100),
+      uri: `${sandboxCheckRoutePath(v.id)}/*`,
+      vars,
+      status: 1,
+      labels: label,
+      upstream: sandbox.upstream,
+      plugins: plugins({
+        regex_uri: [
+          `^${escapeRegex(sandboxCheckRoutePath(v.id))}/(.*)$`,
+          `${sandbox.pathPrefix}/$1`,
+        ],
+      }),
+    },
+  };
 }

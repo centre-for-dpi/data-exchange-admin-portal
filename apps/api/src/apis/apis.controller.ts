@@ -210,6 +210,30 @@ export class ApisController {
     return this.apis.submit(entity.entityId, apiId, versionId, principal, request.id);
   }
 
+  @Post(':apiId/versions/:versionId/validations')
+  @HttpCode(200)
+  @EntityAccess('api.write')
+  @ApiOperation({
+    operationId: 'revalidateApiVersion',
+    summary: 'Run the automatic validations of a version in review again',
+    description:
+      'Healthcheck of the upstream through the gateway and contract test (Schemathesis) of the ' +
+      'sandbox upstream (M4-06). The operator approves only when they passed.',
+    tags: ['apis'],
+    params: apiVersionParamsSchema,
+    responses: { 200: { description: 'The version', schema: apiVersionDetailSchema } },
+    errors: [401, 403, 404, 409],
+  })
+  revalidate(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('apiId', uuid) apiId: string,
+    @Param('versionId', uuid) versionId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.apis.revalidate(entity.entityId, apiId, versionId, principal, request.id);
+  }
+
   @Post(':apiId/versions/:versionId/deprecate')
   @HttpCode(200)
   @EntityAccess('api.write')

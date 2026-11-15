@@ -104,6 +104,10 @@ services:
     <<: *no-ports
     restart: unless-stopped
 
+  contract-runner:
+    <<: *no-ports
+    restart: unless-stopped
+
   wg-hub:
     restart: unless-stopped
     # Nodes reach the hub from the internet (UDP 51820, RID_WG_HUB_ENDPOINT); the agent and the

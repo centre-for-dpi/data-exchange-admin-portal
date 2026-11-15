@@ -83,6 +83,12 @@ const set = {
   RID_WG_HUB_PUBLIC_KEY: raw(hub.publicKey.export({ format: 'jwk' }).x),
   RID_WG_HUB_ENDPOINT: `${gatewayHost ?? new URL(publicUrl).hostname}:51820`,
   RID_WG_HUB_AGENT_URL: 'http://wg-hub:8090',
+  // Validations at submission (M4-06).
+  RID_VALIDATION_TOKEN: secret(32),
+  RID_GATEWAY_INTERNAL_URL: 'http://apisix:9080',
+  RID_CONTRACT_RUNNER_URL: 'http://contract-runner:8096',
+  RID_CONTRACT_RUNNER_TOKEN: secret(32),
+  RID_CONTRACT_RUNNER_GATEWAY_URL: 'http://apisix:9080',
   RID_WG_HUB_AGENT_TOKEN: secret(32),
   // The dev-style CA initialises its provisioner with this same password (infra/step-ca).
   STEP_CA_PASSWORD: stepCaPassword,

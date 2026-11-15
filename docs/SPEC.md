@@ -138,8 +138,10 @@ published → deprecated → retired
 1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige upstream, completa campos expuestos, base legal, finalidades permitidas, SLA.
 2. Validaciones automáticas al enviar a revisión (bloqueantes):
    - Lint del OpenAPI con el conjunto de reglas RID (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), descripciones en español.
-   - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba.
-   - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo.
+   - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba (GET a la raíz del servicio; pasa con cualquier respuesta que no sea 5xx).
+   - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo. El sandbox es el servicio de pruebas con datos sintéticos que la versión declara; sin sandbox, la prueba se omite y no bloquea.
+
+   Las dos corren en segundo plano al enviar a revisión, y sus resultados acompañan la revisión. El operador solo aprueba si pasaron; el proveedor puede repetirlas después de corregir su servicio. De la prueba de contrato solo se guardan, por operación, los códigos de las verificaciones que fallaron y el código HTTP, nunca un cuerpo.
 3. `platform_reviewer` revisa ficha, clasificación y minimización. Si `classification ∈ {sensitive}` y `features.approval.regulatorForSensitive`, pasa además por `regulator`. El regulador aprueba (se publica) o la devuelve al proveedor con motivo (`changes_requested`). No decide quien ya participó en la versión ni quien pertenece a la entidad proveedora.
 4. Al publicar: se crea la ruta en el gateway en modo "cerrado" (sin suscripciones nadie entra) y la API aparece en el catálogo.
 5. Una versión nueva mayor convive con la anterior. `deprecated` muestra aviso y fecha de retiro; `retired` elimina la ruta y revoca las suscripciones (con aviso previo configurable, por defecto 90 días).

@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import {
   DeprecateVersionForm,
   ReplaceOpenapiForm,
+  RevalidateVersionForm,
   SubmitVersionForm,
 } from '../../../../../../components/apis/api-forms';
 import { VersionSheet } from '../../../../../../components/apis/version-sheet';
@@ -153,6 +154,13 @@ export default async function VersionPage({ params }: PageProps) {
             </div>
           </Section>
         </>
+      ) : null}
+
+      {canWrite && version.status === 'in_review' && version.validation?.status !== 'running' ? (
+        <div className="card flex flex-wrap items-center justify-between gap-4 bg-surface-panel p-6">
+          <p className="text-sm">{t('version.validation.rerunHint')}</p>
+          <RevalidateVersionForm apiId={api.id} versionId={version.id} />
+        </div>
       ) : null}
 
       {canWrite && editable ? (

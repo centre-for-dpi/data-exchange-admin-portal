@@ -175,7 +175,15 @@
       "xroadMemberCode": "Código de miembro",
       "xroadSubsystem": "Subsistema (opcional)",
       "xroadService": "Código del servicio",
-      "xroadPath": "Ruta después del servicio (opcional)"
+      "xroadPath": "Ruta después del servicio (opcional)",
+      "sandbox": "Servicio de pruebas (sandbox)",
+      "sandboxHint": "Con datos sintéticos. La prueba de contrato al enviar a revisión y las aplicaciones sandbox van ahí, nunca al servicio real.",
+      "sandbox_none": "Sin sandbox",
+      "sandbox_node": "En un nodo",
+      "sandbox_direct": "URL",
+      "sandboxNode": "Nodo del sandbox",
+      "sandboxServicePath": "Ruta del servicio de pruebas",
+      "sandboxUrl": "URL del servicio de pruebas"
     },
     "detail": {
       "title": "{api} · versión {version}",
@@ -215,6 +223,25 @@
       "sunsetAt": "Fecha de retiro",
       "sunsetHint": "Desde el {date}.",
       "deprecate": "Marcar como obsoleta"
+    },
+    "validation": {
+      "title": "Validaciones automáticas",
+      "lead": "Al enviar a revisión: healthcheck del servicio a través del gateway y prueba de contrato (Schemathesis) contra el sandbox. El operador aprueba solo si pasaron.",
+      "rerun": "Repetir validaciones",
+      "rerunHint": "¿Corregiste el servicio? Vuelve a correr las validaciones.",
+      "healthcheck": "Healthcheck a través del gateway: {status} (HTTP {http}, {ms} ms)",
+      "contract": "Prueba de contrato en el sandbox: {status}",
+      "status": {
+        "running": "En curso",
+        "passed": "Superadas",
+        "failed": "Fallidas"
+      },
+      "check": {
+        "passed": "superada",
+        "failed": "fallida",
+        "error": "error",
+        "skipped": "omitida"
+      }
     }
   },
   "reviewDecision": {
@@ -574,7 +601,9 @@
         "deprecated": "Versión marcada como obsoleta",
         "retired": "Versión retirada",
         "openapi_replaced": "Documento OpenAPI reemplazado",
-        "purposes_changed": "Finalidades permitidas cambiadas"
+        "purposes_changed": "Finalidades permitidas cambiadas",
+        "validated": "Validaciones automáticas terminadas",
+        "validation_requested": "Validaciones automáticas pedidas otra vez"
       },
       "application": {
         "created": "Aplicación creada"

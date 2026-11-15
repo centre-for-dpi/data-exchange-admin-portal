@@ -7,6 +7,7 @@ import {
   createVersionAction,
   replaceOpenapiAction,
   deprecateVersionAction,
+  revalidateVersionAction,
   submitVersionAction,
 } from '../../lib/api-actions';
 import { type FormState, initialFormState } from '../../lib/forms';
@@ -190,6 +191,62 @@ function OpenapiInputs({ state }: { state: FormState }) {
   );
 }
 
+/**
+ * Optional test upstream with synthetic data (M4-06, M4-08): the contract test at submission and
+ * the sandbox applications go there, never to the production upstream.
+ */
+function SandboxFields({ nodes, state }: { nodes: Option[]; state: FormState }) {
+  const t = useTranslations('version.create');
+  const [kind, setKind] = useState<'none' | 'node' | 'direct'>('none');
+  return (
+    <fieldset className="space-y-3">
+      <legend className="mb-1 text-sm font-medium text-foreground-strong">{t('sandbox')}</legend>
+      <p className="text-sm text-muted-foreground">{t('sandboxHint')}</p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {(['none', 'node', 'direct'] as const).map((value) => (
+          <label
+            key={value}
+            className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border-control bg-background px-4 py-3 text-sm has-[:checked]:border-primary-ink has-[:checked]:bg-primary-soft"
+          >
+            <input
+              type="radio"
+              className={checkClass}
+              name="sandboxType"
+              value={value}
+              checked={kind === value}
+              onChange={() => setKind(value)}
+            />
+            {t(`sandbox_${value}`)}
+          </label>
+        ))}
+      </div>
+      {kind === 'node' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field name="sandboxNodeId" label={t('sandboxNode')} state={state}>
+            {(p) => (
+              <select {...p} className={inputClass} defaultValue="">
+                <option value="">{t('noNode')}</option>
+                {nodes.map((node) => (
+                  <option key={node.value} value={node.value}>
+                    {node.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field name="sandboxUpstream" label={t('sandboxServicePath')} required state={state}>
+            {(p) => <input {...p} name="sandboxServicePath" type="text" className={inputClass} />}
+          </Field>
+        </div>
+      ) : kind === 'direct' ? (
+        <Field name="sandboxUpstream" label={t('sandboxUrl')} required state={state}>
+          {(p) => <input {...p} name="sandboxUrl" type="url" className={inputClass} />}
+        </Field>
+      ) : null}
+    </fieldset>
+  );
+}
+
 export function CreateVersionForm({
   apiId,
   purposes,
@@ -300,6 +357,8 @@ export function CreateVersionForm({
         </>
       )}
 
+      <SandboxFields nodes={nodes} state={state} />
+
       <fieldset
         className="space-y-2"
         aria-describedby={purposeErrors.length ? 'purposes-error' : undefined}
@@ -408,6 +467,23 @@ export function DeprecateVersionForm({
       </Field>
       <Button type="submit" variant="danger" disabled={pending}>
         {t('deprecate')}
+      </Button>
+    </form>
+  );
+}
+
+/** The provider fixed its service: run the validations again (M4-06). */
+export function RevalidateVersionForm({ apiId, versionId }: { apiId: string; versionId: string }) {
+  const t = useTranslations('version.validation');
+  const [state, action, pending] = useActionState(
+    revalidateVersionAction.bind(null, apiId, versionId),
+    initialFormState,
+  );
+  return (
+    <form action={action} className="space-y-3">
+      <ErrorSummary state={state} />
+      <Button type="submit" variant="outline" disabled={pending}>
+        {t('rerun')}
       </Button>
     </form>
   );

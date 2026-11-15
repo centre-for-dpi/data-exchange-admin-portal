@@ -102,6 +102,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.write` |
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/purposes` | entidad: `api.purposes.write` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/submit` | entidad: `api.write` |
+| POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/validations` | entidad: `api.write` |
 | GET | `/api/v1/entities/:entityId/applications` | entidad: `application.read` |
 | POST | `/api/v1/entities/:entityId/applications` | entidad: `application.write` |
 | GET | `/api/v1/entities/:entityId/applications/:applicationId` | entidad: `application.read` |

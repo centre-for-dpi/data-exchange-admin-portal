@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { ApiVersionStatus, PlatformRole, ReviewDetail } from '@rid/contracts';
 import { ApisService, VERSION_INCLUDE, versionSnapshot } from '../apis/apis.service.js';
+import { VersionValidationService } from '../apis/version-validation.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PLATFORM_PERMISSIONS } from '../auth/authz.policy.js';
 import type { Principal } from '../auth/principal.service.js';
@@ -139,6 +140,8 @@ export class ReviewsService {
     const before = await this.load(versionId);
     const role = this.reviewerRole(principal);
     assertTransition(before.status, 'approved_operator');
+    // Blocking validations at submission (SPEC.md §4.2 step 2, M4-06).
+    VersionValidationService.assertPassed(before.validationReport);
     await assertEntityActive(this.prisma, before.api.entityId);
     this.assertImpartial(principal, before);
     const actor = { type: 'user' as const, id: principal.keycloakSub };

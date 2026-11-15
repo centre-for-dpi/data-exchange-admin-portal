@@ -625,7 +625,17 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Probado contra APISIX y OPA reales, con la política real y un Security Server simulado (`xroad.int.test.ts`): URL y `X-Road-Client`, cabeceras de la política, cabeceras falsas del consumidor, truco de ruta, llamada negada. Además, 3 tests de política, el registro con y sin miembro, y un e2e del operador y del publicador.
     - Pendiente de confirmar con un Security Server real (piloto): que las `X-RID-*` llegan intactas al sistema del proveedor (S-5).
     - Despliegue: `RID_XROAD_SECURITY_SERVER_URL`, `RID_XROAD_CLIENT` y `RID_XROAD_SECURITY_SERVER_CA` (archivo PEM).
-- [ ] **M4-06 — Validaciones al enviar a revisión**: healthcheck a través del gateway y prueba de contrato con Schemathesis en sandbox; resultados adjuntos a la revisión.
+- [x] **M4-06 — Validaciones al enviar a revisión**: healthcheck a través del gateway y prueba de contrato con Schemathesis en sandbox; resultados adjuntos a la revisión.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1`.
+    - La versión declara un **upstream de sandbox** opcional, con datos sintéticos (nodo o URL, mismos controles que el upstream). Lo usan la prueba de contrato y, en M4-08, las aplicaciones sandbox.
+    - Mientras la versión está en revisión, el reconciliador mantiene dos rutas de verificación estrechas, detrás de `RID_VALIDATION_TOKEN`: GET a la raíz del servicio real (conectividad, nunca datos) y la ruta del sandbox para Schemathesis.
+    - Al enviar a revisión se encola `version.validate`: healthcheck por el gateway (pasa con cualquier respuesta que no sea 5xx) y prueba de contrato con Schemathesis 4 (`infra/contract-runner`, contenedor con API interno).
+    - Interpretación de "bloqueantes": la versión entra a revisión enseguida y las validaciones corren en segundo plano. El operador solo aprueba con validaciones superadas (409 si no). El proveedor las repite después de corregir. Sin sandbox, la prueba de contrato se omite y no bloquea.
+    - Privacidad: de Schemathesis solo se guardan el nombre de la operación, los códigos de verificación fallidos y el código HTTP, nunca cuerpos ni comandos `curl` (regla 2). El runner descarta su informe.
+    - La primera corrida encontró un bug real del proveedor de prueba de salud: un cuerpo que no es JSON daba 500 en lugar de 400. Se corrigió.
+    - Web: resultados en la ficha de la versión (proveedor y revisor), botón "Repetir validaciones" y campos del sandbox en el formulario.
+    - Pruebas contra APISIX real: rutas de verificación (solo con el token; la real, solo GET a la raíz), healthcheck, prueba de contrato con el runner, borrado al salir de revisión, y el bloqueo de la aprobación. Las pruebas de integración del resto del API corren con `RID_VERSION_VALIDATION=off`.
+    - Despliegue: servicio `contract-runner` y variables `RID_VALIDATION_TOKEN`, `RID_GATEWAY_INTERNAL_URL`, `RID_CONTRACT_RUNNER_URL`, `RID_CONTRACT_RUNNER_TOKEN` y `RID_CONTRACT_RUNNER_GATEWAY_URL`.
 - [ ] **M4-07 — Lista de preparación del bootcamp**: por entidad, checklist de prerrequisitos (servidor, usuario de solo lectura, salida 443, responsables designados, caso de uso) con estado visible para el operador.
 - [ ] **M4-08 — Modo sandbox**: aplicaciones sandbox con aprobación automática hacia upstreams de prueba.
 - [ ] **M4-09 — Ficha del servicio imprimible**: vista e impresión/PDF desde el navegador.

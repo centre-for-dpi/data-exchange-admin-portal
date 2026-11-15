@@ -493,6 +493,12 @@ model ApiVersion {
   upstreamType     UpstreamType     @map("upstream_type")
   /// Shape depends on upstreamType (SPEC.md §3.1); validated with zod in packages/contracts.
   upstream         Json
+  /// Test upstream with synthetic data (M4-06, M4-08): the contract test and sandbox
+  /// applications go there, never to `upstream`.
+  sandboxUpstream  Json?            @map("sandbox_upstream")
+  /// Last automatic validations at submission (M4-06): healthcheck and contract test, parsed
+  /// results only (never a request or response body).
+  validationReport Json?            @map("validation_report")
   /// /{entitySlug}/{apiSlug}/v{major}
   basePath         String           @map("base_path")
   /// [{ name, personal, sensitive }]: personal data the API exposes (minimization, SPEC.md §5).

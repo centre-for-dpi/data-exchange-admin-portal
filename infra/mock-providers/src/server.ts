@@ -57,14 +57,21 @@ export function buildServer(provider: Provider, options: ServerOptions = {}): Fa
     ajv: { customOptions: { removeAdditional: false } },
   });
 
-  app.setErrorHandler((error: { validation?: unknown; message: string }, _request, reply) => {
-    if (error.validation) return problem(reply, 400, 'Solicitud inválida', error.message);
-    app.log.error({ err: error.message }, 'unexpected error');
-    return reply
-      .code(500)
-      .type('application/problem+json')
-      .send({ type: 'about:blank', title: 'Error interno', status: 500 });
-  });
+  app.setErrorHandler(
+    (error: { validation?: unknown; message: string; statusCode?: number }, _request, reply) => {
+      if (error.validation) return problem(reply, 400, 'Solicitud inválida', error.message);
+      // A body that is not JSON (Fastify's parser rejects it with a 4xx): the client's fault, a 400,
+      // as the OpenAPI documents. Found by the contract test of M4-06.
+      if (error.statusCode !== undefined && error.statusCode >= 400 && error.statusCode < 500) {
+        return problem(reply, 400, 'Solicitud inválida');
+      }
+      app.log.error({ err: error.message }, 'unexpected error');
+      return reply
+        .code(500)
+        .type('application/problem+json')
+        .send({ type: 'about:blank', title: 'Error interno', status: 500 });
+    },
+  );
 
   app.addHook('onRequest', (request, _reply, done) => {
     if (request.routeOptions.url !== '/health') {

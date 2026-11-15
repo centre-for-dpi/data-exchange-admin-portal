@@ -11,7 +11,12 @@ import type {
   LintReport,
   PaginationQuery,
 } from '@rid/contracts';
-import { createApiSchema, createApiVersionSchema, upstreamSchema } from '@rid/contracts';
+import {
+  createApiSchema,
+  createApiVersionSchema,
+  type Upstream,
+  upstreamSchema,
+} from '@rid/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError, ValidationError } from '../common/errors.js';
@@ -25,6 +30,7 @@ import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import { nodeIdOf, upstreamNodes } from '../nodes/node-status.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
+import { storedValidation, VersionValidationService } from './version-validation.service.js';
 import { lintOpenApi, listOperations } from './lint/openapi-lint.js';
 
 type ApiRow = Prisma.ApiGetPayload<object>;
@@ -78,6 +84,7 @@ export class ApisService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly validation: VersionValidationService,
   ) {}
 
   private actor(principal: Principal, entityId: string) {
@@ -201,6 +208,8 @@ export class ApisService {
       updatedAt: v.updatedAt.toISOString(),
       upstream: upstreamSchema.parse(v.upstream),
       node,
+      sandboxUpstream: v.sandboxUpstream ? upstreamSchema.parse(v.sandboxUpstream) : null,
+      validation: storedValidation(v.validationReport),
       exposedFields: v.exposedFields as ApiVersionDetail['exposedFields'],
       allowedPurposes: v.allowedPurposes.map((p) => p.purposeCode).sort(),
       legalBasisText: v.legalBasisText,
@@ -252,6 +261,58 @@ export class ApisService {
     });
   }
 
+  /**
+   * What a version's upstream (or sandbox upstream) may name (M4-04, M4-05): a kit node of the same
+   * entity still in the network, or a service of the entity's own X-Road member in the operator's
+   * instance. The reconciler checks it again on every pass and fails closed.
+   */
+  private async assertUpstreamAllowed(
+    entity: { id: string; xroadMemberClass: string | null; xroadMemberCode: string | null },
+    upstream: Upstream,
+    path: string,
+  ): Promise<void> {
+    // A version on a kit node names a node of the same entity that is still in the network
+    // (M4-04); the reconciler checks it again on every pass and fails closed.
+    if (upstream.type === 'node' && upstream.nodeId) {
+      const node = await scopedRepo(this.prisma.node, entity.id).findFirst({
+        where: { id: upstream.nodeId, status: { not: 'decommissioned' } },
+        select: { id: true },
+      });
+      if (!node) {
+        throw new ValidationError([
+          { path: `${path}.nodeId`, message: 'Not a node of this entity in the network' },
+        ]);
+      }
+    }
+    // Every xroad route leaves with the operator's identity: an entity only publishes services
+    // of its own X-Road member, which the operator set (M4-05, SPIKE S-5).
+    if (upstream.type === 'xroad') {
+      const { memberClass, memberCode } = upstream.serviceId;
+      if (!entity.xroadMemberClass || !entity.xroadMemberCode) {
+        throw new ValidationError([
+          {
+            path: `${path}.serviceId`,
+            message: 'The operator has not registered the entity’s X-Road member yet',
+          },
+        ]);
+      }
+      const instance = process.env.RID_XROAD_CLIENT?.split('/')[0];
+      if (instance && upstream.serviceId.instance !== instance) {
+        throw new ValidationError([
+          { path: `${path}.serviceId`, message: `The X-Road instance must be ${instance}` },
+        ]);
+      }
+      if (memberClass !== entity.xroadMemberClass || memberCode !== entity.xroadMemberCode) {
+        throw new ValidationError([
+          {
+            path: `${path}.serviceId`,
+            message: 'The service is not of the entity’s X-Road member',
+          },
+        ]);
+      }
+    }
+  }
+
   async createVersion(
     entityId: string,
     apiId: string,
@@ -274,45 +335,9 @@ export class ApisService {
         unknown.map((code) => ({ path: 'allowedPurposes', message: `Unknown purpose "${code}"` })),
       );
     }
-    // A version on a kit node names a node of the same entity that is still in the network
-    // (M4-04); the reconciler checks it again on every pass and fails closed.
-    if (data.upstream.type === 'node' && data.upstream.nodeId) {
-      const node = await scopedRepo(this.prisma.node, entityId).findFirst({
-        where: { id: data.upstream.nodeId, status: { not: 'decommissioned' } },
-        select: { id: true },
-      });
-      if (!node) {
-        throw new ValidationError([
-          { path: 'upstream.nodeId', message: 'Not a node of this entity in the network' },
-        ]);
-      }
-    }
-    // Every xroad route leaves with the operator's identity: an entity only publishes services
-    // of its own X-Road member, which the operator set (M4-05, SPIKE S-5).
-    if (data.upstream.type === 'xroad') {
-      const { memberClass, memberCode } = data.upstream.serviceId;
-      if (!entity.xroadMemberClass || !entity.xroadMemberCode) {
-        throw new ValidationError([
-          {
-            path: 'upstream.serviceId',
-            message: 'The operator has not registered the entity’s X-Road member yet',
-          },
-        ]);
-      }
-      const instance = process.env.RID_XROAD_CLIENT?.split('/')[0];
-      if (instance && data.upstream.serviceId.instance !== instance) {
-        throw new ValidationError([
-          { path: 'upstream.serviceId', message: `The X-Road instance must be ${instance}` },
-        ]);
-      }
-      if (memberClass !== entity.xroadMemberClass || memberCode !== entity.xroadMemberCode) {
-        throw new ValidationError([
-          {
-            path: 'upstream.serviceId',
-            message: 'The service is not of the entity’s X-Road member',
-          },
-        ]);
-      }
+    await this.assertUpstreamAllowed(entity, data.upstream, 'upstream');
+    if (data.sandboxUpstream) {
+      await this.assertUpstreamAllowed(entity, data.sandboxUpstream, 'sandboxUpstream');
     }
 
     const [major = 0, minor = 0] = data.version.split('.').map(Number);
@@ -343,6 +368,7 @@ export class ApisService {
             lintReport: parsed.report,
             upstreamType: data.upstream.type,
             upstream: data.upstream,
+            ...(data.sandboxUpstream ? { sandboxUpstream: data.sandboxUpstream } : {}),
             basePath: `/${entity.slug}/${api.slug}/v${major}`,
             exposedFields: data.exposedFields,
             legalBasisText: data.legalBasisText ?? null,
@@ -681,8 +707,34 @@ export class ApisService {
         after: versionSnapshot(after),
         requestId,
       });
+      // Healthcheck and contract test through the gateway (M4-06), attached to the review.
+      await this.validation.queueInTx(tx, versionId, 'submitted');
       return after;
     });
-    return this.detailOf(updated);
+    return this.detailOf(await this.findVersion(entityId, apiId, updated.id));
+  }
+
+  /** Runs the validations again (the provider fixed its service) while the version is in review. */
+  async revalidate(
+    entityId: string,
+    apiId: string,
+    versionId: string,
+    principal: Principal,
+    requestId?: string,
+  ): Promise<ApiVersionDetail> {
+    const version = await this.findVersion(entityId, apiId, versionId);
+    if (version.status !== 'in_review') {
+      throw new ConflictError('Only a version in review is validated');
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await this.audit.record(tx, {
+        actor: this.actor(principal, entityId),
+        action: 'api_version.validation_requested',
+        target: { type: 'api_version', id: versionId },
+        requestId,
+      });
+      await this.validation.queueInTx(tx, versionId, 'requested');
+    });
+    return this.detailOf(await this.findVersion(entityId, apiId, versionId));
   }
 }

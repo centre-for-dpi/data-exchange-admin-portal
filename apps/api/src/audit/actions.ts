@@ -52,6 +52,8 @@ export const AUDIT_ACTIONS = [
   'api_version.revised',
   'api_version.deprecated',
   'api_version.retired',
+  'api_version.validated',
+  'api_version.validation_requested',
   // Applications and credentials
   'application.created',
   'credential.created',

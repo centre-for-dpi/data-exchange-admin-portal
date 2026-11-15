@@ -48,6 +48,10 @@ import { AdminPurposesController } from './purposes/admin-purposes.controller.js
 import { PurposesController } from './purposes/purposes.controller.js';
 import { PurposesService } from './purposes/purposes.service.js';
 import { AdminNodesController, NodesController } from './nodes/nodes.controller.js';
+import {
+  GatewayValidationProbes,
+  VersionValidationService,
+} from './apis/version-validation.service.js';
 import { NodeControlController } from './nodes/node-control.controller.js';
 import { NodeControlGuard } from './nodes/node-control.guard.js';
 import { NodeControlService } from './nodes/node-control.service.js';
@@ -140,6 +144,8 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     DataSubjectsService,
     SubjectAlertsService,
     NodesService,
+    VersionValidationService,
+    GatewayValidationProbes,
     NodeControlService,
     NodeControlGuard,
     CitizenGuard,

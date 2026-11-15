@@ -72,6 +72,29 @@ export async function submitNewApi(
   return { name, slug, versionUrl: page.url() };
 }
 
+/**
+ * On a review page: waits for the automatic validations of the submission (M4-06) to pass,
+ * reloading, since they run in the background for a few seconds.
+ */
+export async function waitForValidations(page: Page) {
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByTestId('version-validation')).toContainText('Superadas', {
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 120_000, intervals: [2_000] });
+}
+
+/** On a review page: waits until the validations finished, passed or not (M4-06). */
+export async function waitForValidationsToFinish(page: Page) {
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByTestId('version-validation')).toContainText(/Superadas|Fallidas/, {
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 180_000, intervals: [2_000] });
+}
+
 /** pedro submits a new API and ana approves it, in separate browser sessions. */
 export async function publishNewApi(
   browser: Browser,
@@ -82,6 +105,7 @@ export async function publishNewApi(
   const versionId = submitted.versionUrl.split('/versions/')[1]?.split(/[?#]/)[0] ?? '';
   const operator = await (await browser.newContext()).newPage();
   await signIn(operator, 'ana.operadora', `/operator/reviews/${versionId}`);
+  await waitForValidations(operator);
   await operator.getByRole('button', { name: 'Aprobar' }).click();
   await expect(operator.getByTestId('version-status')).toHaveText('Publicada');
   await publisher.context().close();

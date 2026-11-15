@@ -62,6 +62,24 @@ export async function createApiAction(_prev: FormState, formData: FormData): Pro
   return {};
 }
 
+/** The optional sandbox upstream of the version form (M4-06, M4-08). */
+function sandboxUpstreamOf(formData: FormData): { sandboxUpstream?: unknown } {
+  const kind = text(formData, 'sandboxType');
+  if (kind === 'node') {
+    return {
+      sandboxUpstream: {
+        type: 'node',
+        servicePath: text(formData, 'sandboxServicePath'),
+        ...(text(formData, 'sandboxNodeId') ? { nodeId: text(formData, 'sandboxNodeId') } : {}),
+      },
+    };
+  }
+  if (kind === 'direct') {
+    return { sandboxUpstream: { type: 'direct', url: text(formData, 'sandboxUrl'), mtls: false } };
+  }
+  return {};
+}
+
 export async function createVersionAction(
   apiId: string,
   _prev: FormState,
@@ -104,6 +122,7 @@ export async function createVersionAction(
                 servicePath: text(formData, 'servicePath'),
                 ...(text(formData, 'nodeId') ? { nodeId: text(formData, 'nodeId') } : {}),
               },
+      ...sandboxUpstreamOf(formData),
       exposedFields,
       allowedPurposes: formData.getAll('allowedPurposes').map(String),
       ...(text(formData, 'legalBasisText')
@@ -157,6 +176,26 @@ export async function deprecateVersionAction(
   if (!result.ok) return fail(result.problem);
   revalidatePath('/', 'layout');
   return {};
+}
+
+/** Runs the automatic validations of a version in review again (M4-06). */
+export async function revalidateVersionAction(
+  apiId: string,
+  versionId: string,
+  _prev: FormState,
+  _formData: FormData,
+): Promise<FormState> {
+  const entityId = await activeEntityId();
+  if (!entityId) return fail(undefined);
+  const result = await apiSend(
+    'POST',
+    `/entities/${entityId}/apis/${apiId}/versions/${versionId}/validations`,
+    undefined,
+    apiVersionDetailSchema,
+  );
+  if (!result.ok) return fail(result.problem);
+  revalidatePath('/', 'layout');
+  return { done: true };
 }
 
 export async function submitVersionAction(

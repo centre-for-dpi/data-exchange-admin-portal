@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { parse } from 'yaml';
-import { openapiFile, signIn, submitNewApi } from './flows';
+import { openapiFile, signIn, submitNewApi, waitForValidations } from './flows';
 import { gateway, probeGateway } from './gateway-flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
@@ -29,6 +29,7 @@ test.describe('API version lifecycle (M2-05)', () => {
     const { versionUrl } = await submitNewApi(publisher, { name, slug });
     const operator = await (await browser.newContext()).newPage();
     await signIn(operator, 'ana.operadora', `/operator/reviews/${versionIdOf(versionUrl)}`);
+    await waitForValidations(operator);
     await operator.getByRole('button', { name: 'Aprobar' }).click();
     await expect(operator.getByTestId('version-status')).toHaveText('Publicada');
 

@@ -340,6 +340,20 @@ services:
       <<: *healthcheck-defaults
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8090/health']
 
+  contract-runner:
+    # Contract tests of API versions in review (M4-06): Schemathesis against the sandbox, through
+    # the gateway's check routes. Internal API on :8096; only parsed results come back.
+    build:
+      context: ../contract-runner
+    image: rid/contract-runner:dev
+    environment:
+      RID_CONTRACT_RUNNER_TOKEN: ${RID_CONTRACT_RUNNER_TOKEN:?set RID_CONTRACT_RUNNER_TOKEN in .env}
+    ports:
+      - 127.0.0.1:${CONTRACT_RUNNER_PORT:-8096}:8096
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8096/health']
+
   mock-node:
     # Simulated kit node (M4-03): a test fixture, not the kit (ADR-0011). Profile `nodes`. It
     # waits for an enrollment token in /var/lib/mock-node/token (or RID_ENROLLMENT_TOKEN), then

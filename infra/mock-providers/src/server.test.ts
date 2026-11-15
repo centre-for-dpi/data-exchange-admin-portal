@@ -148,6 +148,16 @@ describe('mock provider: salud', () => {
     }
   });
 
+  it('answers a body that is not JSON with 400, as documented (found by the M4-06 contract test)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/afiliados/verificaciones',
+      headers: { 'content-type': 'application/json' },
+      payload: '\u0000',
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('serves its OpenAPI document', async () => {
     const res = await app.inject({ method: 'GET', url: '/openapi.yaml' });
     expect(res.statusCode).toBe(200);

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn, submitNewApi } from './flows';
+import { signIn, submitNewApi, waitForValidations } from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 // M1-04: the operator reviews a submitted version, approves it (published) or requests changes.
@@ -24,6 +24,12 @@ test.describe('operator review (M1-04)', () => {
     await expect(operator.getByRole('cell', { name: 'regimen' })).toBeVisible();
     await expectNoAccessibilityViolations(operator);
 
+    // The validations at submission (M4-06) go with the review, and they must pass first.
+    await waitForValidations(operator);
+    await expect(operator.getByTestId('version-validation')).toContainText(
+      'Healthcheck a través del gateway: superada',
+    );
+    await expectNoAccessibilityViolations(operator);
     await operator.getByLabel('Comentario (opcional)').fill('Ficha completa.');
     await operator.getByRole('button', { name: 'Aprobar' }).click();
     await expect(operator.getByText('Esta versión ya no está en revisión.')).toBeVisible();

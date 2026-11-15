@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { createApplication, requestAccess, signIn, submitNewApi } from './flows';
+import {
+  createApplication,
+  requestAccess,
+  signIn,
+  submitNewApi,
+  waitForValidations,
+} from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 // M2-04: with features.approval.regulatorForSensitive, a sensitive API is published only after
@@ -24,6 +30,7 @@ test.describe('regulator approval (M2-04)', () => {
     const versionId = versionIdOf(versionUrl);
     const operator = await (await browser.newContext()).newPage();
     await signIn(operator, 'ana.operadora', `/operator/reviews/${versionId}`);
+    await waitForValidations(operator);
     await operator.getByRole('button', { name: 'Aprobar' }).click();
     await expect(operator.getByTestId('version-status')).toHaveText('Aprobada por el operador');
 

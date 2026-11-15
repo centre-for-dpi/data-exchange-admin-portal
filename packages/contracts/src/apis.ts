@@ -170,6 +170,8 @@ export const createApiVersionSchema = z.strictObject({
   version: z.string().regex(/^[1-9][0-9]{0,2}\.[0-9]{1,3}$/, 'major.minor, e.g. 1.0'),
   openapi: openapiSourceSchema,
   upstream: upstreamSchema,
+  /** Optional test upstream with synthetic data (M4-06, M4-08). */
+  sandboxUpstream: upstreamSchema.optional(),
   exposedFields: z.array(exposedFieldSchema).max(200).default([]),
   allowedPurposes: z.array(z.string().min(1)).min(1).max(20),
   legalBasisText: z.string().trim().max(5_000).optional(),
@@ -235,6 +237,41 @@ export const versionReviewSchema = z.object({
 });
 export type VersionReview = z.infer<typeof versionReviewSchema>;
 
+/**
+ * Automatic validations when a version is sent to review (SPEC.md §4.2 step 2, M4-06). The
+ * contract test keeps only, per operation, the Schemathesis check codes that failed and the status
+ * received: never a body (CLAUDE.md, rule 2).
+ */
+export const versionValidationSchema = z.object({
+  status: z.enum(['running', 'passed', 'failed']),
+  startedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime().nullable(),
+  healthcheck: z
+    .object({
+      status: z.enum(['passed', 'failed']),
+      httpStatus: z.number().int().nullable(),
+      latencyMs: z.number().int().nullable(),
+      reason: z.string().optional(),
+    })
+    .nullable(),
+  contract: z
+    .object({
+      status: z.enum(['passed', 'failed', 'error', 'skipped']),
+      reason: z.string().optional(),
+      durationMs: z.number().int().optional(),
+      operations: z.array(
+        z.object({
+          operation: z.string(),
+          passed: z.boolean(),
+          codes: z.array(z.string()),
+          receivedStatus: z.number().int().nullable(),
+        }),
+      ),
+    })
+    .nullable(),
+});
+export type VersionValidation = z.infer<typeof versionValidationSchema>;
+
 /** State of the kit node a version is served by (SPEC.md §4.6 step 5, M4-04). */
 export const upstreamNodeSchema = z.object({
   id: z.uuid(),
@@ -249,6 +286,9 @@ export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
   upstream: upstreamSchema,
   /** The kit node of a `node` upstream with a nodeId; null otherwise. */
   node: upstreamNodeSchema.nullable(),
+  sandboxUpstream: upstreamSchema.nullable(),
+  /** Automatic validations at submission (M4-06); null until the first run. */
+  validation: versionValidationSchema.nullable(),
   exposedFields: z.array(exposedFieldSchema),
   allowedPurposes: z.array(z.string()),
   legalBasisText: z.string().nullable(),

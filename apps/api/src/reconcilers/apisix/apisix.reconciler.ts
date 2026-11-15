@@ -13,8 +13,16 @@ import { listOperations } from '../../apis/lint/openapi-lint.js';
 import { pathRegex } from '../../opa/bundle.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
-import { APISIX_ADMIN, type ApisixAdmin, deleteUpstreamWhenUnused } from './apisix-admin.js';
 import {
+  APISIX_ADMIN,
+  type ApisixAdmin,
+  type ApisixObject,
+  deleteUpstreamWhenUnused,
+} from './apisix-admin.js';
+import {
+  CHECK_ROUTE_PREFIX,
+  checkRouteId,
+  desiredCheckRoutes,
   desiredGateway,
   desiredNodeControlRoute,
   desiredSsl,
@@ -31,6 +39,7 @@ import {
   needsGatewayPki,
   type UpstreamPki,
   routeId,
+  sandboxCheckRouteId,
   sslMatches,
   TOKEN_ROUTE_ID,
   UnsupportedUpstreamError,
@@ -125,6 +134,26 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
         this.logger.warn(`APISIX reconcile of version ${v.id} failed: ${String(error)}`);
       }
     }
+    // Check routes (M4-06): those of versions in review, and none of any other version.
+    try {
+      const reviewing = await this.prisma.apiVersion.findMany({
+        where: { status: 'in_review' },
+        select: { id: true },
+      });
+      const keep = new Set(reviewing.map((v) => v.id));
+      for (const v of reviewing) {
+        await this.reconcileChecks(v.id, await this.loadVersion(v.id)).catch((error: unknown) =>
+          this.logger.warn(`APISIX check routes of version ${v.id}: ${String(error)}`),
+        );
+      }
+      for (const id of await this.admin.list('routes')) {
+        if (!id.startsWith(CHECK_ROUTE_PREFIX)) continue;
+        const versionId = id.slice(CHECK_ROUTE_PREFIX.length).replace(/^sandbox-/, '');
+        if (!keep.has(versionId)) await this.admin.delete('routes', id);
+      }
+    } catch (error) {
+      this.logger.warn(`APISIX check routes cleanup failed: ${String(error)}`);
+    }
     try {
       await this.removeOrphans(
         new Set(versions.map((v) => v.id)),
@@ -133,6 +162,94 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     } catch (error) {
       this.logger.warn(`APISIX orphan cleanup failed: ${String(error)}`);
     }
+  }
+
+  /**
+   * Check routes of a version in review (M4-06): created while it is `in_review`, removed in any
+   * other status. They take the token and the policy out of the way for the portal's validations,
+   * so their builder (desiredCheckRoutes) keeps them narrow.
+   */
+  async reconcileChecks(
+    apiVersionId: string,
+    version: Awaited<ReturnType<typeof this.loadVersion>>,
+  ): Promise<void> {
+    const ids = [checkRouteId(apiVersionId), sandboxCheckRouteId(apiVersionId)];
+    const desired =
+      version?.status === 'in_review' && this.settings.validationToken
+        ? await this.checkRoutesOf(version)
+        : null;
+    const wanted = new Map<string, ApisixObject>();
+    if (desired) {
+      wanted.set(ids[0] ?? '', desired.health);
+      if (desired.sandbox) wanted.set(ids[1] ?? '', desired.sandbox);
+    }
+    for (const id of ids) {
+      const route = wanted.get(id);
+      if (route) await this.apply('routes', id, route);
+      else if (await this.admin.get('routes', id)) await this.admin.delete('routes', id);
+    }
+  }
+
+  private loadVersion(apiVersionId: string) {
+    return this.prisma.apiVersion.findUnique({
+      where: { id: apiVersionId },
+      include: { api: { include: { entity: true } } },
+    });
+  }
+
+  private async checkRoutesOf(version: NonNullable<Awaited<ReturnType<typeof this.loadVersion>>>) {
+    const upstream = upstreamSchema.parse(version.upstream);
+    const sandbox = version.sandboxUpstream ? upstreamSchema.parse(version.sandboxUpstream) : null;
+    const entity = version.api.entity;
+    const nodeOf = async (u: Upstream) =>
+      u.type === 'node' && u.nodeId
+        ? await this.prisma.node.findUnique({
+            where: { id: u.nodeId },
+            select: { id: true, entityId: true, status: true },
+          })
+        : undefined;
+    const needsPki = [upstream, sandbox].some(
+      (u) => u && needsGatewayPki(u, entity.slug, this.settings),
+    );
+    const pki = needsPki ? await this.reconcileClientTls(entity) : undefined;
+    const base = {
+      id: version.id,
+      entityId: entity.id,
+      basePath: version.basePath,
+      methods: [],
+      bodySubjects: [],
+      hasDataSubjects: false,
+      entitySlug: entity.slug,
+      apiName: version.api.name,
+      version: version.version,
+      xroadMember:
+        entity.xroadMemberClass && entity.xroadMemberCode
+          ? { memberClass: entity.xroadMemberClass, memberCode: entity.xroadMemberCode }
+          : null,
+    };
+    const forUpstream = async (u: Upstream) => {
+      const addresses = await this.assertPublicUpstream(u);
+      const node = await nodeOf(u);
+      return {
+        ...base,
+        upstream: u,
+        ...(addresses ? { addresses } : {}),
+        ...(node !== undefined ? { node } : {}),
+      };
+    };
+    const main = desiredCheckRoutes(
+      { ...(await forUpstream(upstream)), sandboxUpstream: null },
+      this.settings,
+      pki,
+    );
+    if (!main) return null;
+    if (!sandbox) return main;
+    const withSandbox = desiredCheckRoutes(
+      { ...(await forUpstream(sandbox)), upstream: sandbox, sandboxUpstream: sandbox },
+      this.settings,
+      pki,
+    );
+    return { health: main.health, sandbox: withSandbox?.sandbox ?? null };
   }
 
   /** Deletes managed routes and upstreams whose version is not served (route first). */
@@ -310,13 +427,14 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
   }
 
   async reconcileVersion(apiVersionId: string): Promise<GatewayResult> {
-    const version = await this.prisma.apiVersion.findUnique({
-      where: { id: apiVersionId },
-      include: { api: { include: { entity: true } } },
-    });
+    const version = await this.loadVersion(apiVersionId);
     const target = gatewaySyncTarget(apiVersionId);
     const served = version && (SERVED as readonly string[]).includes(version.status);
     let desiredHash = hash(null);
+    // Check routes of a version in review (M4-06), on their own: they never block the route.
+    await this.reconcileChecks(apiVersionId, version).catch((error: unknown) =>
+      this.logger.warn(`APISIX check routes of version ${apiVersionId}: ${String(error)}`),
+    );
 
     try {
       if (!served) {

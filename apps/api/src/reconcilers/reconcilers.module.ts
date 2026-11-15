@@ -61,6 +61,7 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
           },
         },
         wgHub: process.env.RID_GATEWAY_WG_HUB ?? 'wg-hub:8443',
+        validationToken: process.env.RID_VALIDATION_TOKEN || undefined,
         xroad:
           process.env.RID_XROAD_SECURITY_SERVER_URL && process.env.RID_XROAD_CLIENT
             ? {

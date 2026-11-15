@@ -393,6 +393,14 @@ async function main() {
 
   step('Revisar y aprobar', 'ana.operadora');
   const ana = await as('ana.operadora');
+  // The validations at submission (M4-06) must pass before the operator approves.
+  await waitFor(
+    async () =>
+      (await ana.call('GET', `/review/api-versions/${version.id}`)).version.validation?.status ===
+      'passed',
+    { timeoutMs: 120_000, what: 'the automatic validations did not pass' },
+  );
+  ok('Validaciones automáticas superadas (healthcheck a través del gateway y prueba de contrato)');
   const review = await ana.call('GET', `/review/api-versions/${version.id}`);
   info(`Datos que expone: ${review.version.exposedFields.map((f) => f.name).join(', ')}`);
   const approved = await ana.call('POST', `/review/api-versions/${version.id}/approve`, {});

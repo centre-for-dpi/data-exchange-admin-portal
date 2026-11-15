@@ -175,7 +175,15 @@
       "xroadMemberCode": "Member code",
       "xroadSubsystem": "Subsystem (optional)",
       "xroadService": "Service code",
-      "xroadPath": "Path after the service (optional)"
+      "xroadPath": "Path after the service (optional)",
+      "sandbox": "Test service (sandbox)",
+      "sandboxHint": "With synthetic data. The contract test at submission and sandbox applications go there, never to the real service.",
+      "sandbox_none": "No sandbox",
+      "sandbox_node": "On a node",
+      "sandbox_direct": "URL",
+      "sandboxNode": "Sandbox node",
+      "sandboxServicePath": "Path of the test service",
+      "sandboxUrl": "URL of the test service"
     },
     "detail": {
       "title": "{api} · version {version}",
@@ -215,6 +223,25 @@
       "sunsetAt": "Retirement date",
       "sunsetHint": "From {date}.",
       "deprecate": "Deprecate"
+    },
+    "validation": {
+      "title": "Automatic validations",
+      "lead": "On submission: healthcheck of the service through the gateway and contract test (Schemathesis) against the sandbox. The operator approves only if they passed.",
+      "rerun": "Run validations again",
+      "rerunHint": "Did you fix the service? Run the validations again.",
+      "healthcheck": "Healthcheck through the gateway: {status} (HTTP {http}, {ms} ms)",
+      "contract": "Contract test on the sandbox: {status}",
+      "status": {
+        "running": "Running",
+        "passed": "Passed",
+        "failed": "Failed"
+      },
+      "check": {
+        "passed": "passed",
+        "failed": "failed",
+        "error": "error",
+        "skipped": "skipped"
+      }
     }
   },
   "reviewDecision": {
@@ -574,7 +601,9 @@
         "deprecated": "Version deprecated",
         "retired": "Version retired",
         "openapi_replaced": "OpenAPI document replaced",
-        "purposes_changed": "Allowed purposes changed"
+        "purposes_changed": "Allowed purposes changed",
+        "validated": "Automatic validations finished",
+        "validation_requested": "Automatic validations requested again"
       },
       "application": {
         "created": "Application created"

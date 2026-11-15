@@ -10,6 +10,10 @@ import { dataSubjectLabel } from './data-subject';
  * what the reviewer checks (minimization of exposed personal data, purposes, lint). Shared by the
  * provider's version page and the operator's review page.
  */
+/** Badge tone of the validations: running is pending, failed is rejected. */
+const validationTone = (status: string): string =>
+  status === 'passed' ? 'approved' : status === 'failed' ? 'rejected' : 'pending';
+
 export async function VersionSheet({
   version,
   purposeNames,
@@ -66,6 +70,51 @@ export async function VersionSheet({
           </dd>
         </dl>
       </div>
+
+      {version.validation ? (
+        <Section title={t('version.validation.title')} description={t('version.validation.lead')}>
+          <div className="card space-y-4 p-6" data-testid="version-validation">
+            <p>
+              <StatusBadge status={validationTone(version.validation.status)}>
+                {t(`version.validation.status.${version.validation.status}`)}
+              </StatusBadge>
+            </p>
+            {version.validation.healthcheck ? (
+              <p className="text-sm">
+                {t('version.validation.healthcheck', {
+                  status: t(`version.validation.check.${version.validation.healthcheck.status}`),
+                  http: version.validation.healthcheck.httpStatus ?? '—',
+                  ms: version.validation.healthcheck.latencyMs ?? '—',
+                })}
+              </p>
+            ) : null}
+            {version.validation.contract ? (
+              <div className="space-y-2 text-sm">
+                <p>
+                  {t('version.validation.contract', {
+                    status: t(`version.validation.check.${version.validation.contract.status}`),
+                  })}
+                  {version.validation.contract.reason
+                    ? ` (${version.validation.contract.reason})`
+                    : ''}
+                </p>
+                {version.validation.contract.operations.length ? (
+                  <ul className="list-disc space-y-1 pl-5">
+                    {version.validation.contract.operations.map((op) => (
+                      <li key={op.operation}>
+                        <span className="font-mono">{op.operation}</span>:{' '}
+                        {op.passed
+                          ? t('version.validation.check.passed')
+                          : `${op.codes.join(', ')}${op.receivedStatus ? ` (HTTP ${op.receivedStatus})` : ''}`}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
 
       {version.reviews.length > 0 ? (
         <Section title={t('version.detail.reviews')}>

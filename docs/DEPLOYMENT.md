@@ -60,6 +60,7 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `mailpit` | `axllent/mailpit:v1.32.0` | 8025 (UI), 1025 (SMTP) | 8025, 1025 | — | base | `mailpit readyz` |
 | `mock-salud`, `mock-socioeconomico` | `rid/mock-providers:dev` (build local) | 8000 | 8101, 8102 | — | base | `GET /health` |
 | `wg-hub` | `rid/wg-hub:dev` (build local, `infra/wg-hub`) | 51820/udp (túnel), 8443 (enrutador SNI), 8090 (agente) | 51820/udp y 8095 (agente) en `127.0.0.1` | `wg-hub-data` | base | `GET /health` en 8090 |
+| `contract-runner` | `rid/contract-runner:dev` (build local, `infra/contract-runner`) | 8096 | `CONTRACT_RUNNER_PORT` 8096 en `127.0.0.1` | — | base | `GET /health` |
 | `mock-node` | `rid/mock-node:dev` (build local, `infra/mock-node`) | 8443 en su dirección del túnel | no se publica | anónimo | `nodes` | — |
 | `opensearch` | `opensearchproject/opensearch:3.9.0` | 9200 | `OPENSEARCH_PORT` 9200 | `opensearch-data` | `observability` | `_cluster/health` amarillo |
 | `fluent-bit` | `fluent/fluent-bit:5.1.5-debug` | 9880 (HTTP), 2020 | no se publica | — | `observability` | `GET /api/v1/health` en 2020 |
@@ -280,6 +281,8 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 | `AUTH_SECRET` | Cierra todas las sesiones de la web |
 
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
+
+Validaciones al enviar a revisión (M4-06): `RID_VALIDATION_TOKEN` (las rutas de verificación de APISIX solo existen con él), `RID_GATEWAY_INTERNAL_URL` (APISIX como lo alcanza el API), `RID_CONTRACT_RUNNER_URL` y `RID_CONTRACT_RUNNER_TOKEN` (el runner de Schemathesis), `RID_CONTRACT_RUNNER_GATEWAY_URL` (APISIX como lo alcanza el runner) y opcionales `RID_CONTRACT_MAX_EXAMPLES` (20) y `RID_CONTRACT_TIMEOUT_SECONDS` (120). Sin el token, la healthcheck falla y el operador no puede aprobar; sin el runner, la prueba de contrato se omite.
 
 X-Road (M4-05, `ARCHITECTURE.md §4.1`): `RID_XROAD_SECURITY_SERVER_URL` (el Security Server del operador, como lo alcanza APISIX), `RID_XROAD_CLIENT` (el subsistema del operador, `INSTANCIA/CLASE/MIEMBRO/SUBSISTEMA`) y `RID_XROAD_SECURITY_SERVER_CA` (ruta del PEM que verifica el certificado TLS interno del Security Server). Sin las dos primeras, las versiones `xroad` no tienen ruta. Sobre HTTPS, el operador registra en su Security Server el certificado `CN=<RID_GATEWAY_CLIENT_NAME>.xroad` del gateway (objeto SSL `rid-ssl-gateway-xroad`).
 
