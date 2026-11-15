@@ -1,0 +1,80 @@
+# Routes of the bundled proxy (infra/compose/docker-compose.edge.yml). install.sh writes
+# infra/edge/dynamic/rid.yml from this file, replacing the PORTAL_HOST, GATEWAY_HOST and TLS
+# markers (each between two @).
+# Same routes as DEPLOYMENT.md §5.2; keep both in step.
+#
+# Never published: /api/v1/internal (transparency collector) and /api/v1/opa (OPA bundle).
+
+http:
+  middlewares:
+    rid-strip-gw:
+      stripPrefix: { prefixes: ['/gw'] }
+    rid-strip-tsa:
+      stripPrefix: { prefixes: ['/tsa'] }
+    # Keycloak trusts these headers on the gateway's token route only (ADR-0022): every other way
+    # to Keycloak drops them.
+    rid-no-client-cert-headers:
+      headers:
+        customRequestHeaders: { SSL_CLIENT_CERT: '', ssl-client-verify: '' }
+
+  routers:
+    rid-web:
+      rule: 'Host(`@PORTAL_HOST@`)'
+      entryPoints: [websecure]
+      service: rid-web
+      tls: @TLS@
+    rid-api:
+      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/api/v1`) && !PathPrefix(`/api/v1/internal`) && !PathPrefix(`/api/v1/opa`)'
+      entryPoints: [websecure]
+      service: rid-api
+      tls: @TLS@
+    rid-auth:
+      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/auth`)'
+      entryPoints: [websecure]
+      service: rid-keycloak
+      middlewares: [rid-no-client-cert-headers]
+      tls: @TLS@
+    rid-gw:
+      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/gw`)'
+      entryPoints: [websecure]
+      service: rid-apisix
+      middlewares: [rid-strip-gw]
+      tls: @TLS@
+    rid-mail:
+      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/mail`)'
+      entryPoints: [websecure]
+      service: rid-mailpit
+      tls: @TLS@
+    rid-carpeta:
+      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/carpeta`)'
+      entryPoints: [websecure]
+      service: rid-carpeta
+      tls: @TLS@
+    rid-tsa:
+      rule: 'Host(`@PORTAL_HOST@`) && Path(`/tsa/api/v1/timestamp/certchain`)'
+      entryPoints: [websecure]
+      service: rid-tsa
+      middlewares: [rid-strip-tsa]
+      tls: @TLS@
+
+  services:
+    rid-web: { loadBalancer: { servers: [{ url: 'http://rid-portal-web:3000' }] } }
+    rid-api: { loadBalancer: { servers: [{ url: 'http://rid-portal-api:4000' }] } }
+    rid-keycloak: { loadBalancer: { servers: [{ url: 'http://rid-keycloak:8080' }] } }
+    rid-apisix: { loadBalancer: { servers: [{ url: 'http://rid-apisix:9080' }] } }
+    rid-mailpit: { loadBalancer: { servers: [{ url: 'http://rid-mailpit:8025' }] } }
+    rid-carpeta: { loadBalancer: { servers: [{ url: 'http://rid-carpeta:3100' }] } }
+    rid-tsa: { loadBalancer: { servers: [{ url: 'http://rid-tsa:3004' }] } }
+
+# The gateway's name: TLS goes through untouched to APISIX, which presents its step-ca certificate
+# and asks for the client certificate (applications and kit nodes).
+tcp:
+  routers:
+    rid-gateway-mtls:
+      rule: 'HostSNI(`@GATEWAY_HOST@`)'
+      entryPoints: [websecure]
+      service: rid-apisix-tls
+      tls: { passthrough: true }
+  services:
+    rid-apisix-tls:
+      loadBalancer: { servers: [{ address: 'rid-apisix:9443' }] }

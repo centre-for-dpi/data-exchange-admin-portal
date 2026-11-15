@@ -54,3 +54,8 @@ apps/api/src/generated/
 
 # Schemathesis cache when the contract runner runs on the host (M4-06)
 .schemathesis/
+
+# Single-host installer (install.sh): generated proxy routes, the portal's own certificate, backups
+infra/edge/dynamic/
+infra/edge/certs/
+backups/

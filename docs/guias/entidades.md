@@ -1,0 +1,152 @@
+# Guía para entidades participantes
+
+Versión 1.0 · noviembre 2026 · para la jornada de incorporación (bootcamp) con las entidades
+
+Esta guía explica qué tiene que **designar, disponer y hacer** cada entidad para conectarse a la Red de Intercambio de Datos (RID), como **proveedora** de datos, como **consumidora** o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso.
+
+## 1. Qué significa para una entidad
+
+- **Como proveedora**, publica una API sobre sus datos. Decide, por medio de su **responsable de datos**, quién accede, para qué finalidad, a qué operaciones y por cuánto tiempo. Sabe en cada consulta quién la hizo y para qué. Los datos nunca se copian a la plataforma.
+- **Como consumidora**, encuentra APIs en el catálogo, crea una aplicación con sus credenciales y pide acceso declarando una **finalidad**. Cuando el proveedor aprueba, sus sistemas consultan a través del gateway.
+- **El ciudadano** ve qué entidad consultó sus datos y para qué. Cada consulta debe responder a una finalidad legítima y declarada.
+
+## 2. Personas que la entidad debe designar
+
+| Rol en el portal | Quién suele ser | Qué hace | Segundo factor |
+| :-- | :-- | :-- | :-- |
+| `entity_admin` | Jefe de TI o de la oficina de datos | Pide el alta de la entidad, invita a su gente y asigna roles, gestiona los nodos del kit | — |
+| `data_steward` (responsable de datos) | Quien responde por los datos (designación formal) | Aprueba, rechaza, suspende y revoca accesos a las APIs de la entidad | **Obligatorio** |
+| `api_publisher` | Responsable técnico | Registra las APIs y las envía a revisión | — |
+| `app_developer` | Desarrollador del sistema consumidor | Crea aplicaciones, maneja credenciales y pide accesos | — |
+
+Cada persona necesita un **correo institucional propio**: la cuenta se verifica por correo y las invitaciones llegan a esa dirección. El segundo factor se configura con una app autenticadora (FreeOTP, Aegis, Google Authenticator u otra TOTP) en el teléfono de la persona.
+
+**Documento:** el acto de designación del responsable de datos y del responsable técnico, en PDF. Se adjunta en la solicitud de alta.
+
+## 3. Lo que la entidad debe disponer
+
+### 3.1 Como consumidora
+
+| Qué | Detalle |
+| :-- | :-- |
+| Un sistema consumidor | El servidor o la aplicación que hará las consultas. Debe poder hacer HTTPS con **certificado de cliente** (mTLS): cualquier lenguaje moderno lo permite (curl, Java, .NET, Python, Node) |
+| Salida a internet | `443/tcp` hacia el **nombre del gateway** y el **nombre del portal** |
+| Lugar seguro para secretos | La llave privada del certificado y el secreto de la aplicación: nunca en el código ni en un repositorio |
+| `openssl` | Para generar la llave y la solicitud de certificado (CSR). La llave **nunca sale** del servidor de la entidad |
+| Identificador del funcionario | Las APIs con datos personales exigen `X-RID-End-User`: el usuario o el correo institucional de quien hace la consulta. Solo se registra como hash |
+
+### 3.2 Como proveedora: tres maneras de conectar el servicio
+
+| Opción | Cuándo | Qué debe tener la entidad |
+| :-- | :-- | :-- |
+| **A. API existente** (upstream directo) | La entidad ya tiene un servicio REST | HTTPS con un **certificado público válido** para su nombre; alcanzable desde la IP del gateway (permitirla en el firewall); un contrato **OpenAPI 3** con `operationId` en cada operación. Opcional: mTLS que acepte solo el certificado del gateway emitido para la entidad (`CN=rid-gateway.<slug>`) |
+| **B. Nodo del kit de APIs instantáneas** | La entidad no tiene API: el kit la genera sobre su base de datos | Un servidor para el nodo dentro de su red; un **usuario de solo lectura** en la base de datos; **salida** `UDP 51820` y `443/tcp` hacia el gateway. **No abre puertos de entrada**: el nodo abre un túnel cifrado hacia afuera. El kit y sus requisitos de servidor son de su propio repositorio |
+| **C. X-Road** | La entidad ya publica servicios en X-Road | Su miembro X-Road, que registra el operador. El gateway llega por el Security Server del operador |
+
+En las tres opciones conviene ofrecer un **sandbox**: el mismo servicio con **datos sintéticos**. Con él el portal prueba el contrato al enviar a revisión, y los consumidores integran sin tocar datos reales.
+
+**Lo que el servicio del proveedor recibe en cada consulta** (cabeceras que pone el gateway; las que mande el consumidor se borran):
+
+| Cabecera | Contenido |
+| :-- | :-- |
+| `X-RID-Consumer-Entity` / `X-RID-Consumer-App` | Entidad y aplicación consumidoras |
+| `X-RID-Subscription` | La autorización con que se hizo la consulta |
+| `X-RID-Purpose` | Finalidad declarada |
+| `X-RID-Operation` | Operación del contrato |
+| `X-RID-End-User-Hash` | Hash del funcionario que consulta |
+| `X-Request-Id` | Identificador de correlación |
+
+El servicio del proveedor debe aplicar la **minimización**: responder solo los campos que declaró en la ficha.
+
+### 3.3 Lista de preparación
+
+El portal tiene esta lista por entidad (Mi entidad → Preparación del bootcamp), y el operador ve el avance de todas:
+
+- [ ] **Servidor** disponible (el sistema consumidor, o el del nodo del kit).
+- [ ] **Usuario de solo lectura** en la base de datos (solo con el kit).
+- [ ] **Salida 443** hacia el gateway (y UDP 51820 con el kit).
+- [ ] **Responsables designados:** el portal lo marca solo cuando hay un `api_publisher` y un `data_steward` activos.
+- [ ] **Caso de uso** definido: qué dato, para qué finalidad, con qué base legal y entre qué entidades.
+
+## 4. Paso a paso de la jornada
+
+Antes de empezar, el operador da a las entidades los dos nombres de la plataforma: el del **portal** (`https://<portal>`) y el del **gateway** (`<gateway>`).
+
+### 4.1 Verificar la red desde el servidor de la entidad
+
+Desde el servidor que hará las consultas (o el del nodo), con el script `scripts/entity-check.sh` del repositorio, que el operador entrega en la jornada:
+
+```bash
+chmod +x entity-check.sh
+./entity-check.sh check <portal> <gateway>
+```
+
+Comprueba el DNS, la salida HTTPS al portal y al gateway, y que el certificado del gateway verifica contra la raíz de la red. Deja la raíz en `./rid-network-ca.pem`. Solo necesita `bash`, `curl` y `openssl`.
+
+### 4.2 Alta de la entidad y de su gente
+
+1. El futuro `entity_admin` entra a `https://<portal>`, crea su cuenta y confirma el correo.
+2. Pide el alta de la entidad: datos, responsables designados y documento de designación. El operador la revisa y la aprueba. Si la entidad ya está incorporada por un acto formal, el operador la da de alta directamente.
+3. El `entity_admin` invita a cada persona a su correo y asigna roles. Cada invitado crea su cuenta con **ese mismo correo** y acepta la invitación.
+4. El `data_steward` configura su segundo factor la primera vez que el portal lo pide.
+
+### 4.3 Entidad proveedora: publicar una API
+
+1. **Con el kit (opción B):** el `entity_admin` va a Mi entidad → Nodos del kit, registra el nodo y copia el **token de enrolamiento**. Se muestra una sola vez y vale 72 horas. Con ese token se instala el kit en el servidor de la entidad, que se enrola solo y queda **En línea**.
+2. El `api_publisher` crea la API y su versión:
+   - sube el contrato OpenAPI;
+   - elige dónde vive el servicio: el nodo, la URL de la API existente o el servicio X-Road;
+   - declara el sandbox;
+   - completa la clasificación (pública, interna, personal o sensible), los datos expuestos, la base legal y las finalidades permitidas.
+3. **Envía a revisión.** El portal prueba la conectividad a través del gateway y el contrato contra el sandbox. Si algo falla, el publicador corrige su servicio y pulsa "Repetir validaciones".
+4. El operador revisa y aprueba. Si es **sensible**, también el regulador. La API queda **publicada**, y la ruta del gateway existe en segundos, cerrada hasta que haya accesos aprobados.
+5. La ficha imprimible del servicio (Catálogo → la API → Ficha del servicio) sirve para el expediente.
+
+### 4.4 Entidad consumidora: primera consulta
+
+1. **Probar en sandbox primero.** El `app_developer` crea una aplicación de tipo **sandbox**. Sus solicitudes a APIs con sandbox se aprueban al instante y llaman a `/sandbox/...`, con datos sintéticos.
+2. **Guardar el secreto** que se muestra al crear la aplicación: se ve una sola vez.
+3. **Certificado de la aplicación** (mTLS), en el servidor de la entidad:
+   ```bash
+   ./entity-check.sh csr <client_id>      # crea <client_id>.key (600) y <client_id>.csr
+   ```
+   Pega la CSR en la ficha de la aplicación → Certificado de cliente (mTLS), descarga el certificado y guárdalo como `<client_id>.crt` junto a la llave.
+4. **Pedir acceso:** en el catálogo, la API → Solicitar acceso. Elige la aplicación, la finalidad, el detalle, la base legal, las operaciones, la vigencia y el acuerdo de intercambio. En producción la aprueba el `data_steward` del proveedor (y el regulador, si es sensible).
+5. **Llamar:**
+   ```bash
+   CLIENT_SECRET=... ./entity-check.sh call <portal> <gateway> <client_id> \
+     /sandbox/<entidad>/<api>/v1/<recurso> <finalidad> <funcionario>
+   ```
+   El script pide el token al gateway (`/oauth/token`, ligado al certificado), hace la consulta con `X-RID-Purpose` y `X-RID-End-User`, y explica la respuesta. Las URL exactas están en la ficha de la API y en la ficha de la suscripción.
+6. Con la aplicación de **producción** se repiten los pasos 2 a 5 con la ruta real (sin `/sandbox`), una vez aprobada la solicitud.
+
+## 5. Por qué el gateway niega una llamada
+
+El gateway responde `403` con `application/problem+json` y un `code` estable:
+
+| `code` | Qué significa | Qué hacer |
+| :-- | :-- | :-- |
+| `no_subscription` | La aplicación no tiene acceso activo a esa versión | Pedir acceso o esperar la aprobación ("Aprobada, activándose" tarda segundos) |
+| `purpose_not_allowed` | Falta `X-RID-Purpose` o no es la finalidad aprobada | Enviar el código de finalidad de la suscripción |
+| `operation_not_allowed` | La suscripción no cubre esa operación | Pedir acceso a esa operación |
+| `end_user_required` / `end_user_invalid` | Falta `X-RID-End-User` o es inválido (1 a 128 caracteres visibles, sin espacios) | Enviar el usuario institucional del funcionario |
+| `client_certificate_required` / `certificate_mismatch` / `certificate_revoked` | Sin certificado, el de otra aplicación o uno revocado | Usar el certificado vigente de **esa** aplicación |
+| `token_not_bound` | El token no está ligado al certificado | Pedir el token en `https://<gateway>/oauth/token` con el certificado |
+| `environment_mismatch` | Aplicación sandbox en una ruta real, o al revés | Usar la ruta que corresponde al tipo de aplicación |
+| `subscription_expired` / `app_suspended` | Venció la vigencia o la aplicación está suspendida | Renovar la solicitud o hablar con el operador |
+
+Otros códigos: `401` (token vencido o inválido; dura 5 minutos), `404` (no hay API publicada en esa ruta), `429` (límite de la suscripción alcanzado).
+
+## 6. Compromisos de la entidad
+
+- **Finalidad real.** Solo consultar para la finalidad declarada y aprobada. Cada consulta queda en la bitácora y el ciudadano la ve.
+- **Funcionario identificado.** Enviar en `X-RID-End-User` a la persona que realmente consulta.
+- **Credenciales protegidas.** La llave privada y el secreto no se comparten ni se suben a repositorios. Ante una sospecha, se **revocan** desde la ficha de la aplicación. Antes de que venza un certificado (90 días, con aviso a los 15), se emite otro: el anterior sigue sirviendo durante la ventana de rotación.
+- **No guardar de más.** Conservar solo lo que la finalidad exige.
+- **Avisar los cambios.** Un cambio incompatible en una API publicada exige una versión mayor nueva. La anterior se deprecia con fecha de retiro.
+
+## 7. Contactos y soporte
+
+- **Operador (AND):** altas de entidades, revisión de APIs, problemas de conexión con el gateway.
+- **Regulador (MinTIC):** aprobaciones de datos sensibles, marco normativo.
+- **Dentro de la entidad:** el `entity_admin` gestiona su gente y sus nodos; el `data_steward` decide los accesos.

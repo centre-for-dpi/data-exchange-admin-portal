@@ -4,6 +4,9 @@
 // of the Compose network and the public URL. Prints nothing secret.
 //
 //   node scripts/make-deploy-env.mjs https://portal.example.org [--out .env] [--demo-password <pw>]
+//     [--gateway-host <name>] [--traefik-network <net>] [--country <code>]
+//
+// install.sh (docs/INSTALL.md) runs it with the answers of the operator.
 //
 // The seed users' password is random unless --demo-password is given.
 //
@@ -22,6 +25,8 @@ const { positionals, values } = parseArgs({
     'traefik-network': { type: 'string', default: 'lab-router_default' },
     // The gateway's own name (M3-10): its TLS ends in APISIX, behind a TLS passthrough.
     'gateway-host': { type: 'string' },
+    // config/country/<code>.yaml; .env.example's value when absent.
+    country: { type: 'string' },
   },
 });
 const [publicUrl] = positionals;
@@ -37,6 +42,14 @@ if (gatewayHost !== undefined && !/^[a-z0-9.-]+$/i.test(gatewayHost)) {
   process.exit(2);
 }
 const root = resolve(import.meta.dirname, '..');
+const country = values.country;
+if (
+  country !== undefined &&
+  (!/^[a-z]{2,3}$/.test(country) || !existsSync(resolve(root, 'config/country', `${country}.yaml`)))
+) {
+  console.error(`--country: no config/country/${country}.yaml`);
+  process.exit(2);
+}
 const out = resolve(root, values.out);
 if (existsSync(out)) {
   console.error(`${out} exists: not overwriting the secrets of a deployment.`);
@@ -59,6 +72,7 @@ const hub = generateKeyPairSync('x25519');
 const raw = (jwkField) => Buffer.from(jwkField ?? '', 'base64url').toString('base64');
 const webhookSecret = `whsec_${randomBytes(32).toString('base64')}`;
 const set = {
+  ...(country ? { RID_COUNTRY: country } : {}),
   POSTGRES_PASSWORD: db.owner,
   RID_APP_DB_PASSWORD: db.app,
   DATABASE_URL: `postgresql://rid_app:${db.app}@postgres:5432/rid`,

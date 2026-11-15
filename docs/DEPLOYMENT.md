@@ -11,7 +11,7 @@ Este documento describe **cómo se despliega cada componente** del portal y del 
 | Topología | Archivos | Estado | Uso |
 | :-- | :-- | :-- | :-- |
 | **Desarrollo local** | `infra/compose/docker-compose.yml`; web y API en el host con `pnpm dev` | Disponible | Programar y probar |
-| **Piloto en una máquina** | `docker-compose.yml` + `docker-compose.deploy.yml`, detrás de un proxy inverso existente | Disponible | Demos y pilotos |
+| **Piloto en una máquina** | `docker-compose.yml` + `docker-compose.deploy.yml`, detrás de un proxy inverso existente o del incluido (`docker-compose.edge.yml`) | Disponible; **instalador interactivo `install.sh`** ([`INSTALL.md`](INSTALL.md)) | Demos, pilotos y bootcamp |
 | **Producción** | Helm charts (`infra/helm/`) con la topología de `ARCHITECTURE.md §11` | **No existe todavía** (M6-05) | Operador nacional |
 
 El piloto no es un despliegue de producción. Sus límites conocidos están en la §8.
@@ -322,6 +322,10 @@ Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX 
 El API usa `KEYCLOAK_URL` para validar los tokens y para el Admin API de `rid-gateway`: en el piloto llega a Keycloak por la URL pública, a través del proxy.
 
 ## 5. Piloto en una máquina
+
+La forma recomendada de instalar el piloto es `sudo ./install.sh` ([`INSTALL.md`](INSTALL.md)): hace las preguntas, escribe `.env` con `make-deploy-env.mjs`, pone el proxy y arranca todo. Esta sección describe lo que hay debajo, para quien lo hace a mano o tiene su propio proxy.
+
+**Proxy incluido (`docker-compose.edge.yml`).** Para un servidor sin proxy propio: Traefik en 80 y 443 con las rutas de §5.2, generadas por `install.sh` desde `infra/edge/rid.yml.template` en `infra/edge/dynamic/rid.yml`. Termina HTTPS en el nombre del portal (Let's Encrypt, o un certificado propio en `infra/edge/certs/`) y pasa el TLS del nombre del gateway intacto a APISIX. En la red `rid-edge` toma los dos nombres públicos como alias (`RID_PORTAL_HOST`, `RID_GATEWAY_HOST`), así el API y la web llegan a Keycloak por la URL pública sin salir del servidor. No lleva log de accesos.
 
 ### 5.1 Qué hace el override `docker-compose.deploy.yml`
 

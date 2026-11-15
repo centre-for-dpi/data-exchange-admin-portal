@@ -379,7 +379,7 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 
 **Desarrollo:** `infra/compose/docker-compose.yml` con todos los servicios, datos semilla y realms importados; web y API en el host.
 
-**Pilotos y demos:** el mismo archivo más `infra/compose/docker-compose.deploy.yml` (web, API y carpeta en contenedores, sin puertos publicados, detrás de un proxy inverso). Detalle por componente en `docs/DEPLOYMENT.md`; puesta en marcha y operación en `docs/OPERATIONS.md`.
+**Pilotos y demos:** el mismo archivo más `infra/compose/docker-compose.deploy.yml` (web, API y carpeta en contenedores, sin puertos publicados, detrás de un proxy inverso; `docker-compose.edge.yml` trae uno). Instalador interactivo: `install.sh` (`docs/INSTALL.md`). Detalle por componente en `docs/DEPLOYMENT.md`; puesta en marcha y operación en `docs/OPERATIONS.md`.
 
 **Producción (M6):**
 - Gateway: ≥ 2 nodos APISIX en zonas distintas, OPA local en cada uno, etcd en clúster de 3 con mTLS.
