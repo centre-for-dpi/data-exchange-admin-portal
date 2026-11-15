@@ -1,6 +1,6 @@
 # Guía de operación — Portal RID
 
-Versión 0.1 · noviembre 2026 · estado del código al cierre de M2 (M3 en curso)
+Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en curso)
 
 Qué hace cada componente al arrancar, qué tiene que hacer o correr el operador para dejarlo operativo, cómo comprobar que funciona y qué revisar en el día a día. Cómo se despliega cada pieza está en [`DEPLOYMENT.md`](DEPLOYMENT.md). El runbook completo de incidentes, rotación de la CA intermedia y revocación masiva es M6-07.
 
@@ -44,10 +44,10 @@ Compose respeta este orden con `depends_on` y health checks: `api` espera a `pos
 | Componente | Lo hace solo al arrancar | Lo tiene que hacer el operador | Cómo comprobarlo |
 | :-- | :-- | :-- | :-- |
 | `postgres` | Con el volumen vacío: roles `rid_app` y `keycloak`, bases `keycloak` y `rid_test` (`infra/postgres/init`) | Nada. Las contraseñas de `.env` se fijan aquí y solo aquí | `dc exec postgres pg_isready` |
-| `keycloak` | Importa los realms `rid-portal`, `rid-gateway` y `rid-citizens` si no existen, con los secretos de `.env` | Nada en un despliegue nuevo. En uno existente, aplicar con `kcadm` los cambios de realm que pida la versión (§5.3) | `curl -fsS $RID_PUBLIC_URL/auth/realms/rid-portal/.well-known/openid-configuration` |
+| `keycloak` | Importa los realms `rid-portal`, `rid-gateway` y `rid-citizens` si no existen, con los secretos de `.env` | Nada en un despliegue nuevo. En uno existente, aplicar los cambios de realm que pida la versión (§5.3), entre ellos la política de rotación de secretos de M3-04 | `curl -fsS $RID_PUBLIC_URL/auth/realms/rid-portal/.well-known/openid-configuration` |
 | `etcd` | — | Nada | `dc ps etcd` (healthy) |
-| `apisix` | Lee `infra/apisix/config.yaml`; sin rutas hasta que el API reconcilie | **Nada a mano**: las rutas las crea el API | `dc ps apisix` (healthy); §2.2 |
-| `step-ca` | Primera vez: crea la CA y el provisioner `rid-portal`. Siempre: `configure.sh` fija plantilla y duraciones | Guardar la huella de la raíz si otro sistema la necesita (§5.4) | `dc exec step-ca step ca health --ca-url=https://localhost:9000 --root=/home/step/certs/root_ca.crt` |
+| `apisix` | Lee `infra/apisix/config.yaml`; sin rutas ni objetos SSL hasta que el API reconcilie | **Nada a mano**: rutas, upstreams y objetos SSL los crea el API | `dc ps apisix` (healthy); §2.2 |
+| `step-ca` | Primera vez: crea la CA y el provisioner `rid-portal`. Siempre: `configure.sh` fija plantillas y duraciones, y crea `rid-gateway-tls` si falta | Guardar la huella de la raíz si otro sistema la necesita (§5.4) | `dc exec step-ca step ca health --ca-url=https://localhost:9000 --root=/home/step/certs/root_ca.crt` |
 | `tsa-init` / `tsa` | `tsa-init` crea una vez la cadena de la TSA; `tsa` firma sellos | Nada | `curl -fsS $RID_PUBLIC_URL/tsa/api/v1/timestamp/certchain` devuelve PEM |
 | `opa` | Pide el bundle al API cada 10–20 s; niega todo hasta tenerlo | Nada | `dc exec api wget -qO- 'http://opa:8181/health?bundles'` responde `{}` (200) solo con el bundle activo |
 | `fluent-bit-transparency` | Escucha en 5170; envía al colector del API con reintentos | Nada | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/health` |
@@ -67,7 +67,7 @@ Estado general de un vistazo: `dc ps` (todos `running`, y `healthy` los que tien
    ```bash
    dc exec api sh -c 'wget -qO- --header "X-API-KEY: $APISIX_ADMIN_KEY" http://apisix:9180/apisix/admin/routes'
    ```
-   Cada versión publicada tiene una ruta `rid-route-<apiVersionId>`.
+   Cada versión publicada tiene una ruta `rid-route-<apiVersionId>`. Con `.../apisix/admin/ssls` se ven `rid-ssl-gateway` (TLS del gateway) y un `rid-ssl-gateway-client-<entityId>` por cada proveedor con upstreams mTLS.
 3. **Ensayo de la demo completo** (`scripts/demo.mjs`, los 11 pasos de `DEMO.md`). En el piloto se corre en la misma máquina, porque lee los logs del mock con `docker logs`:
    ```bash
    # una vez: compilar el verificador abierto (paso 11)
@@ -100,17 +100,17 @@ Todos corren dentro del proceso `api`. Con `RID_WORKER=off` no corre ninguno.
 | :-- | :-- | :-- | :-- |
 | Relevo del outbox | 1 s | Pasa las filas de `outbox` a colas de pg-boss | Las filas quedan sin `published_at` y se reintentan |
 | `gateway.sync` | Al cambiar una versión de API | Reconciliador de APISIX: rutas, upstreams y plugins de esa versión | pg-boss reintenta; el error queda en `sync_state` |
-| Reconciliación completa APISIX | Al arrancar y cada 5 min | Recalcula todas las versiones servidas y borra huérfanos | Se registra por versión; la siguiente pasada corrige |
-| `keycloak.sync` | Al cambiar una aplicación | Reconciliador de Keycloak: clientes `rid-app-<uuid>` en `rid-gateway`, secretos | Igual que APISIX |
+| Reconciliación completa APISIX | Al arrancar y cada 5 min | Asegura el TLS del gateway (y renueva su certificado), recalcula todas las versiones servidas, con los certificados de cliente del gateway que necesiten, y borra huérfanos | Se registra por versión y por objeto SSL; la siguiente pasada corrige |
+| `keycloak.sync` | Al cambiar una aplicación o sus secretos | Reconciliador de Keycloak: clientes `rid-app-<uuid>` en `rid-gateway`, secretos y su rotación (secreto rotado durante la ventana) | Igual que APISIX |
 | Reconciliación completa Keycloak | Al arrancar y cada 5 min | Corrige la deriva de todos los clientes | — |
-| `policy.sync` | Al cambiar suscripciones o versiones | Actualiza el estado de sincronización de OPA; el bundle se genera cuando OPA lo pide | Las suscripciones quedan "Aprobada (activándose)" hasta que OPA reporta la revisión |
+| `policy.sync` | Al cambiar suscripciones, versiones o certificados de aplicación | Actualiza el estado de sincronización de OPA; el bundle se genera cuando OPA lo pide | Las suscripciones quedan "Aprobada (activándose)" hasta que OPA reporta la revisión |
 | `notification.dispatch` | Por evento de auditoría que notifica | Avisos en el portal y por correo | Reintentos de pg-boss |
 | `invitation.email` | Por invitación | Correo de invitación | Reintentos durante horas |
 | `audit.anchor_email` | Por anclaje | Correo del anclaje diario a los reguladores | Reintentos |
 | `citizen.alert` | Por registro nuevo con aviso pedido | Webhook firmado a la aplicación ciudadana (`RID_CITIZEN_APPS`) | Hasta 20 reintentos con espera exponencial (máx. 1 h) |
 | Ciclo de vida de suscripciones | `RID_LIFECYCLE_INTERVAL_SECONDS` (300 s) | Marca `expired` las vencidas y avisa de la renovación | — |
 | Ciclo de vida de versiones | Igual | Retira las versiones deprecadas cuya fecha de retiro pasó (ADR-0019) | — |
-| Ciclo de vida de certificados | Igual | Avisa antes del vencimiento y marca `expired` | — |
+| Ciclo de vida de credenciales | Igual | Avisa antes del vencimiento de los certificados y los marca `expired`; cierra las ventanas de rotación vencidas (la credencial anterior pasa a `expired`) | — |
 | Anclaje de la bitácora | `RID_AUDIT_ANCHOR_INTERVAL_SECONDS` (3600 s) | Sella con la TSA el último evento de cada día cerrado (zona del país) | Si la TSA no responde, reintenta en la siguiente ronda. Bloqueo consultivo: un solo nodo ancla |
 | Sellado de transparencia | `RID_TRANSPARENCY_SEAL_INTERVAL_SECONDS` (10 s) | Agrupa registros en lotes Merkle (hasta `RID_TRANSPARENCY_BATCH_MAX`), firma y sella con la TSA | El lote queda pendiente y se reintenta. Un solo nodo sella |
 | Purga de transparencia | Cada 6 h | Borra los registros que pasaron `retention.subjectAccessMonths` (nunca menos que el piso de la base) | — |
@@ -209,6 +209,15 @@ dc exec keycloak /opt/keycloak/bin/kcadm.sh update realms/rid-portal \
 
 En desarrollo el servidor es `http://localhost:8080` (sin `/auth`).
 
+**Política de rotación de secretos (M3-04).** Se aplica desde el JSON del realm, sin borrar datos, con un script idempotente:
+
+```bash
+set -a; . ./.env; set +a
+node scripts/keycloak-client-policies.mjs     # KEYCLOAK_URL y el administrador de master
+```
+
+En el piloto, `KEYCLOAK_URL` es la URL pública (`$RID_PUBLIC_URL/auth`). Comprobación: en la consola de Keycloak, realm `rid-gateway` → Client policies, aparece `rid-secret-rotation` activa.
+
 ### 5.4 Huella de la raíz de la CA
 
 ```bash
@@ -217,7 +226,16 @@ dc exec step-ca step certificate fingerprint certs/root_ca.crt
 
 Es el valor de `RID_STEP_CA_ROOT_FINGERPRINT` para un API que no monta el volumen de la CA.
 
-### 5.5 Rotación de secretos
+### 5.5 Credenciales de las aplicaciones
+
+La rotación y la revocación de los secretos y certificados de las aplicaciones las hacen sus desarrolladores desde la ficha de la aplicación (M3-04); el operador no interviene.
+
+- Durante una rotación, el secreto o certificado anterior sigue funcionando `lifecycle.credentialRotationDays`.
+- Revocar un certificado lo saca del gateway con la siguiente descarga del bundle (10–20 s).
+- Revocar un secreto lo saca de Keycloak cuando corre el reconciliador (`keycloak.sync`, segundos).
+- Si una revocación no surte efecto, revisar SQL 1 (§4.2) con `system = 'keycloak'` u `'opa'`.
+
+### 5.6 Rotación de secretos de la plataforma
 
 | Secreto | Cómo rotarlo hoy |
 | :-- | :-- |
@@ -226,6 +244,7 @@ Es el valor de `RID_STEP_CA_ROOT_FINGERPRINT` para un API que no monta el volume
 | Secretos de clientes de Keycloak (`RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`) | Cambiar el secreto del cliente en Keycloak (consola o `kcadm`) **y** en `.env`, y recrear `web`, `api` o `carpeta` |
 | Contraseñas de PostgreSQL | `ALTER ROLE ... PASSWORD` **y** `.env` (con sus URLs), y recrear los servicios |
 | `RID_TRANSPARENCY_SIGNING_JWK` | Clave nueva con otro `kid`; la pública anterior va a `RID_TRANSPARENCY_RETIRED_JWKS`. Procedimiento completo pendiente para producción |
+| Certificados del gateway (servidor y clientes hacia proveedores) | Los renueva solo el reconciliador de APISIX; para forzarlo, reiniciar el API tras borrar la fila de `gateway_certificate` correspondiente |
 | `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | **No se rotan**: rompen el vínculo con los registros anteriores (`DEPLOYMENT.md §4.1`) |
 | CA intermedia | Runbook de M6-07 |
 
@@ -257,6 +276,9 @@ Haz el respaldo **antes de cada actualización con migraciones**, y guarda los a
 | `api` termina al arrancar con un mensaje de configuración | `RID_COUNTRY` sin valor o YAML del país inválido | Corregir el YAML y reconstruir la imagen |
 | `api` no arranca: error de migración | Migración fallida o base inaccesible como dueño | `dc logs api`; `dc exec api pnpm exec prisma migrate status` |
 | No se emiten certificados (503) | step-ca caído, contraseña del provisioner distinta, o raíz no configurada con `NODE_ENV=production` | `dc logs api` (mensajes `step-ca: ...`); `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD`; `RID_STEP_CA_ROOT_FILE` |
+| `sync_state` en error para `apisix:ssl:...` | step-ca no responde, falta el provisioner `rid-gateway-tls` (step-ca sin recrear) o cambió `RID_SECRETS_KEY` | `dc logs api`; `dc up -d step-ca`; §5.6 |
+| Upstream `direct` que responde 502 | El gateway ahora verifica el certificado del proveedor (vencido, autofirmado o de otro nombre), o el proveedor con mTLS no acepta `CN=rid-gateway.<slug>` | Pedir al proveedor un certificado público válido para su nombre, o que confíe en la CA de la red y en ese nombre |
+| Al rotar un secreto, el anterior deja de funcionar enseguida | Falta la política de rotación en el realm `rid-gateway` existente | §5.3 |
 | El ciudadano no ve sus consultas | Registros detenidos en Fluent Bit (token o host del colector) o la operación no declara titular | `dc logs fluent-bit-transparency`; `RID_TRANSPARENCY_INGEST_TOKEN` y `RID_TRANSPARENCY_COLLECTOR_HOST` |
 | Consultas que siguen "En sellado" | TSA no responde o falta `RID_TRANSPARENCY_SIGNING_JWK` | `dc logs api`; `dc ps tsa` |
 | Inicio de sesión en bucle o error de emisor | `KC_HOSTNAME`, `KEYCLOAK_URL` o `AUTH_URL` no coinciden con la URL pública | Revisar `RID_PUBLIC_URL` y las URLs derivadas (`DEPLOYMENT.md §4.2`) |

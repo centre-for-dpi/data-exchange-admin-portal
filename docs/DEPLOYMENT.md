@@ -1,6 +1,6 @@
 # Despliegue — Portal RID
 
-Versión 0.1 · noviembre 2026 · estado del código al cierre de M2 (M3 en curso)
+Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en curso)
 
 Este documento describe **cómo se despliega cada componente** del portal y del gateway: imagen, configuración, puertos, volúmenes, secretos y dependencias. Cómo dejarlo operativo y cómo operarlo día a día está en [`OPERATIONS.md`](OPERATIONS.md). La arquitectura de referencia está en [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -102,6 +102,7 @@ Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen toke
 - **La importación no actualiza un realm que ya existe** (`IGNORE_EXISTING`). Un cambio en los JSON, en esos secretos o en las URLs no llega a un Keycloak ya inicializado: se aplica con `kcadm.sh` (ver `OPERATIONS.md §5.3`) o borrando la base de Keycloak.
 - Emisor de los tokens: en desarrollo `KC_HOSTNAME=http://localhost:${KEYCLOAK_PORT}`; en el piloto `${RID_PUBLIC_URL}/auth` con `KC_HTTP_RELATIVE_PATH=/auth` y `KC_PROXY_HEADERS=xforwarded`. `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` deja que los contenedores (APISIX) lo alcancen por nombre de servicio.
 - Administrador inicial: `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD` (`KC_BOOTSTRAP_ADMIN_*`).
+- **Política de cliente `rid-secret-rotation`** en `rid-gateway` (M3-04): en los clientes con el atributo `rid.managed = true`, los que crea el portal, regenerar el secreto deja el anterior como secreto rotado durante la ventana de rotación (a lo sumo 30 días). Llega con el realm en una instalación nueva; en un Keycloak que ya importó el realm se aplica con `node scripts/keycloak-client-policies.mjs` (`OPERATIONS.md §5.3`). Sin ella, rotar un secreto deja de aceptar el anterior en cuanto el reconciliador aplica el nuevo.
 - Detalle de los tres realms y los usuarios semilla: `infra/keycloak/README.md`.
 
 ### 3.4 etcd + APISIX
@@ -117,12 +118,17 @@ Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen toke
 5. reenvía la petición al proveedor con las cabeceras de trazabilidad que devolvió OPA;
 6. envía los metadatos de la llamada a los dos Fluent Bit: analítica y transparencia.
 
-No guarda cuerpos de petición ni de respuesta. En el piloto se publica en `/gw`.
+También termina el TLS del gateway en 9443 con su certificado de servidor y, cuando `features.mtls.required` está activo, exige ahí el certificado de cliente de la aplicación (M3-02). Hacia los proveedores con mTLS presenta el certificado de cliente del gateway de esa entidad (M3-03). No guarda cuerpos de petición ni de respuesta. En el piloto se publica en `/gw`.
 
 - etcd guarda la configuración de APISIX (prefijo `/apisix`). Un solo nodo, HTTP sin TLS, no se publica.
 - APISIX en modo `traditional` con `config_provider: etcd` (`infra/apisix/config.yaml`, montado de solo lectura). La clave del Admin API llega por `APISIX_ADMIN_KEY`.
 - El Admin API (9180) acepta solo direcciones privadas (`127.0.0.0/24`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) y exige la clave. Nunca se expone al público.
-- Plugins propios en `infra/apisix/plugins` (montados en `/usr/local/apisix/rid`): `rid-data-subject` (ADR-0017). La lista de plugins de `config.yaml` es explícita.
+- Plugins propios en `infra/apisix/plugins` (montados en `/usr/local/apisix/rid`): `rid-data-subject` (ADR-0017) y `rid-client-cert` (M3-02: pasa a OPA la huella RFC 8705 del certificado de cliente verificado). La lista de plugins de `config.yaml` es explícita: un plugin nuevo exige reiniciar APISIX.
+- **Objetos SSL** (los crea el reconciliador, como las rutas):
+  - `rid-ssl-gateway`: certificado de servidor del gateway en los nombres de `RID_GATEWAY_TLS_HOSTS`, emitido por step-ca y renovado por el portal. Con `features.mtls.required`, además `client.ca` con la CA de la red: sin certificado válido, el handshake falla.
+  - `rid-ssl-gateway-client-<entityId>`: certificado de cliente que el gateway presenta a los upstreams con mTLS de esa entidad proveedora, `CN=rid-gateway.<slug>` (prefijo `RID_GATEWAY_CLIENT_NAME`). Uno por proveedor, para que una entidad no pueda llegar a la API mTLS de otra con la identidad del gateway. Cada proveedor debe aceptar solo su nombre.
+- **Upstreams.** Los `direct` verifican el certificado del proveedor y apuntan a las direcciones que el reconciliador resolvió y encontró públicas, con el nombre como Host y SNI (sin DNS rebinding). Los nodos sobre TLS se verifican contra la CA de la red (M3-03).
+- En desarrollo APISIX alcanza el host por `host.docker.internal` (solo para las pruebas de mTLS hacia upstreams); el override del piloto lo quita.
 - **Privacidad:** el access log de nginx está desactivado y el error log en nivel `error` (`ARCHITECTURE.md §8`).
 - **Nadie escribe rutas a mano.** Rutas, upstreams y plugins los crea el reconciliador del API (ADR-0007). Cada ruta lleva `prometheus`, `http-logger` (analítica → `fluent-bit:9880`) y, si alguna operación declara titular, `tcp-logger` (transparencia → `fluent-bit-transparency:5170`).
 - **Estado reconstruible:** si se pierde etcd, el reconciliador completo (cada 5 minutos o al reiniciar el API) recrea todo desde PostgreSQL.
@@ -132,9 +138,9 @@ No guarda cuerpos de petición ni de respuesta. En el piloto se publica en `/gw`
 **Función en el despliegue.** Decide cada llamada: la permite o la niega con una razón estable (`no_subscription`, `purpose_not_allowed`…). Decide solo con los datos del **bundle** que publica el portal:
 
 - rutas y operaciones;
-- clientes y su estado;
+- clientes y su estado, con las huellas de sus certificados vigentes (M3-02);
 - suscripciones vigentes con sus operaciones, finalidades y fechas;
-- la sal del funcionario y la clave del seudónimo.
+- la sal del funcionario, la clave del seudónimo y si la red exige mTLS (`mtlsRequired`).
 
 Además calcula el hash del funcionario y el seudónimo del titular, y devuelve las cabeceras de trazabilidad que APISIX envía al proveedor. Nunca consulta en línea la base del portal, y por eso el tráfico sobrevive a una caída del portal. Su reporte de estado le indica al portal cuándo una suscripción aprobada ya rige en el gateway, y entonces la suscripción pasa a `active`.
 
@@ -145,12 +151,19 @@ Además calcula el hash del funcionario y el seudónimo del titular, y devuelve 
 
 ### 3.6 step-ca
 
-**Función en el despliegue.** Es la autoridad certificadora de la red. Firma los certificados de cliente de las aplicaciones consumidoras a partir de los CSR que las entidades suben al portal (M3-01). Esos certificados sirven para el mTLS con el gateway y para los tokens ligados al certificado (RFC 8705) cuando `features.mtls.required` está activo. En M3 y M4 también emitirá el certificado de servidor del gateway y los de los nodos del kit. Solo el API habla con ella; las entidades nunca la llaman directamente.
+**Función en el despliegue.** Es la autoridad certificadora de la red. Firma:
+
+- los certificados de cliente de las aplicaciones consumidoras, a partir de los CSR que las entidades suben al portal (M3-01). Sirven para el mTLS con el gateway y para los tokens ligados al certificado (RFC 8705) cuando `features.mtls.required` está activo;
+- el certificado de servidor TLS del gateway (M3-02);
+- los certificados de cliente del gateway hacia los proveedores con mTLS, uno por entidad (M3-03).
+
+En M4 también firmará los de los nodos del kit. Solo el API habla con ella; las entidades nunca la llaman directamente.
 
 - En el primer arranque la imagen inicializa la CA con `DOCKER_STEPCA_INIT_*`: nombre `RID Dev CA`, DNS `localhost,step-ca`, provisioner JWK `rid-portal`, contraseña `STEP_CA_PASSWORD`. **El piloto usa esta misma CA de desarrollo**; la raíz fuera de línea y la intermedia en HSM son de producción (M6).
-- En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `rid-portal` (plantilla `app.tpl`, 90 días por defecto, 397 como máximo) y luego inicia la CA. Es idempotente.
+- En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `rid-portal` (plantilla `app.tpl`, solo autenticación de cliente, 90 días por defecto, 397 como máximo). También crea, si no existe, el provisioner `rid-gateway-tls` con la contraseña de la CA (plantilla `gateway.tpl`, solo autenticación de servidor, 90 días). Luego inicia la CA. Es idempotente.
+- El portal genera las claves de los certificados del gateway y las guarda selladas con `RID_SECRETS_KEY` (tabla `gateway_certificate`). Los renueva en el último tercio de su vida, en la pasada completa del reconciliador de APISIX.
 - El estado (raíz, intermedia, claves, `secrets/password`) vive en `step-ca-data`. **Perder ese volumen invalida todos los certificados emitidos.**
-- El API firma los CSR con el provisioner (`RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER`, `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD`) y verifica el TLS de la CA con `RID_STEP_CA_ROOT_FILE` o `RID_STEP_CA_ROOT_FINGERPRINT`. Con `NODE_ENV=production` (imágenes del piloto) una de las dos es **obligatoria**; sin ninguna, solo en desarrollo, confía en la raíz que sirve la CA.
+- El API firma los CSR con los provisioners (`RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER`, `RID_STEP_CA_GATEWAY_PROVISIONER`, `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD` para los dos) y verifica el TLS de la CA con `RID_STEP_CA_ROOT_FILE` o `RID_STEP_CA_ROOT_FINGERPRINT`. Con `NODE_ENV=production` (imágenes del piloto) una de las dos es **obligatoria**; sin ninguna, solo en desarrollo, confía en la raíz que sirve la CA.
 
 ### 3.7 Registro de transparencia: Fluent Bit + TSA
 
@@ -188,7 +201,7 @@ Además calcula el hash del funcionario y el seudónimo del titular, y devuelve 
 **Función en el despliegue.** Es el centro del plano de gobierno, y el único componente que escribe en APISIX, Keycloak (`rid-gateway`) y step-ca. Tiene dos caras:
 
 - **REST (`/api/v1`).** Atiende a la web y a los sistemas. Aplica los flujos de publicación, solicitud y aprobación. Verifica rol y pertenencia a la entidad en cada endpoint y registra cada cambio en la bitácora.
-- **Trabajos en segundo plano.** Traducen el estado de PostgreSQL a configuración: rutas de APISIX, clientes de Keycloak y bundle de OPA. También firman certificados con step-ca, reciben y sellan el registro de transparencia (firma del operador más sello de la TSA), envían correos y webhooks, y vencen suscripciones, versiones y certificados.
+- **Trabajos en segundo plano.** Traducen el estado de PostgreSQL a configuración: rutas, upstreams y objetos SSL de APISIX, clientes de Keycloak (con la rotación de secretos) y bundle de OPA. También firman certificados con step-ca, reciben y sellan el registro de transparencia (firma del operador más sello de la TSA), envían correos y webhooks, y vencen suscripciones, versiones, certificados y ventanas de rotación de credenciales.
 
 Además sirve la API del titular que consume la carpeta ciudadana.
 
@@ -223,7 +236,7 @@ Muestra lo que debe implementar una carpeta real; no es un producto.
 
 ### 3.13 Proveedores de prueba (`infra/mock-providers`)
 
-**Función en el despliegue.** `mock-salud` y `mock-socioeconomico` simulan los servicios de dos entidades proveedoras con datos sintéticos (ADR-0009). Ocupan el lugar de los nodos del kit hasta M4: el reconciliador apunta los upstreams a ellos según `RID_DEV_NODES` (`slug=host:puerto`). Registran en su log las cabeceras `X-RID-*` que reciben, y así la demo muestra qué le llega al proveedor. En producción no existen: los upstreams son nodos del kit, APIs existentes de las entidades o un Security Server de X-Road.
+**Función en el despliegue.** `mock-salud` y `mock-socioeconomico` simulan los servicios de dos entidades proveedoras con datos sintéticos (ADR-0009). Ocupan el lugar de los nodos del kit hasta M4: el reconciliador apunta los upstreams a ellos según `RID_DEV_NODES` (`slug=host:puerto`; con `https://host:puerto`, el gateway les habla con mTLS como a un nodo enrolado). Registran en su log las cabeceras `X-RID-*` que reciben, y así la demo muestra qué le llega al proveedor. En producción no existen: los upstreams son nodos del kit, APIs existentes de las entidades o un Security Server de X-Road.
 
 - Una sola imagen (`rid/mock-providers:dev`); `PROVIDER` elige el servicio y sus datos (`salud` o `socioeconomico`), con su OpenAPI en `infra/mock-providers/<proveedor>/openapi.yaml`.
 - Escuchan en 8000 dentro de la red de Compose; en desarrollo se publican en 8101 y 8102.
@@ -239,13 +252,15 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 | `RID_SUBJECT_REF_KEY` (≥ 32 caracteres) | Cambia el seudónimo de cada titular: se pierde el vínculo entre un ciudadano y sus registros anteriores |
 | `RID_END_USER_HASH_SALT` (≥ 16 caracteres) | Cambian todos los hashes de funcionario |
 | `RID_TRANSPARENCY_SIGNING_JWK` | Los comprobantes anteriores solo verifican si la clave pública vieja pasa a `RID_TRANSPARENCY_RETIRED_JWKS` |
-| `RID_SECRETS_KEY` (32 bytes base64) | No se pueden abrir los secretos de cliente sellados que el reconciliador de Keycloak aún no aplicó |
+| `RID_SECRETS_KEY` (32 bytes base64) | No se pueden abrir los secretos de cliente sellados que el reconciliador de Keycloak aún no aplicó, ni las claves de los certificados del gateway (`gateway_certificate`): el reconciliador de APISIX falla hasta que se emitan certificados nuevos |
 | `POSTGRES_PASSWORD`, `RID_APP_DB_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Solo se aplican al crear el volumen (§3.2) |
 | `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET` | Solo se aplican al importar el realm (§3.3) |
-| `STEP_CA_PASSWORD` | Cifra las claves de la CA ya creadas |
+| `STEP_CA_PASSWORD` | Cifra las claves de la CA y de los provisioners `rid-portal` y `rid-gateway-tls` ya creadas |
 | `AUTH_SECRET` | Cierra todas las sesiones de la web |
 
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, el API no puede construir el bundle de OPA y el gateway niega todo.
+
+Otras variables del gateway (M3): `RID_GATEWAY_TLS_HOSTS` (nombres del certificado de servidor del gateway, por defecto `localhost`; en el piloto, el nombre propio del gateway de M3-10) y `RID_GATEWAY_CLIENT_NAME` (prefijo del certificado de cliente hacia los proveedores, por defecto `rid-gateway`). La ventana de rotación de credenciales es `lifecycle.credentialRotationDays` en la configuración del país (7 días por defecto).
 
 ### 4.2 Lo que cambia entre desarrollo y piloto
 
@@ -353,6 +368,10 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 
 - Las migraciones se aplican solas al arrancar el API.
 - Revisa en las notas de la historia (`BACKLOG.md`) si la versión pide pasos manuales: cambios de realm de Keycloak (no se reimportan, §3.3), variables nuevas en `.env` (`make-deploy-env.mjs` no edita un `.env` existente) o volúmenes nuevos.
+- **Al pasar a M3 (M3-01 a M3-04)**, sobre un piloto anterior:
+  1. Agregar a `.env`: `RID_STEP_CA_URL=https://step-ca:9000`, `RID_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`), `RID_STEP_CA_ROOT_FILE=/var/lib/rid/step-ca/root_ca.crt` y, si cambian sus valores por defecto, `RID_GATEWAY_TLS_HOSTS` y `RID_GATEWAY_CLIENT_NAME`.
+  2. Recrear `step-ca` (crea el provisioner `rid-gateway-tls`) y `apisix` (carga `rid-client-cert`) antes que el API.
+  3. Aplicar la política de rotación al realm existente: `node scripts/keycloak-client-policies.mjs` con `KEYCLOAK_URL` y el administrador de `master` (`OPERATIONS.md §5.3`).
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
 ## 6. Desarrollo local
