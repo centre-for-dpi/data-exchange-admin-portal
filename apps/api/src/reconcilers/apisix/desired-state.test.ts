@@ -104,13 +104,25 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     const plugins = desiredGateway(version(), settings).route.plugins as Plugins;
     expect(Object.keys(plugins).sort()).toEqual([
       'http-logger',
+      'limit-count',
       'opa',
       'openid-connect',
       'prometheus',
       'proxy-rewrite',
       'request-id',
       'rid-client-cert',
+      'rid-rate-limited',
     ]);
+    // Per-subscription limit (S-2): from OPA's headers, counted on each node.
+    expect(plugins['limit-count']).toMatchObject({
+      count: '$http_x_rid_rate_limit',
+      key_type: 'var',
+      key: 'http_x_rid_subscription',
+      time_window: 60,
+      policy: 'local',
+      rejected_code: 429,
+    });
+    expect(plugins.opa?.send_headers_upstream as string[]).toContain('X-RID-Rate-Limit');
     // The client never chooses the certificate thumbprint OPA reads, nor the provider sees it.
     expect(plugins['rid-client-cert']).toEqual({});
     expect(plugins['proxy-rewrite']?.headers).not.toMatchObject({

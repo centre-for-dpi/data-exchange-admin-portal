@@ -212,6 +212,7 @@ describe('OPA bundle and activation (M1-09)', () => {
         country: 'CO',
         documentTypes: ['CC', 'CE', 'TI', 'PEP', 'PPT', 'PA'],
         mtlsRequired: false,
+        gatewayNodes: 1,
       });
     });
 

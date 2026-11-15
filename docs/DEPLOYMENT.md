@@ -123,7 +123,7 @@ También termina el TLS del gateway en 9443 con su certificado de servidor y, cu
 - etcd guarda la configuración de APISIX (prefijo `/apisix`). Un solo nodo, HTTP sin TLS, no se publica.
 - APISIX en modo `traditional` con `config_provider: etcd` (`infra/apisix/config.yaml`, montado de solo lectura). La clave del Admin API llega por `APISIX_ADMIN_KEY`.
 - El Admin API (9180) acepta solo direcciones privadas (`127.0.0.0/24`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) y exige la clave. Nunca se expone al público.
-- Plugins propios en `infra/apisix/plugins` (montados en `/usr/local/apisix/rid`): `rid-data-subject` (ADR-0017) y `rid-client-cert` (M3-02: pasa a OPA la huella RFC 8705 del certificado de cliente verificado). La lista de plugins de `config.yaml` es explícita: un plugin nuevo exige reiniciar APISIX.
+- Plugins propios en `infra/apisix/plugins` (montados en `/usr/local/apisix/rid`): `rid-data-subject` (ADR-0017) `rid-client-cert` (M3-02: pasa a OPA la huella RFC 8705 del certificado de cliente verificado) y `rid-rate-limited` (M3-05: el 429 del límite por suscripción en problem+json). La lista de plugins de `config.yaml` es explícita: un plugin nuevo exige reiniciar APISIX.
 - **Objetos SSL** (los crea el reconciliador, como las rutas):
   - `rid-ssl-gateway`: certificado de servidor del gateway en los nombres de `RID_GATEWAY_TLS_HOSTS`, emitido por step-ca y renovado por el portal. Con `features.mtls.required`, además `client.ca` con la CA de la red: sin certificado válido, el handshake falla.
   - `rid-ssl-gateway-client-<entityId>`: certificado de cliente que el gateway presenta a los upstreams con mTLS de esa entidad proveedora, `CN=rid-gateway.<slug>` (prefijo `RID_GATEWAY_CLIENT_NAME`). Uno por proveedor, para que una entidad no pueda llegar a la API mTLS de otra con la identidad del gateway. Cada proveedor debe aceptar solo su nombre.
@@ -260,7 +260,7 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, el API no puede construir el bundle de OPA y el gateway niega todo.
 
-Otras variables del gateway (M3): `RID_GATEWAY_TLS_HOSTS` (nombres del certificado de servidor del gateway, por defecto `localhost`; en el piloto, el nombre propio del gateway de M3-10) y `RID_GATEWAY_CLIENT_NAME` (prefijo del certificado de cliente hacia los proveedores, por defecto `rid-gateway`). La ventana de rotación de credenciales es `lifecycle.credentialRotationDays` en la configuración del país (7 días por defecto).
+Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX atienden el tráfico, 1 por defecto: cada nodo cuenta las peticiones por su lado y el bundle le da a cada uno su parte del límite de la suscripción, ADR-0020; un valor inválido deja a OPA sin bundle), `RID_GATEWAY_TLS_HOSTS` (nombres del certificado de servidor del gateway, por defecto `localhost`; en el piloto, el nombre propio del gateway de M3-10) y `RID_GATEWAY_CLIENT_NAME` (prefijo del certificado de cliente hacia los proveedores, por defecto `rid-gateway`). La ventana de rotación de credenciales es `lifecycle.credentialRotationDays` en la configuración del país (7 días por defecto).
 
 ### 4.2 Lo que cambia entre desarrollo y piloto
 
@@ -372,6 +372,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
   1. Agregar a `.env`: `RID_STEP_CA_URL=https://step-ca:9000`, `RID_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`), `RID_STEP_CA_ROOT_FILE=/var/lib/rid/step-ca/root_ca.crt` y, si cambian sus valores por defecto, `RID_GATEWAY_TLS_HOSTS` y `RID_GATEWAY_CLIENT_NAME`.
   2. Recrear `step-ca` (crea el provisioner `rid-gateway-tls`) y `apisix` (carga `rid-client-cert`) antes que el API.
   3. Aplicar la política de rotación al realm existente: `node scripts/keycloak-client-policies.mjs` con `KEYCLOAK_URL` y el administrador de `master` (`OPERATIONS.md §5.3`).
+  4. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-RID-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
 ## 6. Desarrollo local

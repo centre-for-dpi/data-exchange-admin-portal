@@ -132,6 +132,11 @@ export interface BundleData {
     documentTypes: string[];
     /** features.mtls.required: every call needs a client certificate and a bound token. */
     mtlsRequired: boolean;
+    /**
+     * Nodes of the gateway (RID_GATEWAY_NODES, ADR-0020): each counts locally, so the policy
+     * gives each node its share of a subscription's limit.
+     */
+    gatewayNodes: number;
   };
 }
 

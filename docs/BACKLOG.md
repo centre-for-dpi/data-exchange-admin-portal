@@ -475,7 +475,19 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Keycloak guarda los dos secretos con su política de rotación (`rid-secret-rotation`). Keycloak ignora los atributos de secreto rotado por la Admin API: se comprobó con Keycloak 26.8, y `tests/infra` lo prueba con la cuenta del provisionador.
     - Todo queda auditado: `credential.rotation_started`, `credential.revoked`, `credential.rotation_ended`.
     - Despliegue: en el VPS hay que aplicar la política con `node scripts/keycloak-client-policies.mjs`, porque su realm ya existe.
-- [ ] **M3-05 — Límites por suscripción**: `limit-count` según el resultado de S-2; 429 con problem+json; límite visible en la suscripción.
+- [x] **M3-05 — Límites por suscripción**: `limit-count` según el resultado de S-2; 429 con problem+json; límite visible en la suscripción.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §4.1` y `§4.2`.
+    - Cada ruta lleva `limit-count`: `count: $http_x_rid_rate_limit`, clave `http_x_rid_subscription`, ventana de 60 s, contadores locales.
+    - OPA pone las dos cabeceras al permitir. El límite es el `rateLimitPerMinute` de la suscripción, o el de la versión, dividido por `RID_GATEWAY_NODES` (ADR-0020) y redondeado hacia arriba.
+    - El 429 propio del gateway sale en problem+json (`rate_limited`) por el plugin propio `rid-rate-limited`, y el 429 de un proveedor pasa intacto. Se usó un plugin y no `response-rewrite`, como en S-2, porque las versiones deprecadas ya usan `response-rewrite` para sus cabeceras.
+    - El límite que aplica ya se veía en la ficha de la suscripción. La guía de integración de la aplicación explica el 429 y las cabeceras `X-RateLimit-*`.
+    - Probado con tráfico real (la prueba de S-2 convertida en integración):
+      - cada suscripción tiene su propio límite;
+      - el cliente no puede subirse el límite ni reiniciar su contador;
+      - una llamada negada no consume el límite;
+      - cambiar el límite no reinicia el contador;
+      - el 429 del proveedor pasa intacto.
+    - CI levanta además `opa` y `mock-salud` para la integración del API.
 - [ ] **M3-06 — Funcionario final**: `X-RID-End-User` obligatorio según clasificación; hash con sal por despliegue; nunca se guarda en claro.
 - [ ] **M3-07 — Anti-suplantación de cabeceras**: test que envía `X-RID-*` falsas desde el cliente y verifica que el proveedor recibe las correctas.
 - [ ] **M3-08 — MFA para roles críticos**: roles de plataforma y `data_steward` exigen MFA en Keycloak.

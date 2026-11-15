@@ -49,7 +49,7 @@ jobs:
       # the development TSA: the transparency evidence is stamped for real (MT-04), and step-ca:
       # application certificates are signed by the real CA (M3-01).
       - run: cp .env.example .env
-      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres etcd apisix tsa step-ca
+      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres etcd apisix tsa step-ca opa mock-salud
       - run: pnpm exec turbo run build --filter=@rid/api^...
       - run: pnpm --filter @rid/api test:integration
       # Compiled code under plain Node: catches CommonJS interop issues Vitest hides.

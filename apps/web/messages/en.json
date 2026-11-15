@@ -329,7 +329,8 @@
       "guide": "Integration guide",
       "guideToken": "1. Get an access token (valid for 5 minutes):",
       "guideCall": "2. Call an API with the token and the purpose of your approved request:",
-      "guideNote": "Replace YOUR_SECRET with the secret you saved when you created the application. You need an approved access request for the gateway to accept the call."
+      "guideNote": "Replace YOUR_SECRET with the secret you saved when you created the application. You need an approved access request for the gateway to accept the call.",
+      "guideLimit": "Each subscription has a limit of requests per minute. Over it, the gateway answers 429 in application/problem+json (code rate_limited); the X-RateLimit-Limit, X-RateLimit-Remaining and X-RateLimit-Reset headers give the limit, what is left and in how many seconds it resets."
     },
     "certificates": {
       "title": "Client certificate (mTLS)",

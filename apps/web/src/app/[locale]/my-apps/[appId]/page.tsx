@@ -261,6 +261,7 @@ export default async function ApplicationPage({ params }: PageProps) {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{t('detail.guideNote')}</p>
+        <p className="text-sm text-muted-foreground">{t('detail.guideLimit')}</p>
       </Section>
     </Page>
   );

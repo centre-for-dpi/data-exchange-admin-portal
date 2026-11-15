@@ -329,7 +329,8 @@
       "guide": "Guía de integración",
       "guideToken": "1. Obtén un token de acceso (dura 5 minutos):",
       "guideCall": "2. Llama a una API con el token y la finalidad de tu solicitud aprobada:",
-      "guideNote": "Reemplaza TU_SECRETO por el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada."
+      "guideNote": "Reemplaza TU_SECRETO por el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada.",
+      "guideLimit": "Cada suscripción tiene un límite de peticiones por minuto. Al superarlo, el gateway responde 429 en application/problem+json (código rate_limited); las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset dicen el límite, lo que queda y en cuántos segundos se reinicia."
     },
     "certificates": {
       "title": "Certificado de cliente (mTLS)",

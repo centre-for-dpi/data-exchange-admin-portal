@@ -209,12 +209,17 @@ allow if not deny_reason
 # Rule 6, allow: headers for the upstream.
 end_user_hash := crypto.hmac.sha256(end_user, data.config.endUserHashSalt) if end_user
 
+# Per-subscription limit (SPIKE S-2, ADR-0020, M3-05): APISIX's limit-count counts on each gateway
+# node, so each node gets its share of the subscription's requests per minute, rounded up.
+rate_limit := ceil(subscription_data.rateLimitPerMinute / object.get(data.config, "gatewayNodes", 1))
+
 base_headers := {
 	"X-RID-Consumer-Entity": client.entitySlug,
 	"X-RID-Consumer-App": client_id,
 	"X-RID-Subscription": subscription,
 	"X-RID-Purpose": purpose,
 	"X-RID-Operation": operation.id,
+	"X-RID-Rate-Limit": format_int(rate_limit, 10),
 	"X-Request-Id": object.get(input.request.headers, "x-request-id", ""),
 }
 

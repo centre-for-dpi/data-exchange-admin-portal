@@ -75,6 +75,8 @@ export const OPA_UPSTREAM_HEADERS = [
   'X-RID-Subscription',
   'X-RID-Purpose',
   'X-RID-Operation',
+  // The subscription's limit for limit-count (S-2): the client never chooses it.
+  'X-RID-Rate-Limit',
   'X-RID-End-User-Hash',
   'X-RID-Subject-Ref',
   'X-RID-End-User',
@@ -346,6 +348,19 @@ export function desiredGateway(
         with_route: true,
         send_headers_upstream: OPA_UPSTREAM_HEADERS,
       },
+      // Per-subscription limit (S-2, ADR-0020): OPA puts the subscription and its share of the
+      // limit for this node in headers; counters live in each node. A denied call never gets here.
+      'limit-count': {
+        count: '$http_x_rid_rate_limit',
+        time_window: 60,
+        key_type: 'var',
+        key: 'http_x_rid_subscription',
+        policy: 'local',
+        rejected_code: 429,
+        show_limit_quota_header: true,
+      },
+      // That 429 in problem+json; a provider's own 429 passes untouched.
+      'rid-rate-limited': {},
       prometheus: { prefer_name: false },
       ...(v.deprecation
         ? { 'response-rewrite': { headers: { set: deprecationHeaders(v.deprecation) } } }

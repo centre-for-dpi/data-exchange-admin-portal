@@ -21,6 +21,7 @@ const data = (salt = 'salt-for-tests-0001'): BundleData => ({
     country: 'XX',
     documentTypes: ['ID', 'PP'],
     mtlsRequired: false,
+    gatewayNodes: 1,
   },
 });
 

@@ -59,6 +59,7 @@ bundle := {
 		"country": "CO",
 		"documentTypes": ["CC", "CE", "TI"],
 		"mtlsRequired": false,
+		"gatewayNodes": 1,
 	},
 }
 
@@ -469,4 +470,36 @@ test_mtls_deny_reason_has_a_problem_detail if {
 	r.code == "client_certificate_required"
 	r.status == 403
 	contains(r.detail, "client certificate")
+}
+
+# --- Per-subscription limit (SPIKE S-2, ADR-0020, M3-05) --------------------------------------
+
+test_allow_passes_the_subscription_limit_for_limit_count if {
+	h := headers_for(request({}), bundle)
+	h["X-RID-Rate-Limit"] == "600"
+	h["X-RID-Subscription"] == "sub-1"
+}
+
+test_the_limit_is_shared_among_gateway_nodes_rounding_up if {
+	three_nodes := object.union(bundle, {"config": {"gatewayNodes": 3}})
+	h := headers_for(request({}), three_nodes)
+	h["X-RID-Rate-Limit"] == "200"
+	odd := object.union(with_subscription({"rateLimitPerMinute": 10}), {"config": {"gatewayNodes": 3}})
+	headers_for(request({}), odd)["X-RID-Rate-Limit"] == "4"
+}
+
+test_a_client_cannot_choose_its_limit if {
+	h := headers_for(with_headers({"x-rid-rate-limit": "1000000"}), bundle)
+	h["X-RID-Rate-Limit"] == "600"
+}
+
+test_a_denied_call_carries_no_limit if {
+	inp := with_headers({"x-rid-purpose": "other_purpose"})
+	h := headers_for(inp, bundle)
+	not h["X-RID-Rate-Limit"]
+}
+
+test_without_gateway_nodes_one_node_is_assumed if {
+	no_nodes := json.patch(bundle, [{"op": "remove", "path": "/config/gatewayNodes"}])
+	headers_for(request({}), no_nodes)["X-RID-Rate-Limit"] == "600"
 }

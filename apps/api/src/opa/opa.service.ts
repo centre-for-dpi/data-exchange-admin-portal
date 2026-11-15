@@ -65,6 +65,16 @@ export class OpaService implements OnApplicationBootstrap {
     return key;
   }
 
+  /** RID_GATEWAY_NODES (ADR-0020), 1 by default; a malformed value is not guessed (fail closed). */
+  private gatewayNodes(): number {
+    const raw = process.env.RID_GATEWAY_NODES ?? '1';
+    const nodes = Number(raw);
+    if (!Number.isInteger(nodes) || nodes < 1 || nodes > 100) {
+      throw new BundleUnavailableError('RID_GATEWAY_NODES must be an integer from 1 to 100');
+    }
+    return nodes;
+  }
+
   async data(): Promise<{ data: BundleData; subscriptionIds: string[] }> {
     const salt = this.salt();
     const subjectRefKey = this.subjectRefKey();
@@ -159,6 +169,7 @@ export class OpaService implements OnApplicationBootstrap {
           country: country.country.code,
           documentTypes: [...country.identifiers.person],
           mtlsRequired: country.features.mtls.required,
+          gatewayNodes: this.gatewayNodes(),
         },
       },
       subscriptionIds,
