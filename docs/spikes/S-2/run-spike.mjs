@@ -26,13 +26,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // The spike's stand-in for the bundle: who the client is (here a plain header instead of the
 // token) and the limit of its subscription, in requests per minute.
+// Fresh subscription ids per run: counters outlive the route (same id, same plugin conf) for the
+// whole time window, so a rerun within a minute would start from the previous counts.
+const RUN = Date.now().toString(36);
+
 const POLICY = `package spikes2
 
 import rego.v1
 
 subscriptions := {
-	"app-a": {"id": "sub-a", "rateLimit": 2},
-	"app-b": {"id": "sub-b", "rateLimit": 4},
+	"app-a": {"id": "sub-a-${RUN}", "rateLimit": 2},
+	"app-b": {"id": "sub-b-${RUN}", "rateLimit": 4},
 }
 
 sub := subscriptions[input.request.headers["x-spike-client"]]
