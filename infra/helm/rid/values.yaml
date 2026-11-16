@@ -60,6 +60,9 @@ secrets:
 api:
   replicas: 2
   port: 4000
+  # The first platform administrator (RID_BOOTSTRAP_ADMIN_EMAIL): whoever signs in first with this
+  # address, verified, while the network has none. Remove it once they are in.
+  bootstrapAdminEmail: ''
   # Proxies allowed to set X-Forwarded-For (RID_TRUST_PROXY, M6-01): the ingress controller's pods.
   trustProxy: '10.0.0.0/8'
   # Uploaded documents (designation, agreements): shared by every replica.

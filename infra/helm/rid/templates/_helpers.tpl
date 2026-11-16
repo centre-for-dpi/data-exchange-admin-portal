@@ -137,6 +137,9 @@ Bit run in every gateway pod, on 127.0.0.1).
 - { name: RID_CONTRACT_RUNNER_URL, value: {{ printf "http://%s:8096" (include "rid.name" "contract-runner") | quote }} }
 - { name: RID_OPENSEARCH_URL, value: {{ printf "%s://%s:%v" (ternary "https" "http" .Values.accessLogs.opensearch.tls) .Values.accessLogs.opensearch.host .Values.accessLogs.opensearch.port | quote }} }
 - { name: RID_TRUST_PROXY, value: {{ .Values.api.trustProxy | quote }} }
+{{- with .Values.api.bootstrapAdminEmail }}
+- { name: RID_BOOTSTRAP_ADMIN_EMAIL, value: {{ . | quote }} }
+{{- end }}
 - { name: RID_STEP_CA_URL, value: {{ printf "https://%s:9000" (include "rid.name" "step-ca") | quote }} }
 - { name: RID_STEP_CA_ROOT_FINGERPRINT, value: {{ required "stepCa.rootFingerprint: the SHA-256 of the network's root" .Values.stepCa.rootFingerprint | quote }} }
 {{- range $name, $value := .Values.api.env }}

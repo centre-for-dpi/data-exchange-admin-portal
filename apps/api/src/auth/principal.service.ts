@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ConflictError, ForbiddenError } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requiresMfa } from './authz.policy.js';
+import { bootstrapPlatformAdmin } from './bootstrap-admin.js';
 import { TOKEN_VERIFIER, type TokenVerifier, type VerifiedIdentity } from './token-verifier.js';
 
 export interface PrincipalMembership {
@@ -109,6 +110,14 @@ export class PrincipalService {
         after: created,
         requestId,
       });
+      // The first platform administrator of a production network (M6-05), in the same transaction.
+      await bootstrapPlatformAdmin(
+        tx,
+        this.audit,
+        { userId: created.id, email, emailVerified: identity.emailVerified },
+        process.env.RID_BOOTSTRAP_ADMIN_EMAIL,
+        requestId,
+      );
     });
   }
 }
