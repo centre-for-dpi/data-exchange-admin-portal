@@ -81,6 +81,13 @@ keycloak:
     - KEYCLOAK_SMTP_PASSWORD
 keycloak-citizens:
   keys: [RID_CARPETA_CLIENT_SECRET]
+prometheus:
+  keys: [RID_METRICS_TOKEN]
+alertmanager:
+  keys: [ALERTMANAGER_SMTP_PASSWORD]
+grafana:
+  keys: [GRAFANA_ADMIN_PASSWORD]
+  derived: { GRAFANA_ADMIN_USER: admin }
 # CloudNativePG's roles (kubernetes.io/basic-auth): the owner of the schema, the API's runtime
 # role, and Keycloak's own database.
 db-owner:
@@ -104,6 +111,9 @@ keycloak-db:
 {{- else if eq .component "contract-runner" -}}{{ $v.contractRunner.enabled }}
 {{- else if eq .component "keycloak-citizens" -}}{{ $v.keycloak.citizensRealm }}
 {{- else if eq .component "access-logs" -}}{{ $v.accessLogs.enabled }}
+{{- else if eq .component "prometheus" -}}{{ $v.prometheus.enabled }}
+{{- else if eq .component "alertmanager" -}}{{ and $v.prometheus.enabled $v.prometheus.alertmanager.enabled }}
+{{- else if eq .component "grafana" -}}{{ $v.grafana.enabled }}
 {{- else -}}true{{- end -}}
 {{- end -}}
 
@@ -140,6 +150,12 @@ Bit run in every gateway pod, on 127.0.0.1).
 - { name: RID_CONTRACT_RUNNER_URL, value: {{ printf "http://%s:8096" (include "rid.name" "contract-runner") | quote }} }
 - { name: RID_OPENSEARCH_URL, value: {{ printf "%s://%s:%v" (ternary "https" "http" .Values.accessLogs.opensearch.tls) .Values.accessLogs.opensearch.host .Values.accessLogs.opensearch.port | quote }} }
 - { name: RID_TRUST_PROXY, value: {{ .Values.api.trustProxy | quote }} }
+{{- if .Values.opensearch.enabled }}
+- { name: NODE_EXTRA_CA_CERTS, value: /var/run/rid/internal-ca/ca.crt }
+{{- end }}
+{{- if .Values.prometheus.enabled }}
+- { name: RID_PROMETHEUS_URL, value: {{ printf "http://%s" (include "rid.name" "prometheus") | quote }} }
+{{- end }}
 {{- with .Values.api.bootstrapAdminEmail }}
 - { name: RID_BOOTSTRAP_ADMIN_EMAIL, value: {{ . | quote }} }
 {{- end }}
@@ -154,5 +170,9 @@ Bit run in every gateway pod, on 127.0.0.1).
 {{- define "rid.np.from" -}}
 - podSelector:
     matchLabels:
+      {{- if eq . "prometheus" }}
+      rid-network: prometheus
+      {{- else }}
       app.kubernetes.io/name: {{ include "rid.name" . }}
+      {{- end }}
 {{- end -}}

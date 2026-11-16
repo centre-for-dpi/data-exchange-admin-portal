@@ -222,8 +222,8 @@ accessLogs:
     host: rid-opensearch
     port: 9200
     tls: true
-    # The Secret with the CA of OpenSearch's certificate (key ca.crt).
-    caSecret: rid-opensearch-ca
+    # The Secret with the CA of OpenSearch's certificate (key ca.crt): cert-manager's.
+    caSecret: rid-opensearch-tls
     # OpenSearch's pods, the only place the pipeline may send to (NetworkPolicy).
     podLabels:
       app.kubernetes.io/name: opensearch
@@ -239,3 +239,159 @@ networkPolicy:
   # Private ranges the gateway may call besides public addresses (an X-Road Security Server or
   # providers inside the operator's network). Empty: public addresses only.
   gatewayExtraEgressCidrs: []
+
+# --- Observability (subcharts) ---------------------------------------------------------------------
+
+# Access-log analytics (M5): OpenSearch with its security plugin and TLS (opensearch-security.yaml).
+# Users and their password hashes: OPENSEARCH_INTERNAL_USERS_YML in the store (DEPLOYMENT.md §9).
+opensearch:
+  enabled: true
+  fullnameOverride: rid-opensearch
+  clusterName: rid-opensearch
+  replicas: 3
+  labels:
+    app.kubernetes.io/part-of: rid
+  extraEnvs:
+    - { name: DISABLE_INSTALL_DEMO_CONFIG, value: 'true' }
+  opensearchJavaOpts: -Xms1g -Xmx1g
+  resources:
+    requests: { cpu: 500m, memory: 2Gi }
+    limits: { memory: 2Gi }
+  persistence:
+    size: 50Gi
+  secretMounts:
+    - name: tls
+      secretName: rid-opensearch-tls
+      path: /usr/share/opensearch/config/certs
+  config:
+    opensearch.yml: |
+      cluster.name: rid-opensearch
+      network.host: 0.0.0.0
+      plugins.security.ssl.transport.pemcert_filepath: certs/tls.crt
+      plugins.security.ssl.transport.pemkey_filepath: certs/tls.key
+      plugins.security.ssl.transport.pemtrustedcas_filepath: certs/ca.crt
+      plugins.security.ssl.transport.enforce_hostname_verification: true
+      plugins.security.ssl.http.enabled: true
+      plugins.security.ssl.http.pemcert_filepath: certs/tls.crt
+      plugins.security.ssl.http.pemkey_filepath: certs/tls.key
+      plugins.security.ssl.http.pemtrustedcas_filepath: certs/ca.crt
+      plugins.security.nodes_dn: ['CN=rid-opensearch']
+      plugins.security.authcz.admin_dn: ['CN=rid-opensearch-admin']
+      plugins.security.allow_default_init_securityindex: true
+      plugins.security.restapi.roles_enabled: ['all_access']
+  securityConfig:
+    enabled: true
+    config:
+      securityConfigSecret: rid-opensearch-security
+      dataComplete: true
+
+# Metrics and alerts (M5-06). Prometheus scrapes the gateway's pods (APISIX and OPA's diagnostic
+# listener), the API (with RID_METRICS_TOKEN) and Keycloak; the rules are infra/prometheus's.
+prometheus:
+  enabled: true
+  kube-state-metrics: { enabled: false }
+  prometheus-node-exporter: { enabled: false }
+  prometheus-pushgateway: { enabled: false }
+  server:
+    fullnameOverride: rid-prometheus
+    # The chart's own labels already name it: this one is for the NetworkPolicies.
+    podLabels:
+      rid-network: prometheus
+    retention: 30d
+    persistentVolume: { size: 20Gi }
+    extraConfigmapMounts:
+      - { name: rid-rules, mountPath: /etc/rid-rules, configMap: rid-prometheus-rules, readOnly: true }
+    extraSecretMounts:
+      - { name: metrics-token, mountPath: /etc/rid-metrics, secretName: rid-prometheus, readOnly: true }
+  serverFiles:
+    prometheus.yml:
+      rule_files:
+        - /etc/rid-rules/rid.rules.yml
+  scrapeConfigs:
+    gateway:
+      job_name: apisix
+      metrics_path: /apisix/prometheus/metrics
+      kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+          regex: rid-gateway;metrics
+          action: keep
+    opa:
+      job_name: opa
+      kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+          regex: rid-gateway;opa-diag
+          action: keep
+    api:
+      job_name: api
+      metrics_path: /metrics
+      authorization: { type: Bearer, credentials_file: /etc/rid-metrics/RID_METRICS_TOKEN }
+      kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+          regex: rid-api;http
+          action: keep
+    keycloak:
+      job_name: keycloak
+      kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+          regex: rid-keycloak;management
+          action: keep
+  # The operator's mail: the server's password is ALERTMANAGER_SMTP_PASSWORD (rid-alertmanager).
+  alertmanager:
+    enabled: true
+    fullnameOverride: rid-alertmanager
+    podLabels:
+      app.kubernetes.io/part-of: rid
+    extraSecretMounts:
+      - { name: smtp, mountPath: /etc/rid-smtp, secretName: rid-alertmanager, readOnly: true }
+    config:
+      global:
+        smtp_smarthost: smtp.example.org:587
+        smtp_from: alertas@rid.example.org
+        smtp_auth_username: alertas@rid.example.org
+        smtp_auth_password_file: /etc/rid-smtp/ALERTMANAGER_SMTP_PASSWORD
+        smtp_require_tls: true
+      route:
+        receiver: operator
+        group_by: [alertname, system, kind]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        routes:
+          - { matchers: ['severity="critical"'], receiver: operator, repeat_interval: 1h }
+      receivers:
+        - name: operator
+          email_configs:
+            - { to: operaciones@rid.example.org, send_resolved: true }
+
+# The operator's dashboard (AGPL-3.0, its own service). Behind the ingress at /grafana, with its
+# own login (admin password GRAFANA_ADMIN_PASSWORD, rid-grafana).
+grafana:
+  enabled: true
+  fullnameOverride: rid-grafana
+  podLabels:
+    app.kubernetes.io/part-of: rid
+  admin:
+    existingSecret: rid-grafana
+    userKey: GRAFANA_ADMIN_USER
+    passwordKey: GRAFANA_ADMIN_PASSWORD
+  grafana.ini:
+    server: { serve_from_sub_path: true }
+    users: { allow_sign_up: false, default_language: es-ES }
+    auth.anonymous: { enabled: false }
+    analytics: { reporting_enabled: false, check_for_updates: false }
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - { name: Prometheus, uid: prometheus, type: prometheus, access: proxy, url: 'http://rid-prometheus', isDefault: true, editable: false }
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - { name: rid, folder: RID, type: file, options: { path: /var/lib/grafana/dashboards/rid } }
+  dashboardsConfigMaps:
+    rid: rid-grafana-dashboards

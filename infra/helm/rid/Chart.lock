@@ -1,0 +1,12 @@
+dependencies:
+- name: opensearch
+  repository: https://opensearch-project.github.io/helm-charts
+  version: 3.9.0
+- name: prometheus
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 29.40.1
+- name: grafana
+  repository: https://grafana-community.github.io/helm-charts
+  version: 14.3.1
+digest: sha256:8c10a48c0b316516fa0ef9478619cfdb98d0dc170a6b5e9ea16777b1eecbf27c
+generated: "2026-11-16T22:54:10.541320051Z"

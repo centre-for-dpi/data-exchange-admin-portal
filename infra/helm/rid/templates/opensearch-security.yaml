@@ -1,0 +1,120 @@
+{{- if .Values.opensearch.enabled }}
+{{- $c := dict "root" . "component" "opensearch" }}
+{{- $name := include "rid.name" "opensearch" }}
+{{- /*
+OpenSearch with its security plugin (ASVS 12.3, 13.2.1, pending since M6-01): TLS on transport and
+HTTP with certificates of the internal CA, and users with only what they need (roles.yml below):
+  - rid-logs: Fluent Bit, writes the access-log indexes only;
+  - rid-api: the portal, reads them and keeps their template and retention policy (M5);
+  - admin: operations (securityadmin.sh with the admin certificate).
+Their password hashes come from the store (OPENSEARCH_INTERNAL_USERS_YML, made with the image's
+plugins/opensearch-security/tools/hash.sh): the security index is created from them on the first
+start; later changes go through securityadmin (DEPLOYMENT.md §9).
+*/}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}-tls
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  secretName: {{ $name }}-tls
+  duration: 2160h
+  renewBefore: 720h
+  # OpenSearch reads PKCS#8 keys only.
+  privateKey: { algorithm: RSA, size: 2048, encoding: PKCS8, rotationPolicy: Always }
+  usages: [server auth, client auth]
+  commonName: {{ $name }}
+  dnsNames:
+    - {{ $name }}
+    - {{ $name }}-headless
+    - '*.{{ $name }}-headless'
+    - '*.{{ $name }}-headless.{{ .Release.Namespace }}.svc'
+  issuerRef: { name: {{ include "rid.name" "internal" }}, kind: Issuer }
+---
+# The administrator's certificate (plugins.security.authcz.admin_dn): securityadmin.sh.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}-admin
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  secretName: {{ $name }}-admin
+  duration: 2160h
+  renewBefore: 720h
+  privateKey: { algorithm: RSA, size: 2048, encoding: PKCS8, rotationPolicy: Always }
+  usages: [client auth]
+  commonName: {{ $name }}-admin
+  issuerRef: { name: {{ include "rid.name" "internal" }}, kind: Issuer }
+{{- if eq .Values.secrets.mode "externalSecrets" }}
+---
+# The security plugin's configuration (securityConfig.config.securityConfigSecret): users from the
+# store, the rest fixed here. With existing Secrets, the operator writes rid-opensearch-security
+# with these same files.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $name }}-security
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  refreshInterval: {{ .Values.secrets.externalSecrets.refreshInterval }}
+  secretStoreRef:
+    name: {{ .Values.secrets.externalSecrets.secretStoreRef.name }}
+    kind: {{ .Values.secrets.externalSecrets.secretStoreRef.kind }}
+  target:
+    name: {{ $name }}-security
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      engineVersion: v2
+      mergePolicy: Replace
+      data:
+        internal_users.yml: '{{ "{{" }} .OPENSEARCH_INTERNAL_USERS_YML {{ "}}" }}'
+        config.yml: |
+          _meta: { type: config, config_version: 2 }
+          config:
+            dynamic:
+              http: { anonymous_auth_enabled: false }
+              authc:
+                basic_internal_auth_domain:
+                  http_enabled: true
+                  transport_enabled: true
+                  order: 0
+                  http_authenticator: { type: basic, challenge: false }
+                  authentication_backend: { type: intern }
+        roles.yml: |
+          _meta: { type: roles, config_version: 2 }
+          # Fluent Bit: writes the access logs, nothing else.
+          rid_logs_writer:
+            cluster_permissions: [cluster_monitor, 'indices:data/write/bulk*']
+            index_permissions:
+              - index_patterns: ['rid-access-*']
+                allowed_actions: [create_index, 'indices:data/write/*', 'indices:admin/mapping/put']
+          # The portal: reads them, keeps their template and their retention (ISM, M5-01).
+          rid_api:
+            cluster_permissions:
+              - cluster_monitor
+              - 'indices:admin/index_template/*'
+              - 'cluster:admin/opendistro/ism/*'
+              - 'cluster:admin/opensearch/ism/*'
+            index_permissions:
+              - index_patterns: ['rid-access-*']
+                allowed_actions: [read, 'indices:monitor/*', 'indices:admin/mappings/get', 'indices:admin/opensearch/ism/*']
+        roles_mapping.yml: |
+          _meta: { type: rolesmapping, config_version: 2 }
+          all_access: { reserved: true, users: [admin] }
+          rid_logs_writer: { users: [rid-logs] }
+          rid_api: { users: [rid-api] }
+        action_groups.yml: |
+          _meta: { type: actiongroups, config_version: 2 }
+        tenants.yml: |
+          _meta: { type: tenants, config_version: 2 }
+  data:
+    - secretKey: OPENSEARCH_INTERNAL_USERS_YML
+      remoteRef:
+        key: {{ .Values.secrets.externalSecrets.remoteKey }}
+        property: OPENSEARCH_INTERNAL_USERS_YML
+{{- end }}
+{{- end }}

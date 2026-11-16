@@ -22,7 +22,6 @@ export const SHARED = {
   'infra/fluent-bit/gateway-errors.lua': 'fluent-bit/gateway-errors.lua',
   'infra/fluent-bit/gateway-errors.yaml': 'fluent-bit/gateway-errors.yaml',
   'infra/prometheus/rules/rid.rules.yml': 'prometheus/rid.rules.yml',
-  'infra/alertmanager/alertmanager.yml': 'alertmanager/alertmanager.yml',
   'infra/grafana/dashboards/rid-operator.json': 'grafana/rid-operator.json',
   'infra/opa/config.yaml': 'opa/config.yaml',
   'infra/step-ca/app.tpl': 'step-ca/app.tpl',
