@@ -800,6 +800,21 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Al volver el portal, el registro de transparencia tiene todas las consultas de la caída y una revocación llega en 18 s.
     - **Corregido:** OPA guarda el último bundle en disco (volumen `opa-data`, `persist: true`). Antes, un OPA reiniciado sin el portal quedaba sin política y el gateway lo negaba todo.
 - [ ] **M6-05 — Helm charts** para producción con la topología de `ARCHITECTURE.md §11`.
+  - _Avance (2026-11-16):_ `infra/helm/rid-platform` y `infra/helm/rid`, en `DEPLOYMENT.md §9`. Validados con `helm lint`, `helm template` y kubeconform estricto (59 recursos). Sin instalar en ningún clúster por ahora, por decisión del equipo.
+    - **Hecho:**
+      - portal, gateway (APISIX con OPA local y los Fluent Bit por pod), etcd de 3 miembros, Keycloak en modo producción con base propia, PostgreSQL con réplica (CloudNativePG, `verify-full`), step-ca con raíz fuera de línea, hub y runner;
+      - secretos por componente desde External Secrets con OpenBao;
+      - NetworkPolicies e ingress con Traefik;
+      - realms de producción sin usuarios de demostración;
+      - el primer `platform_admin` sin seed (`RID_BOOTSTRAP_ADMIN_EMAIL`).
+    - **Falta:**
+      - instalarlo (kind con `pnpm helm:kind`, y luego el entorno del operador);
+      - OpenSearch con seguridad, y Prometheus, Alertmanager y Grafana como subcharts;
+      - etcd con mTLS y la salida de red del resto;
+      - SBOM y escaneo de imágenes;
+      - logs del API en el pipeline central;
+      - publicar nuestras imágenes desde CI.
+    - **Para M6-06:** CloudNativePG respalda con Barman, no con pgBackRest. El operador de pgBackRest (Crunchy) distribuye sus imágenes con términos no OSI, así que hace falta un ADR.
 - [ ] **M6-06 — Respaldos y recuperación**: pgBackRest, procedimiento de restauración probado.
 - [ ] **M6-07 — Runbook del operador**: alta de entidad, incidentes, rotación de la CA intermedia, revocación masiva.
 - [ ] **M6-08 — Antivirus de documentos** (ClamAV) y catálogo público opcional.

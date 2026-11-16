@@ -538,3 +538,57 @@ En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.d
 | Métricas y alertas | No hay Prometheus; APISIX expone métricas en 9091 sin que nadie las lea | Prometheus + Alertmanager (M5-06) |
 | Respaldos | `pg_dump` manual | pgBackRest con restauración probada (M6-06) |
 | mTLS de aplicaciones | Desactivado (`features.mtls.required: false`, ADR-0010) | Obligatorio desde M3-10 |
+
+## 9. Kubernetes: charts de Helm (M6-05, en curso)
+
+> **Estado (2026-11-16).** Los charts están escritos y validados de forma estática: `helm lint`, más `helm template` y kubeconform estricto contra Kubernetes 1.31 (59 recursos válidos). **Todavía no se instalaron en ningún clúster.** `pnpm helm:kind` lo hará en kind cuando se decida, y es de esperar que haya ajustes en esa primera instalación.
+
+### 9.1 Los dos charts
+
+| Chart | Qué instala | Cuándo |
+| :-- | :-- | :-- |
+| `infra/helm/rid-platform` | Los operadores del clúster: CloudNativePG 0.29.1 (PostgreSQL con réplicas), External Secrets 2.14.0 (secretos desde OpenBao u otro almacén) y cert-manager v1.21.3 | Una vez por clúster, antes de `rid`, en el namespace `rid-platform` |
+| `infra/helm/rid` | Todo RID: web y API, el gateway (APISIX con su OPA y los Fluent Bit de transparencia y de errores en cada pod), etcd, Keycloak, las dos bases de datos, step-ca, el hub de nodos, el runner de contrato, el pipeline de acceso y las NetworkPolicies | Un `helm install` |
+
+Son dos porque Helm no puede crear un operador y sus recursos en la misma instalación: los recursos (un `Cluster` de base de datos, un `ExternalSecret`) llegan al webhook del operador antes de que este responda.
+
+**Prerrequisitos del clúster:**
+- **Traefik como ingress**: `ingress.className`. ingress-nginx está retirado. Con otro controlador, este debe quitar `SSL_CLIENT_CERT` y `ssl-client-verify` de toda petición al host público.
+- **Una StorageClass con `ReadWriteMany`** para los documentos subidos (`api.documents`). Las demás piezas usan `ReadWriteOnce`.
+- **Un balanceador de red (`LoadBalancer`)** para el gateway, que termina el mTLS de las aplicaciones (no pasa por el ingress), y para el UDP del hub de nodos.
+- **OpenBao** (o cualquier almacén de External Secrets) con un `ClusterSecretStore`: `secrets.externalSecrets.secretStoreRef`.
+
+### 9.2 Secretos
+
+Cada componente tiene su Secret `rid-<componente>`, solo con las claves que usa. Con `secrets.mode: externalSecrets`, todas son propiedades de una sola entrada del almacén (`secrets.externalSecrets.remoteKey`, por omisión `rid/platform`). External Secrets arma los Secrets y además deriva las URL de conexión y los Secrets `basic-auth` de CloudNativePG a partir de las contraseñas, para que nunca se guarde un mismo valor dos veces. Con `secrets.mode: existing`, el operador crea esos Secrets con esos nombres. La lista exacta de claves está en `templates/_helpers.tpl` (`rid.secrets`), y son las mismas de `.env.example`, salvo:
+- `DB_OWNER_PASSWORD` y `DB_APP_PASSWORD`, de las que se derivan `DATABASE_MIGRATION_URL` y `DATABASE_URL`;
+- `KEYCLOAK_SMTP_USER` y `KEYCLOAK_SMTP_PASSWORD`, para el correo del realm.
+
+Las URL de conexión usan `sslmode=verify-full` con el certificado de la CA de cada base de datos. Nunca se monta su clave.
+
+**Rotación.** Se cambia el valor en el almacén y External Secrets actualiza el Secret dentro de `refreshInterval`. Los pods leen sus secretos al arrancar: hay que reiniciarlos (`kubectl rollout restart`) o dejar que lo haga Reloader. El orden de cada rotación es el de OPERATIONS §5.6.
+
+### 9.3 Primera instalación
+
+1. **La CA de la red.** La raíz se crea fuera del clúster, fuera de línea. El Secret `stepCa.pkiSecret` lleva `root_ca.crt`, `intermediate_ca.crt` e `intermediate_ca_key` (cifrada con `RID_STEP_CA_PROVISIONER_PASSWORD`). `stepCa.rootFingerprint` es la huella de la raíz, que el API fija. En el primer arranque, step-ca escribe su `ca.json` y los tres provisioners del portal, como `infra/step-ca/configure.sh`.
+2. **Keycloak.** Importa los realms de producción: los de desarrollo sin sus personas (`pnpm helm:sync` solo deja las cuentas de servicio de los clientes) y con el SMTP de `keycloak.smtp`. Arranca con un administrador temporal (`keycloak.bootstrapAdmin`), que se reemplaza por uno propio con segundo factor.
+3. **El primer `platform_admin`.** Producción no tiene seed. `api.bootstrapAdminEmail` (`RID_BOOTSTRAP_ADMIN_EMAIL`) le da el rol a quien entra primero con esa dirección, verificada por Keycloak, mientras la red no tiene ninguno. Queda auditado. Después se borra el valor, y el resto de los roles se da desde la consola.
+4. **Migraciones.** Corren en un contenedor de inicio del API con las credenciales del dueño del esquema, que solo llegan a ese contenedor. Prisma toma un bloqueo, así que dos réplicas no migran a la vez.
+
+### 9.4 Archivos compartidos con Compose
+
+Helm solo lee archivos dentro del chart. `pnpm helm:sync` copia a `infra/helm/rid/files/` lo que el chart comparte con Compose:
+- los plugins de APISIX;
+- los filtros y configuraciones de Fluent Bit;
+- las reglas de Prometheus y el tablero de Grafana;
+- la configuración de OPA y las plantillas de step-ca;
+- los realms, en su forma de producción.
+
+`tests/infra` falla si una copia no coincide con su fuente. Las configuraciones cuyo host cambia en Kubernetes (la de APISIX, la del pipeline de acceso) son plantillas del chart. Si cambia la fuente, se cambia también la plantilla.
+
+### 9.5 Pendiente en M6-05
+
+- **Instalar** en kind (`pnpm helm:kind`) y luego en el entorno tipo producción del operador. El chart nunca se ha instalado.
+- **Componentes:** OpenSearch con su plugin de seguridad y TLS (cert-manager); Prometheus, Alertmanager y Grafana como subcharts.
+- **Seguridad:** etcd con mTLS; restringir la salida de red de los demás componentes; SBOM y escaneo de imágenes en CI; los logs del API en el pipeline central.
+- **Publicar nuestras imágenes** (`ghcr.io/centre-for-dpi/rid-*`) desde CI. Hoy no se publican.

@@ -414,7 +414,11 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 - Portal: ≥ 2 réplicas de web y api; PostgreSQL con réplica y respaldos (pgBackRest).
 - Keycloak en clúster con base de datos propia.
 - step-ca con raíz fuera de línea; intermedia con clave en HSM.
-- Helm charts en `infra/helm/` (M6-05, todavía no existen).
+- Helm charts en `infra/helm/`: `rid-platform` (operadores) y `rid` (todo RID). Están escritos y validados de forma estática, pero todavía no se instalaron en ningún clúster (M6-05; `DEPLOYMENT.md §9`).
+  - El gateway es un StatefulSet: cada pod lleva APISIX, su OPA (decisiones solo en `127.0.0.1`), el Fluent Bit de transparencia con su disco y el de errores.
+  - PostgreSQL y Keycloak usan CloudNativePG, con `verify-full`.
+  - Los secretos llegan por componente desde External Secrets.
+  - Las NetworkPolicies replican la segmentación de M6-01.
 
 ## 12. Seguridad
 
