@@ -48,31 +48,48 @@ spec:
             - etcd
             - --name=$(POD_NAME)
             - --data-dir=/var/lib/etcd
-            - --listen-client-urls=http://0.0.0.0:2379
-            - --advertise-client-urls=http://$(POD_NAME).{{ $name }}:2379
-            - --listen-peer-urls=http://0.0.0.0:2380
-            - --initial-advertise-peer-urls=http://$(POD_NAME).{{ $name }}:2380
-            - --initial-cluster={{- range $i := until (int .Values.etcd.replicas) }}{{ if $i }},{{ end }}{{ $name }}-{{ $i }}=http://{{ $name }}-{{ $i }}.{{ $name }}:2380{{- end }}
+            # Mutual TLS (ASVS 12.3, M6-05): clients (the gateway) and peers present a certificate of
+            # the internal CA, or etcd refuses them. It has no other authentication of its own.
+            - --listen-client-urls=https://0.0.0.0:2379
+            - --advertise-client-urls=https://$(POD_NAME).{{ $name }}:2379
+            - --listen-peer-urls=https://0.0.0.0:2380
+            - --initial-advertise-peer-urls=https://$(POD_NAME).{{ $name }}:2380
+            - --initial-cluster={{- range $i := until (int .Values.etcd.replicas) }}{{ if $i }},{{ end }}{{ $name }}-{{ $i }}=https://{{ $name }}-{{ $i }}.{{ $name }}:2380{{- end }}
+            - --cert-file=/etc/etcd/tls/tls.crt
+            - --key-file=/etc/etcd/tls/tls.key
+            - --trusted-ca-file=/etc/etcd/tls/ca.crt
+            - --client-cert-auth=true
+            - --peer-cert-file=/etc/etcd/tls/tls.crt
+            - --peer-key-file=/etc/etcd/tls/tls.key
+            - --peer-trusted-ca-file=/etc/etcd/tls/ca.crt
+            - --peer-client-cert-auth=true
+            # Health and metrics only, without TLS, for the probes and Prometheus.
+            - --listen-metrics-urls=http://0.0.0.0:2381
             - --initial-cluster-token={{ $name }}-{{ .Release.Namespace }}
             - --initial-cluster-state=new
           ports:
             - { name: client, containerPort: 2379 }
             - { name: peer, containerPort: 2380 }
+            - { name: metrics, containerPort: 2381 }
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
           readinessProbe:
-            httpGet: { path: /health, port: client }
+            httpGet: { path: /health, port: metrics }
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /livez, port: client }
+            httpGet: { path: /livez, port: metrics }
             initialDelaySeconds: 15
             periodSeconds: 15
           resources:
             {{- toYaml .Values.etcd.resources | nindent 12 }}
           volumeMounts:
             - { name: data, mountPath: /var/lib/etcd }
+            - { name: tls, mountPath: /etc/etcd/tls, readOnly: true }
+      volumes:
+        - name: tls
+          secret: { secretName: {{ include "rid.name" "etcd-tls" }} }
   volumeClaimTemplates:
     - metadata:
         name: data

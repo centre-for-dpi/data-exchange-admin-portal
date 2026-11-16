@@ -48,6 +48,22 @@ spec:
           labelSelector:
             matchLabels:
               {{- include "rid.selector" $c | nindent 14 }}
+      initContainers:
+        # One bundle of trusted CAs: the system's and the internal CA of etcd.
+        - name: ca-bundle
+          image: {{ .Values.images.apisix }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - cat /etc/ssl/certs/ca-certificates.crt /etcd/ca.crt > /trust/ca-bundle.crt
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: etcd-client, mountPath: /etcd, readOnly: true }
+            - { name: trust, mountPath: /trust }
       containers:
         - name: apisix
           image: {{ .Values.images.apisix }}
@@ -78,6 +94,8 @@ spec:
           volumeMounts:
             - { name: config, mountPath: /usr/local/apisix/conf/config.yaml, subPath: config.yaml }
             - { name: plugins, mountPath: /usr/local/apisix/rid/apisix/plugins }
+            - { name: etcd-client, mountPath: /usr/local/apisix/conf/etcd, readOnly: true }
+            - { name: trust, mountPath: /usr/local/apisix/conf/trust, readOnly: true }
         - name: opa
           image: {{ .Values.images.opa }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
@@ -158,6 +176,9 @@ spec:
           configMap: { name: {{ include "rid.name" "gateway-config" }} }
         - name: plugins
           configMap: { name: {{ include "rid.name" "gateway-plugins" }} }
+        - name: etcd-client
+          secret: { secretName: {{ include "rid.name" "etcd-client" }} }
+        - { name: trust, emptyDir: {} }
   volumeClaimTemplates:
     - metadata:
         name: opa-data

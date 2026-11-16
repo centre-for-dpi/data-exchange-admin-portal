@@ -1,0 +1,78 @@
+{{- $c := dict "root" . "component" "internal-pki" }}
+{{- $etcd := include "rid.name" "etcd" }}
+{{- /*
+The namespace's internal PKI (cert-manager, installed by rid-platform): TLS and mutual
+authentication between the platform's own components (ASVS 12.3, M6-05), separate from the
+network's CA (step-ca), which issues the applications' and the nodes' certificates. A CA of its own
+(self-signed root, kept by cert-manager in rid-internal-ca) signs:
+  - etcd: its members' certificate (server and peer) and the gateway's client certificate;
+  - OpenSearch: its nodes' certificate and its administrator's.
+cert-manager renews them before they expire; the pods read them from their Secrets.
+*/}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "rid.name" "selfsigned" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "rid.name" "internal-ca" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  isCA: true
+  commonName: RID internal CA ({{ .Release.Namespace }})
+  secretName: {{ include "rid.name" "internal-ca" }}
+  duration: 87600h # 10 years
+  privateKey: { algorithm: ECDSA, size: 256 }
+  issuerRef: { name: {{ include "rid.name" "selfsigned" }}, kind: Issuer }
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "rid.name" "internal" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  ca:
+    secretName: {{ include "rid.name" "internal-ca" }}
+---
+# etcd's members: the same certificate as server (clients) and peer (the other members).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "rid.name" "etcd-tls" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  secretName: {{ include "rid.name" "etcd-tls" }}
+  duration: 2160h
+  renewBefore: 720h
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
+  usages: [server auth, client auth]
+  dnsNames:
+    - {{ $etcd }}
+    - '*.{{ $etcd }}'
+    - '*.{{ $etcd }}.{{ .Release.Namespace }}.svc'
+  issuerRef: { name: {{ include "rid.name" "internal" }}, kind: Issuer }
+---
+# The gateway's client certificate for etcd: without it, etcd refuses the connection.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "rid.name" "etcd-client" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  secretName: {{ include "rid.name" "etcd-client" }}
+  duration: 2160h
+  renewBefore: 720h
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
+  usages: [client auth]
+  commonName: rid-gateway
+  issuerRef: { name: {{ include "rid.name" "internal" }}, kind: Issuer }

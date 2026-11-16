@@ -19,6 +19,9 @@ data:
         enable: true
         listen:
           - port: 9443
+        # The system's CAs (the providers' public certificates) plus the internal CA (etcd):
+        # APISIX verifies every TLS it opens against this one bundle (gateway.yaml, ca-bundle).
+        ssl_trusted_certificate: /usr/local/apisix/conf/trust/ca-bundle.crt
       status:
         ip: 0.0.0.0
         port: 7085
@@ -50,10 +53,16 @@ data:
       etcd:
         host:
           {{- range $i := until (int .Values.etcd.replicas) }}
-          - http://{{ include "rid.name" "etcd" }}-{{ $i }}.{{ include "rid.name" "etcd" }}:2379
+          - https://{{ include "rid.name" "etcd" }}-{{ $i }}.{{ include "rid.name" "etcd" }}:2379
           {{- end }}
         prefix: /apisix
         timeout: 30
+        # mTLS with etcd (internal-pki.yaml): the gateway's client certificate; etcd's own is
+        # verified against apisix.ssl.ssl_trusted_certificate.
+        tls:
+          cert: /usr/local/apisix/conf/etcd/tls.crt
+          key: /usr/local/apisix/conf/etcd/tls.key
+          verify: true
     nginx_config:
       http:
         # Rule 2: no nginx access log (it writes the request line); access logs leave through
