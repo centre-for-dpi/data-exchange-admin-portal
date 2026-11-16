@@ -16,6 +16,8 @@ import { OpaController } from './opa/opa.controller.js';
 import { OpaService } from './opa/opa.service.js';
 import { ApisService } from './apis/apis.service.js';
 import { VersionLifecycleService } from './apis/version-lifecycle.service.js';
+import { AccessLogIndexReconciler } from './analytics/access-log-index.js';
+import { HttpOpenSearch, OPENSEARCH, openSearchUrl } from './analytics/opensearch.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CatalogController } from './catalog/catalog.controller.js';
 import { CatalogService } from './catalog/catalog.service.js';
@@ -154,6 +156,8 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     NodeControlService,
     NodeControlGuard,
     CitizenGuard,
+    { provide: OPENSEARCH, useFactory: () => new HttpOpenSearch(openSearchUrl()) },
+    AccessLogIndexReconciler,
     {
       provide: CITIZEN_TOKEN_VERIFIER,
       useFactory: () => createCitizenTokenVerifier(citizenTokenOptions()),

@@ -47,9 +47,10 @@ jobs:
       # Same PostgreSQL image and init scripts (roles rid/rid_app, database rid_test) as local dev,
       # plus APISIX and etcd: the APISIX reconciler is tested against the real Admin API (M1-08),
       # the development TSA: the transparency evidence is stamped for real (MT-04), and step-ca:
-      # application certificates are signed by the real CA (M3-01).
+      # application certificates are signed by the real CA (M3-01), and OpenSearch with Fluent Bit:
+      # the access-log pipeline and the usage analytics run on the real index (M5).
       - run: cp .env.example .env
-      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres etcd apisix tsa step-ca opa mock-salud
+      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres etcd apisix tsa step-ca opa mock-salud opensearch fluent-bit
       - run: pnpm exec turbo run build --filter=@rid/api^...
       - run: pnpm --filter @rid/api test:integration
       # Compiled code under plain Node: catches CommonJS interop issues Vitest hides.

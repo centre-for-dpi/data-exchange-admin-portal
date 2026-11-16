@@ -72,6 +72,10 @@ describe('a consumer cannot forge the X-RID-* headers the provider receives (M3-
     provider = createServer((req, res) => {
       received.push(req.headers);
       res.setHeader('content-type', 'application/json');
+      // A provider faking what the gateway tells the consumer and the access log (M5-01).
+      res.setHeader('X-RID-Deny-Reason', 'nada');
+      res.setHeader('X-RID-Consumer-App', 'rid-app-falsa');
+      res.setHeader('x_rid_consumer_entity', 'entidad-falsa');
       res.end('{"regimen":"contributivo"}');
     });
     await new Promise<void>((resolve) => provider.listen(0, '0.0.0.0', () => resolve()));
@@ -203,7 +207,7 @@ describe('a consumer cannot forge the X-RID-* headers the provider receives (M3-
       },
     });
     await res.arrayBuffer();
-    return { status: res.status, seen: received[0] };
+    return { status: res.status, seen: received[0], response: res.headers };
   };
 
   it('the provider receives the values OPA decided, never the forged ones', async () => {
@@ -282,6 +286,24 @@ describe('a consumer cannot forge the X-RID-* headers the provider receives (M3-
     expect(received[0]?.['x-rid-subject-ref']).toBe(hmac('CO|CC|1000000001', SUBJECT_KEY));
   });
 
+  it('a provider cannot send X-RID-* response headers to the consumer or the log (M5-01)', async () => {
+    const { status, response } = await call({});
+    expect(status).toBe(200);
+    expect([...response.keys()].filter((name) => /^x-rid-/i.test(name))).toEqual([]);
+    expect(JSON.stringify([...response.entries()])).not.toContain('rid-app-falsa');
+  });
+
+  it('a denial names the reason and a known consumer, for the access log (M5-03)', async () => {
+    const res = await fetch(`${GATEWAY}${BASE}/afiliados/1000000001`, {
+      headers: { authorization: `Bearer ${token(CLIENT)}`, 'x-rid-purpose': 'benefit_targeting' },
+    });
+    await res.arrayBuffer();
+    expect(res.status).toBe(403);
+    expect(res.headers.get('x-rid-deny-reason')).toBe('purpose_not_allowed');
+    expect(res.headers.get('x-rid-consumer-app')).toBe(CLIENT);
+    expect(res.headers.get('x-rid-consumer-entity')).toBe('programas-sociales');
+  });
+
   it('a forged header cannot turn a denied call into an allowed one', async () => {
     const res = await fetch(`${GATEWAY}${BASE}/afiliados/1000000001`, {
       headers: {
@@ -295,6 +317,8 @@ describe('a consumer cannot forge the X-RID-* headers the provider receives (M3-
     received = [];
     expect(res.status).toBe(403);
     expect(res.headers.get('x-rid-deny-reason')).toBe('no_subscription');
+    // An unknown client is not named, whatever it sent.
+    expect(res.headers.get('x-rid-consumer-app')).toBeNull();
     expect(received).toHaveLength(0);
   });
 });

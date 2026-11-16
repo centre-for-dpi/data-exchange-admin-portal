@@ -1,0 +1,33 @@
+# Error log of the gateway (ARCHITECTURE.md §8, M5-01): nginx writes it over syslog (UDP 5140)
+# instead of to its own stderr, because a real error ("connect() failed... while connecting to
+# upstream") carries the request line and the upstream URI, with the identification numbers in
+# the path. gateway-errors.lua masks them; the result goes to this container's stdout, where the
+# operator reads it (docker logs). It never reaches OpenSearch.
+service:
+  flush: 1
+  log_level: warn
+  parsers_file: /fluent-bit/etc/parsers.conf
+  http_server: on
+  http_listen: 0.0.0.0
+  http_port: 2020
+  health_check: on
+
+pipeline:
+  inputs:
+    - name: syslog
+      mode: udp
+      listen: 0.0.0.0
+      port: 5140
+      parser: syslog-rfc3164-local
+      tag: apisix.error
+
+  filters:
+    - name: lua
+      match: apisix.*
+      script: /fluent-bit/etc/rid/gateway-errors.lua
+      call: scrub
+
+  outputs:
+    - name: stdout
+      match: apisix.*
+      format: json_lines

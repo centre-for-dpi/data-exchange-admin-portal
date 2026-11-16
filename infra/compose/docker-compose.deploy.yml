@@ -75,6 +75,9 @@ services:
   fluent-bit-transparency:
     restart: unless-stopped
 
+  fluent-bit-errors:
+    restart: unless-stopped
+
   tsa:
     <<: *no-ports
     restart: unless-stopped

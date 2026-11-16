@@ -284,11 +284,23 @@ else := {}
 # plugin then removes them before the upstream (SPIKE S-1).
 headers := object.union_n([base_headers, end_user_header, subject_header, xroad_headers]) if allow
 
-# Rule 6, deny: response headers and a problem+json body.
-headers := {
-	"Content-Type": "application/problem+json",
-	"X-RID-Deny-Reason": deny_reason,
-} if not allow
+# Rule 6, deny: response headers and a problem+json body. A known client is also named, so the
+# access log can attribute the refusal to its application (M5-03): the call never reached the
+# provider, and these are the only headers OPA returns on a denial. The client knows its own id.
+headers := object.union(
+	{
+		"Content-Type": "application/problem+json",
+		"X-RID-Deny-Reason": deny_reason,
+	},
+	deny_consumer_headers,
+) if not allow
+
+deny_consumer_headers := {
+	"X-RID-Consumer-App": client_id,
+	"X-RID-Consumer-Entity": client.entitySlug,
+} if {
+	client
+} else := {}
 
 status_code := 403 if not allow
 

@@ -55,6 +55,7 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `opa` | `openpolicyagent/opa:1.21.4-static` | 8181 | `OPA_PORT` 8181 | — | base | `GET /health` |
 | `step-ca` | `smallstep/step-ca:0.30.2` | 9000 | `STEP_CA_PORT` 9000 | `step-ca-data` | base | `step ca health` |
 | `fluent-bit-transparency` | `fluent/fluent-bit:5.1.5-debug` | 5170 (TCP), 2020 (salud) | no se publica | `transparency-buffer` | base | `GET /api/v1/health` en 2020 |
+| `fluent-bit-errors` | `fluent/fluent-bit:5.1.5-debug` | 5140/udp (syslog), 2020 (salud) | no se publica | — | base | `GET /api/v1/health` en 2020 |
 | `tsa-init` | `smallstep/step-ca:0.30.2` | — (tarea única) | — | `tsa-data` | base | termina con código 0 |
 | `tsa` | `ghcr.io/sigstore/timestamp-server:v2.1.4` | 3004 | `RID_TSA_PORT` 3004 | `tsa-data` (lectura) | base | ninguno (imagen distroless) |
 | `mailpit` | `axllent/mailpit:v1.32.0` | 8025 (UI), 1025 (SMTP) | 8025, 1025 | — | base | `mailpit readyz` |
@@ -185,15 +186,18 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 - `tsa-init` crea una sola vez la cadena de la TSA de desarrollo en `tsa-data` (`infra/tsa/init.sh`). `tsa` es sigstore timestamp-server con esa clave. En producción se usa la TSA acreditada del país (`RID_TSA_URL`).
 - La cadena de la TSA es pública: `GET /api/v1/timestamp/certchain`.
 
+**Función de `fluent-bit-errors` en el despliegue (M5-01).** Recibe el error log de nginx en APISIX por syslog. Un error real, por ejemplo un proveedor que no responde, trae la línea de la petición y la URI del upstream, con el número de identificación en la ruta. Este servicio las enmascara (`infra/fluent-bit/gateway-errors.lua`) y escribe el resultado en su salida: **el operador lee los errores del gateway con `docker logs rid-fluent-bit-errors-1`, no en APISIX**. APISIX depende de él para arrancar, porque nginx resuelve el nombre del servidor syslog al leer su configuración. Si este servicio se cae, los errores se pierden (UDP) y el tráfico no se afecta.
+
 ### 3.8 Analítica: Fluent Bit + OpenSearch (perfil `observability`)
 
-**Función de `fluent-bit` en el despliegue.** Es la segunda barrera de privacidad del log de acceso. Recibe del `http-logger` de APISIX los metadatos de **todas** las llamadas, también las negadas con su razón. Descarta cualquier campo fuera de la lista permitida y escribe el resto en OpenSearch.
+**Función de `fluent-bit` en el despliegue.** Es la segunda barrera de privacidad del log de acceso. Recibe del `http-logger` de APISIX los metadatos de **todas** las llamadas, también las negadas con su razón. Descarta cualquier campo fuera de la lista permitida y todo valor sin la forma que pone el gateway. Convierte números y latencias y escribe el resto en OpenSearch.
 
-**Función de `opensearch` en el despliegue.** Guarda los logs de acceso para la analítica de uso: llamadas por consumidor, por finalidad y por operación, latencias y razones de negación. Hoy solo acumula datos, porque las pantallas que los consultan llegan con M5. Se puede prescindir de él: perderlo no afecta al tráfico, a la auditoría ni al registro de transparencia.
+**Función de `opensearch` en el despliegue.** Guarda los logs de acceso para la analítica de uso: llamadas por consumidor, por finalidad y por operación, latencias y razones de negación. Lo consultan las pantallas de uso y los indicadores (M5-02 a M5-05). Se puede prescindir de él: sin él esas pantallas dicen que la analítica no está disponible, y el tráfico, la auditoría y el registro de transparencia siguen igual.
 
-- `fluent-bit` (`infra/fluent-bit/fluent-bit.yaml`): entrada HTTP 9880, filtro de lista permitida `allowlist.lua`, salida a OpenSearch, índice `rid-access-YYYY.MM`.
-- OpenSearch en modo un solo nodo **sin plugin de seguridad** (`DISABLE_SECURITY_PLUGIN=true`), solo dentro de la red de Compose.
-- Hoy el portal no consulta OpenSearch (las pantallas de uso son M5-02 a M5-04) ni hay política de retención del índice configurada.
+- `fluent-bit` (`infra/fluent-bit/fluent-bit.yaml`): entrada HTTP 9880, filtro `allowlist.lua`, salida a OpenSearch, índice `rid-access-YYYY.MM`.
+- OpenSearch en modo un solo nodo **sin plugin de seguridad** (`DISABLE_SECURITY_PLUGIN=true`), solo dentro de la red de Compose. El API lo alcanza en `RID_OPENSEARCH_URL` (`http://opensearch:9200` en el piloto); con el plugin de seguridad, `RID_OPENSEARCH_AUTH=usuario:clave`.
+- El API mantiene la plantilla de índice `rid-access` (campos tipados, `dynamic: strict`) y la política de retención ISM `rid-access-retention` (`retention.accessLogMonths` del país, más un mes). Lo hace al arrancar y cada hora, y el estado queda en `sync_state` (`opensearch:*`). No hay que crearlas a mano.
+- **Al desplegar M5 sobre un OpenSearch que ya tenía datos:** los índices `rid-access-*` anteriores tienen un mapeo dinámico (números como texto) que la plantilla no cambia. En el piloto se borran: `curl -X DELETE 'http://opensearch:9200/rid-access-*'`, desde un contenedor de la red. Son logs de la demo.
 - `pnpm infra:up:core` levanta todo sin este perfil. Las rutas siguen enviando a `fluent-bit:9880`; sin ese servicio, esos logs se pierden y el tráfico no se afecta.
 
 ### 3.9 Mailpit
@@ -281,6 +285,8 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 | `AUTH_SECRET` | Cierra todas las sesiones de la web |
 
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
+
+Analítica (M5): `RID_OPENSEARCH_URL` (OpenSearch como lo alcanza el API) y opcional `RID_OPENSEARCH_AUTH`.
 
 Validaciones al enviar a revisión (M4-06): `RID_VALIDATION_TOKEN` (las rutas de verificación de APISIX solo existen con él), `RID_GATEWAY_INTERNAL_URL` (APISIX como lo alcanza el API), `RID_CONTRACT_RUNNER_URL` y `RID_CONTRACT_RUNNER_TOKEN` (el runner de Schemathesis), `RID_CONTRACT_RUNNER_GATEWAY_URL` (APISIX como lo alcanza el runner) y opcionales `RID_CONTRACT_MAX_EXAMPLES` (20) y `RID_CONTRACT_TIMEOUT_SECONDS` (120). Sin el token, la healthcheck falla y el operador no puede aprobar; sin el runner, la prueba de contrato se omite.
 

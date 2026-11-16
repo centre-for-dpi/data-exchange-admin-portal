@@ -355,6 +355,14 @@ test_the_consumer_cannot_assert_the_subject_in_a_header if {
 
 # --- Rule 6: deny response ------------------------------------------------------------------
 
+test_a_denial_of_an_unknown_client_names_no_consumer if {
+	inp := with_headers({"authorization": concat(" ", ["Bearer", token({"azp": "rid-app-unknown"})])})
+	h := headers_for(inp, bundle)
+	h["X-RID-Deny-Reason"] == "no_subscription"
+	not h["X-RID-Consumer-App"]
+	not h["X-RID-Consumer-Entity"]
+}
+
 test_deny_returns_problem_json_and_the_reason_header if {
 	inp := with_headers({"x-rid-purpose": "benefit_targeting"})
 	h := authz.headers with input as inp
@@ -362,7 +370,13 @@ test_deny_returns_problem_json_and_the_reason_header if {
 		with data.clients as bundle.clients
 		with data.config as bundle.config
 		with time.now_ns as june_2026
-	h == {"Content-Type": "application/problem+json", "X-RID-Deny-Reason": "purpose_not_allowed"}
+	h == {
+		"Content-Type": "application/problem+json",
+		"X-RID-Deny-Reason": "purpose_not_allowed",
+		# The known client is named for the access log (M5-03).
+		"X-RID-Consumer-App": "rid-app-a",
+		"X-RID-Consumer-Entity": "programas-sociales",
+	}
 	body := authz.reason with input as inp
 		with data.routes as bundle.routes
 		with data.clients as bundle.clients

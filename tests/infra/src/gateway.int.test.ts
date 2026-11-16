@@ -66,6 +66,44 @@ describe('APISIX (M0-04)', () => {
     await new Promise((r) => setTimeout(r, 1_000));
     expect(containerLogsSince('rid-apisix-1', since)).not.toContain(identifier);
   });
+
+  it('a real error reaches the operator masked, never with the path (M5-01)', async () => {
+    // nginx appends the request line and the upstream URI to an upstream error: its error log
+    // goes over syslog to fluent-bit-errors, which masks them (infra/fluent-bit/gateway-errors.lua).
+    const routeId = `rid-test-errors-${randomUUID()}`;
+    const prefix = `/__rid-test/${routeId}`;
+    const created = await asAdmin(`/routes/${routeId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        uri: `${prefix}/*`,
+        // Nothing listens there: connect() fails, an error with the request line.
+        upstream: { type: 'roundrobin', nodes: { '127.0.0.1:1': 1 } },
+      }),
+    });
+    expect([200, 201]).toContain(created.status);
+    try {
+      const since = new Date(Date.now() - 1_000).toISOString();
+      const identifier = String(Date.now()).slice(-10);
+      let status = 404;
+      for (let attempt = 0; attempt < 20 && status === 404; attempt += 1) {
+        status = (await fetch(`${gatewayUrl()}${prefix}/afiliados/${identifier}?doc=${identifier}`))
+          .status;
+        if (status === 404) await new Promise((r) => setTimeout(r, 250));
+      }
+      expect(status).toBe(502);
+      await new Promise((r) => setTimeout(r, 2_000));
+      expect(containerLogsSince('rid-apisix-1', since)).not.toContain(identifier);
+      const errors = containerLogsSince('rid-fluent-bit-errors-1', since);
+      const line = errors.split('\n').find((l) => l.includes('while connecting to upstream'));
+      expect(line, errors.slice(-500)).toBeDefined();
+      expect(line).toContain('request: \\"[masked]\\"');
+      expect(line).toContain('upstream: \\"[masked]\\"');
+      expect(errors).not.toContain(identifier);
+      expect(errors).not.toContain(prefix);
+    } finally {
+      await asAdmin(`/routes/${routeId}`, { method: 'DELETE' });
+    }
+  });
 });
 
 describe('APISIX reaches the mock providers over the Compose network (M0-04)', () => {

@@ -679,7 +679,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
 ## M5 — Uso, indicadores y observabilidad
 
-- [ ] **M5-01 — Pipeline de logs**: `http-logger` con el formato de `ARCHITECTURE.md §8` → Fluent Bit con filtro de lista permitida → OpenSearch. Test que verifica que ningún documento indexado contiene la ruta real ni query.
+- [x] **M5-01 — Pipeline de logs**: `http-logger` con el formato de `ARCHITECTURE.md §8` → Fluent Bit con filtro de lista permitida → OpenSearch. Test que verifica que ningún documento indexado contiene la ruta real ni query.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §8`.
+    - **Fluent Bit.** Además de la lista permitida, da tipos a los campos (enteros, latencias en ms) y comprueba la forma de cada valor. Con eso un cliente no mete un número de identificación por `X-RID-Purpose` o `X-Request-Id`.
+    - **Llamadas negadas.** OPA nombra al consumidor conocido en su respuesta, y el log las atribuye a la aplicación (lo necesita M5-03). `rid-header-guard` quita las cabeceras `X-RID-*` que manda un proveedor, y Fluent Bit ignora una razón de negación si hubo upstream.
+    - **OpenSearch.** El API mantiene la plantilla `rid-access` (tipada, `dynamic: strict`) y la retención ISM desde `retention.accessLogMonths`, como un reconciliador más (`sync_state`).
+    - **Error log de nginx** (lo pendiente de §8). Va por syslog a `fluent-bit-errors`, que enmascara la línea de la petición, la URI del upstream y los números.
+    - **Pruebas.** Cubren el filtro en un Fluent Bit real (`tests/infra`), el pipeline completo con la llamada permitida y la negada (`apps/api/src/analytics/access-log.int.test.ts`: ningún documento tiene la ruta, la query ni el número) y el error enmascarado.
 - [ ] **M5-02 — Uso para proveedores**: llamadas por consumidor, finalidad, operación, códigos de respuesta, latencia; filtros por fecha.
 - [ ] **M5-03 — Uso para consumidores**: llamadas por aplicación y API, errores de autorización con su razón.
 - [ ] **M5-04 — Indicadores de la red**: los de `SPEC.md §8` para regulador y operador.

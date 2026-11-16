@@ -180,6 +180,10 @@ const ACCESS_LOG_FORMAT = {
   bytes_sent: '$bytes_sent',
   gateway_node: '$hostname',
   deny_reason: '$sent_http_x_rid_deny_reason',
+  // On a denial OPA names a known client in its response (M5-03); Fluent Bit folds these into
+  // consumer_app and consumer_entity and drops them (infra/fluent-bit/allowlist.lua).
+  deny_consumer_app: '$sent_http_x_rid_consumer_app',
+  deny_consumer_entity: '$sent_http_x_rid_consumer_entity',
 };
 
 /**

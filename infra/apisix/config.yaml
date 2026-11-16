@@ -48,6 +48,14 @@ nginx_config:
     enable_access_log: false
   # Warnings (e.g. every request a plugin denies) also print the request line; keep errors only.
   error_log_level: error
+  # Real errors print it too (and the upstream URI): the error log goes over syslog to
+  # fluent-bit-errors, which masks them (infra/fluent-bit/gateway-errors.lua, M5-01), never to
+  # this container's stderr. nginx always keeps a file error log besides syslog (its default is
+  # logs/error.log, the container's stderr in this image): that one is /dev/null. nginx resolves
+  # the syslog name when it starts. Errors before the configuration is read still go to stderr.
+  error_log: /dev/null
+  main_configuration_snippet: |
+    error_log syslog:server=fluent-bit-errors:5140,tag=apisix,nohostname error;
 
 plugin_attr:
   prometheus:
