@@ -302,7 +302,7 @@ sequenceDiagram
 | `X-RID-Subject-Ref` | seudónimo del titular de los datos (HMAC con clave, ADR-0015), si la operación lo declara |
 | `X-Request-Id` | ID de correlación extremo a extremo |
 
-El proveedor sabe quién consulta, para qué y bajo qué autorización: resuelve el problema de "solo veo al gateway". En una versión futura estas cabeceras irán en una aserción firmada por el gateway (JWS) para no repudio (SPIKE S-6).
+El proveedor sabe quién consulta, para qué y bajo qué autorización: resuelve el problema de "solo veo al gateway". Además, el gateway las firmará por llamada en una aserción JWS (`X-RID-Assertion`) para no repudio: ADR-0024, probado en el SPIKE S-6 e implementado en M6-10.
 
 ## 7. Datos
 
@@ -492,4 +492,4 @@ Carpeta Ciudadana ─(token del ciudadano)─▶ API: /data-subjects/me/accesses
 | S-3 | mTLS de cliente: variable con la huella del certificado en APISIX, comparación con `cnf.x5t#S256` del token y con lista de revocados en OPA | M3 |
 | S-4 | Keycloak: `tls_client_auth` + tokens ligados a certificado en `client_credentials` | M3 |
 | S-5 | X-Road REST: cabeceras para propagar el consumidor real; configuración del gateway como cliente (resuelta, `docs/spikes/S-5.md`) | M4 |
-| S-6 | Aserción firmada del gateway hacia el proveedor (JWS) para no repudio | M6 |
+| S-6 | Aserción firmada del gateway hacia el proveedor (JWS) para no repudio (resuelta, `docs/spikes/S-6.md`, ADR-0024) | M6 |

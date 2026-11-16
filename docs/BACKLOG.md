@@ -741,8 +741,12 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
 ## M6 — Endurecimiento y producción
 
-- [ ] **SPIKE S-6 — Aserción firmada del gateway hacia el proveedor**
-- [ ] **M6-01 — Revisión ASVS L2** con lista de verificación y correcciones. Incluye el filtrado de salida del gateway por red (RFC 1918, link-local y subredes de la plataforma), pendiente de la revisión de seguridad de M1-08.
+- [x] **SPIKE S-6 — Aserción firmada del gateway hacia el proveedor**
+  - _Resultado:_ `docs/spikes/S-6.md` y ADR-0024. JWS ES256 por llamada en `X-RID-Assertion`, firmado por el plugin `rid-assertion` después de OPA y ligado a la petición (método y hash de la URI, `aud` = proveedor, `jti` = request id). La clave va en la metadata del plugin, cifrada en etcd. El prototipo pasa 13 de 13 verificaciones: firma, claims, cabecera falsa del cliente, alteración, repetición, otro proveedor, rotación y falla cerrada sin clave. La implementación es M6-10.
+- [ ] **M6-01 — Revisión ASVS L2** con lista de verificación y correcciones. Incluye:
+  - el filtrado de salida del gateway por red (RFC 1918, link-local y subredes de la plataforma), pendiente de la revisión de seguridad de M1-08;
+  - un `data_encryption.keyring` propio de APISIX por despliegue (S-6: el de fábrica es público, y con él se cifran en etcd las claves TLS y la de las aserciones);
+  - la paginación de la cola de solicitudes de alta del operador (hoy solo muestra las 200 más antiguas).
 - [ ] **M6-02 — Auditoría de accesibilidad** WCAG 2.1 AA de todas las pantallas.
 - [ ] **M6-03 — Prueba de carga** con k6: 500 peticiones/s sostenidas, p95 agregado por el gateway < 50 ms.
 - [ ] **M6-04 — Resiliencia**: con el portal caído, el tráfico sigue; con OPA sin bundle nuevo, se mantiene el último; test documentado.
@@ -751,5 +755,6 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 - [ ] **M6-07 — Runbook del operador**: alta de entidad, incidentes, rotación de la CA intermedia, revocación masiva.
 - [ ] **M6-08 — Antivirus de documentos** (ClamAV) y catálogo público opcional.
 - [ ] **M6-09 — Inglés completo** y plantilla `example.yaml` probada levantando un "país de ejemplo".
+- [ ] **M6-10 — Aserción firmada del gateway (ADR-0024)**. Clave generada y rotada por el portal y empujada por el reconciliador a la metadata de `rid-assertion`. JWKS público. Activación por configuración del país. `body_sha256` en operaciones con cuerpo. Verificación en los mocks y guía del proveedor.
 
 **Cierre M6:** despliegue en un entorno tipo producción del operador con las pruebas de M6-03 y M6-04 en verde.

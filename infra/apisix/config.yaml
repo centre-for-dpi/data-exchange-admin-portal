@@ -4,7 +4,8 @@ apisix:
   node_listen: 9080
   enable_ipv6: false
   # Our own plugins (infra/apisix/plugins, mounted read-only): rid-data-subject (ADR-0017),
-  # rid-client-cert (S-3, M3-02), rid-rate-limited (S-2, M3-05) and rid-header-guard (M3-07).
+  # rid-client-cert (S-3, M3-02), rid-rate-limited (S-2, M3-05), rid-header-guard (M3-07) and
+  # rid-assertion (SPIKE S-6, prototype).
   extra_lua_path: /usr/local/apisix/rid/?.lua
   ssl:
     enable: true
@@ -180,3 +181,4 @@ plugins:
   - rid-client-cert
   - rid-rate-limited
   - rid-header-guard
+  - rid-assertion
