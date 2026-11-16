@@ -53,8 +53,8 @@ Todos los puertos se publican solo en `127.0.0.1`. Si alguno ya está ocupado en
 - [docs/BACKLOG.md](docs/BACKLOG.md) — hitos e historias
 - [docs/DEMO.md](docs/DEMO.md) — guion de demo
 - [docs/INSTALL.md](docs/INSTALL.md) — **instalación en un servidor** con `sudo ./install.sh` y requisitos del VPS
-- [docs/guias/operador.md](docs/guias/operador.md) — la plataforma explicada para el operador y el regulador
-- [docs/guias/entidades.md](docs/guias/entidades.md) — qué designa, dispone y hace cada entidad participante
+- [docs/guias/operador.md](docs/guias/operador.md) — la plataforma explicada para el operador y el regulador (versión para proyectar: `operador.html`)
+- [docs/guias/entidades.md](docs/guias/entidades.md) — qué designa, dispone y hace cada entidad participante (versión para proyectar: `entidades.html`)
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — despliegue de cada componente (desarrollo y piloto)
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — puesta en marcha, rutina de operación, respaldos y problemas frecuentes
 - [docs/AUTHZ.md](docs/AUTHZ.md) — matriz de autorización (generada)

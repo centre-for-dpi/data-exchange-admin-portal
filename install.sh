@@ -249,11 +249,12 @@ questions() {
   fi
   info "El certificado del gateway ($GATEWAY_HOST) no se pide aquí: lo emite la CA de la red (step-ca)."
 
-  step "Paso 5 · Analítica de uso (OpenSearch)"
-  info "Guarda los metadatos de cada llamada para los indicadores (M5). Suma ~1 GB de RAM."
+  step "Paso 5 · Observabilidad (analítica, métricas y alertas)"
+  info "OpenSearch guarda los metadatos de cada llamada para los indicadores; Prometheus, Alertmanager"
+  info "y Grafana (/grafana) vigilan la plataforma y avisan al operador por correo. Suma ~1,5 GB de RAM."
   local def=n
   ((MEM_GB >= 15)) && def=s
-  if yes_no "¿Activar la analítica?" "$def"; then OBSERVABILITY=true; else OBSERVABILITY=false; fi
+  if yes_no "¿Activar la observabilidad?" "$def"; then OBSERVABILITY=true; else OBSERVABILITY=false; fi
 
   step "Paso 6 · Usuarios de demostración"
   info "El piloto carga entidades ficticias y usuarios de demo (operador, regulador, publicador…)."
@@ -266,7 +267,7 @@ questions() {
     "Gateway (mTLS):" "https://$GATEWAY_HOST" \
     "Proxy:" "$([[ $PROXY == bundled ]] && echo "incluido (Traefik en 80/443)" || echo "existente (red $EDGE_NET)")" \
     "Certificado del portal:" "$(case $TLS in letsencrypt) echo "Let's Encrypt";; files) echo "propio ($CERT_FILE)";; *) echo "lo gestiona tu proxy";; esac)" \
-    "Analítica:" "$([[ $OBSERVABILITY == true ]] && echo sí || echo no)" \
+    "Observabilidad:" "$([[ $OBSERVABILITY == true ]] && echo sí || echo no)" \
     "Contraseña de demo:" "$([[ -n $DEMO_PASSWORD ]] && echo "la indicada" || echo "aleatoria")"
   yes_no "¿Continuar con la instalación?" s || fail "Instalación cancelada; no se cambió nada."
 }
@@ -424,6 +425,7 @@ summary() {
     "Consola de Keycloak:" "https://$PORTAL_HOST/auth/admin/" \
     "Correo de pruebas:" "https://$PORTAL_HOST/mail" \
     "Carpeta ciudadana demo:" "https://$PORTAL_HOST/carpeta"
+  [[ $OBSERVABILITY == true ]] && printf '  %-26s %s\n' "Tablero del operador:" "https://$PORTAL_HOST/grafana/"
   echo
   info "Usuarios y contraseñas:   sudo ./install.sh credentials"
   info "Código de segundo factor: sudo ./install.sh otp"
@@ -476,6 +478,8 @@ cmd_credentials() {
     "  ciudadana (carpeta):" "ciudadana.demo" \
     "Keycloak (realm master):" "$(env_get KEYCLOAK_ADMIN_USER) / $(env_get KEYCLOAK_ADMIN_PASSWORD)" \
     "Correo de pruebas (/mail):" "$(env_get MAILPIT_UI_AUTH | sed 's/:/ \/ /')"
+  [[ $(env_get RID_INSTALL_OBSERVABILITY) == true ]] &&
+    printf '  %-34s %s\n' "Grafana (/grafana):" "admin / $(env_get GRAFANA_ADMIN_PASSWORD)"
   info "Código de segundo factor de los usuarios de demo: sudo ./install.sh otp"
 }
 

@@ -1,6 +1,6 @@
 # Instalación en un servidor — Portal RID (portal + gateway)
 
-Versión 1.0 · noviembre 2026 · estado del código con M4 cerrado
+Versión 1.1 · noviembre 2026 · estado del código con M5 cerrado y M6 en curso
 
 Esta guía instala **toda la plataforma central** (portal, gateway, identidad, CA, sellado de tiempo, registros) en **un solo servidor Linux** con un script interactivo: `sudo ./install.sh`. Es la topología de **piloto** (`DEPLOYMENT.md §1`). Sirve para la puesta en marcha con el operador, el bootcamp de entidades y las demos. La producción, con alta disponibilidad, es otro ejercicio: son los Helm charts de M6-05.
 
@@ -10,7 +10,7 @@ Esta guía instala **toda la plataforma central** (portal, gateway, identidad, C
 
 ### 1.1 Tamaño
 
-| | Mínimo (sin analítica) | **Recomendado (bootcamp, con analítica)** |
+| | Mínimo (sin observabilidad) | **Recomendado (bootcamp, con observabilidad)** |
 | :-- | :-- | :-- |
 | vCPU | 4 | **4–8** |
 | RAM | 8 GB | **16 GB** |
@@ -71,7 +71,7 @@ El script hace las preguntas una por una, muestra un resumen y pide confirmació
 | 3 | **Nombre del gateway** | Por defecto `gw.<portal>`. Debe ser distinto del portal |
 | 4 | **Proxy de entrada** | `1` Incluido (recomendado): el instalador pone Traefik en 80/443. `2` Ya tengo Traefik: se une a su red de Docker y las rutas las configuras tú, como en `DEPLOYMENT.md §5.2` |
 | 4 | **Certificado del portal** | `1` Let's Encrypt (correo de contacto opcional; el puerto 80 debe ser alcanzable). `2` Propio: rutas al certificado (cadena completa) y a la llave, en PEM. Debe ser de una CA pública reconocida: el API y la web también llaman al portal por su nombre y verifican el certificado |
-| 5 | **Analítica (OpenSearch)** | Sí, si el servidor tiene 16 GB. Se puede prescindir: no afecta al tráfico, a la auditoría ni a la transparencia |
+| 5 | **Observabilidad** (OpenSearch, Prometheus, Alertmanager, Grafana) | Sí, si el servidor tiene 16 GB: da los indicadores de uso, las alertas por correo y el tablero del operador en `/grafana`. Se puede prescindir: no afecta al tráfico, a la auditoría ni a la transparencia |
 | 6 | **Contraseña de los usuarios de demo** | Enter genera una aleatoria. Elige una si la vas a compartir en el bootcamp |
 
 Luego, sin más preguntas:
@@ -99,6 +99,7 @@ Luego, sin más preguntas:
 | `<gateway>:51820/udp` | Hub WireGuard: túneles de los nodos del kit | Nodos |
 | `https://<portal>/mail` | Correo de pruebas (Mailpit): todo el correo del piloto llega aquí, con usuario y contraseña | Operador |
 | `https://<portal>/carpeta` | Carpeta ciudadana de referencia (demo de transparencia) | Demos |
+| `https://<portal>/grafana/` | Tablero del operador (con la observabilidad activada), con su propio usuario `admin` | Operador |
 
 Los demás servicios (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, el runner de contratos, los proveedores de prueba) no se publican. La explicación de cada uno está en [`guias/operador.md`](guias/operador.md).
 
@@ -125,7 +126,7 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 | Comando | Qué hace |
 | :-- | :-- |
 | `sudo ./install.sh status` | Estado de los contenedores y las comprobaciones del paso 10 |
-| `sudo ./install.sh credentials` | Usuarios de demo, administrador de Keycloak y usuario del correo de pruebas |
+| `sudo ./install.sh credentials` | Usuarios de demo, administrador de Keycloak, usuario del correo de pruebas y de Grafana |
 | `sudo ./install.sh otp` | Código vigente de segundo factor de los usuarios de demo con rol crítico |
 | `sudo ./install.sh logs [servicio]` | Logs (p. ej. `logs api`) |
 | `sudo ./install.sh backup` | Respaldo en `backups/<fecha>/`: bases `rid` y `keycloak`, volúmenes de la CA, la TSA, documentos y carpeta, y `.env` |
@@ -139,7 +140,7 @@ alias dc='docker compose -f infra/compose/docker-compose.yml -f infra/compose/do
   -f infra/compose/docker-compose.edge.yml --env-file .env --profile observability'
 ```
 
-Sin analítica, quita `--profile observability`; con un Traefik propio, quita `-f infra/compose/docker-compose.edge.yml`.
+Sin observabilidad, quita `--profile observability`; con un Traefik propio, quita `-f infra/compose/docker-compose.edge.yml`.
 
 Un `.env` escrito a mano o por `make-deploy-env.mjs` (como el del piloto de demo) no tiene las respuestas del instalador. Agrégale `RID_PORTAL_HOST`, `RID_GATEWAY_HOST`, `RID_INSTALL_PROXY` (`bundled` o `external`), `RID_INSTALL_TLS` y `RID_INSTALL_OBSERVABILITY` (`true` o `false`), o sigue usando Compose directamente.
 

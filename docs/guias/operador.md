@@ -133,6 +133,7 @@ Para cada uno: **qué hace**, **qué pasa si cae** y **qué guarda**. Todos corr
 | **Hub WireGuard** | Extremo central de los túneles cifrados que abren los **nodos del kit** desde la red de cada entidad, de adentro hacia afuera (la entidad no abre puertos de entrada). El gateway llega al nodo por el túnel, con mTLS de punta a punta. Un nodo no puede alcanzar a otros nodos ni a la plataforma | Las APIs servidas por nodos no responden | Último estado de los túneles |
 | **Fluent Bit (transparencia)** | Lleva del gateway al portal el registro de cada consulta **autorizada** a datos de una persona: quién, para qué, con qué suscripción, y el **seudónimo** del titular (nunca su número de documento) | Los registros esperan en su búfer en disco | Búfer temporal |
 | **Fluent Bit (analítica) + OpenSearch** | Segunda barrera de privacidad: deja pasar solo metadatos permitidos (sin ruta real, sin query, sin cuerpo) y los guarda para los indicadores de uso | Se pierden esos metadatos; el tráfico no se afecta | Metadatos de uso (prescindible) |
+| **Prometheus + Alertmanager + Grafana** | Métricas del gateway, del API y de OPA; nueve alertas para el operador (5xx, latencia, servicio caído, política atrasada, reconciliación fallida, nodos fuera de línea, certificados por vencer, cola acumulada), que llegan por correo; tablero en `/grafana` | No hay alertas; el tráfico no se afecta | Métricas (30 días) |
 | **Runner de contratos** (Schemathesis) | Cuando una entidad envía una API a revisión, prueba su contrato OpenAPI contra el sandbox. El operador solo aprueba con las validaciones superadas | No se prueban contratos | Nada (descarta el informe) |
 
 ### 4.4 Utilería del piloto (no va a producción)
@@ -214,7 +215,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
    git clone <url-del-repositorio> rid && cd rid
    sudo ./install.sh
    ```
-   El script pregunta el país, los dos nombres, el proxy y el certificado, si se activa la analítica y la contraseña de demo. Después genera todos los secretos, compila, arranca y comprueba.
+   El script pregunta el país, los dos nombres, el proxy y el certificado, si se activa la observabilidad y la contraseña de demo. Después genera todos los secretos, compila, arranca y comprueba.
 3. **Entregar:**
    - copia cifrada del `.env` fuera del servidor (custodia del operador);
    - credenciales (`sudo ./install.sh credentials`) a las personas que correspondan;
@@ -237,7 +238,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 - **Respaldos:** `sudo ./install.sh backup` antes de cada actualización y con regularidad; los archivos van fuera del servidor.
 - **Actualizar:** `sudo ./install.sh update`, que respalda, actualiza, recompila y reinicia.
 - **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte. Si algo no cuadra, se mira `sync_state` (`OPERATIONS.md §4.2`).
-- **Alertas:** todavía manuales. Prometheus y Alertmanager llegan con M5-06.
+- **Alertas** (con la observabilidad activada): Prometheus vigila el gateway, el API y OPA, y Alertmanager avisa por correo al operador (en el piloto, a `/mail`) cuando hay muchos 5xx o latencia alta, un servicio no responde, OPA se atrasa con la política, falla una reconciliación, hay nodos fuera de línea, vence pronto un certificado o se acumula la cola de trabajos. El tablero del operador está en `https://<portal>/grafana/`.
 
 ## 9. Piloto hoy vs. producción
 
@@ -251,7 +252,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | Identidad ciudadana | Simulada (`rid-citizens`) | La del país |
 | Datos iniciales | Entidades ficticias y usuarios de demo | Sin datos de demo; primer administrador por un procedimiento propio |
 | Respaldos | Manuales (`install.sh backup`) | pgBackRest con restauración probada (M6-06) |
-| Métricas y alertas | Comprobaciones manuales | Prometheus + Alertmanager (M5-06) |
+| Métricas y alertas | Prometheus, Alertmanager y Grafana en el mismo servidor; avisos a Mailpit | Los mismos, con el SMTP del operador y almacenamiento de métricas de larga duración |
 
 ## 10. Preguntas que suelen surgir
 
