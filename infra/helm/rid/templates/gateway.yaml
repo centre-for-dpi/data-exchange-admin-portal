@@ -81,10 +81,14 @@ spec:
         - name: opa
           image: {{ .Values.images.opa }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
+          # Decisions on loopback only: APISIX, in this pod, is the only caller. OPA's API can also
+          # replace policies and data, so nothing else may reach it. Health and metrics go on the
+          # diagnostic listener, which serves only /health and /metrics.
           args:
             - run
             - --server
-            - --addr=0.0.0.0:8181
+            - --addr=127.0.0.1:8181
+            - --diagnostic-addr=0.0.0.0:8282
             - --log-format=json
             - --config-file=/config/opa.yaml
           env:
@@ -92,7 +96,7 @@ spec:
             - name: OPA_BUNDLE_TOKEN
               valueFrom: { secretKeyRef: { name: {{ $secret }}, key: OPA_BUNDLE_TOKEN } }
           ports:
-            - { name: opa, containerPort: 8181 }
+            - { name: opa-diag, containerPort: 8282 }
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -101,10 +105,10 @@ spec:
             capabilities: { drop: [ALL] }
           readinessProbe:
             # Ready once a bundle is active: until then it would deny every call.
-            httpGet: { path: '/health?bundles=true', port: opa }
+            httpGet: { path: '/health?bundles=true', port: opa-diag }
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /health, port: opa }
+            httpGet: { path: /health, port: opa-diag }
             periodSeconds: 15
           resources:
             {{- toYaml .Values.gateway.resources.opa | nindent 12 }}

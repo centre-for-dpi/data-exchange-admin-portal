@@ -69,10 +69,10 @@ spec:
     - from:
         {{- include "rid.np.from" "api" | nindent 8 }}
       ports: [{ port: 9180 }]
-    # Metrics: APISIX and OPA.
+    # Metrics: APISIX, and OPA's diagnostic listener (never its API on 8181, which is loopback).
     - from:
         {{- include "rid.np.from" "prometheus" | nindent 8 }}
-      ports: [{ port: 9091 }, { port: 8181 }]
+      ports: [{ port: 9091 }, { port: 8282 }]
   egress:
     # Its own services: etcd, the portal (OPA's bundle, transparency, node control), Keycloak
     # (token route, JWKS), the access logs, the nodes' hub.
