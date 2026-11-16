@@ -1,0 +1,27 @@
+apiVersion: v2
+name: rid-platform
+description: >-
+  The cluster's operators the RID chart builds on (M6-05): CloudNativePG (PostgreSQL with replicas),
+  External Secrets Operator (secrets from OpenBao or another store) and cert-manager (internal
+  certificates). Installed once per cluster, before the rid chart: Helm cannot create an operator
+  and its resources in one release, since the resources reach the operator's webhook first.
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+kubeVersion: '>=1.29.0-0'
+annotations:
+  # Apache-2.0, all three (CLAUDE.md, rule 1).
+  licenses: Apache-2.0
+dependencies:
+  - name: cloudnative-pg
+    version: 0.29.1
+    repository: https://cloudnative-pg.github.io/charts
+    condition: cloudnative-pg.enabled
+  - name: external-secrets
+    version: 2.14.0
+    repository: https://charts.external-secrets.io
+    condition: external-secrets.enabled
+  - name: cert-manager
+    version: v1.21.3
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled

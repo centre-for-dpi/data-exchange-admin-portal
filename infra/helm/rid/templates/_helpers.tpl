@@ -25,46 +25,71 @@ app.kubernetes.io/instance: {{ .root.Release.Name }}
 {{/*
 The keys of each component's Secret (rid-<component>): only what it uses, so a compromised pod
 does not read the rest (least privilege). docs/DEPLOYMENT.md §9.2 lists them for the store.
+`keys` are copied from the store as they are; `derived` keys are built from them by External
+Secrets (with existing Secrets, the operator writes them): connection URLs never disagree with the
+passwords, and CloudNativePG gets its basic-auth Secrets. ESO's template braces are escaped here.
 */}}
-{{- define "rid.secretKeys" -}}
+{{- define "rid.secrets" -}}
+{{- $o := "{{" }}{{- $c := "}}" }}
+{{- $db := include "rid.name" "db" }}
+{{- $tls := "sslmode=verify-full&sslrootcert=/var/run/rid/db-ca/ca.crt" }}
 api:
-  - DATABASE_URL
-  - APISIX_ADMIN_KEY
-  - OPA_BUNDLE_TOKEN
-  - RID_END_USER_HASH_SALT
-  - RID_SUBJECT_REF_KEY
-  - RID_TRANSPARENCY_INGEST_TOKEN
-  - RID_TRANSPARENCY_SIGNING_JWK
-  - RID_NODE_CONTROL_TOKEN
-  - RID_VALIDATION_TOKEN
-  - RID_METRICS_TOKEN
-  - RID_CONTRACT_RUNNER_TOKEN
-  - RID_WG_HUB_AGENT_TOKEN
-  - RID_STEP_CA_PROVISIONER_PASSWORD
-  - RID_SECRETS_KEY
-  - RID_GATEWAY_PROVISIONER_SECRET
-  - KEYCLOAK_ADMIN_PASSWORD
-  - RID_CITIZEN_APPS
-  - RID_SMTP_URL
-  - RID_OPENSEARCH_AUTH
+  keys:
+    - DB_APP_PASSWORD
+    - APISIX_ADMIN_KEY
+    - OPA_BUNDLE_TOKEN
+    - RID_END_USER_HASH_SALT
+    - RID_SUBJECT_REF_KEY
+    - RID_TRANSPARENCY_INGEST_TOKEN
+    - RID_TRANSPARENCY_SIGNING_JWK
+    - RID_NODE_CONTROL_TOKEN
+    - RID_VALIDATION_TOKEN
+    - RID_METRICS_TOKEN
+    - RID_CONTRACT_RUNNER_TOKEN
+    - RID_WG_HUB_AGENT_TOKEN
+    - RID_STEP_CA_PROVISIONER_PASSWORD
+    - RID_SECRETS_KEY
+    - RID_GATEWAY_PROVISIONER_SECRET
+    - KEYCLOAK_ADMIN_PASSWORD
+    - RID_CITIZEN_APPS
+    - RID_SMTP_URL
+    - RID_OPENSEARCH_AUTH
+  derived:
+    DATABASE_URL: 'postgresql://rid_app:{{ $o }} .DB_APP_PASSWORD | urlquery {{ $c }}@{{ $db }}-rw:5432/rid?{{ $tls }}'
 migrate:
-  - DATABASE_MIGRATION_URL
+  keys: [DB_OWNER_PASSWORD]
+  derived:
+    DATABASE_MIGRATION_URL: 'postgresql://rid:{{ $o }} .DB_OWNER_PASSWORD | urlquery {{ $c }}@{{ $db }}-rw:5432/rid?{{ $tls }}'
 web:
-  - AUTH_SECRET
-  - RID_PORTAL_WEB_CLIENT_SECRET
+  keys: [AUTH_SECRET, RID_PORTAL_WEB_CLIENT_SECRET]
 gateway:
-  - APISIX_ADMIN_KEY
-  - RID_APISIX_KEYRING
-  - OPA_BUNDLE_TOKEN
-  - RID_TRANSPARENCY_INGEST_TOKEN
+  keys: [APISIX_ADMIN_KEY, RID_APISIX_KEYRING, OPA_BUNDLE_TOKEN, RID_TRANSPARENCY_INGEST_TOKEN]
 wg-hub:
-  - RID_WG_HUB_PRIVATE_KEY
-  - RID_WG_HUB_AGENT_TOKEN
+  keys: [RID_WG_HUB_PRIVATE_KEY, RID_WG_HUB_AGENT_TOKEN]
 contract-runner:
-  - RID_CONTRACT_RUNNER_TOKEN
+  keys: [RID_CONTRACT_RUNNER_TOKEN]
 access-logs:
-  - OPENSEARCH_USER
-  - OPENSEARCH_PASSWORD
+  keys: [OPENSEARCH_USER, OPENSEARCH_PASSWORD]
+step-ca:
+  keys: [RID_STEP_CA_PROVISIONER_PASSWORD]
+keycloak:
+  keys: [KEYCLOAK_ADMIN_PASSWORD, RID_PORTAL_WEB_CLIENT_SECRET, RID_GATEWAY_PROVISIONER_SECRET]
+keycloak-citizens:
+  keys: [RID_CARPETA_CLIENT_SECRET]
+# CloudNativePG's roles (kubernetes.io/basic-auth): the owner of the schema, the API's runtime
+# role, and Keycloak's own database.
+db-owner:
+  type: kubernetes.io/basic-auth
+  keys: [DB_OWNER_PASSWORD]
+  derived: { username: rid, password: '{{ $o }} .DB_OWNER_PASSWORD {{ $c }}' }
+db-app:
+  type: kubernetes.io/basic-auth
+  keys: [DB_APP_PASSWORD]
+  derived: { username: rid_app, password: '{{ $o }} .DB_APP_PASSWORD {{ $c }}' }
+keycloak-db:
+  type: kubernetes.io/basic-auth
+  keys: [KEYCLOAK_DB_PASSWORD]
+  derived: { username: keycloak, password: '{{ $o }} .KEYCLOAK_DB_PASSWORD {{ $c }}' }
 {{- end -}}
 
 {{/* Whether a component is deployed (its Secret is only made then). */}}
@@ -72,6 +97,7 @@ access-logs:
 {{- $v := .root.Values -}}
 {{- if eq .component "wg-hub" -}}{{ $v.wgHub.enabled }}
 {{- else if eq .component "contract-runner" -}}{{ $v.contractRunner.enabled }}
+{{- else if eq .component "keycloak-citizens" -}}{{ $v.keycloak.citizensRealm }}
 {{- else -}}true{{- end -}}
 {{- end -}}
 
@@ -106,6 +132,8 @@ Bit run in every gateway pod, on 127.0.0.1).
 - { name: RID_CONTRACT_RUNNER_URL, value: {{ printf "http://%s:8096" (include "rid.name" "contract-runner") | quote }} }
 - { name: RID_OPENSEARCH_URL, value: {{ printf "%s://%s:%v" (ternary "https" "http" .Values.accessLogs.opensearch.tls) .Values.accessLogs.opensearch.host .Values.accessLogs.opensearch.port | quote }} }
 - { name: RID_TRUST_PROXY, value: {{ .Values.api.trustProxy | quote }} }
+- { name: RID_STEP_CA_URL, value: {{ printf "https://%s:9000" (include "rid.name" "step-ca") | quote }} }
+- { name: RID_STEP_CA_ROOT_FINGERPRINT, value: {{ required "stepCa.rootFingerprint: the SHA-256 of the network's root" .Values.stepCa.rootFingerprint | quote }} }
 {{- range $name, $value := .Values.api.env }}
 - { name: {{ $name }}, value: {{ $value | quote }} }
 {{- end }}

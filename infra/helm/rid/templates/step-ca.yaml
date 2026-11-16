@@ -1,0 +1,143 @@
+{{- $c := dict "root" . "component" "step-ca" }}
+{{- $name := include "rid.name" "step-ca" }}
+{{- /*
+The network's CA (ARCHITECTURE §11): issues the applications', the gateway's and the nodes'
+certificates. Its root is offline: the operator brings the root's certificate and the intermediate
+(certificate and key, encrypted with the CA's password) in the Secret stepCa.pkiSecret; the root
+key never reaches the cluster. On its first start, `configure` writes ca.json from them and creates
+the three provisioners of infra/step-ca/configure.sh (same templates and durations); later starts
+keep it. One replica on its own disk: issuance is not on the call path (the gateway serves with
+certificates it already holds).
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rid.name" "step-ca-config" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+data:
+  app.tpl: |
+    {{- .Files.Get "files/step-ca/app.tpl" | nindent 4 }}
+  gateway.tpl: |
+    {{- .Files.Get "files/step-ca/gateway.tpl" | nindent 4 }}
+  node.tpl: |
+    {{- .Files.Get "files/step-ca/node.tpl" | nindent 4 }}
+  configure.sh: |
+    set -eu
+    STEPPATH=/home/step
+    CONFIG="$STEPPATH/config/ca.json"
+    if [ -f "$CONFIG" ]; then echo "ca.json exists: kept"; exit 0; fi
+    mkdir -p "$STEPPATH/config" "$STEPPATH/certs" "$STEPPATH/secrets" "$STEPPATH/db"
+    cp /pki/root_ca.crt /pki/intermediate_ca.crt "$STEPPATH/certs/"
+    cp /pki/intermediate_ca_key "$STEPPATH/secrets/intermediate_ca_key"
+    printf %s "$RID_STEP_CA_PROVISIONER_PASSWORD" > /tmp/password
+    cat > "$CONFIG" <<EOF
+    {
+      "root": "$STEPPATH/certs/root_ca.crt",
+      "crt": "$STEPPATH/certs/intermediate_ca.crt",
+      "key": "$STEPPATH/secrets/intermediate_ca_key",
+      "address": ":9000",
+      "dnsNames": ["{{ $name }}", "{{ $name }}.{{ .Release.Namespace }}.svc"],
+      "db": { "type": "badgerv2", "dataSource": "$STEPPATH/db" },
+      "authority": { "provisioners": [] },
+      "tls": { "minVersion": 1.2 }
+    }
+    EOF
+    # The portal's provisioners, as infra/step-ca/configure.sh: applications, the gateway's TLS,
+    # the kit nodes.
+    for p in rid-portal:app.tpl:9528h rid-gateway-tls:gateway.tpl:2160h rid-nodes:node.tpl:2160h; do
+      name="${p%%:*}"; rest="${p#*:}"; template="${rest%%:*}"; max="${rest#*:}"
+      step ca provisioner add "$name" --type JWK --create --password-file /tmp/password \
+        --ca-config="$CONFIG" >/dev/null
+      step ca provisioner update "$name" --ca-config="$CONFIG" --x509-template="/rid/$template" \
+        --x509-min-dur=5m --x509-default-dur=2160h --x509-max-dur="$max" >/dev/null
+    done
+    rm -f /tmp/password
+    echo "ca.json written with the portal's provisioners"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: configure
+          image: {{ .Values.stepCa.image }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command: ['sh', '/rid/configure.sh']
+          env: &password
+            - name: RID_STEP_CA_PROVISIONER_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: RID_STEP_CA_PROVISIONER_PASSWORD } }
+          securityContext: &security
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts: &mounts
+            - { name: data, mountPath: /home/step }
+            - { name: config, mountPath: /rid, readOnly: true }
+            - { name: pki, mountPath: /pki, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      containers:
+        - name: step-ca
+          image: {{ .Values.stepCa.image }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - printf %s "$RID_STEP_CA_PROVISIONER_PASSWORD" > /tmp/password && exec /usr/local/bin/step-ca --password-file /tmp/password /home/step/config/ca.json
+          env: *password
+          ports:
+            - { name: https, containerPort: 9000 }
+          securityContext: *security
+          readinessProbe:
+            tcpSocket: { port: https }
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.stepCa.resources | nindent 12 }}
+          volumeMounts: *mounts
+      volumes:
+        - name: config
+          configMap: { name: {{ include "rid.name" "step-ca-config" }} }
+        - name: pki
+          secret: { secretName: {{ .Values.stepCa.pkiSecret }} }
+        - { name: tmp, emptyDir: { medium: Memory } }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.stepCa.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests: { storage: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: https, port: 9000, targetPort: https }

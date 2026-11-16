@@ -95,6 +95,55 @@ ingress:
   # The TLS certificate of publicUrl's host (cert-manager or the operator's own).
   tlsSecretName: rid-portal-tls
 
+# --- Keycloak ------------------------------------------------------------------------------------
+
+keycloak:
+  image: quay.io/keycloak/keycloak:26.8.0
+  replicas: 2
+  # The temporary administrator of the first start (its password: KEYCLOAK_ADMIN_PASSWORD).
+  bootstrapAdmin: rid-bootstrap
+  # rid-citizens simulates the country's digital identity in development; in production the
+  # citizen folder uses the national one (RID_CITIZEN_ISSUER).
+  citizensRealm: false
+  carpetaUrl: ''
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { memory: 2Gi }
+
+# --- The network's CA (step-ca) ---------------------------------------------------------------------
+
+stepCa:
+  image: smallstep/step-ca:0.30.2
+  # The operator's CA material (offline root, ARCHITECTURE §11): root_ca.crt, intermediate_ca.crt
+  # and intermediate_ca_key (encrypted with RID_STEP_CA_PROVISIONER_PASSWORD).
+  pkiSecret: rid-step-ca-pki
+  # SHA-256 of root_ca.crt (`step certificate fingerprint root_ca.crt`): the API pins it.
+  rootFingerprint: ''
+  storageClass: ''
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 256Mi }
+
+# --- Databases (CloudNativePG, installed by the rid-platform chart) --------------------------------
+
+postgres:
+  # Empty: the operator's default PostgreSQL image.
+  imageName: ''
+  storageClass: ''
+  portal:
+    # A primary and a replica in another zone (ARCHITECTURE §11).
+    instances: 2
+    size: 50Gi
+    resources:
+      requests: { cpu: 500m, memory: 1Gi }
+      limits: { memory: 2Gi }
+  keycloak:
+    instances: 2
+    size: 10Gi
+    resources:
+      requests: { cpu: 250m, memory: 512Mi }
+      limits: { memory: 1Gi }
+
 # --- Gateway -------------------------------------------------------------------------------------
 
 gateway:

@@ -1,0 +1,12 @@
+dependencies:
+- name: cloudnative-pg
+  repository: https://cloudnative-pg.github.io/charts
+  version: 0.29.1
+- name: external-secrets
+  repository: https://charts.external-secrets.io
+  version: 2.14.0
+- name: cert-manager
+  repository: https://charts.jetstack.io
+  version: v1.21.3
+digest: sha256:994ff5a4d657a66384a804e07f7a0a336828df15fb3827d2864e1e7365c035b8
+generated: "2026-11-16T21:56:13.95190461Z"

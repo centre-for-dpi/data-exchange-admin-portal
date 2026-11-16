@@ -48,6 +48,7 @@ spec:
             capabilities: { drop: [ALL] }
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
+            - { name: db-ca, mountPath: /var/run/rid/db-ca, readOnly: true }
       containers:
         - name: api
           image: {{ include "rid.image" (dict "root" . "name" "api") }}
@@ -73,8 +74,15 @@ spec:
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
             - { name: documents, mountPath: /var/lib/rid/documents }
+            - { name: db-ca, mountPath: /var/run/rid/db-ca, readOnly: true }
       volumes:
         - { name: tmp, emptyDir: {} }
+        # The database cluster's CA, to verify its certificate (sslmode=verify-full). Only the
+        # certificate: the Secret also holds the CA's key, which must not reach the API.
+        - name: db-ca
+          secret:
+            secretName: {{ include "rid.name" "db" }}-ca
+            items: [{ key: ca.crt, path: ca.crt }]
         - name: documents
           persistentVolumeClaim: { claimName: {{ include "rid.name" "api-documents" }} }
 ---

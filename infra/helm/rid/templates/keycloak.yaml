@@ -1,0 +1,158 @@
+{{- $c := dict "root" . "component" "keycloak" }}
+{{- $kc := .Values.keycloak }}
+{{- $name := include "rid.name" "keycloak" }}
+{{- /*
+Keycloak in production mode (ASVS 13.4.2, M6-05): `start`, its own database (rid-keycloak-db),
+TLS at the ingress, several replicas clustered through the database (JDBC_PING, Keycloak's default
+stack). The realms are imported once from the production realms of the chart (infra/keycloak
+without its demo users, `pnpm helm:sync`); later changes go through the admin API, as in
+OPERATIONS.md §5.3. A StatefulSet started in order: the first replica imports, the others find the
+realms there.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rid.name" "keycloak-realms" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+data:
+  rid-portal-realm.json: |
+    {{- .Files.Get "files/keycloak/rid-portal-realm.json" | nindent 4 }}
+  rid-gateway-realm.json: |
+    {{- .Files.Get "files/keycloak/rid-gateway-realm.json" | nindent 4 }}
+  {{- if $kc.citizensRealm }}
+  rid-citizens-realm.json: |
+    {{- .Files.Get "files/keycloak/rid-citizens-realm.json" | nindent 4 }}
+  {{- end }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  serviceName: {{ $name }}
+  replicas: {{ $kc.replicas }}
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: {{ .Values.gateway.topologyKey }}
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "rid.selector" $c | nindent 14 }}
+      containers:
+        - name: keycloak
+          image: {{ $kc.image }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args:
+            - start
+            - --import-realm
+            # Mail to the account owner when a password or a second factor changes (M3-08).
+            - --spi-events-listener--email--include-events=UPDATE_CREDENTIAL,REMOVE_CREDENTIAL
+            # The applications' certificate arrives from the gateway's token route, verified by
+            # APISIX (ADR-0022). Every other way in must strip SSL_CLIENT_CERT and ssl-client-verify:
+            # ingress-nginx drops headers with underscores by default (ingress.className).
+            - --spi-x509cert-lookup--provider=nginx
+            - --spi-x509cert-lookup--nginx--ssl-client-cert=SSL_CLIENT_CERT
+            - --spi-x509cert-lookup--nginx--trust-proxy-verification=true
+          env:
+            - { name: KC_DB, value: postgres }
+            - name: KC_DB_URL
+              value: {{ printf "jdbc:postgresql://%s-rw:5432/keycloak?sslmode=verify-full&sslrootcert=/var/run/rid/db-ca/ca.crt" (include "rid.name" "keycloak-db") | quote }}
+            - name: KC_DB_USERNAME
+              valueFrom: { secretKeyRef: { name: {{ include "rid.name" "keycloak-db" }}, key: username } }
+            - name: KC_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ include "rid.name" "keycloak-db" }}, key: password } }
+            # Tokens carry the public issuer; APISIX and the API reach Keycloak by its service name.
+            - { name: KC_HOSTNAME, value: {{ printf "%s/auth" .Values.publicUrl | quote }} }
+            - { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: 'true' }
+            - { name: KC_HTTP_RELATIVE_PATH, value: /auth }
+            - { name: KC_HTTP_MANAGEMENT_RELATIVE_PATH, value: / }
+            # TLS ends at the ingress (and at APISIX for the token route).
+            - { name: KC_HTTP_ENABLED, value: 'true' }
+            - { name: KC_PROXY_HEADERS, value: xforwarded }
+            - { name: KC_HEALTH_ENABLED, value: 'true' }
+            - { name: KC_METRICS_ENABLED, value: 'true' }
+            # The temporary administrator of the first start (OPERATIONS.md §2: replace it).
+            - { name: KC_BOOTSTRAP_ADMIN_USERNAME, value: {{ $kc.bootstrapAdmin | quote }} }
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: KEYCLOAK_ADMIN_PASSWORD } }
+            # Placeholders of the realms.
+            - { name: RID_WEB_URL, value: {{ .Values.publicUrl | quote }} }
+            - name: RID_PORTAL_WEB_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: RID_PORTAL_WEB_CLIENT_SECRET } }
+            - name: RID_GATEWAY_PROVISIONER_SECRET
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: RID_GATEWAY_PROVISIONER_SECRET } }
+            {{- if $kc.citizensRealm }}
+            - { name: RID_CARPETA_URL, value: {{ $kc.carpetaUrl | quote }} }
+            - name: RID_CARPETA_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ include "rid.name" "keycloak-citizens" }}, key: RID_CARPETA_CLIENT_SECRET } }
+            {{- end }}
+          ports:
+            - { name: http, containerPort: 8080 }
+            - { name: management, containerPort: 9000 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          startupProbe:
+            # The first start builds Keycloak and imports the realms: minutes on a small node.
+            httpGet: { path: /health/started, port: management }
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health/ready, port: management }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health/live, port: management }
+            periodSeconds: 20
+          resources:
+            {{- toYaml $kc.resources | nindent 12 }}
+          volumeMounts:
+            - { name: realms, mountPath: /opt/keycloak/data/import, readOnly: true }
+            - { name: db-ca, mountPath: /var/run/rid/db-ca, readOnly: true }
+      volumes:
+        - name: realms
+          configMap: { name: {{ include "rid.name" "keycloak-realms" }} }
+        - name: db-ca
+          secret:
+            secretName: {{ include "rid.name" "keycloak-db" }}-ca
+            items: [{ key: ca.crt, path: ca.crt }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}

@@ -1,0 +1,15 @@
+# Operators of the cluster (M6-05). Disable the ones the cluster already has.
+
+cloudnative-pg:
+  enabled: true
+
+external-secrets:
+  enabled: true
+  installCRDs: true
+
+cert-manager:
+  enabled: true
+  crds:
+    enabled: true
+    # The CRDs outlive the chart: deleting them would delete every certificate.
+    keep: true
