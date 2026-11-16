@@ -180,7 +180,7 @@ describe('sandbox applications and the sandbox route (M4-08)', () => {
     await reconciler.reconcileVersion(versionId);
     const route = await admin.get('routes', sandboxRouteId(versionId));
     expect(route?.uri).toMatch(/^\/sandbox\/salud\/sandbox-[^/]+\/v1\/\*$/);
-    expect(Object.keys((route?.plugins ?? {}))).toEqual(
+    expect(Object.keys(route?.plugins ?? {})).toEqual(
       expect.arrayContaining(['openid-connect', 'opa', 'limit-count']),
     );
     // No transparency register for synthetic data.

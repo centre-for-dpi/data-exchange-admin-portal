@@ -406,7 +406,7 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
     // Paths stay inside the version: no `.`/`..` segments, encoded dots or slashes, backslashes or
     // empty segments, which a gateway, a Security Server or the contract test could resolve to
     // another route (M4-06 security review).
-    for (const path of Object.keys((spec.paths ?? {}))) {
+    for (const path of Object.keys(spec.paths ?? {})) {
       if (/(^|\/)\.{1,2}(\/|$)|%2e|%2f|%5c|\\|\/\//i.test(path)) {
         const at = ['paths', path];
         const range = document.getRangeForJsonPath(at, true);

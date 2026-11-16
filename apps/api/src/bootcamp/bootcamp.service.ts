@@ -70,9 +70,7 @@ export class BootcampService {
   }
 
   async get(entityId: string): Promise<BootcampChecklist> {
-    const stored = (await scopedRepo(this.prisma.bootcampChecklistItem, entityId).findMany(
-      {},
-    ));
+    const stored = await scopedRepo(this.prisma.bootcampChecklistItem, entityId).findMany({});
     return checklist(stored, (await this.designees([entityId])).has(entityId));
   }
 
