@@ -1,0 +1,251 @@
+{{- $c := dict "root" . "component" "gateway" }}
+{{- $secret := include "rid.name" "gateway" }}
+{{- /*
+The gateway: one pod per node, each with APISIX and, on 127.0.0.1, its own OPA (decisions without
+leaving the pod, ARCHITECTURE §11), the transparency Fluent Bit (tcp-logger, buffered on its own
+disk) and the error-log Fluent Bit. A StatefulSet, so each pod keeps its volumes: OPA's last
+bundle (M6-04) and the transparency buffer (a consultation is never lost).
+*/}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "rid.name" "gateway" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  serviceName: {{ include "rid.name" "gateway-pods" }}
+  replicas: {{ .Values.gateway.replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/gateway-config.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      # Spread over zones (ARCHITECTURE §11): losing a zone leaves a gateway.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: {{ .Values.gateway.topologyKey }}
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "rid.selector" $c | nindent 14 }}
+        # One gateway per node: a node that fails takes one gateway down, not two.
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: {{ .Values.gateway.onePerNode | ternary "DoNotSchedule" "ScheduleAnyway" }}
+          labelSelector:
+            matchLabels:
+              {{- include "rid.selector" $c | nindent 14 }}
+      containers:
+        - name: apisix
+          image: {{ .Values.images.apisix }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - name: RID_APISIX_KEYRING
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: RID_APISIX_KEYRING } }
+            - name: APISIX_ADMIN_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: APISIX_ADMIN_KEY } }
+          ports:
+            - { name: http, containerPort: 9080 }
+            - { name: https, containerPort: 9443 }
+            - { name: admin, containerPort: 9180 }
+            - { name: metrics, containerPort: 9091 }
+            - { name: status, containerPort: 7085 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /status/ready, port: status }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /status, port: status }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.gateway.resources.apisix | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /usr/local/apisix/conf/config.yaml, subPath: config.yaml }
+            - { name: plugins, mountPath: /usr/local/apisix/rid/apisix/plugins }
+        - name: opa
+          image: {{ .Values.images.opa }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          args:
+            - run
+            - --server
+            - --addr=0.0.0.0:8181
+            - --log-format=json
+            - --config-file=/config/opa.yaml
+          env:
+            - { name: OPA_PORTAL_URL, value: {{ printf "%s/api/v1/opa" (include "rid.url.api" .) | quote }} }
+            - name: OPA_BUNDLE_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: OPA_BUNDLE_TOKEN } }
+          ports:
+            - { name: opa, containerPort: 8181 }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            # Ready once a bundle is active: until then it would deny every call.
+            httpGet: { path: '/health?bundles=true', port: opa }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: opa }
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.gateway.resources.opa | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /config/opa.yaml, subPath: opa.yaml }
+            - { name: opa-data, mountPath: /var/lib/opa }
+        - name: transparency
+          image: {{ .Values.images.fluentBit }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/transparency.yaml']
+          env:
+            - { name: FLUENT_BIT_HTTP_PORT, value: '2020' }
+            - { name: RID_TRANSPARENCY_COLLECTOR_HOST, value: {{ include "rid.name" "api" }} }
+            - { name: RID_TRANSPARENCY_COLLECTOR_PORT, value: {{ .Values.api.port | quote }} }
+            - name: RID_TRANSPARENCY_INGEST_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: RID_TRANSPARENCY_INGEST_TOKEN } }
+          securityContext: &sidecarSecurity
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /api/v1/health, port: 2020 }
+          resources:
+            {{- toYaml .Values.gateway.resources.fluentBit | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /fluent-bit/etc/rid/transparency.yaml, subPath: transparency.yaml }
+            - { name: config, mountPath: /fluent-bit/etc/rid/transparency.lua, subPath: transparency.lua }
+            - { name: transparency, mountPath: /var/lib/fluent-bit }
+        - name: errors
+          image: {{ .Values.images.fluentBit }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/gateway-errors.yaml']
+          env:
+            - { name: FLUENT_BIT_HTTP_PORT, value: '2021' }
+          securityContext: *sidecarSecurity
+          readinessProbe:
+            httpGet: { path: /api/v1/health, port: 2021 }
+          resources:
+            {{- toYaml .Values.gateway.resources.fluentBit | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /fluent-bit/etc/rid/gateway-errors.yaml, subPath: gateway-errors.yaml }
+            - { name: config, mountPath: /fluent-bit/etc/rid/gateway-errors.lua, subPath: gateway-errors.lua }
+      volumes:
+        - name: config
+          configMap: { name: {{ include "rid.name" "gateway-config" }} }
+        - name: plugins
+          configMap: { name: {{ include "rid.name" "gateway-plugins" }} }
+  volumeClaimTemplates:
+    - metadata:
+        name: opa-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.gateway.storage.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests: { storage: {{ .Values.gateway.storage.opaSize }} }
+    - metadata:
+        name: transparency
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.gateway.storage.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests: { storage: {{ .Values.gateway.storage.transparencySize }} }
+---
+# The pods' own names (StatefulSet).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "gateway-pods" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: http, port: 9080 }
+---
+# Inside the namespace: the validations and the contract runner call the gateway over HTTP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "gateway" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: http, port: 9080, targetPort: http }
+---
+# The Admin API, for the portal's reconcilers only (NetworkPolicy).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "gateway-admin" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: admin, port: 9180, targetPort: admin }
+---
+# The applications' entrance: TLS with their certificate, terminated by APISIX (not an ingress).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "gateway-public" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+  {{- with .Values.gateway.service.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.gateway.service.type }}
+  # The caller's address reaches APISIX (rate limits, logs) without a proxy in between.
+  {{- if eq .Values.gateway.service.type "LoadBalancer" }}
+  externalTrafficPolicy: Local
+  {{- with .Values.gateway.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges: {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: https, port: 443, targetPort: https }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "rid.name" "gateway" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}

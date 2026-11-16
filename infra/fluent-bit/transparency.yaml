@@ -7,7 +7,8 @@ service:
   log_level: warn
   http_server: on
   http_listen: 0.0.0.0
-  http_port: 2020
+  # The health endpoint; its port comes from the environment: sidecars of one pod need their own.
+  http_port: ${FLUENT_BIT_HTTP_PORT}
   health_check: on
   # Chunks live on disk until the collector accepts them: a portal restart loses nothing.
   storage.path: /var/lib/fluent-bit/transparency

@@ -1,0 +1,115 @@
+{{- $c := dict "root" . "component" "etcd" }}
+{{- $name := include "rid.name" "etcd" }}
+{{- /*
+etcd for APISIX: a cluster of `etcd.replicas` members (3 in production, ARCHITECTURE §11), each
+with its stable name (StatefulSet) and its disk. Only the gateway reaches it (NetworkPolicy).
+*/}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  serviceName: {{ $name }}
+  replicas: {{ .Values.etcd.replicas }}
+  # Members start together: each waits for the others to form the cluster.
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: {{ .Values.gateway.topologyKey }}
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "rid.selector" $c | nindent 14 }}
+      containers:
+        - name: etcd
+          image: {{ .Values.images.etcd }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+          # No shell in the image: Kubernetes expands $(POD_NAME) in the arguments.
+          command:
+            - etcd
+            - --name=$(POD_NAME)
+            - --data-dir=/var/lib/etcd
+            - --listen-client-urls=http://0.0.0.0:2379
+            - --advertise-client-urls=http://$(POD_NAME).{{ $name }}:2379
+            - --listen-peer-urls=http://0.0.0.0:2380
+            - --initial-advertise-peer-urls=http://$(POD_NAME).{{ $name }}:2380
+            - --initial-cluster={{- range $i := until (int .Values.etcd.replicas) }}{{ if $i }},{{ end }}{{ $name }}-{{ $i }}=http://{{ $name }}-{{ $i }}.{{ $name }}:2380{{- end }}
+            - --initial-cluster-token={{ $name }}-{{ .Release.Namespace }}
+            - --initial-cluster-state=new
+          ports:
+            - { name: client, containerPort: 2379 }
+            - { name: peer, containerPort: 2380 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /health, port: client }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /livez, port: client }
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.etcd.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/etcd }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.etcd.storage.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests: { storage: {{ .Values.etcd.storage.size }} }
+---
+# Members' names for each other and for APISIX (headless). Not ready members still resolve: the
+# cluster forms before any member is ready.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: client, port: 2379 }
+    - { name: peer, port: 2380 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  # Quorum: a 3-member cluster survives one member down.
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}

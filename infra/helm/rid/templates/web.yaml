@@ -1,0 +1,96 @@
+{{- $c := dict "root" . "component" "web" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rid.name" "web" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "rid.selector" $c | nindent 14 }}
+      containers:
+        - name: web
+          image: {{ include "rid.image" (dict "root" . "name" "web") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - { name: http, containerPort: {{ .Values.web.port }} }
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: RID_COUNTRY, value: {{ .Values.country | quote }} }
+            - { name: AUTH_URL, value: {{ .Values.publicUrl | quote }} }
+            - { name: AUTH_TRUST_HOST, value: 'true' }
+            - { name: RID_WEB_URL, value: {{ .Values.publicUrl | quote }} }
+            - { name: KEYCLOAK_URL, value: {{ printf "%s/auth" .Values.publicUrl | quote }} }
+            - { name: RID_API_URL, value: {{ include "rid.url.api" . | quote }} }
+            - { name: RID_GATEWAY_PUBLIC_URL, value: {{ printf "https://%s" .Values.gatewayHost | quote }} }
+            {{- range $name, $value := .Values.web.env }}
+            - { name: {{ $name }}, value: {{ $value | quote }} }
+            {{- end }}
+          envFrom:
+            - secretRef: { name: {{ include "rid.name" "web" }} }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /api/auth/providers, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/auth/providers, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          volumeMounts:
+            # Next.js caches rendered pages and images here.
+            - { name: cache, mountPath: /repo/apps/web/.next/cache }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: cache, emptyDir: {} }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "web" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: http, port: {{ .Values.web.port }}, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "rid.name" "web" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}

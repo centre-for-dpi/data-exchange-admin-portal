@@ -1,0 +1,109 @@
+{{- $c := dict "root" . "component" "gateway" }}
+{{- /*
+The gateway pod's configuration. APISIX's config.yaml follows infra/apisix/config.yaml (keep them
+together), with the hosts it has here: etcd's pods, and the error log to its own sidecar.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rid.name" "gateway-config" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+data:
+  config.yaml: |
+    apisix:
+      node_listen: 9080
+      enable_ipv6: false
+      extra_lua_path: /usr/local/apisix/rid/?.lua
+      ssl:
+        enable: true
+        listen:
+          - port: 9443
+      status:
+        ip: 0.0.0.0
+        port: 7085
+      # The deployment's own keyring for the private keys in etcd (M6-01). The factory key stays
+      # behind it only to read what an older installation wrote.
+      data_encryption:
+        enable_encrypt_fields: true
+        keyring:
+          - '${{"{{"}}RID_APISIX_KEYRING{{"}}"}}'
+          - qeddd145sfvddff3
+    deployment:
+      role: traditional
+      role_traditional:
+        config_provider: etcd
+      admin:
+        admin_key_required: true
+        admin_key:
+          - name: admin
+            key: ${{"{{"}}APISIX_ADMIN_KEY{{"}}"}}
+            role: admin
+        # The pod network: the NetworkPolicy lets only the portal API reach port 9180.
+        allow_admin:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        admin_listen:
+          ip: 0.0.0.0
+          port: 9180
+      etcd:
+        host:
+          {{- range $i := until (int .Values.etcd.replicas) }}
+          - http://{{ include "rid.name" "etcd" }}-{{ $i }}.{{ include "rid.name" "etcd" }}:2379
+          {{- end }}
+        prefix: /apisix
+        timeout: 30
+    nginx_config:
+      http:
+        # Rule 2: no nginx access log (it writes the request line); access logs leave through
+        # http-logger with the allow-listed fields only.
+        enable_access_log: false
+      error_log_level: error
+      error_log: /dev/null
+      # The error log goes to the gateway-errors sidecar, which masks paths and identifiers.
+      main_configuration_snippet: |
+        error_log syslog:server=127.0.0.1:5140,tag=apisix,nohostname error;
+    plugin_attr:
+      prometheus:
+        export_addr:
+          ip: 0.0.0.0
+          port: 9091
+    plugins:
+      - request-id
+      - rid-header-guard
+      - openid-connect
+      - rid-client-cert
+      - rid-data-subject
+      - proxy-rewrite
+      - opa
+      - rid-assertion
+      - limit-count
+      - rid-rate-limited
+      - response-rewrite
+      - fault-injection
+      - prometheus
+      - http-logger
+      - tcp-logger
+  opa.yaml: |
+    {{- .Files.Get "files/opa/config.yaml" | nindent 4 }}
+  transparency.yaml: |
+    {{- .Files.Get "files/fluent-bit/transparency.yaml" | nindent 4 }}
+  transparency.lua: |
+    {{- .Files.Get "files/fluent-bit/transparency.lua" | nindent 4 }}
+  gateway-errors.yaml: |
+    {{- .Files.Get "files/fluent-bit/gateway-errors.yaml" | nindent 4 }}
+  gateway-errors.lua: |
+    {{- .Files.Get "files/fluent-bit/gateway-errors.lua" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rid.name" "gateway-plugins" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+data:
+  {{- range $path, $_ := .Files.Glob "files/apisix/plugins/*.lua" }}
+  {{ base $path }}: |
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}

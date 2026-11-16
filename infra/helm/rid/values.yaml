@@ -1,0 +1,169 @@
+# Values of the RID chart (M6-05). docs/DEPLOYMENT.md §9 explains each block; the defaults are the
+# production topology of docs/ARCHITECTURE.md §11. Nothing country-specific here: the country is
+# config/country/<code>.yaml, chosen with `country` (CLAUDE.md, rule 6).
+
+# --- The deployment ------------------------------------------------------------------------------
+
+# config/country/<code>.yaml baked in the API and web images.
+country: co
+
+# The portal's public URL (web, API under /api/v1, Keycloak under /auth): one host behind the ingress.
+publicUrl: https://rid.example.org
+
+# The gateway's own public name. With mTLS (features.mtls.required) applications reach it on this
+# name, whose TLS the gateway terminates: it is not behind the portal's ingress.
+gatewayHost: gw.rid.example.org
+
+imagePullSecrets: []
+
+images:
+  api:
+    repository: ghcr.io/centre-for-dpi/rid-portal-api
+    tag: '' # appVersion when empty
+  web:
+    repository: ghcr.io/centre-for-dpi/rid-portal-web
+    tag: ''
+  wgHub:
+    repository: ghcr.io/centre-for-dpi/rid-wg-hub
+    tag: ''
+  contractRunner:
+    repository: ghcr.io/centre-for-dpi/rid-contract-runner
+    tag: ''
+  apisix: apache/apisix:3.19.0-debian
+  opa: openpolicyagent/opa:1.21.4-static
+  # Not the -debug image (ASVS 13.4.2): the probes are HTTP, no shell needed.
+  fluentBit: fluent/fluent-bit:5.1.5
+  etcd: quay.io/coreos/etcd:v3.6.16
+  pullPolicy: IfNotPresent
+
+# --- Secrets -------------------------------------------------------------------------------------
+#
+# Each component gets a Secret with only the keys it uses (rid-<component>; the keys are listed in
+# docs/DEPLOYMENT.md §9.2). Two ways to fill them:
+#   externalSecrets: External Secrets Operator reads them from a secret store (OpenBao, the open
+#     fork of Vault, or any ESO backend): one entry, `remoteKey`, with every key as a property.
+#     Rotation: change the value in the store; ESO refreshes the Secret within refreshInterval.
+#     The pods read their secrets at start: restart them (`kubectl rollout restart`) or let
+#     Reloader do it (DEPLOYMENT.md §9.3, and the order of each rotation in OPERATIONS.md §5.6).
+#   existing: the Secrets already exist in the namespace, created by the operator.
+secrets:
+  mode: externalSecrets # externalSecrets | existing
+  externalSecrets:
+    secretStoreRef:
+      name: openbao
+      kind: ClusterSecretStore
+    remoteKey: rid/platform
+    refreshInterval: 1h
+
+# --- Portal --------------------------------------------------------------------------------------
+
+api:
+  replicas: 2
+  port: 4000
+  # Proxies allowed to set X-Forwarded-For (RID_TRUST_PROXY, M6-01): the ingress controller's pods.
+  trustProxy: '10.0.0.0/8'
+  # Uploaded documents (designation, agreements): shared by every replica.
+  documents:
+    storageClass: ''
+    size: 20Gi
+    accessMode: ReadWriteMany
+  # Non-secret settings (see .env.example); the secrets come from rid-api.
+  env:
+    RID_MAIL_FROM: no-reply@rid.example.org
+    RID_SMTP_URL: smtp://smtp.example.org:587
+    RID_TSA_URL: https://tsa.example.org
+    RID_TRANSPARENCY_LOG_ID: rid-transparency
+    RID_GATEWAY_NODES: '2'
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 1Gi }
+
+web:
+  replicas: 2
+  port: 3000
+  env:
+    # The realm's ssoSessionIdleTimeout (WCAG 2.2.1, M6-02).
+    RID_SESSION_IDLE_SECONDS: '1800'
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  # The TLS certificate of publicUrl's host (cert-manager or the operator's own).
+  tlsSecretName: rid-portal-tls
+
+# --- Gateway -------------------------------------------------------------------------------------
+
+gateway:
+  # ≥ 2 nodes in different zones (ARCHITECTURE §11), each with its local OPA.
+  replicas: 2
+  topologyKey: topology.kubernetes.io/zone
+  # Never two gateways on one node (false only for single-node test clusters).
+  onePerNode: true
+  service:
+    # The gateway terminates the applications' TLS (mTLS): a network load balancer, not an ingress.
+    type: LoadBalancer
+    annotations: {}
+    loadBalancerSourceRanges: []
+  resources:
+    apisix:
+      requests: { cpu: '1', memory: 512Mi }
+      limits: { memory: 1Gi }
+    opa:
+      # About 2.5 ms of CPU per decision (docs/performance/M6-03.md).
+      requests: { cpu: '1', memory: 256Mi }
+      limits: { memory: 512Mi }
+    fluentBit:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { memory: 256Mi }
+  storage:
+    storageClass: ''
+    # OPA's last bundle (M6-04) and the transparency buffer (never lose a consultation).
+    opaSize: 1Gi
+    transparencySize: 5Gi
+
+etcd:
+  replicas: 3
+  storage:
+    storageClass: ''
+    size: 8Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
+
+wgHub:
+  enabled: true
+  # The kit nodes reach the hub over UDP from the internet.
+  service:
+    type: LoadBalancer
+    annotations: {}
+  subnet: 10.77.0.0/16
+  storage:
+    storageClass: ''
+    size: 1Gi
+
+contractRunner:
+  enabled: true
+
+# Access-log analytics: Fluent Bit -> OpenSearch (M5).
+accessLogs:
+  replicas: 2
+  opensearch:
+    host: rid-opensearch
+    port: 9200
+    tls: true
+    # The Secret with the CA of OpenSearch's certificate (key ca.crt).
+    caSecret: rid-opensearch-ca
+
+# --- Network ---------------------------------------------------------------------------------------
+
+networkPolicy:
+  enabled: true
+  # The namespace of the ingress controller that reaches the web and the API.
+  ingressControllerNamespace: ingress-nginx
+  # Private ranges the gateway may call besides public addresses (an X-Road Security Server or
+  # providers inside the operator's network). Empty: public addresses only.
+  gatewayExtraEgressCidrs: []

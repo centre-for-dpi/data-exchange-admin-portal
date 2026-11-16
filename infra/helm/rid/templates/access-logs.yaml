@@ -1,0 +1,119 @@
+{{- $c := dict "root" . "component" "access-logs" }}
+{{- $os := .Values.accessLogs.opensearch }}
+{{- /*
+Access-log pipeline (M5, ARCHITECTURE §8): APISIX http-logger -> allow-list filter -> OpenSearch.
+Same pipeline as infra/fluent-bit/fluent-bit.yaml (keep them together); here OpenSearch is reached
+over TLS with its own user, as production requires (ASVS 12.3, M6-05).
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rid.name" "access-logs" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+data:
+  fluent-bit.yaml: |
+    service:
+      flush: 1
+      log_level: info
+      http_server: on
+      http_listen: 0.0.0.0
+      http_port: 2020
+      health_check: on
+    pipeline:
+      inputs:
+        - name: http
+          listen: 0.0.0.0
+          port: 9880
+          tag: apisix.access
+      filters:
+        # Second privacy barrier after APISIX: only metadata fields stay.
+        - name: lua
+          match: apisix.*
+          script: /fluent-bit/etc/rid/allowlist.lua
+          call: allowlist
+      outputs:
+        - name: opensearch
+          match: apisix.*
+          host: {{ $os.host }}
+          port: {{ $os.port }}
+          {{- if $os.tls }}
+          tls: on
+          tls.verify: on
+          tls.ca_file: /fluent-bit/etc/opensearch/ca.crt
+          http_user: ${OPENSEARCH_USER}
+          http_passwd: ${OPENSEARCH_PASSWORD}
+          {{- end }}
+          logstash_format: on
+          logstash_prefix: rid-access
+          logstash_dateformat: '%Y.%m'
+          suppress_type_name: on
+          trace_error: on
+  allowlist.lua: |
+    {{- .Files.Get "files/fluent-bit/allowlist.lua" | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rid.name" "access-logs" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.accessLogs.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+      annotations:
+        checksum/config: {{ .Files.Get "files/fluent-bit/allowlist.lua" | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: fluent-bit
+          image: {{ .Values.images.fluentBit }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/fluent-bit.yaml']
+          envFrom:
+            - secretRef: { name: {{ include "rid.name" "access-logs" }} }
+          ports:
+            - { name: logs, containerPort: 9880 }
+            - { name: health, containerPort: 2020 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /api/v1/health, port: health }
+          resources:
+            {{- toYaml .Values.gateway.resources.fluentBit | nindent 12 }}
+          volumeMounts:
+            - { name: config, mountPath: /fluent-bit/etc/rid }
+            {{- if $os.tls }}
+            - { name: opensearch-ca, mountPath: /fluent-bit/etc/opensearch }
+            {{- end }}
+      volumes:
+        - name: config
+          configMap: { name: {{ include "rid.name" "access-logs" }} }
+        {{- if $os.tls }}
+        - name: opensearch-ca
+          secret: { secretName: {{ $os.caSecret }}, items: [{ key: ca.crt, path: ca.crt }] }
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "access-logs" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: logs, port: 9880, targetPort: logs }

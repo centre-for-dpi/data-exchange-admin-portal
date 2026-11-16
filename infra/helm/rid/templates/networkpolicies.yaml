@@ -1,0 +1,163 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- /*
+The segmentation of M6-01 in Kubernetes (ARCHITECTURE §12): every RID pod refuses what is not
+listed here. etcd and OPA, without authentication of their own, are reached only from the gateway's
+pods; the gateway leaves only to its own services and to public addresses (the providers), never to
+the platform's internals; the Admin API only from the portal API.
+*/}}
+{{- $root := . }}
+{{- $ingressController := .Values.networkPolicy.ingressControllerNamespace }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "default-deny" }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: rid
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "web" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "web" }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
+      ports: [{ port: {{ .Values.web.port }} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "api" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "api" }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
+        # Server-side pages, OPA's bundle, the transparency collector, the nodes' control route.
+        {{- include "rid.np.from" "web" | nindent 8 }}
+        {{- include "rid.np.from" "gateway" | nindent 8 }}
+        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+      ports: [{ port: {{ .Values.api.port }} }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "gateway" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "gateway" }} }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    # The applications, from anywhere: their certificate is what lets them in.
+    - ports: [{ port: 9443 }]
+    # Plain HTTP inside the namespace: the validations and the contract runner.
+    - from:
+        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "rid.np.from" "contract-runner" | nindent 8 }}
+      ports: [{ port: 9080 }]
+    # The Admin API: only the portal's reconcilers.
+    - from:
+        {{- include "rid.np.from" "api" | nindent 8 }}
+      ports: [{ port: 9180 }]
+    # Metrics: APISIX and OPA.
+    - from:
+        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+      ports: [{ port: 9091 }, { port: 8181 }]
+  egress:
+    # Its own services: etcd, the portal (OPA's bundle, transparency, node control), Keycloak
+    # (token route, JWKS), the access logs, the nodes' hub.
+    - to:
+        {{- include "rid.np.from" "etcd" | nindent 8 }}
+        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "rid.np.from" "keycloak" | nindent 8 }}
+        {{- include "rid.np.from" "access-logs" | nindent 8 }}
+        {{- include "rid.np.from" "wg-hub" | nindent 8 }}
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+    # The providers' existing APIs: public addresses only (also enforced when a version is
+    # registered and by the reconciler, ARCHITECTURE §4.1), plus the operator's own ranges.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10]
+        {{- range .Values.networkPolicy.gatewayExtraEgressCidrs }}
+        - ipBlock: { cidr: {{ . }} }
+        {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "etcd" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "etcd" }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- include "rid.np.from" "gateway" | nindent 8 }}
+      ports: [{ port: 2379 }]
+    - from:
+        {{- include "rid.np.from" "etcd" | nindent 8 }}
+      ports: [{ port: 2379 }, { port: 2380 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "access-logs" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "access-logs" }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- include "rid.np.from" "gateway" | nindent 8 }}
+      ports: [{ port: 9880 }]
+{{- if .Values.wgHub.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "wg-hub" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "wg-hub" }} }
+  policyTypes: [Ingress]
+  ingress:
+    # The kit nodes, from the internet.
+    - ports: [{ port: 51820, protocol: UDP }]
+    - from:
+        {{- include "rid.np.from" "gateway" | nindent 8 }}
+      ports: [{ port: 8443 }]
+    - from:
+        {{- include "rid.np.from" "api" | nindent 8 }}
+      ports: [{ port: 8090 }]
+{{- end }}
+{{- if .Values.contractRunner.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "contract-runner" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "contract-runner" }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- include "rid.np.from" "api" | nindent 8 }}
+      ports: [{ port: 8096 }]
+{{- end }}
+{{- end }}

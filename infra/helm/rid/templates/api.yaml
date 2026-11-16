@@ -1,0 +1,121 @@
+{{- $c := dict "root" . "component" "api" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rid.name" "api" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "rid.selector" $c | nindent 14 }}
+      initContainers:
+        # Pending migrations, as the schema owner (the API itself runs as rid_app). Prisma takes an
+        # advisory lock: replicas starting together do not migrate twice.
+        - name: migrate
+          image: {{ include "rid.image" (dict "root" . "name" "api") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          command: ['pnpm', 'db:deploy']
+          env:
+            - name: DATABASE_MIGRATION_URL
+              valueFrom:
+                secretKeyRef: { name: {{ include "rid.name" "migrate" }}, key: DATABASE_MIGRATION_URL }
+          securityContext: &containerSecurity
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      containers:
+        - name: api
+          image: {{ include "rid.image" (dict "root" . "name" "api") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          # The image's default command also migrates and seeds (pilots): here only the server.
+          command: ['node', '--enable-source-maps', 'dist/main.js']
+          ports:
+            - { name: http, containerPort: {{ .Values.api.port }} }
+          env:
+            {{- include "rid.apiEnv" . | nindent 12 }}
+          envFrom:
+            - secretRef: { name: {{ include "rid.name" "api" }} }
+          securityContext: *containerSecurity
+          readinessProbe:
+            httpGet: { path: /api/v1/health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/v1/health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: documents, mountPath: /var/lib/rid/documents }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - name: documents
+          persistentVolumeClaim: { claimName: {{ include "rid.name" "api-documents" }} }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "rid.name" "api-documents" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+  annotations:
+    # Uploaded documents outlive the release.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [{{ .Values.api.documents.accessMode }}]
+  {{- with .Values.api.documents.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.api.documents.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "api" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: http, port: {{ .Values.api.port }}, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "rid.name" "api" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}

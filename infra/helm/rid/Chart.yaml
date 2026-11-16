@@ -1,0 +1,18 @@
+apiVersion: v2
+name: rid
+description: >-
+  Portal and gateway of the data exchange network (RID) for production, with the topology of
+  docs/ARCHITECTURE.md §11: the portal (web, API), the gateway (APISIX with its local OPA, on
+  each node), etcd, the kit nodes' hub and the platform's dependencies.
+type: application
+version: 0.1.0
+appVersion: '0.1.0'
+kubeVersion: '>=1.29.0-0'
+home: https://github.com/centre-for-dpi/data-exchange-admin-portal
+sources:
+  - https://github.com/centre-for-dpi/data-exchange-admin-portal
+keywords: [data-exchange, api-gateway, apisix, opa, keycloak]
+annotations:
+  # Every image and dependency is open source with an OSI-approved license (CLAUDE.md, rule 1);
+  # Grafana (AGPL-3.0) runs as its own service, never linked with our code.
+  licenses: Apache-2.0

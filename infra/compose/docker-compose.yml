@@ -333,6 +333,7 @@ services:
     networks: [default, gateway]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/transparency.yaml']
     environment:
+      FLUENT_BIT_HTTP_PORT: '2020'
       RID_TRANSPARENCY_INGEST_TOKEN: ${RID_TRANSPARENCY_INGEST_TOKEN:?set RID_TRANSPARENCY_INGEST_TOKEN in .env}
       RID_TRANSPARENCY_COLLECTOR_HOST: ${RID_TRANSPARENCY_COLLECTOR_HOST:-host.docker.internal}
       RID_TRANSPARENCY_COLLECTOR_PORT: ${RID_TRANSPARENCY_COLLECTOR_PORT:-4000}
@@ -354,6 +355,8 @@ services:
     image: fluent/fluent-bit:5.1.5-debug
     networks: [gateway]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/gateway-errors.yaml']
+    environment:
+      FLUENT_BIT_HTTP_PORT: '2020'
     volumes:
       - ../fluent-bit:/fluent-bit/etc/rid:ro
     # Not published: APISIX sends to fluent-bit-errors:5140/udp over the Compose network.

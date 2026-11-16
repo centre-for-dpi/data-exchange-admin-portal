@@ -34,7 +34,8 @@
     "traffic:simulate": "pnpm --filter @rid/api traffic:simulate",
     "load:seed": "pnpm --filter @rid/api load:seed",
     "load:test": "node scripts/load-test.mjs",
-    "resilience:test": "node scripts/resilience-test.mjs"
+    "resilience:test": "node scripts/resilience-test.mjs",
+    "helm:sync": "node scripts/helm-sync.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

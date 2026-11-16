@@ -1,0 +1,36 @@
+# OPA runtime configuration (ARCHITECTURE.md §4.2). ${VAR} values come from the container env.
+services:
+  portal:
+    # The portal API runs on the host during development (`pnpm dev`).
+    url: ${OPA_PORTAL_URL}
+    credentials:
+      bearer:
+        token: ${OPA_BUNDLE_TOKEN}
+
+# The last activated bundle is kept on disk (M6-04): an OPA that restarts while the portal is down
+# starts with it instead of with no policy, which would deny every call. It holds the data of the
+# bundle, keys included (subject reference, end-user hash): the volume is OPA's only (uid 1000).
+persistence_directory: /var/lib/opa
+
+bundles:
+  rid:
+    service: portal
+    # GET {url}/bundle.tar.gz (apps/api, ETag = revision). Without a bundle OPA has no policy and
+    # the gateway denies every call (fail closed).
+    resource: bundle.tar.gz
+    persist: true
+    polling:
+      min_delay_seconds: 10
+      max_delay_seconds: 20
+
+# OPA reports its status (including the active bundle revision) to POST {url}/status as soon as a
+# bundle is activated. The portal turns approved subscriptions in that revision into active ones.
+# The report holds bundle and plugin state, never decision inputs.
+status:
+  service: portal
+  # Bundle state as Prometheus metrics on /metrics (M5-06): last_success_bundle_request and
+  # friends (Unix ns), for the stale-bundle alert.
+  prometheus: true
+
+# Decision logs are intentionally NOT configured: each decision input carries request headers
+# (Authorization, X-RID-End-User in clear). Access metadata goes through APISIX -> Fluent Bit.

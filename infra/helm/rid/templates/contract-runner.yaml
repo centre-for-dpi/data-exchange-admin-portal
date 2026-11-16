@@ -1,0 +1,62 @@
+{{- if .Values.contractRunner.enabled }}
+{{- $c := dict "root" . "component" "contract-runner" }}
+{{- /*
+Contract tests of API versions in review (M4-06): Schemathesis against the sandbox, through the
+gateway's check routes. Called by the portal API only (NetworkPolicy); only results come back.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rid.name" "contract-runner" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "rid.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rid.labels" $c | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: contract-runner
+          image: {{ include "rid.image" (dict "root" . "name" "contractRunner") }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          env:
+            - name: RID_CONTRACT_RUNNER_TOKEN
+              valueFrom:
+                secretKeyRef: { name: {{ include "rid.name" "contract-runner" }}, key: RID_CONTRACT_RUNNER_TOKEN }
+          ports:
+            - { name: http, containerPort: 8096 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "contract-runner" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "rid.selector" $c | nindent 4 }}
+  ports:
+    - { name: http, port: 8096, targetPort: http }
+{{- end }}

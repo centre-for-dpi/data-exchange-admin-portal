@@ -1,0 +1,60 @@
+{{- if .Values.ingress.enabled }}
+{{- $c := dict "root" . "component" "portal" }}
+{{- $host := get (urlParse .Values.publicUrl) "host" }}
+{{- /*
+The portal's public host: the web, the API under /api/v1 and Keycloak under /auth. The services'
+own routes stay off it (they already require their tokens: this is defense in depth): the
+transparency collector (/api/v1/internal), OPA's bundle (/api/v1/opa) and Keycloak's admin console
+(/auth/admin) go to rid-blocked, a Service with no endpoints, which answers 503. The gateway is not
+here: applications reach it on its own name, with their certificate (gateway.yaml).
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "rid.name" "portal" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: {{ .Values.ingress.tlsSecretName }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{- range list "/api/v1/internal" "/api/v1/opa" "/auth/admin" }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service: { name: {{ include "rid.name" "blocked" }}, port: { number: 80 } }
+          {{- end }}
+          - path: /api/v1
+            pathType: Prefix
+            backend:
+              service: { name: {{ include "rid.name" "api" }}, port: { number: {{ .Values.api.port }} } }
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service: { name: {{ include "rid.name" "keycloak" }}, port: { number: 8080 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: {{ include "rid.name" "web" }}, port: { number: {{ .Values.web.port }} } }
+---
+# No pods match it: whatever the ingress sends here gets 503.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rid.name" "blocked" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: rid-nothing-runs-here
+  ports:
+    - { name: http, port: 80 }
+{{- end }}
