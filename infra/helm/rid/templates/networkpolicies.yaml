@@ -120,11 +120,21 @@ metadata:
 spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "access-logs" }} }
-  policyTypes: [Ingress]
+  policyTypes: [Ingress, Egress]
   ingress:
     - from:
         {{- include "rid.np.from" "gateway" | nindent 8 }}
       ports: [{ port: 9880 }]
+  egress:
+    - ports: [{ port: {{ .Values.accessLogs.opensearch.port }} }]
+      to:
+        - podSelector:
+            matchLabels: {{- toYaml .Values.accessLogs.opensearch.podLabels | nindent 14 }}
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
 {{- if .Values.wgHub.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
@@ -134,7 +144,23 @@ metadata:
 spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "wg-hub" }} }
-  policyTypes: [Ingress]
+  policyTypes: [Ingress, Egress]
+  # Out only WireGuard's UDP to the nodes (anywhere: their addresses change); the connections to
+  # the nodes' services travel inside the tunnel.
+  egress:
+    - ports: [{ protocol: UDP }]
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10]
+        {{- range .Values.networkPolicy.gatewayExtraEgressCidrs }}
+        - ipBlock: { cidr: {{ . }} }
+        {{- end }}
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
   ingress:
     # The kit nodes, from the internet.
     - ports: [{ port: 51820, protocol: UDP }]
@@ -154,10 +180,21 @@ metadata:
 spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "contract-runner" }} }
-  policyTypes: [Ingress]
+  policyTypes: [Ingress, Egress]
   ingress:
     - from:
         {{- include "rid.np.from" "api" | nindent 8 }}
       ports: [{ port: 8096 }]
+  # It calls what OpenAPI documents of the entities describe: only through the gateway's check
+  # routes, never anything else of the platform (SSRF, as on Compose's providers network).
+  egress:
+    - to:
+        {{- include "rid.np.from" "gateway" | nindent 8 }}
+      ports: [{ port: 9080 }]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
 {{- end }}
 {{- end }}

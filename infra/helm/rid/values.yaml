@@ -157,6 +157,9 @@ accessLogs:
     tls: true
     # The Secret with the CA of OpenSearch's certificate (key ca.crt).
     caSecret: rid-opensearch-ca
+    # OpenSearch's pods, the only place the pipeline may send to (NetworkPolicy).
+    podLabels:
+      app.kubernetes.io/name: opensearch
 
 # --- Network ---------------------------------------------------------------------------------------
 

@@ -59,3 +59,6 @@ apps/api/src/generated/
 infra/edge/dynamic/
 infra/edge/certs/
 backups/
+
+# Helm dependencies: Chart.lock pins them, `helm dependency build` fetches them (M6-05)
+infra/helm/*/charts/
