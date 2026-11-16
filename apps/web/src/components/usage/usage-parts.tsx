@@ -101,7 +101,7 @@ export function UsageFilters({
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+export function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="usage-stat">
       <dt className="text-sm text-muted-foreground">{label}</dt>

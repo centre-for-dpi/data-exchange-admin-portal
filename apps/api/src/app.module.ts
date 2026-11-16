@@ -18,6 +18,9 @@ import { ApisService } from './apis/apis.service.js';
 import { VersionLifecycleService } from './apis/version-lifecycle.service.js';
 import { AccessLogIndexReconciler } from './analytics/access-log-index.js';
 import { HttpOpenSearch, OPENSEARCH, openSearchUrl } from './analytics/opensearch.js';
+import { IndicatorsController } from './analytics/indicators.controller.js';
+import { IndicatorsService } from './analytics/indicators.service.js';
+import { HttpPrometheus, PROMETHEUS, prometheusUrl } from './analytics/prometheus.js';
 import { UsageController } from './analytics/usage.controller.js';
 import { UsageService } from './analytics/usage.service.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -120,6 +123,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     BootcampController,
     AdminBootcampController,
     UsageController,
+    IndicatorsController,
   ],
   providers: [
     StorageService,
@@ -162,6 +166,14 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     { provide: OPENSEARCH, useFactory: () => new HttpOpenSearch(openSearchUrl()) },
     AccessLogIndexReconciler,
     UsageService,
+    IndicatorsService,
+    {
+      provide: PROMETHEUS,
+      useFactory: () => {
+        const url = prometheusUrl();
+        return url ? new HttpPrometheus(url) : null;
+      },
+    },
     {
       provide: CITIZEN_TOKEN_VERIFIER,
       useFactory: () => createCitizenTokenVerifier(citizenTokenOptions()),

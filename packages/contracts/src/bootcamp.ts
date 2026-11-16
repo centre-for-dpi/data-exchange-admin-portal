@@ -31,6 +31,11 @@ export const updateBootcampItemSchema = z.strictObject({
   status: z.enum(['pending', 'done']),
   /** For the operator (server size, the use case). Never a password or credential. */
   note: z.string().trim().max(1_000).optional(),
+  /**
+   * Use case only: manual steps the exchange avoids (paperwork, certificates the citizen no
+   * longer carries). The network adds them up (SPEC.md §8, M5-04).
+   */
+  manualStepsAvoided: z.int().min(0).max(10_000).nullable().optional(),
 });
 
 export const bootcampChecklistItemSchema = z.object({
@@ -39,6 +44,7 @@ export const bootcampChecklistItemSchema = z.object({
   /** Derived from the entity's data, not confirmed by hand. */
   automatic: z.boolean(),
   note: z.string().nullable(),
+  manualStepsAvoided: z.number().int().nullable(),
   updatedAt: z.iso.datetime().nullable(),
 });
 

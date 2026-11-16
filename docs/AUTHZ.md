@@ -55,6 +55,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `document.list` | ✓ | · | · | · |
 | `node.list` | ✓ | ✓ | ✓ | · |
 | `bootcamp.list` | ✓ | ✓ | ✓ | · |
+| `network.indicators.read` | ✓ | ✓ | ✓ | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Rutas
@@ -158,6 +159,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | GET | `/api/v1/me/notifications` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/me/notifications/:notificationId/read` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/me/notifications/read-all` | cualquier sesión; solo recursos propios |
+| GET | `/api/v1/network/indicators` | plataforma: `network.indicators.read` |
 | GET | `/api/v1/nodes/:nodeId/config` | nodo del kit (mTLS con su certificado, a través de la ruta de control del gateway) |
 | POST | `/api/v1/nodes/:nodeId/heartbeat` | nodo del kit (mTLS con su certificado, a través de la ruta de control del gateway) |
 | POST | `/api/v1/nodes/:nodeId/renew` | nodo del kit (mTLS con su certificado, a través de la ruta de control del gateway) |

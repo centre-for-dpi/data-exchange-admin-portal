@@ -1,12 +1,22 @@
 'use client';
 
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 
 export interface UsageDay {
   date: string;
   calls: number;
   errors: number;
+}
+
+/** One column: its axis label, value, and what the tooltip and assistive tech say about it. */
+export interface Column {
+  key: string;
+  label: string;
+  value: number;
+  /** The whole reading, for assistive tech ("2 mar: 12 llamadas, 1 con error"). */
+  description: string;
+  tooltip: ReactNode;
 }
 
 const HEIGHT = 180;
@@ -27,20 +37,25 @@ function ticksFor(max: number): number[] {
   return ticks;
 }
 
-/** UTC noon of a calendar day: formatting it never moves it to the day before. */
-const asDate = (day: string) => new Date(`${day}T12:00:00Z`);
-
 /**
- * Calls per day (M5-02, M5-03): one series, so no legend box (the title names it). Each bar is a
- * hit target wider than the bar, with the same tooltip on hover and keyboard focus; the table
- * view carries every value without hovering.
+ * A single-series column chart (M5): no legend box (the title names the series). Drawn at the
+ * container's real width, so bars keep their 24px cap and text its size. Each column is a hit
+ * target wider than the bar, with the same tooltip on hover and keyboard focus; the table view
+ * (`table`) carries every value without hovering.
  */
-export function DailyChart({ days, title }: { days: UsageDay[]; title: string }) {
+export function ColumnChart({
+  title,
+  columns,
+  table,
+}: {
+  title: string;
+  columns: Column[];
+  table: ReactNode;
+}) {
   const t = useTranslations('usage');
   const format = useFormatter();
   const titleId = useId();
   const [active, setActive] = useState<number | null>(null);
-  // Drawn at the container's real width: bars keep their 24px cap and text its size.
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   useEffect(() => {
@@ -54,16 +69,14 @@ export function DailyChart({ days, title }: { days: UsageDay[]; title: string })
   }, []);
 
   const plot = width - AXIS;
-  const slot = plot / Math.max(days.length, 1);
+  const slot = plot / Math.max(columns.length, 1);
   const bar = Math.min(MAX_BAR, Math.max(2, slot - 2));
-  const ticks = ticksFor(Math.max(...days.map((d) => d.calls), 0));
+  const ticks = ticksFor(Math.max(...columns.map((c) => c.value), 0));
   const top = ticks.at(-1) ?? 1;
   const y = (v: number) => TOP + (HEIGHT - TOP - BOTTOM) * (1 - v / top);
-  const day = (d: string) =>
-    format.dateTime(asDate(d), { day: 'numeric', month: 'short', timeZone: 'UTC' });
-  // As many date labels as fit, about 56px each.
-  const every = Math.max(1, Math.ceil(days.length / Math.max(1, Math.floor(plot / 56))));
-  const current = active === null ? undefined : days[active];
+  // As many axis labels as fit, about 56px each.
+  const every = Math.max(1, Math.ceil(columns.length / Math.max(1, Math.floor(plot / 56))));
+  const current = active === null ? undefined : columns[active];
 
   return (
     <figure className="usage-chart">
@@ -88,9 +101,9 @@ export function DailyChart({ days, title }: { days: UsageDay[]; title: string })
               </text>
             </g>
           ))}
-          {days.map((d, i) => {
+          {columns.map((c, i) => {
             const x = AXIS + i * slot + (slot - bar) / 2;
-            const h = HEIGHT - BOTTOM - y(d.calls);
+            const h = HEIGHT - BOTTOM - y(c.value);
             const r = Math.min(4, h / 2, bar / 2);
             const base = HEIGHT - BOTTOM;
             // 4px rounded data end, square at the baseline.
@@ -100,14 +113,10 @@ export function DailyChart({ days, title }: { days: UsageDay[]; title: string })
                 : `M${x},${base} V${base - h + r} Q${x},${base - h} ${x + r},${base - h} H${x + bar - r} Q${x + bar},${base - h} ${x + bar},${base - h + r} V${base} Z`;
             return (
               <g
-                key={d.date}
+                key={c.key}
                 role="img"
                 tabIndex={0}
-                aria-label={t('chart.point', {
-                  date: day(d.date),
-                  calls: d.calls,
-                  errors: d.errors,
-                })}
+                aria-label={c.description}
                 onPointerEnter={() => setActive(i)}
                 onFocus={() => setActive(i)}
                 onBlur={() => setActive(null)}
@@ -134,7 +143,7 @@ export function DailyChart({ days, title }: { days: UsageDay[]; title: string })
                     textAnchor="middle"
                     className="usage-chart-tick"
                   >
-                    {day(d.date)}
+                    {c.label}
                   </text>
                 )}
               </g>
@@ -154,43 +163,135 @@ export function DailyChart({ days, title }: { days: UsageDay[]; title: string })
             style={{ left: `${((AXIS + (active + 0.5) * slot) / width) * 100}%` }}
             aria-hidden="true"
           >
-            <strong>{format.number(current.calls)}</strong> {t('chart.calls')}
-            <br />
-            <span className="text-muted-foreground">
-              {format.number(current.errors)} {t('chart.errors')} · {day(current.date)}
-            </span>
+            {current.tooltip}
           </div>
         )}
       </div>
       <details className="mt-2 text-sm">
         <summary className="cursor-pointer">{t('chart.asTable')}</summary>
-        <div className="table-wrap mt-2">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th scope="col">{t('chart.date')}</th>
-                <th scope="col" className="text-right">
-                  {t('chart.callsHeader')}
-                </th>
-                <th scope="col" className="text-right">
-                  {t('chart.errorsHeader')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {days.map((d) => (
-                <tr key={d.date}>
-                  <td>
-                    {format.dateTime(asDate(d.date), { dateStyle: 'medium', timeZone: 'UTC' })}
-                  </td>
-                  <td className="text-right tabular-nums">{format.number(d.calls)}</td>
-                  <td className="text-right tabular-nums">{format.number(d.errors)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <div className="table-wrap mt-2">{table}</div>
       </details>
     </figure>
+  );
+}
+
+/** UTC noon of a calendar day: formatting it never moves it to the day before. */
+const asDate = (day: string) => new Date(`${day}T12:00:00Z`);
+
+/** Calls per day (M5-02, M5-03). */
+export function DailyChart({ days, title }: { days: UsageDay[]; title: string }) {
+  const t = useTranslations('usage');
+  const format = useFormatter();
+  const day = (d: string) =>
+    format.dateTime(asDate(d), { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return (
+    <ColumnChart
+      title={title}
+      columns={days.map((d) => ({
+        key: d.date,
+        label: day(d.date),
+        value: d.calls,
+        description: t('chart.point', { date: day(d.date), calls: d.calls, errors: d.errors }),
+        tooltip: (
+          <>
+            <strong>{format.number(d.calls)}</strong> {t('chart.calls')}
+            <br />
+            <span className="text-muted-foreground">
+              {format.number(d.errors)} {t('chart.errors')} · {day(d.date)}
+            </span>
+          </>
+        ),
+      }))}
+      table={
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th scope="col">{t('chart.date')}</th>
+              <th scope="col" className="text-right">
+                {t('chart.callsHeader')}
+              </th>
+              <th scope="col" className="text-right">
+                {t('chart.errorsHeader')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d.date}>
+                <td>{format.dateTime(asDate(d.date), { dateStyle: 'medium', timeZone: 'UTC' })}</td>
+                <td className="text-right tabular-nums">{format.number(d.calls)}</td>
+                <td className="text-right tabular-nums">{format.number(d.errors)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      }
+    />
+  );
+}
+
+/** Entities that published their first API, by month (M5-04). */
+export function MonthlyChart({
+  months,
+  title,
+}: {
+  months: Array<{ month: string; count: number; cumulative: number }>;
+  title: string;
+}) {
+  const t = useTranslations('indicators');
+  const format = useFormatter();
+  const label = (m: string) =>
+    format.dateTime(new Date(`${m}-15T12:00:00Z`), {
+      month: 'short',
+      year: '2-digit',
+      timeZone: 'UTC',
+    });
+  return (
+    <ColumnChart
+      title={title}
+      columns={months.map((m) => ({
+        key: m.month,
+        label: label(m.month),
+        value: m.count,
+        description: t('connected.point', {
+          month: label(m.month),
+          count: m.count,
+          cumulative: m.cumulative,
+        }),
+        tooltip: (
+          <>
+            <strong>{format.number(m.count)}</strong> {t('connected.new')}
+            <br />
+            <span className="text-muted-foreground">
+              {t('connected.cumulative', { cumulative: m.cumulative })} · {label(m.month)}
+            </span>
+          </>
+        ),
+      }))}
+      table={
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th scope="col">{t('connected.month')}</th>
+              <th scope="col" className="text-right">
+                {t('connected.newHeader')}
+              </th>
+              <th scope="col" className="text-right">
+                {t('connected.cumulativeHeader')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {months.map((m) => (
+              <tr key={m.month}>
+                <td>{label(m.month)}</td>
+                <td className="text-right tabular-nums">{format.number(m.count)}</td>
+                <td className="text-right tabular-nums">{format.number(m.cumulative)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      }
+    />
   );
 }

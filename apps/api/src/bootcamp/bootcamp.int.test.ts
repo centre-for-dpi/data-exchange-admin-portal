@@ -132,6 +132,34 @@ describe('bootcamp readiness checklist (M4-07)', () => {
     expect(events).toHaveLength(4);
   });
 
+  it('the use case counts the manual steps it avoids; no other item does (M5-04)', async () => {
+    const entityId = await entity();
+    const admin = await member(entityId, ['entity_admin']);
+    const res = await call('PUT', `/entities/${entityId}/bootcamp/use_case`, admin, {
+      status: 'done',
+      note: 'Certificado de afiliación para subsidios',
+      manualStepsAvoided: 3,
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const list = bootcampChecklistSchema.parse(res.json());
+    expect(list.items.find((i) => i.item === 'use_case')?.manualStepsAvoided).toBe(3);
+    const event = await prisma.auditEvent.findFirstOrThrow({
+      where: { targetId: entityId, action: 'bootcamp.item_updated' },
+    });
+    expect(event.after).toMatchObject({ item: 'use_case', manualStepsAvoided: 3 });
+
+    const server = await call('PUT', `/entities/${entityId}/bootcamp/server`, admin, {
+      status: 'done',
+      manualStepsAvoided: 2,
+    });
+    expect(server.statusCode).toBe(400);
+    const negative = await call('PUT', `/entities/${entityId}/bootcamp/use_case`, admin, {
+      status: 'done',
+      manualStepsAvoided: -1,
+    });
+    expect(negative.statusCode).toBe(400);
+  });
+
   it('only the entity admin and the operator confirm; the operator sees every entity', async () => {
     const entityId = await entity();
     const viewer = await member(entityId, ['entity_viewer']);

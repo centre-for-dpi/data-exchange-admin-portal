@@ -1199,7 +1199,9 @@
       "progress": "Avance",
       "missing": "Falta",
       "count": "{done} de {total}"
-    }
+    },
+    "manualSteps": "Pasos manuales que evita",
+    "manualStepsHint": "Trámites, certificados o desplazamientos que la persona ya no tiene que hacer gracias al intercambio. Cuenta para los indicadores de la red."
   },
   "serviceSheet": {
     "title": "Ficha del servicio: {api}",
@@ -1327,6 +1329,58 @@
       "denials": "Llamadas negadas por el gateway, con su razón",
       "unknownApi": "Una ruta que ya no es de ninguna versión",
       "unattributed": "Las llamadas con un token que el gateway no pudo ligar a una aplicación (401) no aparecen aquí: no se sabe de quién son."
+    }
+  },
+  "indicators": {
+    "title": "Indicadores de la red",
+    "lead": "Cómo avanza la red: consultas exitosas, APIs en uso real, tiempos de aprobación y de puesta en uso, y pasos manuales evitados. Solo tráfico de producción.",
+    "periodLine": "Del {from} al {to}, en la hora de {timeZone}. Los tiempos a la primera API en uso y las entidades conectadas cuentan toda la historia, no solo el periodo.",
+    "noData": "Sin datos",
+    "successful": {
+      "label": "Consultas exitosas",
+      "hint": "{ok} de {counted} respuestas 2xx; {refused} negadas por autorización (401/403) se reportan aparte",
+      "refusedTable": "Negadas por el gateway, por razón"
+    },
+    "availability": {
+      "label": "Disponibilidad del gateway",
+      "hint": "Tiempo con el gateway respondiendo (Prometheus)"
+    },
+    "apisInUse": {
+      "label": "APIs con consumo real",
+      "value": "{inUse} de {published}",
+      "hint": "Publicadas con al menos una llamada exitosa de producción",
+      "table": "APIs con consumo real en el periodo"
+    },
+    "approval": {
+      "label": "Tiempo de aprobación",
+      "value": "{hours} h",
+      "hint": "Mediana entre la solicitud y la decisión del proveedor; {decisions} decisiones"
+    },
+    "firstUse": {
+      "label": "Tiempo a la primera API en uso",
+      "value": "{days} días",
+      "hint": "Mediana; {withUse} de {total} entidades proveedoras ya tienen uso",
+      "table": "Tiempo a la primera API en uso, por entidad",
+      "entity": "Entidad proveedora",
+      "since": "Desde",
+      "node": "Enrolamiento del nodo, {date}",
+      "firstCall": "Primera llamada exitosa",
+      "none": "Todavía ninguna",
+      "days": "Días",
+      "onboarding": "Alta de la entidad, {date}"
+    },
+    "manualSteps": {
+      "label": "Pasos manuales evitados",
+      "hint": "Declarados en {useCases} casos de uso"
+    },
+    "connected": {
+      "title": "Entidades conectadas por mes ({total} en total)",
+      "point": "{month}: {count} entidades publicaron su primera API; {cumulative} en total",
+      "new": "publicaron su primera API",
+      "cumulative": "{cumulative} en total",
+      "month": "Mes",
+      "newHeader": "Primera API publicada",
+      "cumulativeHeader": "Total acumulado"
     }
   }
 }

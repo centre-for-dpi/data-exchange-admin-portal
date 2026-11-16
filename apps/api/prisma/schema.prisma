@@ -1173,6 +1173,8 @@ model BootcampChecklistItem {
   status    BootcampItemStatus @default(pending)
   /// What the entity wants the operator to know (server size, the use case), never a password.
   note      String?
+  /// Use case only: manual steps it avoids (SPEC.md §8, the network's indicator, M5-04).
+  manualStepsAvoided Int? @map("manual_steps_avoided")
   updatedBy String             @map("updated_by") @db.Uuid
   updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)

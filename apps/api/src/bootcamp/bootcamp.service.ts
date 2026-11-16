@@ -9,7 +9,7 @@ import {
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
-import { NotFoundError } from '../common/errors.js';
+import { NotFoundError, ValidationError } from '../common/errors.js';
 import type { BootcampChecklistItem } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
@@ -27,6 +27,7 @@ function checklist(stored: BootcampChecklistItem[], designees: boolean): Bootcam
         status: designees ? ('done' as const) : ('pending' as const),
         automatic: true,
         note: null,
+        manualStepsAvoided: null,
         updatedAt: null,
       };
     }
@@ -36,6 +37,7 @@ function checklist(stored: BootcampChecklistItem[], designees: boolean): Bootcam
       status: row?.status ?? ('pending' as const),
       automatic: false,
       note: row?.note ?? null,
+      manualStepsAvoided: row?.manualStepsAvoided ?? null,
       updatedAt: row?.updatedAt.toISOString() ?? null,
     };
   });
@@ -82,6 +84,11 @@ export class BootcampService {
     requestId?: string,
   ): Promise<BootcampChecklist> {
     const data = updateBootcampItemSchema.parse(input);
+    if (data.manualStepsAvoided != null && item !== 'use_case') {
+      throw new ValidationError([
+        { path: 'manualStepsAvoided', message: 'Only the use case counts manual steps' },
+      ]);
+    }
     await this.prisma.$transaction(async (tx) => {
       const before = await tx.bootcampChecklistItem.findUnique({
         where: { entityId_item: { entityId, item } },
@@ -93,11 +100,15 @@ export class BootcampService {
           item,
           status: data.status,
           note: data.note ?? null,
+          manualStepsAvoided: data.manualStepsAvoided ?? null,
           updatedBy: principal.userId,
         },
         update: {
           status: data.status,
           ...(data.note !== undefined ? { note: data.note || null } : {}),
+          ...(data.manualStepsAvoided !== undefined
+            ? { manualStepsAvoided: data.manualStepsAvoided }
+            : {}),
           updatedBy: principal.userId,
         },
       });
@@ -105,8 +116,20 @@ export class BootcampService {
         actor: { type: 'user', id: principal.keycloakSub, entityId },
         action: 'bootcamp.item_updated',
         target: { type: 'entity', id: entityId },
-        before: before ? { item, status: before.status, note: before.note } : { item },
-        after: { item, status: after.status, note: after.note },
+        before: before
+          ? {
+              item,
+              status: before.status,
+              note: before.note,
+              manualStepsAvoided: before.manualStepsAvoided,
+            }
+          : { item },
+        after: {
+          item,
+          status: after.status,
+          note: after.note,
+          manualStepsAvoided: after.manualStepsAvoided,
+        },
         requestId,
       });
     });

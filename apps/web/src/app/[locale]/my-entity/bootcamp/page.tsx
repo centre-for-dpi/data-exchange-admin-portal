@@ -71,6 +71,7 @@ export default async function BootcampPage({ params }: PageProps) {
                 item={item.item}
                 done={item.status === 'done'}
                 note={item.note}
+                manualStepsAvoided={item.manualStepsAvoided}
               />
             ) : item.note ? (
               <p className="text-sm">{item.note}</p>

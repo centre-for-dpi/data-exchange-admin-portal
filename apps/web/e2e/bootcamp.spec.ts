@@ -28,6 +28,8 @@ test.describe('bootcamp readiness (M4-07)', () => {
         await card
           .getByLabel(/^Nota para el operador/)
           .fill('Afiliación para subsidios de vivienda');
+        // The manual steps the use case avoids count in the network's indicators (M5-04).
+        await card.getByLabel(/^Pasos manuales que evita/).fill('3');
       }
       await card.getByRole('button', { name: 'Guardar' }).click();
       await expect(card).toContainText('Listo');

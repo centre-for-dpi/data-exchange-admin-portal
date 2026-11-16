@@ -1199,7 +1199,9 @@
       "progress": "Progress",
       "missing": "Missing",
       "count": "{done} of {total}"
-    }
+    },
+    "manualSteps": "Manual steps it avoids",
+    "manualStepsHint": "Paperwork, certificates or trips the person no longer has to make thanks to the exchange. It counts in the network indicators."
   },
   "serviceSheet": {
     "title": "Service sheet: {api}",
@@ -1327,6 +1329,58 @@
       "denials": "Calls denied by the gateway, with their reason",
       "unknownApi": "A route that is no longer any version's",
       "unattributed": "Calls with a token the gateway could not tie to an application (401) do not appear here: nobody knows whose they are."
+    }
+  },
+  "indicators": {
+    "title": "Network indicators",
+    "lead": "How the network is doing: successful calls, APIs in real use, approval and time-to-use, and manual steps avoided. Production traffic only.",
+    "periodLine": "From {from} to {to}, in {timeZone} time. Time to first use and connected entities count the whole history, not only the period.",
+    "noData": "No data",
+    "successful": {
+      "label": "Successful calls",
+      "hint": "{ok} of {counted} 2xx responses; {refused} authorization refusals (401/403) are reported apart",
+      "refusedTable": "Refused by the gateway, by reason"
+    },
+    "availability": {
+      "label": "Gateway availability",
+      "hint": "Time the gateway was answering (Prometheus)"
+    },
+    "apisInUse": {
+      "label": "APIs in real use",
+      "value": "{inUse} of {published}",
+      "hint": "Published with at least one successful production call",
+      "table": "APIs in real use in the period"
+    },
+    "approval": {
+      "label": "Approval time",
+      "value": "{hours} h",
+      "hint": "Median from the request to the provider's decision; {decisions} decisions"
+    },
+    "firstUse": {
+      "label": "Time to first API in use",
+      "value": "{days} days",
+      "hint": "Median; {withUse} of {total} provider entities already have use",
+      "table": "Time to first API in use, by entity",
+      "entity": "Provider entity",
+      "since": "Since",
+      "node": "Node enrollment, {date}",
+      "firstCall": "First successful call",
+      "none": "None yet",
+      "days": "Days",
+      "onboarding": "Entity onboarding, {date}"
+    },
+    "manualSteps": {
+      "label": "Manual steps avoided",
+      "hint": "Declared in {useCases} use cases"
+    },
+    "connected": {
+      "title": "Connected entities by month ({total} in total)",
+      "point": "{month}: {count} entities published their first API; {cumulative} in total",
+      "new": "published their first API",
+      "cumulative": "{cumulative} in total",
+      "month": "Month",
+      "newHeader": "First API published",
+      "cumulativeHeader": "Cumulative total"
     }
   }
 }

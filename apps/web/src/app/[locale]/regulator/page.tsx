@@ -31,7 +31,15 @@ export default async function RegulatorPage({ params }: PageProps) {
 
   return (
     <Page>
-      <PageHeader title={t('nav.regulator')} description={t('regulator.lead')} />
+      <PageHeader
+        title={t('nav.regulator')}
+        description={t('regulator.lead')}
+        actions={
+          <Link href="/regulator/indicators" className="link">
+            {t('indicators.title')}
+          </Link>
+        }
+      />
       <Section title={t('regulator.versionsTitle')}>
         {queue.apiVersions.length === 0 ? (
           <EmptyState>{t('regulator.versionsEmpty')}</EmptyState>

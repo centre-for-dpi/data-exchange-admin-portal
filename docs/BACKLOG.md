@@ -696,7 +696,16 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Alcance.** Se acota a los `clientId` de las aplicaciones de la entidad. Por API muestra la versión, la entidad proveedora y si fue el sandbox.
     - **Negaciones.** Cada negación del gateway aparece con su razón estable y su aplicación: OPA nombra al cliente conocido en la negación (M5-01). Ahora también el 429 de `rid-rate-limited` lleva `rate_limited`.
     - **Sin atribuir.** Una llamada con un token que no se pudo ligar a una aplicación (401) no es de nadie, y la pantalla lo dice.
-- [ ] **M5-04 — Indicadores de la red**: los de `SPEC.md §8` para regulador y operador.
+- [x] **M5-04 — Indicadores de la red**: los de `SPEC.md §8` para regulador y operador.
+  - _Notas de implementación:_ endpoint `GET /network/indicators?from&to`, con el permiso `network.indicators.read` (`platform_admin`, `platform_reviewer`, `regulator`). Pantalla `/regulator/indicators`, enlazada desde las consolas del regulador y del operador.
+    - **Fuentes.** Las llamadas salen de OpenSearch, y solo cuentan las rutas de producción (sin sandbox ni verificaciones). El resto sale del portal y de Prometheus.
+    - **Consultas exitosas.** Es 2xx sobre las llamadas sin los 401/403, que se reportan aparte con su razón.
+    - **APIs con consumo real.** Publicadas con al menos un 2xx de producción en el periodo.
+    - **Tiempo a la primera API en uso.** Va del enrolamiento del primer nodo (si fue antes de la primera llamada exitosa, el camino del kit) o del alta de la entidad, hasta ese primer 2xx, dentro de la retención de los logs.
+    - **Entidades conectadas por mes.** Se cuentan por el primer `publishedAt`, en la zona del país, en los últimos 12 meses.
+    - **Tiempo de aprobación.** Mediana de horas entre la solicitud y la primera decisión `approved`/`rejected` de una persona, según la auditoría. Las aprobaciones automáticas del sandbox no cuentan.
+    - **Disponibilidad.** `avg_over_time(up{job="apisix"})` en Prometheus (`RID_PROMETHEUS_URL`); sin Prometheus, "sin datos". La provee M5-06.
+    - **Pasos manuales evitados.** Es un campo nuevo del caso de uso del bootcamp (`manualStepsAvoided`, migración `20261208000000`), que el indicador suma.
 - [ ] **M5-05 — Mapa de intercambios**: grafo entidad consumidora → entidad proveedora con volumen.
 - [ ] **M5-06 — Métricas y alertas**: Prometheus + Alertmanager con las alertas de `ARCHITECTURE.md §9`; Grafana con un tablero de operador.
 - [ ] **M5-07 — Consola de sincronización**: estado de `sync_state`, deriva detectada, reintento manual.

@@ -253,7 +253,7 @@ En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobad
 | Consultas exitosas | % de respuestas 2xx sobre el total (excluye 401/403 de autorización, que se reportan aparte) |
 | Disponibilidad del gateway | % de tiempo con health OK (Prometheus) |
 | Tiempo de aprobación | Mediana de horas entre solicitud y decisión del proveedor |
-| Pasos manuales evitados | Campo manual por caso de uso (se captura en la ficha del caso) |
+| Pasos manuales evitados | Campo manual por caso de uso: se captura con el caso de uso del bootcamp de la entidad (M4-07) |
 
 ## 9. Puntos de extensión previstos
 

@@ -51,6 +51,9 @@ export default async function OperatorPage({ params }: PageProps) {
             <Link href="/operator/bootcamp" className="link">
               {t('bootcamp.network.title')}
             </Link>
+            <Link href="/regulator/indicators" className="link">
+              {t('indicators.title')}
+            </Link>
             {viewer.platformRoles.includes('platform_admin') ? (
               <Link href="/operator/documents" className="link">
                 {t('documentsAdmin.title')}
