@@ -1401,5 +1401,44 @@
     "table": "Intercambios",
     "subscriptions": "Suscripciones activas",
     "empty": "No hay intercambios en este periodo: ni llamadas de producción ni suscripciones activas."
+  },
+  "syncConsole": {
+    "title": "Sincronización del gateway",
+    "lead": "Lo que los reconciliadores mantienen en APISIX, Keycloak, OPA, el hub de nodos y OpenSearch: si quedó aplicado, los errores, la deriva que encontraron (un cambio a mano que deshicieron) y un reintento manual.",
+    "recentDrift": "En las últimas 24 horas se encontró y se corrigió deriva en {count} objetos: alguien los cambió fuera del portal.",
+    "summary": "Resumen por sistema",
+    "system": "Sistema",
+    "status": "Estado",
+    "filters": "Filtros de la sincronización",
+    "problems": "Con problemas",
+    "all": "Todos",
+    "allSystems": "Todos los sistemas",
+    "search": "Buscar en el objeto",
+    "empty": "No hay objetos con estos filtros.",
+    "target": "Objeto",
+    "appliedAt": "Aplicado",
+    "notApplied": "El estado deseado todavía no está aplicado",
+    "drift": "Deriva",
+    "driftAt": "Corregida el {when} ({count} en total)",
+    "lastError": "Último error",
+    "actions": "Acciones",
+    "attempts": "{attempts} intentos",
+    "retry": "Reintentar",
+    "retryFor": "Reintentar la sincronización de {target}",
+    "queued": "En cola",
+    "next": "Siguientes",
+    "statuses": {
+      "pending": "Pendiente",
+      "in_sync": "Sincronizado",
+      "drift": "Con deriva",
+      "error": "Con error"
+    },
+    "systems": {
+      "apisix": "Gateway (APISIX)",
+      "keycloak": "Clientes (Keycloak)",
+      "opa": "Política (OPA)",
+      "wireguard": "Hub de nodos",
+      "opensearch": "Analítica (OpenSearch)"
+    }
   }
 }

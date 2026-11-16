@@ -10,6 +10,7 @@ import {
 import { hashSecret, open } from '../../common/secrets.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
+import { isDrift, recordSyncSuccess } from '../sync-state.js';
 import { getCountryConfig } from '@rid/config';
 import {
   BOUND_TOKENS_ATTRIBUTE,
@@ -136,6 +137,7 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
       )
       .digest('hex');
     const target = syncTarget(app.keycloakClientId);
+    const previous = await this.prisma.syncState.findUnique({ where: { target } });
 
     try {
       const secret = pending?.sealedSecret ? open(pending.sealedSecret, pending.id) : undefined;
@@ -184,25 +186,9 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
           data: { sealedSecret: null },
         });
       }
-      await this.prisma.syncState.upsert({
-        where: { target },
-        create: {
-          target,
-          system: 'keycloak',
-          desiredHash,
-          appliedHash: desiredHash,
-          status: 'in_sync',
-          appliedAt: new Date(),
-        },
-        update: {
-          desiredHash,
-          appliedHash: desiredHash,
-          status: 'in_sync',
-          appliedAt: new Date(),
-          lastError: null,
-          attempts: 0,
-        },
-      });
+      const drift = isDrift(previous, desiredHash, result !== 'unchanged');
+      if (drift) this.logger.warn(`Keycloak drift on ${target}: put back to the desired state`);
+      await recordSyncSuccess(this.prisma, 'keycloak', target, desiredHash, drift);
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

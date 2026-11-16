@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import { recordSyncError, recordSyncSuccess } from '../reconcilers/sync-state.js
 import { ACCESS_LOG_INDICES, OPENSEARCH, type OpenSearch } from './opensearch.js';
 
 export const ACCESS_LOG_TEMPLATE = 'rid-access';
+/** Outbox topic of a reconcile on demand (the operator's sync console, M5-07). */
+export const OPENSEARCH_SYNC_TOPIC = 'opensearch.sync';
 export const ACCESS_LOG_POLICY = 'rid-access-retention';
 export const templateTarget = `opensearch:index-template:${ACCESS_LOG_TEMPLATE}`;
 export const policyTarget = `opensearch:ism-policy:${ACCESS_LOG_POLICY}`;
@@ -127,10 +130,12 @@ export class AccessLogIndexReconciler implements OnApplicationBootstrap, OnAppli
   constructor(
     private readonly prisma: PrismaService,
     @Inject(OPENSEARCH) private readonly openSearch: OpenSearch,
+    @Optional() private readonly queue?: QueueService,
   ) {}
 
-  onApplicationBootstrap(): void {
+  async onApplicationBootstrap(): Promise<void> {
     if (!QueueService.enabled()) return;
+    await this.queue?.work(OPENSEARCH_SYNC_TOPIC, () => this.reconcileAll());
     void this.reconcileAll();
     this.timer = setInterval(() => void this.reconcileAll(), FULL_RECONCILE_MS);
   }

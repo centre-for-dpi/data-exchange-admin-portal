@@ -12,6 +12,7 @@ import { ZodError } from 'zod';
 import { listOperations } from '../../apis/lint/openapi-lint.js';
 import { pathRegex } from '../../opa/bundle.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { isDrift, recordSyncSuccess } from '../sync-state.js';
 import { QueueService } from '../../queue/queue.service.js';
 import {
   APISIX_ADMIN,
@@ -107,6 +108,8 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
   async handle(data: Record<string, unknown>): Promise<void> {
     const [kind, id] = (typeof data.aggregate === 'string' ? data.aggregate : '').split(':');
     if (kind === 'apiVersion' && id) await this.reconcileVersion(id);
+    // The operator's retry of the gateway's own objects (TLS, token and control routes): M5-07.
+    if (kind === 'gateway' && id === 'all') await this.reconcileAll();
   }
 
   /** Full pass: the gateway's TLS, every served version, then orphans. Errors are recorded. */
@@ -600,10 +603,12 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       );
       desiredHash = hash(desired);
 
+      const previous = await this.prisma.syncState.findUnique({ where: { target } });
       // Upstream before route: the route references it.
       const upstream = await this.apply('upstreams', upstreamId(apiVersionId), desired.upstream);
       const route = await this.apply('routes', routeId(apiVersionId), desired.route);
-      await this.recordSuccess(target, desiredHash);
+      const wrote = upstream !== 'unchanged' || route !== 'unchanged';
+      await this.recordSuccess(target, desiredHash, isDrift(previous, desiredHash, wrote));
       // The version's sandbox (M4-08), on its own: it never blocks the real route, but a sandbox
       // the gateway must not serve loses its route (fail closed, like the real one).
       await this.reconcileSandbox(version).catch(async (error: unknown) => {
@@ -678,27 +683,9 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     return deleteUpstreamWhenUnused(this.admin, id);
   }
 
-  private async recordSuccess(target: string, desiredHash: string): Promise<void> {
-    const now = new Date();
-    await this.prisma.syncState.upsert({
-      where: { target },
-      create: {
-        target,
-        system: 'apisix',
-        desiredHash,
-        appliedHash: desiredHash,
-        status: 'in_sync',
-        appliedAt: now,
-      },
-      update: {
-        desiredHash,
-        appliedHash: desiredHash,
-        status: 'in_sync',
-        appliedAt: now,
-        lastError: null,
-        attempts: 0,
-      },
-    });
+  private async recordSuccess(target: string, desiredHash: string, drift = false): Promise<void> {
+    if (drift) this.logger.warn(`APISIX drift on ${target}: put back to the desired state`);
+    await recordSyncSuccess(this.prisma, 'apisix', target, desiredHash, drift);
   }
 
   private async recordError(target: string, desiredHash: string, error: unknown): Promise<void> {

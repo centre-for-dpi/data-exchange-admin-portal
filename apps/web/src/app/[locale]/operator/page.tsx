@@ -54,6 +54,9 @@ export default async function OperatorPage({ params }: PageProps) {
             <Link href="/regulator/indicators" className="link">
               {t('indicators.title')}
             </Link>
+            <Link href="/operator/sync" className="link">
+              {t('syncConsole.title')}
+            </Link>
             {viewer.platformRoles.includes('platform_admin') ? (
               <Link href="/operator/documents" className="link">
                 {t('documentsAdmin.title')}

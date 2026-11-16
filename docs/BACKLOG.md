@@ -711,7 +711,11 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Aristas.** Salen de las llamadas de producción del periodo (entidad consumidora del log, entidad proveedora de la versión de la ruta). Se unen con las suscripciones activas de aplicaciones de producción: un intercambio acordado sin llamadas también aparece, con volumen 0.
     - **Gráfico.** Grafo bipartito con las consumidoras a la izquierda y las proveedoras a la derecha. El grosor es el volumen (escala de raíz, un solo tono) y lo acordado sin llamadas va en línea punteada gris, con leyenda. Cada enlace tiene tooltip con mouse y teclado, y debajo va la tabla con todos los valores.
 - [ ] **M5-06 — Métricas y alertas**: Prometheus + Alertmanager con las alertas de `ARCHITECTURE.md §9`; Grafana con un tablero de operador.
-- [ ] **M5-07 — Consola de sincronización**: estado de `sync_state`, deriva detectada, reintento manual.
+- [x] **M5-07 — Consola de sincronización**: estado de `sync_state`, deriva detectada, reintento manual.
+  - _Notas de implementación:_ `GET /admin/sync?system&status&q&cursor` (`sync.read`: `platform_admin`, `platform_reviewer`) y `POST /admin/sync/retry` (`sync.retry`: `platform_admin`). Pantalla `/operator/sync`.
+    - **Deriva.** Es una escritura con el estado deseado ya aplicado; el detalle está en `ARCHITECTURE.md §4`. Columnas nuevas `drift_detected_at` y `drift_count` (migración `20261209000000`). Hoy la detectan APISIX (versiones) y Keycloak (clientes).
+    - **Reintento.** Encola el trabajo del reconciliador dueño del objetivo y emite el evento de auditoría `sync.retry_requested`. OpenSearch tiene su propio tema (`opensearch.sync`).
+    - **Filtro.** El filtro por defecto es "con problemas": no sincronizado, o con deriva en las últimas 24 horas.
 - [ ] **M5-08 — Guía de integración ampliada**: snippets curl, Java, Python, C#, Node con mTLS + token + cabeceras RID.
 
 **Cierre M5:** el regulador ve los indicadores de un mes simulado (generador de tráfico sintético).

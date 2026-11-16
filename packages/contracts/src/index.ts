@@ -14,3 +14,4 @@ export * from './nodes.js';
 export * from './bootcamp.js';
 export * from './usage.js';
 export * from './indicators.js';
+export * from './sync.js';

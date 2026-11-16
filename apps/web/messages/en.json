@@ -1401,5 +1401,44 @@
     "table": "Exchanges",
     "subscriptions": "Active subscriptions",
     "empty": "No exchanges in this period: no production calls and no active subscriptions."
+  },
+  "syncConsole": {
+    "title": "Gateway sync",
+    "lead": "What the reconcilers keep in APISIX, Keycloak, OPA, the node hub and OpenSearch: whether it is applied, the errors, the drift they found (a change by hand they undid) and a manual retry.",
+    "recentDrift": "In the last 24 hours drift was found and corrected on {count} objects: someone changed them outside the portal.",
+    "summary": "Summary by system",
+    "system": "System",
+    "status": "Status",
+    "filters": "Sync filters",
+    "problems": "With problems",
+    "all": "All",
+    "allSystems": "All systems",
+    "search": "Search in the object",
+    "empty": "No objects with these filters.",
+    "target": "Object",
+    "appliedAt": "Applied",
+    "notApplied": "The desired state is not applied yet",
+    "drift": "Drift",
+    "driftAt": "Corrected on {when} ({count} in total)",
+    "lastError": "Last error",
+    "actions": "Actions",
+    "attempts": "{attempts} attempts",
+    "retry": "Retry",
+    "retryFor": "Retry the sync of {target}",
+    "queued": "Queued",
+    "next": "Next",
+    "statuses": {
+      "pending": "Pending",
+      "in_sync": "In sync",
+      "drift": "Drifted",
+      "error": "Error"
+    },
+    "systems": {
+      "apisix": "Gateway (APISIX)",
+      "keycloak": "Clients (Keycloak)",
+      "opa": "Policy (OPA)",
+      "wireguard": "Node hub",
+      "opensearch": "Analytics (OpenSearch)"
+    }
   }
 }

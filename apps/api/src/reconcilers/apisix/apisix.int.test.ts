@@ -178,6 +178,13 @@ describe('APISIX reconciler (M1-08)', () => {
       await admin.put('routes', routeId(versionId), { ...tampered, plugins });
       expect(await reconciler.reconcileVersion(versionId)).toBe('updated');
       expect((await admin.get('routes', routeId(versionId)))?.plugins).toHaveProperty('opa');
+      // Both repairs were drift: the desired state had not changed (M5-07).
+      const state = await prisma.syncState.findUniqueOrThrow({
+        where: { target: gatewaySyncTarget(versionId) },
+      });
+      expect(state.driftCount).toBe(2);
+      expect(state.driftDetectedAt).not.toBeNull();
+      expect(state.status).toBe('in_sync');
     },
     FULL_PASS_TIMEOUT,
   );

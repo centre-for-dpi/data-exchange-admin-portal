@@ -167,6 +167,10 @@ export const PLATFORM_PERMISSIONS = {
   'bootcamp.list': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** The network's indicators (SPEC.md §8, M5-04): the regulator and the operator. */
   'network.indicators.read': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** The sync console (M5-07): what the reconcilers keep and the drift they found (operator). */
+  'sync.read': ['platform_admin', 'platform_reviewer'],
+  /** Reconcile one target now: queues the reconciler's job (operator admin). */
+  'sync.retry': ['platform_admin'],
   /** The exchange map (M5-05): which entity consumes from which, with volume. */
   'network.map.read': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */

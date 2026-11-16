@@ -124,7 +124,9 @@ Reconciliador
 ```
 
 - **Reconciliación completa** cada 5 minutos además de la incremental, para corregir derivas.
-- La consola del operador muestra `sync_state`: último hash aplicado, errores, objetos en deriva.
+- **Consola del operador (`/operator/sync`, M5-07).** Muestra `sync_state` por sistema y estado: si el hash deseado está aplicado, los errores con sus intentos y la deriva encontrada.
+  - **Deriva.** Es una pasada que tuvo que escribir aunque el estado deseado no había cambiado desde que se aplicó (`appliedHash = desiredHash` y `in_sync`): alguien cambió el objeto fuera del portal. El reconciliador la corrige y deja `driftDetectedAt` y `driftCount`. Así lo detectan las versiones en APISIX y los clientes de Keycloak.
+  - **Reintento.** `POST /admin/sync/retry`, solo `platform_admin`, encola el trabajo del reconciliador dueño del objetivo: `gateway.sync` (`apiVersion:<id>`, o `gateway:all` para TLS y las rutas propias), `keycloak.sync`, `policy.sync`, `wireguard.sync` u `opensearch.sync`. Nunca llama al sistema desde el controlador, y queda en auditoría (`sync.retry_requested`).
 - IDs deterministas: `rid-route-<apiVersionId>`, `rid-upstream-<apiVersionId>`, `rid-app-<applicationId>`.
 
 ### 4.1 Objetos en APISIX por versión de API publicada

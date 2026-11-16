@@ -83,6 +83,8 @@ export const AUDIT_ACTIONS = [
   'subscription.agreement_attached',
   // Bootcamp readiness (M4-07)
   'bootcamp.item_updated',
+  // Sync console (M5-07): the operator queued a reconcile by hand.
+  'sync.retry_requested',
   // Nodes of the kit (M4)
   'node.created',
   'node.enrollment_token_issued',

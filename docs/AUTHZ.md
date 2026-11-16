@@ -56,6 +56,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `node.list` | ✓ | ✓ | ✓ | · |
 | `bootcamp.list` | ✓ | ✓ | ✓ | · |
 | `network.indicators.read` | ✓ | ✓ | ✓ | · |
+| `sync.read` | ✓ | ✓ | · | · |
+| `sync.retry` | ✓ | · | · | · |
 | `network.map.read` | ✓ | ✓ | ✓ | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
@@ -76,6 +78,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | PUT | `/api/v1/admin/purposes/:code` | plataforma: `purpose.manage` |
 | POST | `/api/v1/admin/purposes/:code/activate` | plataforma: `purpose.manage` |
 | POST | `/api/v1/admin/purposes/:code/deactivate` | plataforma: `purpose.manage` |
+| GET | `/api/v1/admin/sync` | plataforma: `sync.read` |
+| POST | `/api/v1/admin/sync/retry` | plataforma: `sync.retry` |
 | GET | `/api/v1/audit/events` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/export` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/timeline/:kind/:id` | plataforma: `audit.read` |

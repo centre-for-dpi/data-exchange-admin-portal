@@ -777,16 +777,20 @@ enum SyncStatus {
 /// Last desired and applied state per external object (APISIX route, Keycloak client, OPA bundle).
 model SyncState {
   /// Deterministic external id, e.g. apisix:route:rid-route-<apiVersionId>.
-  target      String     @id
+  target          String     @id
   /// apisix | keycloak | opa
-  system      String
-  desiredHash String     @map("desired_hash")
-  appliedHash String?    @map("applied_hash")
-  status      SyncStatus @default(pending)
-  lastError   String?    @map("last_error")
-  attempts    Int        @default(0)
-  appliedAt   DateTime?  @map("applied_at") @db.Timestamptz(3)
-  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  system          String
+  desiredHash     String     @map("desired_hash")
+  appliedHash     String?    @map("applied_hash")
+  status          SyncStatus @default(pending)
+  lastError       String?    @map("last_error")
+  attempts        Int        @default(0)
+  appliedAt       DateTime?  @map("applied_at") @db.Timestamptz(3)
+  /// Last time a reconcile found the system different from a desired state already applied
+  /// (someone changed it by hand) and put it back (M5-07).
+  driftDetectedAt DateTime?  @map("drift_detected_at") @db.Timestamptz(3)
+  driftCount      Int        @default(0) @map("drift_count")
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([status])
   @@map("sync_state")
@@ -1166,18 +1170,18 @@ enum BootcampItemStatus {
 }
 
 model BootcampChecklistItem {
-  id        String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  entityId  String             @map("entity_id") @db.Uuid
-  entity    Entity             @relation(fields: [entityId], references: [id])
-  item      BootcampItem
-  status    BootcampItemStatus @default(pending)
+  id                 String             @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  entityId           String             @map("entity_id") @db.Uuid
+  entity             Entity             @relation(fields: [entityId], references: [id])
+  item               BootcampItem
+  status             BootcampItemStatus @default(pending)
   /// What the entity wants the operator to know (server size, the use case), never a password.
-  note      String?
+  note               String?
   /// Use case only: manual steps it avoids (SPEC.md §8, the network's indicator, M5-04).
-  manualStepsAvoided Int? @map("manual_steps_avoided")
-  updatedBy String             @map("updated_by") @db.Uuid
-  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  manualStepsAvoided Int?               @map("manual_steps_avoided")
+  updatedBy          String             @map("updated_by") @db.Uuid
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@unique([entityId, item])
   @@map("bootcamp_checklist_item")
