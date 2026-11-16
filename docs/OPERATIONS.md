@@ -339,7 +339,7 @@ Haz el respaldo **antes de cada actualización con migraciones**, y guarda los a
 | API publicada que no aparece en el gateway (`404`) | Error del reconciliador de APISIX | SQL 1 con `system = 'apisix'`; `dc logs api`; revisar `APISIX_ADMIN_URL` y `APISIX_ADMIN_KEY` |
 | La aplicación no pasa a "Lista" | Error del reconciliador de Keycloak | SQL 1 con `system = 'keycloak'`; revisar `KEYCLOAK_URL` y `RID_GATEWAY_PROVISIONER_SECRET` (debe coincidir con el del realm) |
 | `api` termina al arrancar con un mensaje de configuración | `RID_COUNTRY` sin valor o YAML del país inválido | Corregir el YAML y reconstruir la imagen |
-| `api` no arranca: error de migración | Migración fallida o base inaccesible como dueño | `dc logs api`; `dc exec api pnpm exec prisma migrate status` |
+| `api` no arranca: error de migración | Migración fallida o base inaccesible como dueño | `dc logs api`; `dc exec api node_modules/.bin/prisma migrate status` |
 | No se emiten certificados (503) | step-ca caído, contraseña del provisioner distinta, o raíz no configurada con `NODE_ENV=production` | `dc logs api` (mensajes `step-ca: ...`); `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD`; `RID_STEP_CA_ROOT_FILE` |
 | `sync_state` en error para `apisix:ssl:...` | step-ca no responde, falta el provisioner `rid-gateway-tls` (step-ca sin recrear) o cambió `RID_SECRETS_KEY` | `dc logs api`; `dc up -d step-ca`; §5.6 |
 | Upstream `direct` que responde 502 | El gateway ahora verifica el certificado del proveedor (vencido, autofirmado o de otro nombre), o el proveedor con mTLS no acepta `CN=rid-gateway.<slug>` | Pedir al proveedor un certificado público válido para su nombre, o que confíe en la CA de la red y en ese nombre |

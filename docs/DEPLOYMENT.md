@@ -234,7 +234,7 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 Además sirve la API del titular que consume la carpeta ciudadana.
 
 - Imagen: `apps/api/Dockerfile`, construida desde la raíz del repo (`COPY . .`). **La configuración del país (`config/country/*.yaml`) queda dentro de la imagen**: un cambio en el YAML exige reconstruir.
-- Al arrancar: `pnpm db:deploy` (migraciones como dueño) → `pnpm db:seed` si `RID_ALLOW_SEED=true` → `node dist/main.js` en `API_PORT` (4000). Si la configuración del país es inválida o falta `RID_COUNTRY`, termina con código 1.
+- Al arrancar: `prisma migrate deploy` (migraciones como dueño) → el seed (`dist/seed/main.js`) si `RID_ALLOW_SEED=true` → `node dist/main.js` en `API_PORT` (4000). Si la configuración del país es inválida o falta `RID_COUNTRY`, termina con código 1.
 - Corre como usuario `node`. Documentos en `/var/lib/rid/documents` (`RID_DOCUMENTS_DIR`, volumen `api-documents`).
 - **Trabajos en segundo plano en el mismo proceso** (`OPERATIONS.md §3`). `RID_WORKER=off` arranca el API sin ellos (pruebas, réplicas de solo lectura).
 - Expone `/api/v1/*`. Rutas que **nunca** van al ingreso público: `/api/v1/internal/*` (colector de transparencia) y `/api/v1/opa/*` (bundle y estado de OPA).

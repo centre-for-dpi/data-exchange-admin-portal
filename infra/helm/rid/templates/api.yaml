@@ -37,7 +37,7 @@ spec:
         - name: migrate
           image: {{ include "rid.image" (dict "root" . "name" "api") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          command: ['pnpm', 'db:deploy']
+          command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
           env:
             - name: DATABASE_MIGRATION_URL
               valueFrom:
