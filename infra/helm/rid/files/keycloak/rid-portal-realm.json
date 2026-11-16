@@ -21,10 +21,15 @@
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
   "smtpServer": {
-    "host": "mailpit",
-    "port": "1025",
-    "from": "no-reply@rid.example",
-    "fromDisplayName": "Portal RID"
+    "host": "${KC_SMTP_HOST}",
+    "port": "${KC_SMTP_PORT}",
+    "from": "${KC_SMTP_FROM}",
+    "fromDisplayName": "Portal RID",
+    "starttls": "${KC_SMTP_STARTTLS}",
+    "ssl": "${KC_SMTP_SSL}",
+    "auth": "true",
+    "user": "${KC_SMTP_USER}",
+    "password": "${KC_SMTP_PASSWORD}"
   },
   "clients": [
     {

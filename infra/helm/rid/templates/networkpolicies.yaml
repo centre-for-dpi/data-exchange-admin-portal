@@ -97,6 +97,67 @@ spec:
         - ipBlock: { cidr: {{ . }} }
         {{- end }}
 ---
+# Keycloak: the users through the ingress; the gateway (token route, JWKS), the portal API
+# (provisioning) and the web (server-side token exchange) inside.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "keycloak" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "keycloak" }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
+        {{- include "rid.np.from" "gateway" | nindent 8 }}
+        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "rid.np.from" "web" | nindent 8 }}
+      ports: [{ port: 8080 }]
+    - from:
+        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+      ports: [{ port: 9000 }]
+---
+# The CA: only the portal API asks it for certificates.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "step-ca" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "step-ca" }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- include "rid.np.from" "api" | nindent 8 }}
+      ports: [{ port: 9000 }]
+{{- range $db := list (dict "component" "db" "client" "api") (dict "component" "keycloak-db" "client" "keycloak") }}
+---
+# PostgreSQL: its one client (the API, with its migrations; Keycloak for its own), the cluster's
+# other instances (replication) and the CloudNativePG operator (instance status on 8000).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" $db.component }}
+spec:
+  podSelector:
+    matchLabels: { cnpg.io/cluster: {{ include "rid.name" $db.component }} }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- include "rid.np.from" $db.client | nindent 8 }}
+      ports: [{ port: 5432 }]
+    - from:
+        - podSelector:
+            matchLabels: { cnpg.io/cluster: {{ include "rid.name" $db.component }} }
+      ports: [{ port: 5432 }, { port: 8000 }]
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $.Values.networkPolicy.platformNamespace }} }
+      ports: [{ port: 8000 }, { port: 5432 }]
+{{- end }}
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

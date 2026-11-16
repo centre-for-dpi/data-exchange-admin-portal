@@ -73,7 +73,12 @@ access-logs:
 step-ca:
   keys: [RID_STEP_CA_PROVISIONER_PASSWORD]
 keycloak:
-  keys: [KEYCLOAK_ADMIN_PASSWORD, RID_PORTAL_WEB_CLIENT_SECRET, RID_GATEWAY_PROVISIONER_SECRET]
+  keys:
+    - KEYCLOAK_ADMIN_PASSWORD
+    - RID_PORTAL_WEB_CLIENT_SECRET
+    - RID_GATEWAY_PROVISIONER_SECRET
+    - KEYCLOAK_SMTP_USER
+    - KEYCLOAK_SMTP_PASSWORD
 keycloak-citizens:
   keys: [RID_CARPETA_CLIENT_SECRET]
 # CloudNativePG's roles (kubernetes.io/basic-auth): the owner of the schema, the API's runtime

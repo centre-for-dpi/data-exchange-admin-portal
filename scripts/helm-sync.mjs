@@ -41,6 +41,21 @@ export const SHARED = {
 export function productionRealm(source) {
   const realm = JSON.parse(source);
   realm.users = (realm.users ?? []).filter((user) => user.serviceAccountClientId);
+  // The development mail catcher (Mailpit) is not production's: the chart fills the realm's SMTP
+  // from its values and secrets (Keycloak resolves ${VAR} from its environment on import).
+  if (realm.smtpServer) {
+    realm.smtpServer = {
+      ...realm.smtpServer,
+      host: '${KC_SMTP_HOST}',
+      port: '${KC_SMTP_PORT}',
+      from: '${KC_SMTP_FROM}',
+      starttls: '${KC_SMTP_STARTTLS}',
+      ssl: '${KC_SMTP_SSL}',
+      auth: 'true',
+      user: '${KC_SMTP_USER}',
+      password: '${KC_SMTP_PASSWORD}',
+    };
+  }
   return `${JSON.stringify(realm, null, 2)}\n`;
 }
 

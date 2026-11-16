@@ -16,6 +16,11 @@ metadata:
   labels:
     {{- include "rid.labels" (dict "root" $ "component" $db.component) | nindent 4 }}
 spec:
+  # On the instances' pods too: the default deny and the NetworkPolicies below select them.
+  inheritedMetadata:
+    labels:
+      app.kubernetes.io/part-of: rid
+      app.kubernetes.io/name: {{ include "rid.name" $db.component }}
   instances: {{ $db.spec.instances }}
   {{- with $pg.imageName }}
   imageName: {{ . }}

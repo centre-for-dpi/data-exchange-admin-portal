@@ -106,6 +106,13 @@ keycloak:
   # citizen folder uses the national one (RID_CITIZEN_ISSUER).
   citizensRealm: false
   carpetaUrl: ''
+  # The realm's mail server (the user and password are KEYCLOAK_SMTP_USER and _PASSWORD).
+  smtp:
+    host: ''
+    port: '587'
+    from: no-reply@rid.example.org
+    starttls: 'true'
+    ssl: 'false'
   resources:
     requests: { cpu: 500m, memory: 1Gi }
     limits: { memory: 2Gi }
@@ -216,6 +223,8 @@ networkPolicy:
   enabled: true
   # The namespace of the ingress controller that reaches the web and the API.
   ingressControllerNamespace: ingress-nginx
+  # Where the rid-platform chart runs (the CloudNativePG operator reaches the database pods).
+  platformNamespace: rid-platform
   # Private ranges the gateway may call besides public addresses (an X-Road Security Server or
   # providers inside the operator's network). Empty: public addresses only.
   gatewayExtraEgressCidrs: []
