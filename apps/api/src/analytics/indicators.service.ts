@@ -143,7 +143,7 @@ export class IndicatorsService {
     const consumers = buckets(result.aggregations, 'consumers');
     const versionIds = new Set<string>();
     for (const c of consumers) {
-      for (const r of buckets(c as Record<string, unknown>, 'routes')) {
+      for (const r of buckets(c, 'routes')) {
         const id = versionIdOf(String(r.key));
         if (id) versionIds.add(id);
       }
@@ -197,7 +197,7 @@ export class IndicatorsService {
     for (const c of consumers) {
       const consumer = bySlug.get(String(c.key));
       if (!consumer) continue;
-      for (const r of buckets(c as Record<string, unknown>, 'routes')) {
+      for (const r of buckets(c, 'routes')) {
         const id = versionIdOf(String(r.key));
         const provider = id ? providerOf.get(id) : undefined;
         if (!provider) continue;
