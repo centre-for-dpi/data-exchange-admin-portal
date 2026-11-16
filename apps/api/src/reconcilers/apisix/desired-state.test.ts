@@ -5,6 +5,7 @@ import {
   NODE_ONLY_SKIP_MTLS_REGEX,
   deprecationHeaders,
   desiredGateway,
+  devNodeOf,
   type GatewaySettings,
   matches,
   parseDevNodes,
@@ -140,7 +141,12 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       set_access_token_header: false,
       claim_validator: { audience: { required: true, match_with_client_id: true } },
     });
-    expect(plugins.opa).toMatchObject({ policy: 'rid/authz', with_route: true });
+    expect(plugins.opa).toMatchObject({
+      policy: 'rid/authz/decision',
+      with_route: true,
+      keepalive: true,
+      keepalive_pool: 64,
+    });
     // Clients cannot forge gateway headers; purpose and end user stay for OPA to read.
     const removed = (plugins['proxy-rewrite']?.headers as { remove: string[] }).remove;
     expect(removed).toContain('X-RID-Subscription');
@@ -633,5 +639,17 @@ describe('token route (S-4, M3-10)', () => {
     expect((route.plugins as Record<string, { uri?: string }>)['proxy-rewrite']?.uri).toBe(
       '/auth/realms/rid-gateway/protocol/openid-connect/token',
     );
+  });
+});
+
+describe('development nodes (RID_DEV_NODES)', () => {
+  it('uses the entity slug first, then the longest prefix (M6-03)', () => {
+    const nodes = parseDevNodes(
+      'salud=mock-salud:8000,carga-*=mock-socioeconomico:8000,carga-0*=https://mock-salud:8443',
+    );
+    expect(devNodeOf(nodes, 'salud')?.hostPort).toBe('mock-salud:8000');
+    expect(devNodeOf(nodes, 'carga-123')?.hostPort).toBe('mock-socioeconomico:8000');
+    expect(devNodeOf(nodes, 'carga-012')).toMatchObject({ hostPort: 'mock-salud:8443', tls: true });
+    expect(devNodeOf(nodes, 'otra')).toBeUndefined();
   });
 });

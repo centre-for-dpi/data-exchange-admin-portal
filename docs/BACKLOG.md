@@ -782,6 +782,17 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - espaciado de texto en los gráficos y en Scalar.
     - **Fuera de la automatización:** prueba con lectores de pantalla (NVDA, VoiceOver) y con usuarios, como recomendación para el operador antes de producción.
 - [ ] **M6-03 — Prueba de carga** con k6: 500 peticiones/s sostenidas, p95 agregado por el gateway < 50 ms.
+  - _Avance (2026-11-16):_ resultados en `docs/performance/M6-03.md`.
+    - **Hecho:**
+      - `pnpm load:seed`: la red a la escala de SPEC §9, sintética y auditada;
+      - `pnpm load:test`: k6 en su contenedor por la cadena completa con mTLS, más la latencia de APISIX leída en Prometheus.
+    - **Corregido:**
+      - la activación de suscripciones en lotes (no terminaba con miles pendientes);
+      - el gateway consulta solo `rid/authz/decision` (el p95 de OPA baja de 18,7 a 4,4 ms);
+      - 64 conexiones a OPA por worker (había miles en TIME_WAIT);
+      - `RID_DEV_NODES` con prefijo.
+    - **Resultado en la máquina de desarrollo:** pasa a 200/s (p95 del gateway 13,3 ms). A 500/s la CPU del equipo llega al 100 %, porque el generador comparte la máquina con todo el stack.
+    - **Falta:** validar 500/s en el entorno tipo producción del cierre de M6, con el generador en otra máquina.
 - [ ] **M6-04 — Resiliencia**: con el portal caído, el tráfico sigue; con OPA sin bundle nuevo, se mantiene el último; test documentado.
 - [ ] **M6-05 — Helm charts** para producción con la topología de `ARCHITECTURE.md §11`.
 - [ ] **M6-06 — Respaldos y recuperación**: pgBackRest, procedimiento de restauración probado.

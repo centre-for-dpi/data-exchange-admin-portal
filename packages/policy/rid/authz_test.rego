@@ -626,3 +626,33 @@ test_a_sandbox_app_reaches_its_sandbox_route if {
 		with data.config as b.config
 		with time.now_ns as june_2026
 }
+
+# --- What the gateway reads (M6-03) --------------------------------------------------------------
+
+test_decision_is_what_the_gateway_reads_of_an_allowed_call if {
+	d := authz.decision with input as request({})
+		with data.routes as bundle.routes
+		with data.clients as bundle.clients
+		with data.config as bundle.config
+		with time.now_ns as june_2026
+	h := authz.headers with input as request({})
+		with data.routes as bundle.routes
+		with data.clients as bundle.clients
+		with data.config as bundle.config
+		with time.now_ns as june_2026
+	d == {"allow": true, "headers": h}
+}
+
+test_decision_is_what_the_gateway_reads_of_a_denied_call if {
+	d := authz.decision with input as without_header("authorization")
+		with data.routes as bundle.routes
+		with data.clients as bundle.clients
+		with data.config as bundle.config
+		with time.now_ns as june_2026
+	object.keys(d) == {"allow", "headers", "status_code", "reason"}
+	d.allow == false
+	d.status_code == 403
+	d.reason.code == "no_subscription"
+	d.headers["X-RID-Deny-Reason"] == "no_subscription"
+}
+

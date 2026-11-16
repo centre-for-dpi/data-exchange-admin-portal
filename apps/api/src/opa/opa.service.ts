@@ -24,6 +24,8 @@ const SERVED_VERSIONS = ['published', 'deprecated'] as const;
 /** Subscriptions the gateway lets through; `approved` ones become `active` once OPA has them. */
 const GRANTED = ['approved', 'active'] as const;
 const KEEP_REVISIONS_MS = 24 * 60 * 60 * 1000;
+/** Subscriptions activated per transaction when OPA confirms a revision (M6-03). */
+export const ACTIVATION_BATCH = 100;
 
 export class BundleUnavailableError extends Error {}
 
@@ -229,32 +231,48 @@ export class OpaService implements OnApplicationBootstrap {
   /**
    * OPA reports the revision it activated. Approved subscriptions in that revision become active,
    * each with an audit event in the same transaction. Unknown revisions are ignored.
+   *
+   * In batches of ACTIVATION_BATCH, a transaction each (M6-03): a backlog of thousands (after an
+   * OPA outage, or a bulk load) would not fit in one transaction's time limit, which then rolled
+   * back and retried forever. A batch that fails leaves the rest approved for the next report.
    */
   async reportActiveRevision(revision: string): Promise<{ activated: number }> {
     const bundle = await this.prisma.policyBundle.findUnique({ where: { revision } });
     let activated = 0;
+    const approved =
+      bundle && bundle.subscriptionIds.length > 0
+        ? await this.prisma.subscription.findMany({
+            where: { id: { in: bundle.subscriptionIds }, status: 'approved' },
+            select: { id: true },
+            orderBy: { id: 'asc' },
+          })
+        : [];
+    for (let start = 0; start < approved.length; start += ACTIVATION_BATCH) {
+      const batch = approved.slice(start, start + ACTIVATION_BATCH);
+      activated += await this.prisma.$transaction(
+        async (tx) => {
+          let count = 0;
+          for (const { id } of batch) {
+            const changed = await tx.subscription.updateMany({
+              where: { id, status: 'approved' },
+              data: { status: 'active' },
+            });
+            if (changed.count === 0) continue;
+            count += 1;
+            await this.audit.record(tx, {
+              actor: { type: 'system', id: 'opa' },
+              action: 'subscription.activated',
+              target: { type: 'subscription', id },
+              before: { status: 'approved' },
+              after: { status: 'active', bundleRevision: revision },
+            });
+          }
+          return count;
+        },
+        { timeout: 30_000 },
+      );
+    }
     await this.prisma.$transaction(async (tx) => {
-      if (bundle && bundle.subscriptionIds.length > 0) {
-        const approved = await tx.subscription.findMany({
-          where: { id: { in: bundle.subscriptionIds }, status: 'approved' },
-          select: { id: true },
-        });
-        for (const { id } of approved) {
-          const changed = await tx.subscription.updateMany({
-            where: { id, status: 'approved' },
-            data: { status: 'active' },
-          });
-          if (changed.count === 0) continue;
-          activated += 1;
-          await this.audit.record(tx, {
-            actor: { type: 'system', id: 'opa' },
-            action: 'subscription.activated',
-            target: { type: 'subscription', id },
-            before: { status: 'approved' },
-            after: { status: 'active', bundleRevision: revision },
-          });
-        }
-      }
       const current = await tx.syncState.findUnique({ where: { target: OPA_SYNC_TARGET } });
       const desired = current?.desiredHash ?? revision;
       await tx.syncState.upsert({

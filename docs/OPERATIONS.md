@@ -216,6 +216,20 @@ En la consola de sincronización (`/operator/sync`, M5-07), un `platform_admin` 
 - **Borrarlo.** `--clear` borra todo; `--tag` lo separa (las pruebas usan uno propio).
 - **Restricción.** Solo desarrollo y demos: en producción exige `RID_ALLOW_SYNTHETIC_TRAFFIC=true`. En el piloto se corre dentro del contenedor del API.
 
+### 5.2.2 Prueba de carga del gateway (M6-03)
+
+Mide si el gateway sostiene la carga de SPEC §9: 500 peticiones/s, con un p95 de la latencia que agrega el gateway (sin el proveedor) menor de 50 ms. Resultados, hallazgos y dimensionamiento en `docs/performance/M6-03.md`.
+
+1. **La red a escala.** `pnpm load:seed` crea, si no existen, 200 entidades, 1.000 APIs publicadas, 200 aplicaciones y 5.000 suscripciones. Son sintéticas (prefijo `carga-`) y auditadas como cualquier cambio. Tarda unos 2 minutos, y los reconciliadores tardan unos minutos más en crear las rutas, los clientes y los datos de OPA.
+   - Sus APIs usan el servicio de prueba: `RID_DEV_NODES` lleva `carga-*=mock-salud:8000`.
+   - En un entorno con `NODE_ENV=production` hace falta `RID_ALLOW_LOAD_SEED=true`. Nunca sobre los datos de una red real: las entidades sintéticas aparecerían en el catálogo, los indicadores y la bitácora.
+2. **La prueba.** `pnpm load:test [--rate 500] [--duration 5m] [--warmup 30s] [--seed]`:
+   - prepara, como la demo, una API publicada y una aplicación con certificado y suscripción aprobada;
+   - lanza k6 (`grafana/k6:2.3.0`, en su propio contenedor) contra `RID_GATEWAY_PUBLIC_URL` con mTLS;
+   - lee en Prometheus (`RID_PROMETHEUS_PUBLIC_URL`, por omisión `http://localhost:9090`) la latencia que APISIX mide para su ruta.
+   Sale con 1 si no se cumple. `RID_LOAD_DEBUG=1` muestra las primeras fallas de cada usuario virtual de k6.
+3. **Dónde correrla.** k6 necesita CPU propia: en la misma máquina que el gateway compite con él y el resultado mide la máquina, no el gateway. El criterio se valida en el entorno tipo producción del cierre de M6.
+
 ### 5.3 Cambios en un realm de Keycloak existente
 
 La importación no toca realms que ya existen. Los cambios se aplican con `kcadm.sh`:

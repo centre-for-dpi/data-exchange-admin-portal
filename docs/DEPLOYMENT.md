@@ -265,7 +265,7 @@ Muestra lo que debe implementar una carpeta real; no es un producto.
 
 ### 3.13 Proveedores de prueba (`infra/mock-providers`)
 
-**Función en el despliegue.** `mock-salud` y `mock-socioeconomico` simulan los servicios de dos entidades proveedoras con datos sintéticos (ADR-0009). Ocupan el lugar de los nodos del kit hasta M4: el reconciliador apunta los upstreams a ellos según `RID_DEV_NODES` (`slug=host:puerto`; con `https://host:puerto`, el gateway les habla con mTLS como a un nodo enrolado). Registran en su log las cabeceras `X-RID-*` que reciben, y así la demo muestra qué le llega al proveedor. En producción no existen: los upstreams son nodos del kit, APIs existentes de las entidades o un Security Server de X-Road.
+**Función en el despliegue.** `mock-salud` y `mock-socioeconomico` simulan los servicios de dos entidades proveedoras (y, con `carga-*` en `RID_DEV_NODES`, las APIs sintéticas de la prueba de carga, M6-03) con datos sintéticos (ADR-0009). Ocupan el lugar de los nodos del kit hasta M4: el reconciliador apunta los upstreams a ellos según `RID_DEV_NODES` (`slug=host:puerto`; con `https://host:puerto`, el gateway les habla con mTLS como a un nodo enrolado). Registran en su log las cabeceras `X-RID-*` que reciben, y así la demo muestra qué le llega al proveedor. En producción no existen: los upstreams son nodos del kit, APIs existentes de las entidades o un Security Server de X-Road.
 
 - Una sola imagen (`rid/mock-providers:dev`); `PROVIDER` elige el servicio y sus datos (`salud` o `socioeconomico`), con su OpenAPI en `infra/mock-providers/<proveedor>/openapi.yaml`.
 - Escuchan en 8000 dentro de la red de Compose; en desarrollo se publican en 8101 y 8102.
@@ -310,6 +310,8 @@ Seguridad del API (M6-01):
 - `RID_RATE_LIMIT_PER_MINUTE` (600 por usuario verificado, o por dirección sin un token válido) y `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 en subidas, versiones nuevas, solicitudes de alta, invitaciones y enrolamiento de nodos).
 
 **Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`. El API no está en `providers`: comparte con el runner de contrato la red `runner`, solo de ellos dos. Ver `ARCHITECTURE.md §12`.
+
+**Desplegar M6-03 sobre un piloto existente.** Las rutas pasan a consultar `rid/authz/decision`, que solo existe en el bundle nuevo de OPA. Hasta que OPA lo descarga (10–20 s después de arrancar el API nuevo), las llamadas se niegan, como en el paso 6 de M3. Conviene hacerlo en una ventana de poco tráfico.
 
 **Desplegar M6-01 sobre un piloto existente:**
 1. Agregar `RID_APISIX_KEYRING` (16 caracteres al azar) y `RID_TRUST_PROXY` (la dirección de Traefik, arriba) al `.env`.

@@ -326,3 +326,15 @@ details := {
 	"certificate_mismatch": "The access token is bound to another certificate than the one presented.",
 	"certificate_revoked": "The client certificate is not valid for this application (revoked, expired or another application's).",
 }
+
+# What the gateway reads (M6-03): the opa plugin queries rid/authz/decision, so OPA evaluates and
+# returns only these four, not every rule of the package (the client with its subscriptions and
+# certificates, the route with its operations...). Querying the whole package cost more CPU than
+# the decision itself, in OPA and in APISIX parsing the answer, and saturated OPA at 500 req/s.
+decision["allow"] := allow
+
+decision["headers"] := headers
+
+decision["status_code"] := status_code
+
+decision["reason"] := reason

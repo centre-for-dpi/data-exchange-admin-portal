@@ -12,12 +12,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
 import type { BundleData } from './bundle.js';
-import { OPA_SYNC_TARGET } from './opa.service.js';
+import { seedScale } from '../load/scale-seed.js';
+import { ACTIVATION_BATCH, OPA_SYNC_TARGET } from './opa.service.js';
 
-const openapi = readFileSync(
-  resolve(import.meta.dirname, '../../../../infra/mock-providers/salud/openapi.yaml'),
-  'utf8',
+const openapiFile = resolve(
+  import.meta.dirname,
+  '../../../../infra/mock-providers/salud/openapi.yaml',
 );
+const openapi = readFileSync(openapiFile, 'utf8');
 
 describe('OPA bundle and activation (M1-09)', () => {
   const prisma = new PrismaService();
@@ -277,6 +279,36 @@ describe('OPA bundle and activation (M1-09)', () => {
         'carlos.dev',
       );
       expect(seen.json()).toMatchObject({ status: 'active' });
+    });
+
+    it('activates a backlog larger than one transaction, each with its audit event (M6-03)', async () => {
+      // The load test's synthetic network, small: 4 entities x 10 APIs, 30 subscriptions each.
+      await seedScale(prisma, new AuditService(), {
+        entities: 4,
+        apisPerEntity: 10,
+        subscriptions: ACTIVATION_BATCH + 20,
+        openapiFile,
+        servicePath: '/salud',
+      });
+      const synthetic = { application: { keycloakClientId: { startsWith: 'rid-app-carga-' } } };
+      // A backlog, as after an OPA outage: an earlier run of this test left them active.
+      await prisma.subscription.updateMany({ where: synthetic, data: { status: 'approved' } });
+      const ids = (
+        await prisma.subscription.findMany({ where: synthetic, select: { id: true } })
+      ).map((s) => s.id);
+      expect(ids.length).toBeGreaterThan(ACTIVATION_BATCH);
+      const activations = () =>
+        prisma.auditEvent.count({
+          where: { action: 'subscription.activated', targetId: { in: ids } },
+        });
+      const before = await activations();
+
+      const { revision } = await bundleData();
+      expect((await report(revision)).statusCode).toBe(204);
+      expect(await prisma.subscription.count({ where: { ...synthetic, status: 'approved' } })).toBe(
+        0,
+      );
+      expect(await activations()).toBe(before + ids.length);
     });
   });
 });

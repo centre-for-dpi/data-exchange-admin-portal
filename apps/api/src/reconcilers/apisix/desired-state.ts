@@ -330,7 +330,7 @@ function resolveUpstream(
       pathPrefix: v.upstream.servicePath.replace(/\/$/, ''),
     };
   }
-  const node = settings.devNodes.get(v.entitySlug);
+  const node = devNodeOf(settings.devNodes, v.entitySlug);
   if (!node) {
     throw new UnsupportedUpstreamError(
       `No development node for entity "${v.entitySlug}" (set RID_DEV_NODES)`,
@@ -478,7 +478,7 @@ export function needsGatewayPki(
 ): boolean {
   if (upstream.type === 'direct') return upstream.mtls;
   if (upstream.type === 'node' && !upstream.nodeId) {
-    return settings.devNodes.get(entitySlug)?.tls ?? false;
+    return devNodeOf(settings.devNodes, entitySlug)?.tls ?? false;
   }
   // Enrolled kit nodes are always called over mTLS (M4-04).
   return upstream.type === 'node';
@@ -545,8 +545,15 @@ export function desiredGateway(
       },
       opa: {
         host: settings.opaUrl,
-        policy: 'rid/authz',
+        // Only what the plugin reads (M6-03): see decision in packages/policy/rid/authz.rego.
+        policy: 'rid/authz/decision',
         with_route: true,
+        // Kept connections to the local OPA per worker (M6-03). With the default of 5, every call
+        // beyond them opened and closed its own: at 500 req/s, thousands in TIME_WAIT and connects
+        // that stalled until the decision timed out.
+        keepalive: true,
+        keepalive_pool: OPA_KEEPALIVE_POOL,
+        keepalive_timeout: 60_000,
         send_headers_upstream:
           v.upstream.type === 'xroad'
             ? [...OPA_UPSTREAM_HEADERS, ...XROAD_OPA_HEADERS]
@@ -795,9 +802,13 @@ export interface DevNode {
   tls: boolean;
 }
 
+/** Connections each APISIX worker keeps open to the local OPA (opa plugin, M6-03). */
+export const OPA_KEEPALIVE_POOL = 64;
+
 /**
  * RID_DEV_NODES="salud=mock-salud:8000,socioeconomico=https://mock-socioeconomico:8443": an
- * https:// node gets mTLS like an enrolled kit node (M3-03).
+ * https:// node gets mTLS like an enrolled kit node (M3-03). A slug ending in `*` is a prefix
+ * (`carga-*=mock-salud:8000`: the synthetic entities of the load test, M6-03).
  */
 export function parseDevNodes(value: string | undefined): Map<string, DevNode> {
   const nodes = new Map<string, DevNode>();
@@ -813,6 +824,21 @@ export function parseDevNodes(value: string | undefined): Map<string, DevNode> {
     }
   }
   return nodes;
+}
+
+/** The development node of an entity: its own slug first, then the longest matching prefix. */
+export function devNodeOf(nodes: ReadonlyMap<string, DevNode>, slug: string): DevNode | undefined {
+  const exact = nodes.get(slug);
+  if (exact) return exact;
+  let best: { length: number; node: DevNode } | undefined;
+  for (const [key, node] of nodes) {
+    if (!key.endsWith('*')) continue;
+    const prefix = key.slice(0, -1);
+    if (slug.startsWith(prefix) && prefix.length > (best?.length ?? -1)) {
+      best = { length: prefix.length, node };
+    }
+  }
+  return best?.node;
 }
 
 /** `host:port` (e.g. RID_GATEWAY_TRANSPARENCY_LOG); a malformed value is a startup error. */

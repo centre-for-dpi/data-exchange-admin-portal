@@ -18,7 +18,8 @@
     "db:pgboss-migration": "node scripts/pgboss-migration.mjs",
     "db:seed": "tsx src/seed/main.ts",
     "test:dist": "node scripts/smoke-dist.mjs",
-    "traffic:simulate": "tsx src/analytics/simulate-traffic.ts"
+    "traffic:simulate": "tsx src/analytics/simulate-traffic.ts",
+    "load:seed": "tsx src/load/scale-seed.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "11.2.1",

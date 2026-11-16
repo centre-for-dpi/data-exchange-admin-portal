@@ -31,7 +31,9 @@
     "db:seed": "pnpm --filter @rid/api db:seed",
     "demo": "node scripts/demo.mjs",
     "demo:otp": "node scripts/totp.mjs",
-    "traffic:simulate": "pnpm --filter @rid/api traffic:simulate"
+    "traffic:simulate": "pnpm --filter @rid/api traffic:simulate",
+    "load:seed": "pnpm --filter @rid/api load:seed",
+    "load:test": "node scripts/load-test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
