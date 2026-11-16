@@ -91,6 +91,7 @@ status_code := 403
       status: res.status,
       contentType: res.headers.get('content-type'),
       limit: res.headers.get('x-ratelimit-limit'),
+      denyReason: res.headers.get('x-rid-deny-reason'),
       body: await res.text(),
     };
   };
@@ -161,6 +162,8 @@ status_code := 403
       status: 429,
       code: 'rate_limited',
     });
+    // A refusal of the gateway: the access log counts it with its reason (M5-03).
+    expect(limited.denyReason).toBe('rate_limited');
   });
 
   it('a client can neither raise its limit nor reset its counter', async () => {
@@ -186,5 +189,6 @@ status_code := 403
     expect(res.status).toBe(429);
     expect(await res.text()).toContain('provider: slow down');
     expect(res.headers.get('content-type')).not.toBe('application/problem+json');
+    expect(res.headers.get('x-rid-deny-reason')).toBeNull();
   });
 });

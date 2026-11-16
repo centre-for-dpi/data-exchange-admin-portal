@@ -1301,6 +1301,32 @@
       "byPurpose": "By purpose",
       "byOperation": "By operation",
       "byStatus": "By response code"
+    },
+    "reasons": {
+      "no_subscription": "No active subscription for this API",
+      "app_suspended": "Application suspended",
+      "client_certificate_required": "Client certificate (mTLS) missing",
+      "certificate_mismatch": "The certificate is not the application's",
+      "certificate_revoked": "Certificate revoked",
+      "token_not_bound": "Token not bound to the certificate",
+      "environment_mismatch": "Wrong environment (sandbox against production)",
+      "operation_not_allowed": "Operation not allowed by the subscription",
+      "purpose_not_allowed": "Purpose not approved for the subscription",
+      "subscription_expired": "Subscription expired",
+      "end_user_required": "X-RID-End-User (the official) missing",
+      "end_user_invalid": "X-RID-End-User not valid",
+      "data_subject_required": "Data subject missing",
+      "rate_limited": "Requests-per-minute limit exceeded"
+    },
+    "consumed": {
+      "title": "Usage of my applications",
+      "lead": "The calls of your entity's applications, to which APIs, and why the gateway denied some.",
+      "link": "See the usage",
+      "byApplication": "By application",
+      "byApi": "By API",
+      "denials": "Calls denied by the gateway, with their reason",
+      "unknownApi": "A route that is no longer any version's",
+      "unattributed": "Calls with a token the gateway could not tie to an application (401) do not appear here: nobody knows whose they are."
     }
   }
 }

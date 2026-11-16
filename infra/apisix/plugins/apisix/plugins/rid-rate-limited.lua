@@ -47,6 +47,8 @@ function _M.header_filter(_conf, ctx)
     end
     ctx.rid_rate_limited = true
     core.response.set_header("Content-Type", "application/problem+json")
+    -- A refusal of the gateway, like OPA's: the access log counts it with its reason (M5-03).
+    core.response.set_header("X-RID-Deny-Reason", "rate_limited")
     core.response.clear_header_as_body_modified()
 end
 

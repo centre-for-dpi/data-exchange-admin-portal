@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { loadCountryConfig } from '@rid/config';
-import { providerUsageSchema } from '@rid/contracts';
+import { consumedUsageSchema, providerUsageSchema } from '@rid/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -295,5 +295,245 @@ describe("usage of an entity's APIs (M5-02)", () => {
     } finally {
       await down.close();
     }
+  });
+});
+
+/**
+ * Usage of an entity's applications (M5-03): their calls by application and API, and the gateway's
+ * refusals with their reason. Same store and template as above.
+ */
+describe("usage of an entity's applications (M5-03)", () => {
+  const prisma = new PrismaService();
+  const openSearch = new HttpOpenSearch(openSearchUrl());
+  const realmUsers = readRealmUsers();
+  const sub = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
+  const run = randomUUID().slice(0, 8);
+  const index = `rid-access-test-consumed-${run}`;
+  let app: NestFastifyApplication;
+  let issuer: TestIssuer;
+  let programas = '';
+  let salud = '';
+  let versionId = '';
+  const apps: Record<'prod' | 'sandbox' | 'other', { id: string; clientId: string }> = {
+    prod: { id: '', clientId: '' },
+    sandbox: { id: '', clientId: '' },
+    other: { id: '', clientId: '' },
+  };
+
+  async function application(entityId: string, environment: 'production' | 'sandbox') {
+    const clientId = `rid-app-test-${randomUUID()}`;
+    const row = await prisma.application.create({
+      data: {
+        entityId,
+        name: `Consumo ${environment} ${run}`,
+        description: 'Aplicación de prueba del uso.',
+        environment,
+        keycloakClientId: clientId,
+        technicalContact: 'dev@example.org',
+        createdBy: 'test',
+      },
+    });
+    return { id: row.id, clientId };
+  }
+
+  beforeAll(async () => {
+    await runSeed(prisma, new AuditService(), {
+      config: loadCountryConfig({ code: 'co' }),
+      realmUsers,
+    });
+    programas = (await prisma.entity.findFirstOrThrow({ where: { slug: 'programas-sociales' } }))
+      .id;
+    salud = (await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } })).id;
+    const socioeconomico = (
+      await prisma.entity.findFirstOrThrow({ where: { slug: 'socioeconomico' } })
+    ).id;
+    apps.prod = await application(programas, 'production');
+    apps.sandbox = await application(programas, 'sandbox');
+    apps.other = await application(socioeconomico, 'production');
+    const api = await prisma.api.create({
+      data: {
+        entityId: salud,
+        slug: `consumo-${run}`,
+        name: `Consumo ${run}`,
+        summary: 'API de prueba del uso de consumidores.',
+        description: 'API de prueba.',
+        sector: 'salud',
+        classification: 'personal',
+        ownerContact: 'apis@example.org',
+        status: 'published',
+        createdBy: 'test',
+      },
+    });
+    versionId = (
+      await prisma.apiVersion.create({
+        data: {
+          apiId: api.id,
+          version: '2.1',
+          major: 2,
+          minor: 1,
+          status: 'published',
+          openapiSpec: {},
+          openapiSha256: '0'.repeat(64),
+          upstreamType: 'node',
+          upstream: { type: 'node', servicePath: '/salud' },
+          basePath: `/test/consumo-${run}/v2`,
+          createdBy: 'test',
+        },
+      })
+    ).id;
+    await new AccessLogIndexReconciler(prisma, openSearch).reconcileTemplate();
+
+    const base = {
+      method: 'GET',
+      gateway_node: 'apisix-test',
+      consumer_entity: 'programas-sociales',
+    };
+    const docs = [
+      {
+        route_id: routeId(versionId),
+        status: 200,
+        consumer_app: apps.prod.clientId,
+        latency_ms: 10,
+      },
+      {
+        route_id: routeId(versionId),
+        status: 200,
+        consumer_app: apps.prod.clientId,
+        latency_ms: 30,
+      },
+      {
+        route_id: routeId(versionId),
+        status: 403,
+        consumer_app: apps.prod.clientId,
+        deny_reason: 'purpose_not_allowed',
+        latency_ms: 2,
+      },
+      {
+        route_id: routeId(versionId),
+        status: 429,
+        consumer_app: apps.prod.clientId,
+        deny_reason: 'rate_limited',
+        latency_ms: 1,
+      },
+      // The sandbox app on the version's sandbox; one refusal for the wrong environment.
+      {
+        route_id: sandboxRouteId(versionId),
+        status: 200,
+        consumer_app: apps.sandbox.clientId,
+        latency_ms: 5,
+      },
+      {
+        route_id: routeId(versionId),
+        status: 403,
+        consumer_app: apps.sandbox.clientId,
+        deny_reason: 'environment_mismatch',
+        latency_ms: 1,
+      },
+      // Another entity's application.
+      {
+        route_id: routeId(versionId),
+        status: 200,
+        consumer_app: apps.other.clientId,
+        latency_ms: 5,
+      },
+    ];
+    const bulk =
+      docs
+        .flatMap((d) => [
+          JSON.stringify({ index: { _index: index } }),
+          JSON.stringify({ ...base, ...d, ts: '2026-04-10T15:00:00Z', request_id: randomUUID() }),
+        ])
+        .join('\n') + '\n';
+    const res = await fetch(`${openSearchUrl()}/_bulk?refresh=true`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-ndjson' },
+      body: bulk,
+    });
+    expect(((await res.json()) as { errors: boolean }).errors).toBe(false);
+    issuer = await createTestIssuer();
+    app = await createTestApp(issuer);
+  });
+
+  afterAll(async () => {
+    await openSearch.request('DELETE', `/${index}`);
+    await app.close();
+    await prisma.$disconnect();
+  });
+
+  const get = async (url: string, username: string) =>
+    app.inject({
+      method: 'GET',
+      url: `/api/v1${url}`,
+      headers: { authorization: `Bearer ${await issuer.token(sub(username))}` },
+    });
+  const period = 'from=2026-04-10&to=2026-04-10';
+
+  it("counts the calls of the entity's applications by application and API", async () => {
+    const res = await get(`/entities/${programas}/usage/consumed?${period}`, 'carlos.dev');
+    expect(res.statusCode, res.body).toBe(200);
+    const usage = consumedUsageSchema.parse(res.json());
+    // Six calls of its two applications; the other entity's call is not here.
+    expect(usage.totals).toMatchObject({ calls: 6, ok: 3, denied: 3 });
+    const prod = usage.byApplication.find((a) => a.applicationId === apps.prod.id);
+    expect(prod).toMatchObject({ environment: 'production', calls: 4, errors: 2, denied: 2 });
+    expect(usage.byApplication.find((a) => a.applicationId === apps.sandbox.id)).toMatchObject({
+      environment: 'sandbox',
+      calls: 2,
+    });
+    expect(usage.byApplication.map((a) => a.applicationId)).not.toContain(apps.other.id);
+    expect(usage.byApi).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          apiName: `Consumo ${run}`,
+          version: '2.1',
+          providerName: expect.stringMatching(/Salud/) as unknown,
+          sandbox: false,
+          calls: 5,
+        }),
+        expect.objectContaining({ sandbox: true, calls: 1 }),
+      ]),
+    );
+  });
+
+  it('lists the refusals with their reason, per application', async () => {
+    const usage = consumedUsageSchema.parse(
+      (await get(`/entities/${programas}/usage/consumed?${period}`, 'carlos.dev')).json(),
+    );
+    expect(usage.denials).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: 'purpose_not_allowed',
+          applicationId: apps.prod.id,
+          calls: 1,
+        }),
+        expect.objectContaining({ reason: 'rate_limited', applicationId: apps.prod.id, calls: 1 }),
+        expect.objectContaining({
+          reason: 'environment_mismatch',
+          applicationId: apps.sandbox.id,
+          calls: 1,
+        }),
+      ]),
+    );
+  });
+
+  it('one application at a time; never one of another entity', async () => {
+    const one = consumedUsageSchema.parse(
+      (
+        await get(
+          `/entities/${programas}/usage/consumed?${period}&applicationId=${apps.sandbox.id}`,
+          'carlos.dev',
+        )
+      ).json(),
+    );
+    expect(one.totals.calls).toBe(2);
+    const other = await get(
+      `/entities/${programas}/usage/consumed?${period}&applicationId=${apps.other.id}`,
+      'carlos.dev',
+    );
+    expect(other.statusCode).toBe(404);
+    // A member of another entity does not find programas-sociales.
+    expect(
+      (await get(`/entities/${programas}/usage/consumed?${period}`, 'lucia.datos')).statusCode,
+    ).toBe(404);
   });
 });

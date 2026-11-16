@@ -82,3 +82,55 @@ export const providerUsageSchema = z.object({
   byStatus: z.array(usageStatusSchema),
 });
 export type ProviderUsage = z.infer<typeof providerUsageSchema>;
+
+/** Period and filter of the usage of an entity's applications (M5-03). */
+export const consumedUsageQuerySchema = z
+  .object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    applicationId: z.uuid().optional(),
+  })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, {
+    message: '`from` must not be after `to`',
+    path: ['from'],
+  });
+export type ConsumedUsageQuery = z.infer<typeof consumedUsageQuerySchema>;
+
+/**
+ * Calls the entity's applications made (M5-03). Calls with a token the gateway could not tie to
+ * an application (401) are not anyone's: they are not here.
+ */
+export const consumedUsageSchema = z.object({
+  period: usagePeriodSchema,
+  totals: usageTotalsSchema,
+  daily: z.array(usageDaySchema),
+  byApplication: z.array(
+    countsSchema.extend({
+      applicationId: z.uuid(),
+      name: z.string(),
+      environment: z.enum(['production', 'sandbox']),
+      denied: z.number().int(),
+    }),
+  ),
+  /** The APIs called; `apiId` null for a route that is no version's any more. */
+  byApi: z.array(
+    countsSchema.extend({
+      apiId: z.uuid().nullable(),
+      apiName: z.string().nullable(),
+      version: z.string().nullable(),
+      providerName: z.string().nullable(),
+      sandbox: z.boolean(),
+      latencyP95Ms: z.number().nullable(),
+    }),
+  ),
+  /** Refusals of the gateway by their stable reason (ARCHITECTURE.md §4.2), per application. */
+  denials: z.array(
+    z.object({
+      reason: z.string(),
+      applicationId: z.uuid(),
+      name: z.string(),
+      calls: z.number().int(),
+    }),
+  ),
+});
+export type ConsumedUsage = z.infer<typeof consumedUsageSchema>;

@@ -1,5 +1,5 @@
 import { useFormatter, useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 import { inputClass } from '../form/field';
 import { Button } from '../ui/button';
 
@@ -162,9 +162,12 @@ export function BreakdownTable<R>({
   rowKey: (row: R, index: number) => string;
 }) {
   const t = useTranslations('usage');
+  const headingId = useId();
   return (
-    <section className="usage-breakdown">
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <section className="usage-breakdown" aria-labelledby={headingId}>
+      <h2 id={headingId} className="text-lg font-semibold">
+        {title}
+      </h2>
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('noCalls')}</p>
       ) : (

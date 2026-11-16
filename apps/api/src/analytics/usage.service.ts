@@ -1,9 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ProviderUsage, UsageQuery } from '@rid/contracts';
+import type { ConsumedUsage, ConsumedUsageQuery, ProviderUsage, UsageQuery } from '@rid/contracts';
 import { NotFoundError } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
-import { routeId, sandboxRouteId } from '../reconcilers/apisix/desired-state.js';
+import {
+  ROUTE_PREFIX,
+  routeId,
+  SANDBOX_ROUTE_PREFIX,
+  sandboxRouteId,
+} from '../reconcilers/apisix/desired-state.js';
 import { OPENSEARCH, type OpenSearch } from './opensearch.js';
 import {
   type Bucket,
@@ -25,6 +30,7 @@ import {
 const GROUPS = 200;
 /** Gateway's key for calls it could not attribute (no known consumer, no purpose). */
 const NONE = '__none__';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const errorsOf = (b: Bucket) => b.errors?.doc_count ?? 0;
 
@@ -142,6 +148,117 @@ export class UsageService {
         status: Number(b.key),
         calls: b.doc_count,
       })),
+    };
+  }
+
+  /** Calls of the entity's applications: by application and API, refusals by reason (M5-03). */
+  async consumed(entityId: string, query: ConsumedUsageQuery): Promise<ConsumedUsage> {
+    const period = resolvePeriod(query);
+    const apps = await scopedRepo(this.prisma.application, entityId).findMany({
+      where: query.applicationId ? { id: query.applicationId } : {},
+    });
+    if (query.applicationId && apps.length === 0) throw new NotFoundError('Application');
+    const byClient = new Map(apps.map((a) => [a.keycloakClientId, a]));
+    if (byClient.size === 0) {
+      return {
+        period,
+        totals: emptyTotals(),
+        daily: daily({}, period),
+        byApplication: [],
+        byApi: [],
+        denials: [],
+      };
+    }
+
+    const result = await searchAccessLogs(this.openSearch, {
+      query: {
+        bool: { filter: [periodRange(period), { terms: { consumer_app: [...byClient.keys()] } }] },
+      },
+      aggs: {
+        ...TOTALS_AGGS,
+        daily: dailyAgg(period),
+        apps: {
+          terms: { field: 'consumer_app', size: GROUPS },
+          aggs: { errors: ERRORS, denied: { filter: { exists: { field: 'deny_reason' } } } },
+        },
+        routes: {
+          terms: { field: 'route_id', size: GROUPS, missing: NONE },
+          aggs: {
+            errors: ERRORS,
+            latency: { percentiles: { field: 'latency_ms', percents: [95] } },
+          },
+        },
+        reasons: {
+          terms: { field: 'deny_reason', size: 50 },
+          aggs: { apps: { terms: { field: 'consumer_app', size: GROUPS } } },
+        },
+      },
+    });
+    const aggs = result.aggregations;
+
+    // The versions behind the routes called: any provider's (names as in the catalogue).
+    const routeBuckets = buckets(aggs, 'routes');
+    const versionOf = (route: string) =>
+      route.startsWith(SANDBOX_ROUTE_PREFIX)
+        ? { id: route.slice(SANDBOX_ROUTE_PREFIX.length), sandbox: true }
+        : route.startsWith(ROUTE_PREFIX)
+          ? { id: route.slice(ROUTE_PREFIX.length), sandbox: false }
+          : undefined;
+    const ids = routeBuckets
+      .map((b) => versionOf(String(b.key))?.id)
+      .filter((id): id is string => Boolean(id && UUID.test(id)));
+    const versions = await this.prisma.apiVersion.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        version: true,
+        api: { select: { id: true, name: true, entity: { select: { shortName: true } } } },
+      },
+    });
+    const versionById = new Map(versions.map((v) => [v.id, v]));
+    const app = (clientId: string | number) => byClient.get(String(clientId));
+
+    return {
+      period,
+      totals: totals(result),
+      daily: daily(result, period),
+      byApplication: buckets(aggs, 'apps').flatMap((b) => {
+        const a = app(b.key);
+        if (!a) return [];
+        return [
+          {
+            applicationId: a.id,
+            name: a.name,
+            environment: a.environment,
+            calls: b.doc_count,
+            errors: errorsOf(b),
+            denied: (b.denied as { doc_count?: number } | undefined)?.doc_count ?? 0,
+          },
+        ];
+      }),
+      byApi: routeBuckets.map((b) => {
+        const route = versionOf(String(b.key));
+        const version = route ? versionById.get(route.id) : undefined;
+        return {
+          apiId: version?.api.id ?? null,
+          apiName: version?.api.name ?? null,
+          version: version?.version ?? null,
+          providerName: version?.api.entity.shortName ?? null,
+          sandbox: route?.sandbox ?? false,
+          calls: b.doc_count,
+          errors: errorsOf(b),
+          latencyP95Ms: percentile(b.latency, 95),
+        };
+      }),
+      denials: buckets(aggs, 'reasons').flatMap((reason) =>
+        buckets(reason as Record<string, unknown>, 'apps').flatMap((b) => {
+          const a = app(b.key);
+          if (!a) return [];
+          return [
+            { reason: String(reason.key), applicationId: a.id, name: a.name, calls: b.doc_count },
+          ];
+        }),
+      ),
     };
   }
 }

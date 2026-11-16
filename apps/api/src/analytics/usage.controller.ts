@@ -1,5 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import {
+  type ConsumedUsageQuery,
+  consumedUsageQuerySchema,
+  consumedUsageSchema,
   entityIdParamsSchema,
   providerUsageSchema,
   type UsageQuery,
@@ -34,5 +37,27 @@ export class UsageController {
     @Query(new ZodValidationPipe(usageQuerySchema)) query: UsageQuery,
   ) {
     return this.usage.provided(entity.entityId, query);
+  }
+
+  @Get('consumed')
+  @EntityAccess('usage.consumed.read')
+  @ApiOperation({
+    operationId: 'getConsumedUsage',
+    summary: "Calls of the entity's applications: by application and API, refusals by reason",
+    description:
+      'From the access logs (metadata only), including the calls the gateway refused with ' +
+      'their stable reason. Days in the country time zone; the last 30 days by default, at ' +
+      'most 366. 503 when the analytics store is not available.',
+    tags: ['usage'],
+    params: entityIdParamsSchema,
+    query: consumedUsageQuerySchema,
+    responses: { 200: { description: 'The usage', schema: consumedUsageSchema } },
+    errors: [400, 401, 403, 404, 503],
+  })
+  consumed(
+    @CurrentEntity() entity: EntityContext,
+    @Query(new ZodValidationPipe(consumedUsageQuerySchema)) query: ConsumedUsageQuery,
+  ) {
+    return this.usage.consumed(entity.entityId, query);
   }
 }

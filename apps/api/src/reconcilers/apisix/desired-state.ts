@@ -11,7 +11,8 @@ import {
 import type { ApisixObject } from './apisix-admin.js';
 
 /** Deterministic ids (ARCHITECTURE.md §4): reconciling needs no extra state. */
-export const routeId = (apiVersionId: string): string => `rid-route-${apiVersionId}`;
+export const ROUTE_PREFIX = 'rid-route-';
+export const routeId = (apiVersionId: string): string => `${ROUTE_PREFIX}${apiVersionId}`;
 export const upstreamId = (apiVersionId: string): string => `rid-upstream-${apiVersionId}`;
 /** The gateway's TLS (server certificate and, with mTLS, the client CA) on its public names. */
 export const GATEWAY_SSL_ID = 'rid-ssl-gateway';

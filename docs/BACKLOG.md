@@ -691,7 +691,11 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Contenido.** Totales: exitosas, negadas por el gateway, errores 4xx/5xx y latencia p50/p95. Llamadas por día, en la zona del país. Desgloses por entidad consumidora, finalidad, operación (con p95) y código.
     - **Sandbox aparte.** El tráfico del sandbox se ve por separado: es otra ruta.
     - **Interpretación.** "Latencia" es la del gateway (`latency_ms`); la del proveedor queda en el log (`upstream_latency_ms`) para M5-04. Una llamada sin consumidor identificable (401) aparece como "sin identificar".
-- [ ] **M5-03 — Uso para consumidores**: llamadas por aplicación y API, errores de autorización con su razón.
+- [x] **M5-03 — Uso para consumidores**: llamadas por aplicación y API, errores de autorización con su razón.
+  - _Notas de implementación:_ endpoint `GET /entities/:id/usage/consumed?from&to&applicationId`, con el permiso `usage.consumed.read` (cualquier miembro, más el operador y el regulador). Pantalla `/my-apps/usage`.
+    - **Alcance.** Se acota a los `clientId` de las aplicaciones de la entidad. Por API muestra la versión, la entidad proveedora y si fue el sandbox.
+    - **Negaciones.** Cada negación del gateway aparece con su razón estable y su aplicación: OPA nombra al cliente conocido en la negación (M5-01). Ahora también el 429 de `rid-rate-limited` lleva `rate_limited`.
+    - **Sin atribuir.** Una llamada con un token que no se pudo ligar a una aplicación (401) no es de nadie, y la pantalla lo dice.
 - [ ] **M5-04 — Indicadores de la red**: los de `SPEC.md §8` para regulador y operador.
 - [ ] **M5-05 — Mapa de intercambios**: grafo entidad consumidora → entidad proveedora con volumen.
 - [ ] **M5-06 — Métricas y alertas**: Prometheus + Alertmanager con las alertas de `ARCHITECTURE.md §9`; Grafana con un tablero de operador.

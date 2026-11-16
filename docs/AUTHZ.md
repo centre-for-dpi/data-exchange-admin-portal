@@ -33,6 +33,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `bootcamp.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
 | `bootcamp.write` | ✓ | · | · | · | · | ✓ | · | · | · |
 | `usage.provided.read` | ✓ | ✓ | ✓ | · | ✓ | ✓ | ✓ | ✓ | · |
+| `usage.consumed.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
 | `audit.entity.read` | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · |
 
 ## Acciones de plataforma
@@ -137,6 +138,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | PUT | `/api/v1/entities/:entityId/subscriptions/:subscriptionId/agreement` | entidad: `subscription.write` |
 | POST | `/api/v1/entities/:entityId/subscriptions/:subscriptionId/provide-info` | entidad: `subscription.write` |
 | POST | `/api/v1/entities/:entityId/subscriptions/:subscriptionId/withdraw` | entidad: `subscription.write` |
+| GET | `/api/v1/entities/:entityId/usage/consumed` | entidad: `usage.consumed.read` |
 | GET | `/api/v1/entities/:entityId/usage/provided` | entidad: `usage.provided.read` |
 | GET | `/api/v1/entity-requests` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/entity-requests` | cualquier sesión; solo recursos propios |

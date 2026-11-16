@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type Page, test } from '@playwright/test';
-import { openCatalogApi, publishNewApi, signIn } from './flows';
+import { createApplication, openCatalogApi, publishNewApi, signIn } from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
 const OPENSEARCH = process.env.RID_OPENSEARCH_URL ?? 'http://localhost:9200';
@@ -85,8 +85,7 @@ test.describe('usage of my APIs (M5-02)', () => {
     const stats = page.locator('.usage-stats');
     await expect(stats.getByText('Llamadas', { exact: true }).locator('..')).toContainText('4');
     await expect(stats.getByText('Negadas por el gateway').locator('..')).toContainText('1');
-    const section = (title: string) =>
-      page.locator('section', { has: page.getByRole('heading', { name: title }) });
+    const section = (title: string) => page.getByRole('region', { name: title });
     await expect(
       section('Por entidad consumidora').getByRole('row', { name: /Programas Sociales/ }),
     ).toContainText('4');
@@ -115,5 +114,62 @@ test.describe('usage of my APIs (M5-02)', () => {
     await expect(
       page.getByText('El uso de las APIs lo ven quienes administran, publican o responden'),
     ).toBeVisible();
+  });
+});
+
+// M5-03: usage of the entity's applications for the consumer, with the gateway's refusals.
+test.describe('usage of my applications (M5-03)', () => {
+  const index = `rid-access-e2e-consumed-${Date.now().toString(36)}`;
+  test.afterAll(async () => {
+    await dropIndex(index);
+  });
+
+  test('the developer sees the calls of the application and why some were denied', async ({
+    browser,
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    const slug = `consumo-${Date.now().toString(36)}`;
+    const name = `Afiliación consumo ${slug}`;
+    await publishNewApi(browser, { slug, name });
+    await signIn(page, 'carlos.dev', '/catalog');
+    const { versionId } = await publishedIds(page, name);
+    const appName = `Consumo ${slug}`;
+    const clientId = await createApplication(page, appName);
+    const route = `rid-route-${versionId}`;
+    const base = { route_id: route, consumer_app: clientId, consumer_entity: 'programas-sociales' };
+    await indexAccessLogs(index, [
+      { ...base, ts: '2026-04-10T15:00:00Z', status: 200, latency_ms: 10 },
+      { ...base, ts: '2026-04-10T16:00:00Z', status: 200, latency_ms: 12 },
+      { ...base, ts: '2026-04-10T17:00:00Z', status: 403, deny_reason: 'purpose_not_allowed' },
+      { ...base, ts: '2026-04-10T18:00:00Z', status: 429, deny_reason: 'rate_limited' },
+    ]);
+
+    await page.goto('/my-apps');
+    await page.getByRole('link', { name: 'Ver el uso' }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Uso de mis aplicaciones' }),
+    ).toBeVisible();
+    await page.getByLabel('Desde').fill('2026-04-10');
+    await page.getByLabel('Hasta').fill('2026-04-10');
+    await page.getByLabel('Aplicación', { exact: true }).selectOption({ label: appName });
+    await page.getByRole('button', { name: 'Aplicar' }).click();
+    await page.waitForURL(/applicationId=/);
+
+    const section = (title: string) => page.getByRole('region', { name: title });
+    await expect(
+      section('Por aplicación').getByRole('row', { name: new RegExp(appName) }),
+    ).toContainText('4');
+    await expect(section('Por API').getByRole('row', { name: new RegExp(name) })).toContainText(
+      'Salud',
+    );
+    const denials = section('Llamadas negadas por el gateway, con su razón');
+    await expect(
+      denials.getByRole('row', { name: /Finalidad no aprobada para la suscripción/ }),
+    ).toContainText('purpose_not_allowed');
+    await expect(
+      denials.getByRole('row', { name: /Límite de peticiones por minuto superado/ }),
+    ).toContainText('1');
+    await expectNoAccessibilityViolations(page);
   });
 });

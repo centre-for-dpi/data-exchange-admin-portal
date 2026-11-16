@@ -113,6 +113,14 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['data_steward', 'entity_admin', 'entity_viewer', 'api_publisher'],
     platformRoles: ['platform_admin', 'platform_reviewer', 'regulator'],
   },
+  /**
+   * Usage of the entity's applications (M5-03): their calls and the gateway's refusals with
+   * their reason. Like the applications themselves: any member, the operator and the regulator.
+   */
+  'usage.consumed.read': {
+    entityRoles: ENTITY_ROLES,
+    platformRoles: ['platform_admin', 'platform_reviewer', 'regulator'],
+  },
   /** Timeline of the entity's own objects (its APIs, subscriptions it asked for or received). */
   'audit.entity.read': {
     entityRoles: ENTITY_ROLES,

@@ -46,11 +46,16 @@ export default async function MyAppsPage({ params }: PageProps) {
         title={t('nav.myApps')}
         description={!canWrite ? t('myApps.readOnly') : undefined}
         actions={
-          canWrite ? (
-            <Button asChild>
-              <Link href="/my-apps/new">{t('myApps.newApp')}</Link>
-            </Button>
-          ) : null
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href="/my-apps/usage" className="link">
+              {t('usage.consumed.link')}
+            </Link>
+            {canWrite && (
+              <Button asChild>
+                <Link href="/my-apps/new">{t('myApps.newApp')}</Link>
+              </Button>
+            )}
+          </div>
         }
       />
       {page.items.length === 0 ? (

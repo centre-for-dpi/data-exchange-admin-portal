@@ -1301,6 +1301,32 @@
       "byPurpose": "Por finalidad",
       "byOperation": "Por operación",
       "byStatus": "Por código de respuesta"
+    },
+    "reasons": {
+      "no_subscription": "Sin una suscripción activa para esta API",
+      "app_suspended": "Aplicación suspendida",
+      "client_certificate_required": "Falta el certificado de cliente (mTLS)",
+      "certificate_mismatch": "El certificado no es el de la aplicación",
+      "certificate_revoked": "Certificado revocado",
+      "token_not_bound": "Token no ligado al certificado",
+      "environment_mismatch": "Entorno equivocado (sandbox contra producción)",
+      "operation_not_allowed": "Operación no permitida por la suscripción",
+      "purpose_not_allowed": "Finalidad no aprobada para la suscripción",
+      "subscription_expired": "Suscripción vencida",
+      "end_user_required": "Falta X-RID-End-User (el funcionario)",
+      "end_user_invalid": "X-RID-End-User no válido",
+      "data_subject_required": "Falta el titular de los datos",
+      "rate_limited": "Límite de peticiones por minuto superado"
+    },
+    "consumed": {
+      "title": "Uso de mis aplicaciones",
+      "lead": "Las llamadas de las aplicaciones de tu entidad, a qué APIs y por qué el gateway negó algunas.",
+      "link": "Ver el uso",
+      "byApplication": "Por aplicación",
+      "byApi": "Por API",
+      "denials": "Llamadas negadas por el gateway, con su razón",
+      "unknownApi": "Una ruta que ya no es de ninguna versión",
+      "unattributed": "Las llamadas con un token que el gateway no pudo ligar a una aplicación (401) no aparecen aquí: no se sabe de quién son."
     }
   }
 }
