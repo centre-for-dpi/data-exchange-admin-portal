@@ -135,9 +135,22 @@ services:
           "exec 3<>/dev/tcp/127.0.0.1/7085 && printf 'GET /status/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '",
         ]
 
+  opa-init:
+    # OPA runs as uid 1000 and its volume is created as root: give it the persistence directory
+    # (M6-04). The step-ca image is already in the stack and has a shell.
+    image: smallstep/step-ca:0.30.2
+    networks: [gateway]
+    entrypoint: ['sh', '-c', 'chown 1000:1000 /var/lib/opa && chmod 700 /var/lib/opa']
+    user: root
+    volumes:
+      - opa-data:/var/lib/opa
+
   opa:
     image: openpolicyagent/opa:1.21.4-static
     networks: [gateway]
+    depends_on:
+      opa-init:
+        condition: service_completed_successfully
     command:
       - run
       - --server
@@ -149,6 +162,8 @@ services:
       OPA_BUNDLE_TOKEN: ${OPA_BUNDLE_TOKEN:?set OPA_BUNDLE_TOKEN in .env}
     volumes:
       - ../opa/config.yaml:/config/config.yaml:ro
+      # The last bundle, for a restart while the portal is down (M6-04).
+      - opa-data:/var/lib/opa
     extra_hosts:
       # Lets OPA reach the portal API running on the host (bundle download, M0-04).
       - host.docker.internal:host-gateway
@@ -497,6 +512,7 @@ networks:
 volumes:
   pg-data:
   etcd-data:
+  opa-data:
   step-ca-data:
   opensearch-data:
   transparency-buffer:

@@ -52,7 +52,7 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `keycloak` | `quay.io/keycloak/keycloak:26.8.0` | 8080 (HTTP), 9000 (gestión) | `KEYCLOAK_PORT` 8080 | — (usa `postgres`) | base | `GET /health/ready` en 9000 |
 | `etcd` | `quay.io/coreos/etcd:v3.6.16` | 2379 | no se publica | `etcd-data` | base | `etcdctl endpoint health` |
 | `apisix` | `apache/apisix:3.19.0-debian` | 9080 (HTTP), 9443 (HTTPS), 9180 (admin), 7085 (estado), 9091 (métricas) | 9080, 9443, 9180 | — (estado en etcd) | base | `GET /status/ready` en 7085 |
-| `opa` | `openpolicyagent/opa:1.21.4-static` | 8181 | `OPA_PORT` 8181 | — | base | `GET /health` |
+| `opa` | `openpolicyagent/opa:1.21.4-static` | 8181 | `OPA_PORT` 8181 | `opa-data` (último bundle, M6-04) | base | `GET /health` |
 | `step-ca` | `smallstep/step-ca:0.30.2` | 9000 | `STEP_CA_PORT` 9000 | `step-ca-data` | base | `step ca health` |
 | `fluent-bit-transparency` | `fluent/fluent-bit:5.1.5-debug` | 5170 (TCP), 2020 (salud) | no se publica | `transparency-buffer` | base | `GET /api/v1/health` en 2020 |
 | `fluent-bit-errors` | `fluent/fluent-bit:5.1.5-debug` | 5140/udp (syslog), 2020 (salud) | no se publica | — | base | `GET /api/v1/health` en 2020 |
@@ -157,7 +157,9 @@ También termina el TLS del gateway en 9443 con su certificado de servidor y, cu
 Además calcula el hash del funcionario y el seudónimo del titular, y devuelve las cabeceras de trazabilidad que APISIX envía al proveedor. Nunca consulta en línea la base del portal, y por eso el tráfico sobrevive a una caída del portal. Su reporte de estado le indica al portal cuándo una suscripción aprobada ya rige en el gateway, y entonces la suscripción pasa a `active`.
 
 - Config en `infra/opa/config.yaml`: descarga el bundle `rid` de `${OPA_PORTAL_URL}/bundle.tar.gz` con `Bearer ${OPA_BUNDLE_TOKEN}` cada 10–20 s, y reporta la revisión activa a `${OPA_PORTAL_URL}/status`.
-- Sin estado propio. Sin bundle no tiene política y el gateway niega todo (falla cerrado).
+- **Estado: el último bundle, en disco (M6-04).** Va en el volumen `opa-data` (`/var/lib/opa`, `persist: true`), que `opa-init` le entrega al uid 1000. Un OPA que reinicia mientras el portal no responde arranca con ese bundle. Sin ninguno no tiene política y el gateway niega todo (falla cerrado).
+  - El bundle lleva la clave del seudónimo y la sal del funcionario: el volumen es solo de OPA (modo 700) y se respalda o se destruye como un secreto.
+  - Borrar el volumen no daña nada mientras el portal responda: OPA descarga el bundle en la siguiente consulta.
 - Los *decision logs* están desactivados a propósito (la entrada lleva cabeceras con datos en claro).
 - `OPA_PORTAL_URL`: en desarrollo `http://host.docker.internal:4000/api/v1/opa` (el API corre en el host); en el piloto `http://api:4000/api/v1/opa`.
 
@@ -310,6 +312,8 @@ Seguridad del API (M6-01):
 - `RID_RATE_LIMIT_PER_MINUTE` (600 por usuario verificado, o por dirección sin un token válido) y `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 en subidas, versiones nuevas, solicitudes de alta, invitaciones y enrolamiento de nodos).
 
 **Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`. El API no está en `providers`: comparte con el runner de contrato la red `runner`, solo de ellos dos. Ver `ARCHITECTURE.md §12`.
+
+**Desplegar M6-04 sobre un piloto existente.** `up -d` crea el volumen `opa-data`, corre `opa-init` y recrea OPA: durante unos segundos no hay OPA y el gateway niega (falla cerrado).
 
 **Desplegar M6-03 sobre un piloto existente.** Las rutas pasan a consultar `rid/authz/decision`, que solo existe en el bundle nuevo de OPA. Hasta que OPA lo descarga (10–20 s después de arrancar el API nuevo), las llamadas se niegan, como en el paso 6 de M3. Conviene hacerlo en una ventana de poco tráfico.
 

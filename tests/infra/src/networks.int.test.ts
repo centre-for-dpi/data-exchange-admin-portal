@@ -1,8 +1,17 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { fromRoot } from './paths.js';
 
-type Compose = { services: Record<string, { networks?: Record<string, unknown> }> };
+type Compose = {
+  services: Record<
+    string,
+    {
+      networks?: Record<string, unknown>;
+      volumes?: Array<{ type: string; source?: string; target: string }>;
+    }
+  >;
+};
 
 /** The resolved Compose configuration, as `docker compose config` renders it. */
 function config(files: string[], env: Record<string, string> = {}): Compose {
@@ -76,5 +85,29 @@ describe('network segmentation of the stack (M6-01)', () => {
       networksOf(pilot, s).includes('runner'),
     );
     expect(onRunner.sort()).toEqual(['api', 'contract-runner']);
+  });
+});
+
+/**
+ * OPA without the portal (M6-04): its last bundle is kept on its own volume, so an OPA restarted
+ * while the portal is down starts with the policy instead of denying every call.
+ */
+describe('OPA keeps its last bundle (M6-04)', () => {
+  it('persists the bundle in its persistence directory', () => {
+    const opa = readFileSync(fromRoot('infra/opa/config.yaml'), 'utf8');
+    expect(opa).toMatch(/^persistence_directory: \/var\/lib\/opa$/m);
+    expect(opa).toMatch(/^ {4}persist: true$/m);
+  });
+
+  it('mounts that directory on a volume, in development and in the pilot', () => {
+    const deployEnv = { RID_PUBLIC_URL: 'https://portal.test', MAILPIT_UI_AUTH: 'a:b' };
+    for (const compose of [
+      config(['docker-compose.yml']),
+      config(['docker-compose.yml', 'docker-compose.deploy.yml'], deployEnv),
+    ]) {
+      expect(compose.services.opa?.volumes).toContainEqual(
+        expect.objectContaining({ type: 'volume', source: 'opa-data', target: '/var/lib/opa' }),
+      );
+    }
   });
 });

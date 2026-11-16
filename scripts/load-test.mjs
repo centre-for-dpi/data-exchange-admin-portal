@@ -18,18 +18,8 @@ import { parseArgs } from 'node:util';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env'));
 
-const {
-  API,
-  as,
-  clientCertificate,
-  expect,
-  GATEWAY,
-  gatewayFetch,
-  gatewayToken,
-  ScriptError,
-  tls,
-  waitFor,
-} = await import('./lib/portal.mjs');
+const { API, callingApplication, expect, GATEWAY, ScriptError, tls } =
+  await import('./lib/portal.mjs');
 
 const { values: args } = parseArgs({
   options: {
@@ -43,9 +33,6 @@ const RATE = Number(args.rate);
 const P95_LIMIT_MS = 50;
 const K6_IMAGE = 'grafana/k6:2.3.0';
 const PROMETHEUS = process.env.RID_PROMETHEUS_PUBLIC_URL ?? 'http://localhost:9090';
-const RUN = Date.now().toString(36);
-const SLUG = `carga-objetivo-${RUN}`;
-const PERSON = '1000000001';
 
 const seconds = (text) => {
   const m = /^(\d+)(s|m)$/.exec(text);
@@ -70,104 +57,6 @@ async function preflight() {
     const pull = spawnSync('docker', ['pull', K6_IMAGE], { stdio: 'inherit' });
     expect(pull.status === 0, `could not pull ${K6_IMAGE}`);
   }
-}
-
-/**
- * The application that makes the calls, as in docs/DEMO.md: a published API of the provider, an
- * application of the consumer with its certificate, and an approved subscription whose rate
- * limit leaves room for the test (twice the rate).
- */
-async function caller() {
-  const pedro = await as('pedro.publicador');
-  const salud = pedro.entity('salud');
-  const api = await pedro.call('POST', `/entities/${salud}/apis`, {
-    slug: SLUG,
-    name: `Prueba de carga ${RUN}`,
-    summary: 'API de la prueba de carga (M6-03).',
-    description: 'Datos sintéticos.',
-    sector: 'salud',
-    tags: ['carga'],
-    classification: 'personal',
-    ownerContact: 'apis@salud.demo.rid.example',
-  });
-  const version = await pedro.call('POST', `/entities/${salud}/apis/${api.id}/versions`, {
-    version: '1.0',
-    openapi: readFileSync(resolve(root, 'infra/mock-providers/salud/openapi.yaml'), 'utf8'),
-    upstream: { type: 'node', servicePath: '/salud' },
-    allowedPurposes: ['eligibility_check'],
-    exposedFields: [{ name: 'regimen', personal: true, sensitive: false }],
-  });
-  await pedro.call('POST', `/entities/${salud}/apis/${api.id}/versions/${version.id}/submit`);
-  const ana = await as('ana.operadora');
-  await waitFor(
-    async () =>
-      (await ana.call('GET', `/review/api-versions/${version.id}`)).version.validation?.status ===
-      'passed',
-    { timeoutMs: 180_000, what: 'the automatic validations did not pass' },
-  );
-  await ana.call('POST', `/review/api-versions/${version.id}/approve`, {});
-  const basePath = `/salud/${SLUG}/v1`;
-  log(`  API publicada: ${basePath}`);
-
-  const carlos = await as('carlos.dev');
-  const programas = carlos.entity('programas-sociales');
-  const created = await carlos.call('POST', `/entities/${programas}/applications`, {
-    name: `Carga ${RUN}`,
-    description: 'Aplicación de la prueba de carga (M6-03).',
-    environment: 'production',
-    technicalContact: 'dev@programas.demo.rid.example',
-  });
-  const app = created.application;
-  await waitFor(
-    async () =>
-      (await carlos.call('GET', `/entities/${programas}/applications/${app.id}`)).provisioning ===
-      'ready',
-    { timeoutMs: 120_000, what: 'the Keycloak client was not created' },
-  );
-  await clientCertificate(carlos, programas, app.id, app.clientId);
-  const subscription = await carlos.call('POST', `/entities/${programas}/subscriptions`, {
-    applicationId: app.id,
-    apiVersionId: version.id,
-    purposeCode: 'eligibility_check',
-    purposeDetail: 'Prueba de carga del gateway.',
-    legalBasisText: 'Datos sintéticos de la prueba de carga.',
-    validityMonths: 12,
-    requestedRateLimit: RATE * 60 * 2,
-  });
-  const lucia = await as('lucia.datos');
-  await lucia.call('POST', `/entities/${salud}/access-requests/${subscription.id}/approve`, {
-    validityMonths: 6,
-    comment: 'Prueba de carga.',
-  });
-  await waitFor(
-    async () =>
-      (await carlos.call('GET', `/entities/${programas}/subscriptions/${subscription.id}`))
-        .status === 'active',
-    { timeoutMs: 120_000, what: 'the subscription did not become active' },
-  );
-  // The certificate and the subscription reach OPA with the bundle: until a call goes through.
-  const token = await gatewayToken(app.clientId, created.clientSecret);
-  const path = `${basePath}/afiliados/{n}`;
-  await waitFor(
-    async () =>
-      (
-        await gatewayFetch(`${GATEWAY}${path.replace('{n}', PERSON)}`, {
-          headers: {
-            authorization: `Bearer ${token}`,
-            'x-rid-purpose': 'eligibility_check',
-            'x-rid-end-user': 'funcionario-carga',
-          },
-        })
-      ).status === 200,
-    { timeoutMs: 120_000, what: 'the first call through the gateway did not succeed' },
-  );
-  log(`  Aplicación ${app.clientId} con certificado y suscripción activa`);
-  return {
-    clientId: app.clientId,
-    clientSecret: created.clientSecret,
-    path,
-    versionId: version.id,
-  };
 }
 
 /** k6 in its container, outside the stack's networks, like any consumer. */
@@ -240,7 +129,13 @@ async function main() {
     expect(seed.status === 0, 'the load seed failed');
   }
   log('\nPreparando la aplicación que llama');
-  const target = await caller();
+  const target = await callingApplication({
+    slug: `carga-objetivo-${Date.now().toString(36)}`,
+    purpose: 'Prueba de carga del gateway (M6-03).',
+    // Room for the test: twice the rate.
+    rateLimitPerMinute: RATE * 60 * 2,
+    log,
+  });
 
   log(`\nk6 (${K6_IMAGE})`);
   const k6 = runK6(target);

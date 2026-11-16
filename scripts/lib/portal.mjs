@@ -280,3 +280,108 @@ export async function gatewayToken(clientId, clientSecret) {
   expect(res.ok, `client_credentials token failed: ${res.status} ${await res.clone().text()}`);
   return (await res.json()).access_token;
 }
+
+/** A person the provider's test service has (infra/mock-providers: FIRST_ID). */
+export const TEST_PERSON = '1000000001';
+
+/**
+ * An application that calls a published API through the gateway, as in docs/DEMO.md: pedro
+ * publishes an API of salud (its test service), ana approves it, carlos creates the application
+ * with its certificate (with mTLS) and asks for access, lucia approves it. Returns once a call goes
+ * through. Load and resilience tests (M6-03, M6-04).
+ */
+export async function callingApplication({ slug, purpose, rateLimitPerMinute, log = () => {} }) {
+  const pedro = await as('pedro.publicador');
+  const salud = pedro.entity('salud');
+  const api = await pedro.call('POST', `/entities/${salud}/apis`, {
+    slug,
+    name: `Prueba ${slug}`,
+    summary: purpose,
+    description: 'Datos sintéticos.',
+    sector: 'salud',
+    tags: ['prueba'],
+    classification: 'personal',
+    ownerContact: 'apis@salud.demo.rid.example',
+  });
+  const version = await pedro.call('POST', `/entities/${salud}/apis/${api.id}/versions`, {
+    version: '1.0',
+    openapi: readFileSync(resolve(root, 'infra/mock-providers/salud/openapi.yaml'), 'utf8'),
+    upstream: { type: 'node', servicePath: '/salud' },
+    allowedPurposes: ['eligibility_check'],
+    exposedFields: [{ name: 'regimen', personal: true, sensitive: false }],
+  });
+  await pedro.call('POST', `/entities/${salud}/apis/${api.id}/versions/${version.id}/submit`);
+  const ana = await as('ana.operadora');
+  await waitFor(
+    async () =>
+      (await ana.call('GET', `/review/api-versions/${version.id}`)).version.validation?.status ===
+      'passed',
+    { timeoutMs: 180_000, what: 'the automatic validations did not pass' },
+  );
+  await ana.call('POST', `/review/api-versions/${version.id}/approve`, {});
+  const basePath = `/salud/${slug}/v1`;
+  log(`  API publicada: ${basePath}`);
+
+  const carlos = await as('carlos.dev');
+  const programas = carlos.entity('programas-sociales');
+  const created = await carlos.call('POST', `/entities/${programas}/applications`, {
+    name: `Prueba ${slug}`,
+    description: purpose,
+    environment: 'production',
+    technicalContact: 'dev@programas.demo.rid.example',
+  });
+  const app = created.application;
+  await waitFor(
+    async () =>
+      (await carlos.call('GET', `/entities/${programas}/applications/${app.id}`)).provisioning ===
+      'ready',
+    { timeoutMs: 120_000, what: 'the Keycloak client was not created' },
+  );
+  if (MTLS) await clientCertificate(carlos, programas, app.id, app.clientId);
+  const subscription = await carlos.call('POST', `/entities/${programas}/subscriptions`, {
+    applicationId: app.id,
+    apiVersionId: version.id,
+    purposeCode: 'eligibility_check',
+    purposeDetail: purpose,
+    legalBasisText: 'Datos sintéticos de la prueba.',
+    validityMonths: 12,
+    ...(rateLimitPerMinute ? { requestedRateLimit: rateLimitPerMinute } : {}),
+  });
+  const lucia = await as('lucia.datos');
+  await lucia.call('POST', `/entities/${salud}/access-requests/${subscription.id}/approve`, {
+    validityMonths: 6,
+    comment: 'Prueba.',
+  });
+  await waitFor(
+    async () =>
+      (await carlos.call('GET', `/entities/${programas}/subscriptions/${subscription.id}`))
+        .status === 'active',
+    { timeoutMs: 120_000, what: 'the subscription did not become active' },
+  );
+  // The certificate and the subscription reach OPA with the bundle: until a call goes through.
+  const token = await gatewayToken(app.clientId, created.clientSecret);
+  const path = `${basePath}/afiliados/{n}`;
+  await waitFor(
+    async () =>
+      (
+        await gatewayFetch(`${GATEWAY}${path.replace('{n}', TEST_PERSON)}`, {
+          headers: {
+            authorization: `Bearer ${token}`,
+            'x-rid-purpose': 'eligibility_check',
+            'x-rid-end-user': 'funcionario-prueba',
+          },
+        })
+      ).status === 200,
+    { timeoutMs: 120_000, what: 'the first call through the gateway did not succeed' },
+  );
+  log(`  Aplicación ${app.clientId} con certificado y suscripción activa`);
+  return {
+    clientId: app.clientId,
+    clientSecret: created.clientSecret,
+    path,
+    versionId: version.id,
+    subscriptionId: subscription.id,
+    consumer: { actor: carlos, entityId: programas, applicationId: app.id },
+    provider: { actor: lucia, entityId: salud },
+  };
+}

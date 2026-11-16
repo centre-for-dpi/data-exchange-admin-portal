@@ -7,12 +7,18 @@ services:
       bearer:
         token: ${OPA_BUNDLE_TOKEN}
 
+# The last activated bundle is kept on disk (M6-04): an OPA that restarts while the portal is down
+# starts with it instead of with no policy, which would deny every call. It holds the data of the
+# bundle, keys included (subject reference, end-user hash): the volume is OPA's only (uid 1000).
+persistence_directory: /var/lib/opa
+
 bundles:
   rid:
     service: portal
     # GET {url}/bundle.tar.gz (apps/api, ETag = revision). Without a bundle OPA has no policy and
     # the gateway denies every call (fail closed).
     resource: bundle.tar.gz
+    persist: true
     polling:
       min_delay_seconds: 10
       max_delay_seconds: 20

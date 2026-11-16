@@ -793,7 +793,12 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - `RID_DEV_NODES` con prefijo.
     - **Resultado en la máquina de desarrollo:** pasa a 200/s (p95 del gateway 13,3 ms). A 500/s la CPU del equipo llega al 100 %, porque el generador comparte la máquina con todo el stack.
     - **Falta:** validar 500/s en el entorno tipo producción del cierre de M6, con el generador en otra máquina.
-- [ ] **M6-04 — Resiliencia**: con el portal caído, el tráfico sigue; con OPA sin bundle nuevo, se mantiene el último; test documentado.
+- [x] **M6-04 — Resiliencia**: con el portal caído, el tráfico sigue; con OPA sin bundle nuevo, se mantiene el último; test documentado.
+  - _Notas de implementación:_ `pnpm resilience:test` y resultado en `docs/performance/M6-04.md`.
+    - Con el portal caído durante 45 s: las llamadas permitidas y las negadas siguen, cada una como debe.
+    - OPA y APISIX reinician sin el portal.
+    - Al volver el portal, el registro de transparencia tiene todas las consultas de la caída y una revocación llega en 18 s.
+    - **Corregido:** OPA guarda el último bundle en disco (volumen `opa-data`, `persist: true`). Antes, un OPA reiniciado sin el portal quedaba sin política y el gateway lo negaba todo.
 - [ ] **M6-05 — Helm charts** para producción con la topología de `ARCHITECTURE.md §11`.
 - [ ] **M6-06 — Respaldos y recuperación**: pgBackRest, procedimiento de restauración probado.
 - [ ] **M6-07 — Runbook del operador**: alta de entidad, incidentes, rotación de la CA intermedia, revocación masiva.

@@ -230,6 +230,22 @@ Mide si el gateway sostiene la carga de SPEC §9: 500 peticiones/s, con un p95 d
    Sale con 1 si no se cumple. `RID_LOAD_DEBUG=1` muestra las primeras fallas de cada usuario virtual de k6.
 3. **Dónde correrla.** k6 necesita CPU propia: en la misma máquina que el gateway compite con él y el resultado mide la máquina, no el gateway. El criterio se valida en el entorno tipo producción del cierre de M6.
 
+### 5.2.3 Prueba de resiliencia (M6-04)
+
+`pnpm resilience:test [--outage 45s] [--portal-container rid-api-1]` comprueba contra el stack que el gateway funciona sin el portal:
+
+1. Prepara una aplicación con una suscripción activa, como la demo.
+2. Detiene el portal y, durante la caída, alterna llamadas permitidas y negadas.
+3. Reinicia OPA y APISIX sin el portal.
+4. Lo devuelve y comprueba que el registro de transparencia tiene todas las llamadas de la caída y que una revocación vuelve a llegar al gateway.
+
+Resultado en `docs/performance/M6-04.md`.
+
+- **Piloto.** Detiene y arranca el contenedor del API. Durante la prueba el portal no responde a nadie: es una caída real.
+- **Desarrollo.** El API corre en el host. El script levanta el suyo desde `apps/api/dist` (construirlo antes) y pide que `pnpm dev` esté detenido.
+
+**Qué esperar en una caída real del portal.** El tráfico sigue con lo último que OPA tenía. Las alertas `RidTargetDown` (el API no responde a Prometheus) y `RidOpaBundleFetchFailing` (más de 2 min sin bundle) avisan al operador. Lo que se apruebe o revoque en el portal no llega al gateway hasta que vuelva. Para cortar ya una aplicación comprometida sin el portal, se detiene su cliente en Keycloak: sin token nuevo, sus llamadas se niegan cuando vence el que tiene (5 minutos).
+
 ### 5.3 Cambios en un realm de Keycloak existente
 
 La importación no toca realms que ya existen. Los cambios se aplican con `kcadm.sh`:
