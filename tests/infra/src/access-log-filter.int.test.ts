@@ -7,8 +7,8 @@ const IMAGE = 'fluent/fluent-bit:5.1.5-debug';
 
 type Record = { [key: string]: string | number | undefined };
 
-/** Runs records through allowlist.lua in a real Fluent Bit (stdin input, JSON lines out). */
-function filter(records: Record[]): Record[] {
+/** Runs records through a Lua filter in a real Fluent Bit (stdin input, JSON lines out). */
+function filter(records: Record[], script = 'allowlist.lua', call = 'allowlist'): Record[] {
   const result = spawnSync(
     'docker',
     [
@@ -27,9 +27,9 @@ function filter(records: Record[]): Record[] {
       '-m',
       '*',
       '-p',
-      'script=/rid/allowlist.lua',
+      `script=/rid/${script}`,
       '-p',
-      'call=allowlist',
+      `call=${call}`,
       '-o',
       'stdout',
       '-m',
@@ -185,5 +185,47 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
     expect(out).toMatchObject({ status: 403, upstream_latency_ms: 10 });
     expect(out).not.toHaveProperty('deny_reason');
     expect(out).not.toHaveProperty('consumer_app');
+  });
+});
+
+describe('error-log filter in Fluent Bit (gateway-errors.lua, M5-01)', () => {
+  const errors = (messages: string[]) =>
+    filter(
+      messages.map((message) => ({ ident: 'apisix', message })),
+      'gateway-errors.lua',
+      'scrub',
+    ).map((r) => String(r.message));
+  const prefix =
+    '2026/11/16 01:31:23 [error] 50#50: *1701 connect() failed (111: Connection refused) while ' +
+    'connecting to upstream, client: 172.24.0.1, server: _';
+
+  it('masks the request line and everything after it, keeping the request id', () => {
+    const [out] = errors([
+      `${prefix}, request: "GET /salud/afiliados/1000000001?documento=AB123 HTTP/1.1", ` +
+        `upstream: "http://10.0.0.5:8000/afiliados/1000000001", host: "gw.example", ` +
+        `referrer: "https://x.example/AB123", request_id: "dd4242b0e03c4fce6d98679e89ae89fd"`,
+    ]);
+    expect(out).toBe(
+      `${prefix}, request: "[masked]", request_id: "dd4242b0e03c4fce6d98679e89ae89fd"`,
+    );
+  });
+
+  it('a path with quotes or fake field names does not end the mask early', () => {
+    const [quoted, fake] = errors([
+      `${prefix}, request: "GET /salud/a"b/PASAPORTE-XY987 HTTP/1.1", upstream: "http://u/a"b/XY987", host: "h"`,
+      // The path itself pretends to end with APISIX's request id.
+      `${prefix}, request: "GET /s/XY987, request_id: "abc" HTTP/1.1", upstream: "http://u/XY987", request_id: "abc", x: "XY987"`,
+    ]);
+    for (const line of [quoted, fake]) {
+      expect(line).not.toContain('XY987');
+      expect(line).toContain('request: "[masked]"');
+    }
+  });
+
+  it('masks long digit runs and query strings outside a request too', () => {
+    const [out] = errors(['lua error: failed to parse /afiliados/1000000001?doc=AB123 at line 42']);
+    expect(out).not.toContain('1000000001');
+    expect(out).not.toContain('AB123');
+    expect(out).toContain('line 42');
   });
 });

@@ -97,7 +97,7 @@ describe('APISIX (M0-04)', () => {
       const line = errors.split('\n').find((l) => l.includes('while connecting to upstream'));
       expect(line, errors.slice(-500)).toBeDefined();
       expect(line).toContain('request: \\"[masked]\\"');
-      expect(line).toContain('upstream: \\"[masked]\\"');
+      expect(line).not.toContain('upstream: \\"http');
       expect(errors).not.toContain(identifier);
       expect(errors).not.toContain(prefix);
     } finally {
