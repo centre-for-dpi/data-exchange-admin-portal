@@ -239,6 +239,9 @@ networkPolicy:
   # Private ranges the gateway may call besides public addresses (an X-Road Security Server or
   # providers inside the operator's network). Empty: public addresses only.
   gatewayExtraEgressCidrs: []
+  # Private ranges of the services the portal and Keycloak use outside the cluster, when they are not
+  # at public addresses: the mail server, the TSA. Empty: public addresses only.
+  servicesEgressCidrs: []
 
 # --- Observability (subcharts) ---------------------------------------------------------------------
 

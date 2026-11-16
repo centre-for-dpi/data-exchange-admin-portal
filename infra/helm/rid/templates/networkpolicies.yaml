@@ -329,4 +329,140 @@ spec:
             matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
       ports: [{ port: 3000 }]
 {{- end }}
+---
+# Egress (M6-05): each component leaves only to what it uses. Services outside the cluster (the
+# mail server, the country's TSA) only at public addresses, never the platform's networks.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "etcd-egress" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "etcd" }} }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- include "rid.np.from" "etcd" | nindent 8 }}
+      ports: [{ port: 2380 }, { port: 2379 }]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "step-ca-egress" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "step-ca" }} }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+---
+# Keycloak: its database and the mail server.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "keycloak-egress" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "keycloak" }} }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { cnpg.io/cluster: {{ include "rid.name" "keycloak-db" }} }
+      ports: [{ port: 5432 }]
+    # Its replicas form a cluster (JDBC_PING, Infinispan).
+    - to:
+        {{- include "rid.np.from" "keycloak" | nindent 8 }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10]
+        {{- range .Values.networkPolicy.servicesEgressCidrs }}
+        - ipBlock: { cidr: {{ . }} }
+        {{- end }}
+      ports: [{ port: 25 }, { port: 465 }, { port: 587 }]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+---
+# The web: the API, and Keycloak through the ingress (the public name, as the browser).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "web-egress" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "web" }} }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- include "rid.np.from" "api" | nindent 8 }}
+      ports: [{ port: {{ .Values.api.port }} }]
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
+        {{- include "rid.np.from" "keycloak" | nindent 8 }}
+    # The ingress may be reached at its public address (a load balancer outside the cluster).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10]
+      ports: [{ port: 443 }, { port: 80 }]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
+---
+# The API: its database, the platform's services it drives or reads, and outside the mail server,
+# the TSA and the providers' DNS checks (public addresses only).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rid.name" "api-egress" }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "api" }} }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { cnpg.io/cluster: {{ include "rid.name" "db" }} }
+      ports: [{ port: 5432 }]
+    # Keycloak by its public name (KEYCLOAK_URL, the issuer the tokens carry): through the ingress.
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
+        {{- include "rid.np.from" "gateway" | nindent 8 }}
+        {{- include "rid.np.from" "keycloak" | nindent 8 }}
+        {{- include "rid.np.from" "step-ca" | nindent 8 }}
+        {{- include "rid.np.from" "wg-hub" | nindent 8 }}
+        {{- include "rid.np.from" "contract-runner" | nindent 8 }}
+        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: opensearch }
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 100.64.0.0/10]
+        {{- range .Values.networkPolicy.servicesEgressCidrs }}
+        - ipBlock: { cidr: {{ . }} }
+        {{- end }}
+      ports: [{ port: 443 }, { port: 25 }, { port: 465 }, { port: 587 }]
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports: [{ port: 53, protocol: UDP }, { port: 53, protocol: TCP }]
 {{- end }}
