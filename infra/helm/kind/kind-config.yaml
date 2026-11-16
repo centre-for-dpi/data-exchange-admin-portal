@@ -1,0 +1,13 @@
+# A single-node kind cluster to install the RID charts end to end (M6-05, scripts/helm-kind.mjs).
+# Test only: production has nodes in several zones (ARCHITECTURE §11).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: rid
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+    extraPortMappings:
+      # The portal through Traefik (NodePort 30080), on the host's 18080.
+      - { containerPort: 30080, hostPort: 18080, listenAddress: 127.0.0.1 }
+      # The gateway (NodePort 30443), on the host's 19443.
+      - { containerPort: 30443, hostPort: 19443, listenAddress: 127.0.0.1 }

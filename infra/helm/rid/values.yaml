@@ -13,6 +13,8 @@ publicUrl: https://rid.example.org
 # The gateway's own public name. With mTLS (features.mtls.required) applications reach it on this
 # name, whose TLS the gateway terminates: it is not behind the portal's ingress.
 gatewayHost: gw.rid.example.org
+# Only when applications reach it on another port than 443 (test clusters).
+gatewayPublicUrl: ''
 
 imagePullSecrets: []
 
@@ -93,7 +95,10 @@ web:
 
 ingress:
   enabled: true
-  className: nginx
+  # Traefik (MIT, as the pilots): the chart adds its Middleware that strips the client-certificate
+  # headers Keycloak trusts on the gateway's token route only (ADR-0022). With another controller,
+  # it must strip SSL_CLIENT_CERT and ssl-client-verify itself. (ingress-nginx is retired.)
+  className: traefik
   annotations: {}
   # The TLS certificate of publicUrl's host (cert-manager or the operator's own).
   tlsSecretName: rid-portal-tls
@@ -167,6 +172,8 @@ gateway:
     type: LoadBalancer
     annotations: {}
     loadBalancerSourceRanges: []
+    # With type NodePort (test clusters).
+    nodePort: null
   resources:
     apisix:
       requests: { cpu: '1', memory: 512Mi }
@@ -209,6 +216,7 @@ contractRunner:
 
 # Access-log analytics: Fluent Bit -> OpenSearch (M5).
 accessLogs:
+  enabled: true
   replicas: 2
   opensearch:
     host: rid-opensearch
@@ -225,7 +233,7 @@ accessLogs:
 networkPolicy:
   enabled: true
   # The namespace of the ingress controller that reaches the web and the API.
-  ingressControllerNamespace: ingress-nginx
+  ingressControllerNamespace: traefik
   # Where the rid-platform chart runs (the CloudNativePG operator reaches the database pods).
   platformNamespace: rid-platform
   # Private ranges the gateway may call besides public addresses (an X-Road Security Server or

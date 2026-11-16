@@ -103,11 +103,14 @@ keycloak-db:
 {{- if eq .component "wg-hub" -}}{{ $v.wgHub.enabled }}
 {{- else if eq .component "contract-runner" -}}{{ $v.contractRunner.enabled }}
 {{- else if eq .component "keycloak-citizens" -}}{{ $v.keycloak.citizensRealm }}
+{{- else if eq .component "access-logs" -}}{{ $v.accessLogs.enabled }}
 {{- else -}}true{{- end -}}
 {{- end -}}
 
 {{/* Service URLs inside the namespace. */}}
 {{- define "rid.url.api" -}}http://{{ include "rid.name" "api" }}:{{ .Values.api.port }}{{- end -}}
+{{/* Where applications reach the gateway: https://gatewayHost, or gatewayPublicUrl (with a port). */}}
+{{- define "rid.url.gatewayPublic" -}}{{ default (printf "https://%s" .Values.gatewayHost) .Values.gatewayPublicUrl }}{{- end -}}
 {{- define "rid.url.gateway" -}}http://{{ include "rid.name" "gateway" }}:9080{{- end -}}
 
 {{/*
@@ -122,7 +125,7 @@ Bit run in every gateway pod, on 127.0.0.1).
 - { name: RID_WEB_URL, value: {{ .Values.publicUrl | quote }} }
 - { name: KEYCLOAK_URL, value: {{ printf "%s/auth" .Values.publicUrl | quote }} }
 - { name: RID_CITIZEN_ISSUER, value: {{ printf "%s/auth/realms/rid-citizens" .Values.publicUrl | quote }} }
-- { name: RID_GATEWAY_PUBLIC_URL, value: {{ printf "https://%s" .Values.gatewayHost | quote }} }
+- { name: RID_GATEWAY_PUBLIC_URL, value: {{ include "rid.url.gatewayPublic" . | quote }} }
 - { name: RID_GATEWAY_TLS_HOSTS, value: {{ .Values.gatewayHost | quote }} }
 - { name: APISIX_ADMIN_URL, value: {{ printf "http://%s:9180" (include "rid.name" "gateway-admin") | quote }} }
 - { name: RID_GATEWAY_INTERNAL_URL, value: {{ include "rid.url.gateway" . | quote }} }

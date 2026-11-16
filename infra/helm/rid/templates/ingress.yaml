@@ -1,6 +1,6 @@
 {{- if .Values.ingress.enabled }}
 {{- $c := dict "root" . "component" "portal" }}
-{{- $host := get (urlParse .Values.publicUrl) "host" }}
+{{- $host := (split ":" (get (urlParse .Values.publicUrl) "host"))._0 }}
 {{- /*
 The portal's public host: the web, the API under /api/v1 and Keycloak under /auth. The services'
 own routes stay off it (they already require their tokens: this is defense in depth): the
@@ -14,14 +14,20 @@ metadata:
   name: {{ include "rid.name" "portal" }}
   labels:
     {{- include "rid.labels" $c | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
-  annotations: {{- toYaml . | nindent 4 }}
-  {{- end }}
+  annotations:
+    {{- if eq .Values.ingress.className "traefik" }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s@kubernetescrd" .Release.Namespace (include "rid.name" "no-client-cert-headers") }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
+  {{- if hasPrefix "https://" .Values.publicUrl }}
   tls:
     - hosts: [{{ $host | quote }}]
       secretName: {{ .Values.ingress.tlsSecretName }}
+  {{- end }}
   rules:
     - host: {{ $host | quote }}
       http:
@@ -57,4 +63,20 @@ spec:
     app.kubernetes.io/name: rid-nothing-runs-here
   ports:
     - { name: http, port: 80 }
+{{- if eq .Values.ingress.className "traefik" }}
+---
+# Keycloak trusts these headers on the gateway's token route only (ADR-0022): whatever a client
+# sends under those names on the public host is removed.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "rid.name" "no-client-cert-headers" }}
+  labels:
+    {{- include "rid.labels" $c | nindent 4 }}
+spec:
+  headers:
+    customRequestHeaders:
+      SSL_CLIENT_CERT: ''
+      ssl-client-verify: ''
+{{- end }}
 {{- end }}

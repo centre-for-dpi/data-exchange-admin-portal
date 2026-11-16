@@ -1,0 +1,67 @@
+# Values of the rid chart on the kind test cluster (scripts/helm-kind.mjs). Small, one node, our
+# images built locally; the rest is the production chart as it is.
+publicUrl: http://rid.127.0.0.1.nip.io:18080
+gatewayHost: gw.127.0.0.1.nip.io
+gatewayPublicUrl: https://gw.127.0.0.1.nip.io:19443
+
+images:
+  api: { repository: rid/portal-api, tag: kind }
+  web: { repository: rid/portal-web, tag: kind }
+  wgHub: { repository: rid/wg-hub, tag: kind }
+  contractRunner: { repository: rid/contract-runner, tag: kind }
+
+secrets:
+  externalSecrets:
+    # A fake store of External Secrets with random values (the script): the same path as OpenBao.
+    secretStoreRef: { name: rid-kind, kind: ClusterSecretStore }
+    refreshInterval: 1m
+
+api:
+  replicas: 1
+  trustProxy: 10.0.0.0/8
+  documents: { accessMode: ReadWriteOnce, size: 1Gi }
+  resources: { requests: { cpu: 100m, memory: 384Mi }, limits: { memory: 1Gi } }
+web:
+  replicas: 1
+  resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 768Mi } }
+
+gateway:
+  replicas: 1
+  onePerNode: false
+  service: { type: NodePort, nodePort: 30443 }
+  resources:
+    apisix: { requests: { cpu: 100m, memory: 256Mi }, limits: { memory: 1Gi } }
+    opa: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }
+    fluentBit: { requests: { cpu: 10m, memory: 32Mi }, limits: { memory: 128Mi } }
+  storage: { opaSize: 100Mi, transparencySize: 500Mi }
+
+etcd:
+  replicas: 3
+  storage: { size: 500Mi }
+  resources: { requests: { cpu: 25m, memory: 64Mi }, limits: { memory: 256Mi } }
+
+postgres:
+  portal:
+    instances: 2
+    size: 1Gi
+    resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }
+  keycloak:
+    instances: 1
+    size: 1Gi
+    resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }
+
+keycloak:
+  replicas: 1
+  smtp: { host: localhost }
+  resources: { requests: { cpu: 200m, memory: 768Mi }, limits: { memory: 1536Mi } }
+
+stepCa:
+  resources: { requests: { cpu: 10m, memory: 64Mi }, limits: { memory: 256Mi } }
+
+# The kit nodes' hub needs the host's tun device; the access logs, OpenSearch (another phase).
+wgHub: { enabled: false }
+accessLogs: { enabled: false }
+
+networkPolicy:
+  ingressControllerNamespace: traefik
+  platformNamespace: rid-platform

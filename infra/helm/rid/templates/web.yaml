@@ -44,7 +44,7 @@ spec:
             - { name: RID_WEB_URL, value: {{ .Values.publicUrl | quote }} }
             - { name: KEYCLOAK_URL, value: {{ printf "%s/auth" .Values.publicUrl | quote }} }
             - { name: RID_API_URL, value: {{ include "rid.url.api" . | quote }} }
-            - { name: RID_GATEWAY_PUBLIC_URL, value: {{ printf "https://%s" .Values.gatewayHost | quote }} }
+            - { name: RID_GATEWAY_PUBLIC_URL, value: {{ include "rid.url.gatewayPublic" . | quote }} }
             {{- range $name, $value := .Values.web.env }}
             - { name: {{ $name }}, value: {{ $value | quote }} }
             {{- end }}

@@ -66,7 +66,7 @@ spec:
             - --spi-events-listener--email--include-events=UPDATE_CREDENTIAL,REMOVE_CREDENTIAL
             # The applications' certificate arrives from the gateway's token route, verified by
             # APISIX (ADR-0022). Every other way in must strip SSL_CLIENT_CERT and ssl-client-verify:
-            # ingress-nginx drops headers with underscores by default (ingress.className).
+            # the ingress does it (ingress.yaml, Traefik's Middleware).
             - --spi-x509cert-lookup--provider=nginx
             - --spi-x509cert-lookup--nginx--ssl-client-cert=SSL_CLIENT_CERT
             - --spi-x509cert-lookup--nginx--trust-proxy-verification=true
