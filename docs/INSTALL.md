@@ -4,7 +4,7 @@ Versión 1.1 · noviembre 2026 · estado del código con M5 cerrado y M6 en curs
 
 Esta guía instala **toda la plataforma central** (portal, gateway, identidad, CA, sellado de tiempo, registros) en **un solo servidor Linux** con un script interactivo: `sudo ./install.sh`. Es la topología de **piloto** (`DEPLOYMENT.md §1`). Sirve para la puesta en marcha con el operador, el bootcamp de entidades y las demos. La producción, con alta disponibilidad, es otro ejercicio: son los Helm charts de M6-05.
 
-> **Qué NO instala.** El kit de APIs instantáneas que corre en las entidades es otro producto, con su propio repositorio (ADR-0011). Lo que cada entidad debe tener está en [`guias/entidades.md`](guias/entidades.md).
+> **Qué NO instala.** El kit de APIs instantáneas que corre en las entidades es otro producto, con su propio repositorio (ADR-0011). Lo que cada entidad debe tener está en [`guias/entidades.md`](guias/entidades.md), y lo de las proveedoras, en la guía de proveedoras del repositorio del kit.
 
 ## 1. Requisitos del servidor (VPS)
 

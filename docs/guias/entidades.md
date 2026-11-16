@@ -1,8 +1,10 @@
 # Guía para entidades participantes
 
-Versión 1.0 · noviembre 2026 · para la jornada de incorporación (bootcamp) con las entidades
+Versión 1.2 · noviembre 2026 · para la jornada de incorporación (bootcamp) con las entidades
 
 Esta guía explica qué tiene que **designar, disponer y hacer** cada entidad para conectarse a la Red de Intercambio de Datos (RID), como **proveedora** de datos, como **consumidora** o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso.
+
+**Las proveedoras tienen su propia guía,** en el repositorio del kit (`docs/guias/proveedoras.md`, con su versión para proyectar `proveedoras.html`): cómo se conecta el servicio por el nodo, qué servidor y qué red necesita, cómo se instala el nodo, cómo se publica una API y qué recibe el servicio en cada consulta. Aquí queda lo común a todas las entidades y lo de las consumidoras.
 
 ## 1. Qué significa para una entidad
 
@@ -35,36 +37,19 @@ Cada persona necesita un **correo institucional propio**: la cuenta se verifica 
 | `openssl` | Para generar la llave y la solicitud de certificado (CSR). La llave **nunca sale** del servidor de la entidad |
 | Identificador del funcionario | Las APIs con datos personales exigen `X-RID-End-User`: el usuario o el correo institucional de quien hace la consulta. Solo se registra como hash |
 
-### 3.2 Como proveedora: tres maneras de conectar el servicio
+### 3.2 Como proveedora
 
-| Opción | Cuándo | Qué debe tener la entidad |
-| :-- | :-- | :-- |
-| **A. API existente** (upstream directo) | La entidad ya tiene un servicio REST | HTTPS con un **certificado público válido** para su nombre; alcanzable desde la IP del gateway (permitirla en el firewall); un contrato **OpenAPI 3** con `operationId` en cada operación. Opcional: mTLS que acepte solo el certificado del gateway emitido para la entidad (`CN=rid-gateway.<slug>`) |
-| **B. Nodo del kit de APIs instantáneas** | La entidad no tiene API: el kit la genera sobre su base de datos | Un servidor para el nodo dentro de su red; un **usuario de solo lectura** en la base de datos; **salida** `UDP 51820` y `443/tcp` hacia el gateway. **No abre puertos de entrada**: el nodo abre un túnel cifrado hacia afuera. El kit y sus requisitos de servidor son de su propio repositorio |
-| **C. X-Road** | La entidad ya publica servicios en X-Road | Su miembro X-Road, que registra el operador. El gateway llega por el Security Server del operador |
+Toda proveedora se conecta por medio del **nodo**, que se instala dentro de su red y abre un túnel cifrado **hacia afuera** (salida `UDP 51820` y `443/tcp`; ningún puerto de entrada). Detrás del nodo va la API propia de la entidad (modo canal) o, en una versión posterior del kit, APIs instantáneas sobre vistas de su base de datos (modo completo). Las entidades que ya publican en X-Road llegan por el Security Server del operador.
 
-En las tres opciones conviene ofrecer un **sandbox**: el mismo servicio con **datos sintéticos**. Con él el portal prueba el contrato al enviar a revisión, y los consumidores integran sin tocar datos reales.
-
-**Lo que el servicio del proveedor recibe en cada consulta** (cabeceras que pone el gateway; las que mande el consumidor se borran):
-
-| Cabecera | Contenido |
-| :-- | :-- |
-| `X-RID-Consumer-Entity` / `X-RID-Consumer-App` | Entidad y aplicación consumidoras |
-| `X-RID-Subscription` | La autorización con que se hizo la consulta |
-| `X-RID-Purpose` | Finalidad declarada |
-| `X-RID-Operation` | Operación del contrato |
-| `X-RID-End-User-Hash` | Hash del funcionario que consulta |
-| `X-Request-Id` | Identificador de correlación |
-
-El servicio del proveedor debe aplicar la **minimización**: responder solo los campos que declaró en la ficha.
+Los requisitos del servidor y de la red, la instalación y la publicación están en la **guía de proveedoras** del repositorio del kit.
 
 ### 3.3 Lista de preparación
 
 El portal tiene esta lista por entidad (Mi entidad → Preparación del bootcamp), y el operador ve el avance de todas:
 
-- [ ] **Servidor** disponible (el sistema consumidor, o el del nodo del kit).
-- [ ] **Usuario de solo lectura** en la base de datos (solo con el kit).
-- [ ] **Salida 443** hacia el gateway (y UDP 51820 con el kit).
+- [ ] **Servidor** disponible (el sistema consumidor, o el del nodo).
+- [ ] **Usuario de solo lectura** en la base de datos (solo proveedoras con el modo completo del nodo).
+- [ ] **Salida 443** hacia el gateway (y UDP 51820 para el nodo de una proveedora).
 - [ ] **Responsables designados:** el portal lo marca solo cuando hay un `api_publisher` y un `data_steward` activos.
 - [ ] **Caso de uso** definido: qué dato, para qué finalidad, con qué base legal y entre qué entidades.
 
@@ -90,17 +75,9 @@ Comprueba el DNS, la salida HTTPS al portal y al gateway, y que el certificado d
 3. El `entity_admin` invita a cada persona a su correo y asigna roles. Cada invitado crea su cuenta con **ese mismo correo** y acepta la invitación.
 4. El `data_steward` configura su segundo factor la primera vez que el portal lo pide.
 
-### 4.3 Entidad proveedora: publicar una API
+### 4.3 Entidad proveedora: instalar el nodo y publicar una API
 
-1. **Con el kit (opción B):** el `entity_admin` va a Mi entidad → Nodos del kit, registra el nodo y copia el **token de enrolamiento**. Se muestra una sola vez y vale 72 horas. Con ese token se instala el kit en el servidor de la entidad, que se enrola solo y queda **En línea**.
-2. El `api_publisher` crea la API y su versión:
-   - sube el contrato OpenAPI;
-   - elige dónde vive el servicio: el nodo, la URL de la API existente o el servicio X-Road;
-   - declara el sandbox;
-   - completa la clasificación (pública, interna, personal o sensible), los datos expuestos, la base legal y las finalidades permitidas.
-3. **Envía a revisión.** El portal prueba la conectividad a través del gateway y el contrato contra el sandbox. Si algo falla, el publicador corrige su servicio y pulsa "Repetir validaciones".
-4. El operador revisa y aprueba. Si es **sensible**, también el regulador. La API queda **publicada**, y la ruta del gateway existe en segundos, cerrada hasta que haya accesos aprobados.
-5. La ficha imprimible del servicio (Catálogo → la API → Ficha del servicio) sirve para el expediente.
+Está en la **guía de proveedoras** del repositorio del kit: el token de enrolamiento, la instalación del nodo, la publicación de la API con su sandbox, la revisión y lo que recibe el servicio en cada consulta.
 
 ### 4.4 Entidad consumidora: primera consulta
 

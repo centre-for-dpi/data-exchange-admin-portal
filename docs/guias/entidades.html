@@ -299,10 +299,10 @@ details.faq[open] summary { color: var(--gov); }
   <div class="hero-inner">
     <span class="eyebrow">Jornada de incorporación · miércoles 18 de noviembre de 2026</span>
     <h1>Lo que cada entidad designa, dispone y hace para conectarse</h1>
-    <p class="lede">Como proveedora de datos, como consumidora o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso.</p>
+    <p class="lede">Como proveedora de datos, como consumidora o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso. Las proveedoras tienen además su propia guía, en el repositorio del kit.</p>
     <div class="meta">
       <span><b>Para</b> los equipos de TI y de datos de cada entidad</span>
-      <span><b>Versión</b> 1.1 · noviembre 2026</span>
+      <span><b>Versión</b> 1.2 · noviembre 2026</span>
     </div>
   </div>
 </header>
@@ -394,133 +394,20 @@ details.faq[open] summary { color: var(--gov); }
 
     <section id="proveedora">
       <h2><span class="num">4</span>Lo que dispone una proveedora</h2>
-      <p>Hay tres maneras de conectar el servicio al gateway. Lo que cambia entre ellas es <b>quién abre la conexión</b> y qué tiene que abrir la entidad en su firewall.</p>
-      <figure>
-        <div class="figscroll">
-          <svg viewBox="0 0 960 352" role="img" aria-label="Tres maneras de conectar. A: el gateway entra a la API existente de la entidad por 443, que la entidad permite desde la IP del gateway. B: el nodo del kit, dentro de la red de la entidad, abre hacia afuera un túnel WireGuard por 51820/udp y las consultas llegan por ese túnel; no hay puertos de entrada. C: el gateway pasa por el Security Server X-Road del operador hasta el Security Server de la entidad.">
-            <defs>
-              <marker id="o-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ah"></path></marker>
-              <marker id="o-ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahd"></path></marker>
-              <marker id="o-ahm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahm"></path></marker>
-            </defs>
-            <!-- A -->
-            <text x="160" y="22" text-anchor="middle" class="d-tb">A · API existente</text>
-            <rect x="70" y="38" width="180" height="40" rx="6" class="d-data"></rect>
-            <text x="160" y="63" text-anchor="middle" class="d-tb">Gateway RID</text>
-            <rect x="20" y="160" width="280" height="155" rx="10" class="d-ent"></rect>
-            <text x="32" y="180" class="d-cap">RED DE LA ENTIDAD</text>
-            <rect x="70" y="220" width="180" height="46" rx="6" class="d-box"></rect>
-            <text x="160" y="240" text-anchor="middle" class="d-tb">API existente</text>
-            <text x="160" y="257" text-anchor="middle" class="d-ts">HTTPS · certificado público</text>
-            <line x1="160" y1="78" x2="160" y2="218" class="d-strong" marker-end="url(#o-ahd)"></line>
-            <text x="170" y="118" class="d-ts">el gateway abre</text>
-            <text x="170" y="133" class="d-ts">la conexión</text>
-            <rect x="120" y="152" width="80" height="16" rx="3" class="d-box"></rect>
-            <text x="160" y="164" text-anchor="middle" class="d-lab">443 abierto</text>
-            <text x="160" y="340" text-anchor="middle" class="d-ts">entrada 443 solo desde la IP del gateway</text>
-            <!-- B -->
-            <text x="480" y="22" text-anchor="middle" class="d-tb">B · Nodo del kit</text>
-            <rect x="390" y="38" width="180" height="40" rx="6" class="d-data"></rect>
-            <text x="480" y="63" text-anchor="middle" class="d-tb">Gateway RID · hub</text>
-            <rect x="340" y="160" width="280" height="155" rx="10" class="d-ent"></rect>
-            <text x="352" y="180" class="d-cap">RED DE LA ENTIDAD</text>
-            <rect x="400" y="194" width="160" height="42" rx="6" class="d-box"></rect>
-            <text x="480" y="220" text-anchor="middle" class="d-tb">Nodo del kit</text>
-            <rect x="410" y="262" width="140" height="44" rx="6" class="d-box"></rect>
-            <text x="480" y="281" text-anchor="middle" class="d-tb">Base de datos</text>
-            <text x="480" y="298" text-anchor="middle" class="d-ts">usuario de solo lectura</text>
-            <line x1="480" y1="236" x2="480" y2="260" class="d-thin" marker-end="url(#o-ahm)"></line>
-            <line x1="455" y1="192" x2="455" y2="80" class="d-line" marker-end="url(#o-ah)"></line>
-            <text x="447" y="118" text-anchor="end" class="d-ts">el nodo abre el túnel</text>
-            <text x="447" y="133" text-anchor="end" class="d-lab">51820/udp saliente</text>
-            <line x1="505" y1="80" x2="505" y2="192" class="d-strong" marker-end="url(#o-ahd)"></line>
-            <text x="513" y="118" class="d-ts">consultas por</text>
-            <text x="513" y="133" class="d-ts">dentro del túnel</text>
-            <text x="480" y="340" text-anchor="middle" class="d-ts">sin puertos de entrada</text>
-            <!-- C -->
-            <text x="800" y="22" text-anchor="middle" class="d-tb">C · X-Road</text>
-            <rect x="710" y="38" width="180" height="40" rx="6" class="d-data"></rect>
-            <text x="800" y="63" text-anchor="middle" class="d-tb">Gateway RID</text>
-            <rect x="720" y="98" width="160" height="42" rx="6" class="d-gov"></rect>
-            <text x="800" y="116" text-anchor="middle" class="d-tb">Security Server</text>
-            <text x="800" y="132" text-anchor="middle" class="d-ts">del operador</text>
-            <line x1="800" y1="78" x2="800" y2="96" class="d-strong" marker-end="url(#o-ahd)"></line>
-            <rect x="660" y="160" width="280" height="155" rx="10" class="d-ent"></rect>
-            <text x="672" y="180" class="d-cap">RED DE LA ENTIDAD</text>
-            <rect x="720" y="194" width="160" height="42" rx="6" class="d-box"></rect>
-            <text x="800" y="212" text-anchor="middle" class="d-tb">Security Server</text>
-            <text x="800" y="228" text-anchor="middle" class="d-ts">de la entidad</text>
-            <line x1="800" y1="140" x2="800" y2="192" class="d-strong" marker-end="url(#o-ahd)"></line>
-            <text x="810" y="160" class="d-lab">X-Road</text>
-            <rect x="730" y="262" width="140" height="44" rx="6" class="d-box"></rect>
-            <text x="800" y="289" text-anchor="middle" class="d-tb">Servicio</text>
-            <line x1="800" y1="236" x2="800" y2="260" class="d-thin" marker-end="url(#o-ahm)"></line>
-            <text x="800" y="340" text-anchor="middle" class="d-ts">entre Security Servers, como hoy</text>
-          </svg>
-        </div>
-        <figcaption>La flecha verde es la dirección de las consultas. Solo en la opción B la conexión la abre la entidad, hacia afuera: por eso no necesita puertos de entrada.</figcaption>
-      </figure>
-
-      <div class="comps">
-        <article class="comp d">
-          <div><h4>A · API existente</h4><span class="tech">upstream directo</span></div>
-          <p>Cuando la entidad ya tiene un servicio REST.</p>
-          <ul class="ticks">
-            <li>HTTPS con un <b>certificado público válido</b> para su nombre.</li>
-            <li>Alcanzable desde la IP del gateway: permitirla en el firewall.</li>
-            <li>Un contrato <b>OpenAPI 3</b> con <code>operationId</code> en cada operación.</li>
-            <li>Opcional: mTLS que acepte solo el certificado del gateway emitido para la entidad (<code>CN=rid-gateway.&lt;slug&gt;</code>).</li>
-          </ul>
-        </article>
-        <article class="comp d">
-          <div><h4>B · Nodo del kit</h4><span class="tech">APIs instantáneas</span></div>
-          <p>Cuando la entidad no tiene API: el kit la genera sobre su base de datos.</p>
-          <ul class="ticks">
-            <li>Un servidor para el nodo dentro de su red.</li>
-            <li>Un <b>usuario de solo lectura</b> en la base de datos.</li>
-            <li><b>Salida</b> <code>51820/udp</code> y <code>443/tcp</code> hacia el gateway. Ningún puerto de entrada.</li>
-            <li>El kit y sus requisitos de servidor tienen su propio repositorio y su propia guía.</li>
-          </ul>
-        </article>
-        <article class="comp d">
-          <div><h4>C · X-Road</h4><span class="tech">Security Server</span></div>
-          <p>Cuando la entidad ya publica servicios en X-Road.</p>
-          <ul class="ticks">
-            <li>Su miembro X-Road, que registra el operador.</li>
-            <li>El gateway llega por el Security Server del operador.</li>
-          </ul>
-        </article>
-      </div>
+      <p>Toda proveedora se conecta por medio del <b>nodo</b>, que se instala dentro de su red y abre un túnel cifrado <b>hacia afuera</b>: salida <code>51820/udp</code> y <code>443/tcp</code>, ningún puerto de entrada. Detrás del nodo va la API propia de la entidad (modo canal) o, en una versión posterior del kit, APIs instantáneas sobre vistas de su base de datos (modo completo). Las entidades que ya publican en X-Road llegan por el Security Server del operador.</p>
       <div class="callout info">
-        <b>En las tres opciones conviene un sandbox</b>
-        <p>El mismo servicio con <b>datos sintéticos</b>. Con él el portal prueba el contrato al enviar a revisión, y los consumidores integran sin tocar datos reales.</p>
+        <b>Guía de proveedoras</b>
+        <p>Los requisitos del servidor y de la red, la instalación del nodo, la publicación de una API y lo que recibe el servicio en cada consulta están en la guía de proveedoras del repositorio del kit: <code>docs/guias/proveedoras.md</code>, con su versión para proyectar <code>proveedoras.html</code>.</p>
       </div>
-
-      <h3>Lo que recibe el servicio del proveedor en cada consulta</h3>
-      <p>Cabeceras que pone el gateway. Si el consumidor manda alguna de ellas, el gateway la borra antes.</p>
-      <div class="tablewrap">
-        <table class="t">
-          <thead><tr><th>Cabecera</th><th>Contenido</th></tr></thead>
-          <tbody>
-            <tr><td><code>X-RID-Consumer-Entity</code><br><code>X-RID-Consumer-App</code></td><td class="wrap">Entidad y aplicación consumidoras</td></tr>
-            <tr><td><code>X-RID-Subscription</code></td><td class="wrap">La autorización con que se hizo la consulta</td></tr>
-            <tr><td><code>X-RID-Purpose</code></td><td class="wrap">Finalidad declarada</td></tr>
-            <tr><td><code>X-RID-Operation</code></td><td class="wrap">Operación del contrato</td></tr>
-            <tr><td><code>X-RID-End-User-Hash</code></td><td class="wrap">Hash del funcionario que consulta</td></tr>
-            <tr><td><code>X-Request-Id</code></td><td class="wrap">Identificador de correlación</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>El servicio debe aplicar la <b>minimización</b>: responder solo los campos que declaró en la ficha.</p>
     </section>
 
     <section id="preparacion">
       <h2><span class="num">5</span>Lista de preparación</h2>
       <p>El portal lleva esta lista por entidad (Mi entidad → Preparación del bootcamp) y el operador ve el avance de todas. Aquí puedes marcarla para tu propio control.</p>
       <div class="check" id="pre">
-        <label><input type="checkbox" id="pre-1"><span><b>Servidor</b> disponible: el sistema consumidor, o el del nodo del kit.</span></label>
-        <label><input type="checkbox" id="pre-2"><span><b>Usuario de solo lectura</b> en la base de datos (solo con el kit).</span></label>
-        <label><input type="checkbox" id="pre-3"><span><b>Salida 443</b> hacia el gateway, y UDP 51820 con el kit.</span></label>
+        <label><input type="checkbox" id="pre-1"><span><b>Servidor</b> disponible: el sistema consumidor, o el del nodo.</span></label>
+        <label><input type="checkbox" id="pre-2"><span><b>Usuario de solo lectura</b> en la base de datos (solo proveedoras con el modo completo del nodo).</span></label>
+        <label><input type="checkbox" id="pre-3"><span><b>Salida 443</b> hacia el gateway, y UDP 51820 para el nodo de una proveedora.</span></label>
         <label><input type="checkbox" id="pre-4"><span><b>Responsables designados.</b> El portal lo marca solo cuando hay un <code>api_publisher</code> y un <code>data_steward</code> activos.</span></label>
         <label><input type="checkbox" id="pre-5"><span><b>Caso de uso</b> definido: qué dato, para qué finalidad, con qué base legal y entre qué entidades.</span></label>
       </div>
@@ -546,7 +433,7 @@ details.faq[open] summary { color: var(--gov); }
     </section>
 
     <section id="publicar">
-      <h2><span class="num">8</span>Entidad proveedora: publicar una API</h2>
+      <h2><span class="num">8</span>Entidad proveedora: instalar el nodo y publicar una API</h2>
       <div class="flow" aria-label="Estados de una API">
         <span class="st">borrador</span><span class="arrow">→</span>
         <span class="st">en revisión</span><span class="arrow">→</span>
@@ -554,13 +441,10 @@ details.faq[open] summary { color: var(--gov); }
         <span class="st opt">aprobada por el regulador · si es sensible</span><span class="arrow">→</span>
         <span class="st goal">publicada</span>
       </div>
-      <ol class="steps">
-        <li><span><b>Con el kit (opción B):</b> el <code>entity_admin</code> va a Mi entidad → Nodos del kit, registra el nodo y copia el <b>token de enrolamiento</b>. Se muestra una sola vez y vale 72 horas. Con ese token se instala el kit en el servidor de la entidad, que se enrola solo y queda <b>En línea</b>.</span></li>
-        <li><span>El <code>api_publisher</code> crea la API y su versión: sube el contrato OpenAPI; elige dónde vive el servicio (el nodo, la URL de la API existente o el servicio X-Road); declara el sandbox; completa la clasificación (pública, interna, personal o sensible), los datos expuestos, la base legal y las finalidades permitidas.</span></li>
-        <li><span><b>Envía a revisión.</b> El portal prueba la conectividad a través del gateway y el contrato contra el sandbox. Si algo falla, el publicador corrige su servicio y pulsa "Repetir validaciones".</span></li>
-        <li><span>El operador revisa y aprueba; si es <b>sensible</b>, también el regulador. La API queda publicada y su ruta existe en el gateway en segundos, cerrada hasta que haya accesos aprobados.</span></li>
-        <li><span>La ficha imprimible (Catálogo → la API → Ficha del servicio) sirve para el expediente.</span></li>
-      </ol>
+      <div class="callout info">
+        <b>Guía de proveedoras</b>
+        <p>El token de enrolamiento, la instalación del nodo, la publicación de la API con su sandbox y la revisión están paso a paso en la guía de proveedoras del repositorio del kit.</p>
+      </div>
     </section>
 
     <section id="consultar">
