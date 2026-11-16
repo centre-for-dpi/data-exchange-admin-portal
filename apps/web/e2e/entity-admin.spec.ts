@@ -70,7 +70,8 @@ test.describe('suspension of entities (M2-11)', () => {
       .fill('Decreto 123 de 2026, artículo 4.');
     await expectNoAccessibilityViolations(page);
     await page.getByRole('button', { name: 'Registrar entidad' }).click();
-    await expect(page.getByText('Another entity already uses this identifier')).toBeVisible();
+    // The API's error, in the user's language (M6-02).
+    await expect(page.getByText('Otra entidad ya usa este identificador.')).toBeVisible();
     await expect(page.getByLabel('Nombre legal')).toHaveValue(legalName);
     await expect(page.locator('[name="admin.email"]')).toHaveValue(`admin.${id}@example.org`);
 

@@ -1,3 +1,4 @@
+import { FieldErrorKey } from '@rid/contracts';
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { AuditExportQuery } from '@rid/contracts';
@@ -78,6 +79,8 @@ export class AuditExportService {
         {
           path: 'from',
           message: `${count} events match; narrow the filters to at most ${EXPORT_MAX_EVENTS}`,
+          key: FieldErrorKey.ExportTooLarge,
+          params: { count, max: EXPORT_MAX_EVENTS },
         },
       ]);
     }

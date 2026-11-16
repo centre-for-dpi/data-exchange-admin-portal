@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationMessage } from './validation-messages.js';
 
 /** SPEC.md §4.6 */
 export const NODE_STATUSES = [
@@ -26,7 +27,7 @@ export const createNodeSchema = z.strictObject({
     .trim()
     .min(3)
     .max(80)
-    .regex(/^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u, 'letters, digits, spaces, dots, dashes'),
+    .regex(/^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u, ValidationMessage.node_name_format),
 });
 export type CreateNodeInput = z.input<typeof createNodeSchema>;
 
@@ -135,12 +136,12 @@ export const nodeDnsName = (nodeId: string): string => `rid-node-${nodeId}`;
 /** A WireGuard public key: 32 bytes, base64 (44 characters). */
 export const wireguardKeySchema = z
   .string()
-  .regex(/^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/, 'a WireGuard public key (base64, 32 bytes)');
+  .regex(/^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/, ValidationMessage.wireguard_key);
 
 const kitVersionSchema = z
   .string()
   .max(40)
-  .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/, 'semantic version, e.g. 1.4.0');
+  .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/, ValidationMessage.semantic_version);
 
 const servicePortSchema = z.number().int().min(1).max(65_535);
 

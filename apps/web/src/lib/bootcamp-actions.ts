@@ -4,7 +4,8 @@ import { bootcampChecklistSchema } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 
 /** Confirms (or reopens) a prerequisite of the bootcamp (M4-07). */
 export async function updateBootcampItemAction(
@@ -29,7 +30,10 @@ export async function updateBootcampItemAction(
     bootcampChecklistSchema,
   );
   if (!result.ok)
-    return problemToFormState(result.problem, (await getTranslations('forms'))('unexpected'));
+    return await formStateFromProblem(
+      result.problem,
+      (await getTranslations('forms'))('unexpected'),
+    );
   revalidatePath('/', 'layout');
   return { done: true };
 }

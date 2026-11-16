@@ -9,7 +9,8 @@ import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 
 export async function markAllReadAction(_prev: FormState): Promise<FormState> {
   const result = await apiSend(
@@ -19,7 +20,10 @@ export async function markAllReadAction(_prev: FormState): Promise<FormState> {
     z.object({ updated: z.number() }),
   );
   if (!result.ok)
-    return problemToFormState(result.problem, (await getTranslations('forms'))('unexpected'));
+    return await formStateFromProblem(
+      result.problem,
+      (await getTranslations('forms'))('unexpected'),
+    );
   revalidatePath('/', 'layout');
   return { done: true };
 }
@@ -40,7 +44,10 @@ export async function savePreferencesAction(
     notificationPreferencesSchema,
   );
   if (!result.ok)
-    return problemToFormState(result.problem, (await getTranslations('forms'))('unexpected'));
+    return await formStateFromProblem(
+      result.problem,
+      (await getTranslations('forms'))('unexpected'),
+    );
   revalidatePath('/', 'layout');
   return { done: true };
 }

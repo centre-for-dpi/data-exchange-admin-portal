@@ -49,7 +49,13 @@ test.describe('applications and OAuth2 credentials', () => {
     // The page refreshes itself until the reconciler has created the Keycloak client.
     await expect(page.getByTestId('provisioning')).toHaveText('Lista', { timeout: 60_000 });
     await expect(page.getByText(clientSecret)).toHaveCount(0);
-    await expect(page.locator('pre').getByText(/TU_SECRETO/)).toBeVisible();
+    // The guide reads the secret from the environment, never in the code (M5-08).
+    await expect(
+      page
+        .locator('pre')
+        .getByText(/RID_CLIENT_SECRET/)
+        .first(),
+    ).toBeVisible();
     await expectNoAccessibilityViolations(page);
 
     await issueCertificate(page, clientId);

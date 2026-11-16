@@ -5,7 +5,8 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from '../i18n/navigation';
 import { apiPutBytes, apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 import { getViewer } from './viewer';
 
 const text = (formData: FormData, name: string): string => {
@@ -49,7 +50,7 @@ export async function requestAccessAction(
     },
     subscriptionDetailSchema,
   );
-  if (!result.ok) return problemToFormState(result.problem, t('unexpected'));
+  if (!result.ok) return await formStateFromProblem(result.problem, t('unexpected'));
   revalidatePath('/', 'layout');
   redirect({ href: `/my-apps/requests/${result.data.id}`, locale: await getLocale() });
   return {};
@@ -74,7 +75,7 @@ async function decide(
     if (result.status === 403 && action !== 'revoke') {
       return { formError: (await getTranslations('subscriptions.decide'))('ownRequest') };
     }
-    return problemToFormState(result.problem, t('unexpected'));
+    return await formStateFromProblem(result.problem, t('unexpected'));
   }
   revalidatePath('/', 'layout');
   return {};
@@ -139,7 +140,7 @@ export async function subscriptionStepAction(
     },
     subscriptionDetailSchema,
   );
-  if (!result.ok) return problemToFormState(result.problem, t('unexpected'));
+  if (!result.ok) return await formStateFromProblem(result.problem, t('unexpected'));
   revalidatePath('/', 'layout');
   return {};
 }
@@ -166,7 +167,10 @@ export async function uploadAgreementAction(
   if (!result.ok) {
     if (result.status === 413) return { fieldErrors: { document: [t('tooLarge')] } };
     if (result.status === 415) return { fieldErrors: { document: [t('notPdf')] } };
-    return problemToFormState(result.problem, (await getTranslations('forms'))('unexpected'));
+    return await formStateFromProblem(
+      result.problem,
+      (await getTranslations('forms'))('unexpected'),
+    );
   }
   revalidatePath('/', 'layout');
   return { done: true };

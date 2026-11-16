@@ -11,7 +11,8 @@ import {
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 import { getViewer } from './viewer';
 
 export interface CreateApplicationState extends FormState {
@@ -43,7 +44,7 @@ export async function createApplicationAction(
     },
     createdApplicationSchema,
   );
-  if (!result.ok) return problemToFormState(result.problem, t('unexpected'));
+  if (!result.ok) return await formStateFromProblem(result.problem, t('unexpected'));
   revalidatePath('/', 'layout');
   return {
     created: {
@@ -83,7 +84,7 @@ export async function issueCertificateAction(
   if (!result.ok) {
     if (result.status === 503) return { formError: tc('unavailable'), values: { csr } };
     if (result.status === 409) return { formError: tc('conflict'), values: { csr } };
-    const state = problemToFormState(result.problem, t('unexpected'));
+    const state = await formStateFromProblem(result.problem, t('unexpected'));
     // The API's CSR messages are stable texts (CSR_ERRORS): show them translated.
     if (state.fieldErrors?.csr) {
       state.fieldErrors.csr = state.fieldErrors.csr.map((message) => {
@@ -125,7 +126,7 @@ export async function rotateSecretAction(
   );
   if (!result.ok) {
     if (result.status === 409) return { formError: tr('conflict') };
-    return problemToFormState(result.problem, t('unexpected'));
+    return await formStateFromProblem(result.problem, t('unexpected'));
   }
   revalidatePath('/', 'layout');
   return {
@@ -156,7 +157,7 @@ export async function revokeCredentialAction(
   );
   if (!result.ok) {
     if (result.status === 409) return { formError: tr('conflict') };
-    return { ...problemToFormState(result.problem, t('unexpected')), values: { reason } };
+    return { ...(await formStateFromProblem(result.problem, t('unexpected'))), values: { reason } };
   }
   revalidatePath('/', 'layout');
   return { done: true };

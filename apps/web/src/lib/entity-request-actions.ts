@@ -12,7 +12,8 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { redirect } from '../i18n/navigation';
 import { apiPutBytes, apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 import { ACTIVE_ENTITY_COOKIE } from './viewer';
 
 const text = (formData: FormData, name: string): string => {
@@ -49,7 +50,7 @@ function requestBody(formData: FormData) {
 
 /** The typed values go back with the errors: React resets the form after each action. */
 async function failed(
-  problem: Parameters<typeof problemToFormState>[0],
+  problem: Parameters<typeof formStateFromProblem>[0],
   formData?: FormData,
 ): Promise<FormState> {
   const t = await getTranslations('forms');
@@ -57,7 +58,7 @@ async function failed(
   for (const [key, value] of formData ?? []) {
     if (typeof value === 'string' && !key.startsWith('$')) values[key] = value;
   }
-  return { ...problemToFormState(problem, t('unexpected'), { fullPath: true }), values };
+  return { ...(await formStateFromProblem(problem, t('unexpected'), { fullPath: true })), values };
 }
 
 export async function createEntityRequestAction(

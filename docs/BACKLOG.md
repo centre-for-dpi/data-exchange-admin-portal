@@ -763,7 +763,24 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Queda para M6-05:** TLS y autenticación entre componentes internos, Keycloak en modo producción, bóveda de secretos, SBOM y logs del API en el pipeline central.
     - **Antivirus:** M6-08.
     - **Decisión pendiente del operador:** segundo factor para `entity_admin` y `api_publisher` (ASVS 6.3.3).
-- [ ] **M6-02 — Auditoría de accesibilidad** WCAG 2.1 AA de todas las pantallas.
+- [x] **M6-02 — Auditoría de accesibilidad** WCAG 2.1 AA de todas las pantallas.
+  - _Notas de implementación:_ resultado y estado por criterio en `docs/accessibility/WCAG-2.1-AA.md`.
+    - **Revisión automatizada** (`apps/web/e2e/accessibility.spec.ts`): las 42 pantallas en español e inglés, cada una con el rol que más ve de ella. Por pantalla:
+      - axe;
+      - idioma, título y un solo `h1`;
+      - enlace para saltar al contenido y foco visible;
+      - espaciado de texto (1.4.12);
+      - reflujo a 320 px (1.4.10).
+      Una prueba falla si una página nueva no está en el recorrido. También cubre el aviso de sesión y las páginas de Keycloak.
+    - **Corregido:**
+      - errores del API en el idioma del usuario (ADR-0025);
+      - aviso antes de que la sesión termine por inactividad (2.2.1);
+      - reflujo del encabezado, las tablas, el formulario de solicitud y los gráficos;
+      - un solo `h1` con Scalar;
+      - Escape en los tooltips;
+      - estado de la solicitud como región viva;
+      - espaciado de texto en los gráficos y en Scalar.
+    - **Fuera de la automatización:** prueba con lectores de pantalla (NVDA, VoiceOver) y con usuarios, como recomendación para el operador antes de producción.
 - [ ] **M6-03 — Prueba de carga** con k6: 500 peticiones/s sostenidas, p95 agregado por el gateway < 50 ms.
 - [ ] **M6-04 — Resiliencia**: con el portal caído, el tráfico sigue; con OPA sin bundle nuevo, se mantiene el último; test documentado.
 - [ ] **M6-05 — Helm charts** para producción con la topología de `ARCHITECTURE.md §11`.

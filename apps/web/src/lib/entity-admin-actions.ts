@@ -4,7 +4,8 @@ import { adminEntityListSchema, adminEntitySchema } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 
 export type EntityDecision = 'suspend' | 'reactivate' | 'offboard';
 
@@ -32,7 +33,10 @@ export async function decideEntityStatusAction(
     adminEntityListSchema,
   );
   if (!result.ok)
-    return problemToFormState(result.problem, (await getTranslations('forms'))('unexpected'));
+    return await formStateFromProblem(
+      result.problem,
+      (await getTranslations('forms'))('unexpected'),
+    );
   revalidatePath('/', 'layout');
   return { done: true };
 }
@@ -57,7 +61,10 @@ export async function setXroadMemberAction(
   );
   if (!result.ok)
     return {
-      ...problemToFormState(result.problem, (await getTranslations('forms'))('unexpected')),
+      ...(await formStateFromProblem(
+        result.problem,
+        (await getTranslations('forms'))('unexpected'),
+      )),
       values: { memberClass, memberCode },
     };
   revalidatePath('/', 'layout');

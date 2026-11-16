@@ -56,13 +56,22 @@ export function ColumnChart({
   const format = useFormatter();
   const titleId = useId();
   const [active, setActive] = useState<number | null>(null);
+  // Escape hides the tooltip without moving the pointer or the focus (WCAG 1.4.13, M6-02).
+  useEffect(() => {
+    if (active === null) return;
+    const hide = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActive(null);
+    };
+    document.addEventListener('keydown', hide);
+    return () => document.removeEventListener('keydown', hide);
+  }, [active]);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   useEffect(() => {
     const element = box.current;
     if (!element) return;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(280, Math.floor(entry.contentRect.width)));
+      if (entry) setWidth(Math.max(240, Math.floor(entry.contentRect.width)));
     });
     observer.observe(element);
     return () => observer.disconnect();

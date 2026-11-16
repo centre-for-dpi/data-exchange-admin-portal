@@ -4,7 +4,8 @@ import { issuedEnrollmentTokenSchema, nodeDetailSchema } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 
 /** A form that may return an enrollment token, shown once (M4-01). */
 export interface IssueTokenState extends FormState {
@@ -26,7 +27,10 @@ export async function createNodeAction(
   );
   if (!result.ok) {
     const t = await getTranslations('forms');
-    return { ...problemToFormState(result.problem, t('unexpected')), values: { name: value } };
+    return {
+      ...(await formStateFromProblem(result.problem, t('unexpected'))),
+      values: { name: value },
+    };
   }
   revalidatePath('/', 'layout');
   return {
@@ -51,7 +55,7 @@ export async function reissueTokenAction(
   );
   if (!result.ok) {
     const t = await getTranslations('forms');
-    return problemToFormState(result.problem, t('unexpected'));
+    return await formStateFromProblem(result.problem, t('unexpected'));
   }
   revalidatePath('/', 'layout');
   return {
@@ -76,7 +80,7 @@ export async function decommissionNodeAction(
   );
   if (!result.ok) {
     const t = await getTranslations('forms');
-    return problemToFormState(result.problem, t('unexpected'));
+    return await formStateFromProblem(result.problem, t('unexpected'));
   }
   revalidatePath('/', 'layout');
   return { done: true };
@@ -96,7 +100,7 @@ export async function revokeTokenAction(
   );
   if (!result.ok) {
     const t = await getTranslations('forms');
-    return problemToFormState(result.problem, t('unexpected'));
+    return await formStateFromProblem(result.problem, t('unexpected'));
   }
   revalidatePath('/', 'layout');
   return { done: true };

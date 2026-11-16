@@ -1,3 +1,4 @@
+import { FieldErrorKey } from '@rid/contracts';
 import { Injectable } from '@nestjs/common';
 import { getCountryConfig } from '@rid/config';
 import type {
@@ -141,7 +142,13 @@ export class ApisService {
     const data = createApiSchema.parse(input);
     const sectors = getCountryConfig().sectors.map((s) => s.code);
     if (!sectors.includes(data.sector)) {
-      throw new ValidationError([{ path: 'sector', message: `Unknown sector "${data.sector}"` }]);
+      throw new ValidationError([
+        {
+          path: 'sector',
+          message: `Unknown sector "${data.sector}"`,
+          key: FieldErrorKey.UnknownSector,
+        },
+      ]);
     }
     let api: ApiRow;
     try {
@@ -280,7 +287,11 @@ export class ApisService {
       });
       if (!node) {
         throw new ValidationError([
-          { path: `${path}.nodeId`, message: 'Not a node of this entity in the network' },
+          {
+            path: `${path}.nodeId`,
+            message: 'Not a node of this entity in the network',
+            key: FieldErrorKey.NotANodeOfEntity,
+          },
         ]);
       }
     }
@@ -293,13 +304,19 @@ export class ApisService {
           {
             path: `${path}.serviceId`,
             message: 'The operator has not registered the entity’s X-Road member yet',
+            key: FieldErrorKey.XroadMemberMissing,
           },
         ]);
       }
       const instance = process.env.RID_XROAD_CLIENT?.split('/')[0];
       if (instance && upstream.serviceId.instance !== instance) {
         throw new ValidationError([
-          { path: `${path}.serviceId`, message: `The X-Road instance must be ${instance}` },
+          {
+            path: `${path}.serviceId`,
+            message: `The X-Road instance must be ${instance}`,
+            key: FieldErrorKey.XroadWrongInstance,
+            params: { instance },
+          },
         ]);
       }
       if (memberClass !== entity.xroadMemberClass || memberCode !== entity.xroadMemberCode) {
@@ -307,6 +324,7 @@ export class ApisService {
           {
             path: `${path}.serviceId`,
             message: 'The service is not of the entity’s X-Road member',
+            key: FieldErrorKey.XroadOtherMember,
           },
         ]);
       }
@@ -332,7 +350,12 @@ export class ApisService {
     const unknown = data.allowedPurposes.filter((c) => !purposes.some((p) => p.code === c));
     if (unknown.length > 0) {
       throw new ValidationError(
-        unknown.map((code) => ({ path: 'allowedPurposes', message: `Unknown purpose "${code}"` })),
+        unknown.map((code) => ({
+          path: 'allowedPurposes',
+          message: `Unknown purpose "${code}"`,
+          key: FieldErrorKey.UnknownPurpose,
+          params: { code },
+        })),
       );
     }
     await this.assertUpstreamAllowed(entity, data.upstream, 'upstream');
@@ -479,6 +502,8 @@ export class ApisService {
         breaking.map((message) => ({
           path: 'openapi',
           message: `Incompatible change (needs a new major version): ${message}`,
+          key: FieldErrorKey.IncompatibleChange,
+          params: { change: message },
         })),
       );
     }
@@ -561,6 +586,8 @@ export class ApisService {
         {
           path: 'sunsetAt',
           message: `The retirement date must give at least ${days} days of notice (from ${earliest.toISOString().slice(0, 10)})`,
+          key: FieldErrorKey.RetirementNotice,
+          params: { days, from: earliest.toISOString().slice(0, 10) },
         },
       ]);
     }
@@ -621,6 +648,8 @@ export class ApisService {
         unknown.map((code) => ({
           path: 'allowedPurposes',
           message: `"${code}" is not an active purpose of the catalogue`,
+          key: FieldErrorKey.InactivePurpose,
+          params: { code },
         })),
       );
     }

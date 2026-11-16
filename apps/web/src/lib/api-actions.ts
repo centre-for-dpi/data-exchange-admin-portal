@@ -5,7 +5,8 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from '../i18n/navigation';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 import { getViewer } from './viewer';
 
 const text = (formData: FormData, name: string): string => {
@@ -24,9 +25,9 @@ async function activeEntityId(): Promise<string | undefined> {
   return (await getViewer()).activeEntity?.entity.id;
 }
 
-async function fail(problem: Parameters<typeof problemToFormState>[0]): Promise<FormState> {
+async function fail(problem: Parameters<typeof formStateFromProblem>[0]): Promise<FormState> {
   const t = await getTranslations('forms');
-  return problemToFormState(problem, t('unexpected'));
+  return await formStateFromProblem(problem, t('unexpected'));
 }
 
 async function openapiSource(formData: FormData): Promise<string> {

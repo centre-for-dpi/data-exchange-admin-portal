@@ -47,7 +47,7 @@ export async function SiteHeader() {
             {site.productName}
           </span>
         </Link>
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="ml-auto flex max-w-full min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
           {viewer.memberships.length > 1 ? (
             <EntitySelector
               memberships={viewer.memberships}

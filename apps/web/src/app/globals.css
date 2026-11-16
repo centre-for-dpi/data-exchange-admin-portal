@@ -96,6 +96,10 @@
     color: var(--foreground);
     font-family: var(--font-sans);
   }
+  /* Browsers size a fieldset to its widest content: let it shrink like a div (WCAG 1.4.10). */
+  fieldset {
+    min-inline-size: 0;
+  }
 
   h1,
   h2,
@@ -304,11 +308,14 @@
     padding: 0.75rem 1rem;
     background: var(--background);
   }
+  /* minmax(0, …): a wide table scrolls in its .table-wrap instead of widening the column
+     (WCAG 1.4.10 at 320 px, M6-02). */
   .usage-grid {
     display: grid;
     gap: 1.5rem;
+    grid-template-columns: minmax(0, 1fr);
     @media (min-width: 64rem) {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
   .usage-breakdown {
@@ -324,6 +331,11 @@
     border-radius: 0.75rem;
     padding: 1rem;
     background: var(--background);
+  }
+  /* Axis labels may grow past the plot with more text spacing (WCAG 1.4.12): the card's
+     padding takes them instead of the SVG clipping them. */
+  .usage-chart svg {
+    overflow: visible;
   }
   .usage-chart-mark {
     fill: var(--chart-1);

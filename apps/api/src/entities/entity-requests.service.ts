@@ -11,12 +11,19 @@ import {
   type EntityStatus,
   entityRequestInputSchema,
   type PlatformRole,
+  FieldErrorKey,
 } from '@rid/contracts';
 import type { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import { PLATFORM_PERMISSIONS } from '../auth/authz.policy.js';
 import type { Principal } from '../auth/principal.service.js';
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../common/errors.js';
+import {
+  ConflictError,
+  type FieldError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../common/errors.js';
 import { DocumentsService } from '../documents/documents.service.js';
 import { assertTransition, OPEN_REQUEST_STATUSES } from '../domain/entity/state-machine.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -217,12 +224,20 @@ export class EntityRequestsService {
   /** Values from the country config (rule 6): organization identifier types and sectors. */
   private static checkAgainstConfig(input: RequestInput): void {
     const config = getCountryConfig();
-    const errors: Array<{ path: string; message: string }> = [];
+    const errors: FieldError[] = [];
     if (!config.identifiers.organization.includes(input.taxIdType)) {
-      errors.push({ path: 'taxIdType', message: `Unknown identifier type "${input.taxIdType}"` });
+      errors.push({
+        path: 'taxIdType',
+        message: `Unknown identifier type "${input.taxIdType}"`,
+        key: FieldErrorKey.UnknownTaxIdType,
+      });
     }
     if (!config.sectors.some((s) => s.code === input.sector)) {
-      errors.push({ path: 'sector', message: `Unknown sector "${input.sector}"` });
+      errors.push({
+        path: 'sector',
+        message: `Unknown sector "${input.sector}"`,
+        key: FieldErrorKey.UnknownSector,
+      });
     }
     if (errors.length > 0) throw new ValidationError(errors);
   }
@@ -248,12 +263,20 @@ export class EntityRequestsService {
       },
       select: { slug: true, taxIdType: true, taxId: true },
     });
-    const errors: Array<{ path: string; message: string }> = [];
+    const errors: FieldError[] = [];
     if (taken.some((e) => e.slug === input.slug)) {
-      errors.push({ path: 'slug', message: 'Another entity already uses this identifier' });
+      errors.push({
+        path: 'slug',
+        message: 'Another entity already uses this identifier',
+        key: FieldErrorKey.SlugTaken,
+      });
     }
     if (taken.some((e) => e.taxIdType === input.taxIdType && e.taxId === input.taxId)) {
-      errors.push({ path: 'taxId', message: 'Another entity already uses this tax id' });
+      errors.push({
+        path: 'taxId',
+        message: 'Another entity already uses this tax id',
+        key: FieldErrorKey.TaxIdTaken,
+      });
     }
     if (errors.length > 0) throw new ValidationError(errors);
   }
@@ -320,6 +343,7 @@ export class EntityRequestsService {
     if (open >= MAX_OPEN_REQUESTS) {
       throw new ConflictError(
         `You already have ${MAX_OPEN_REQUESTS} open requests; wait for a decision first`,
+        { key: FieldErrorKey.TooManyOpenRequests, params: { max: MAX_OPEN_REQUESTS } },
       );
     }
     const id = await EntityRequestsService.uniquely(() =>
@@ -452,7 +476,11 @@ export class EntityRequestsService {
     assertTransition(before.status, 'under_review');
     if (!before.designationDocumentId) {
       throw new ValidationError([
-        { path: 'designationDocument', message: 'Attach the designation document first' },
+        {
+          path: 'designationDocument',
+          message: 'Attach the designation document first',
+          key: FieldErrorKey.DesignationDocumentMissing,
+        },
       ]);
     }
     // Submitting claims the slug and tax id: if another request got there first, the partial
@@ -654,6 +682,7 @@ export class EntityRequestsService {
         self.map((path) => ({
           path,
           message: 'Designate someone else: operators hold no role in the entities they register',
+          key: FieldErrorKey.OperatorCannotBeDesignee,
         })),
       );
     }

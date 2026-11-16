@@ -90,9 +90,10 @@ test.describe('integration guide (M5-08)', () => {
       expect(result.out, language).toContain('regimen');
     };
 
-    // curl as on Linux or macOS (OpenSSL): in a container of the stack that has it, on the
-    // Compose network; .curlrc sends localhost:9443 to apisix so the name (and its certificate)
-    // stay the same. jq is not part of the test: a shim reads the token from the JSON.
+    // curl as on Linux or macOS (OpenSSL): in a container that has it, outside the stack's
+    // networks like a real consumer (the gateway is on its own network since M6-01). .curlrc
+    // sends localhost:9443 to the host's published port, so the name (and its certificate) stay
+    // the same. jq is not part of the test: a shim reads the token from the JSON.
     const bin = join(dir, 'bin');
     mkdirSync(bin);
     writeFileSync(
@@ -103,7 +104,7 @@ test.describe('integration guide (M5-08)', () => {
     const gatewayHost = new URL(process.env.RID_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443');
     writeFileSync(
       join(dir, '.curlrc'),
-      `connect-to = ${gatewayHost.hostname}:${gatewayHost.port}:apisix:9443
+      `connect-to = ${gatewayHost.hostname}:${gatewayHost.port}:host.docker.internal:${gatewayHost.port}
 `,
     );
     const script = fill(code.curl ?? '').replace(
@@ -121,8 +122,8 @@ echo " $(cat body.json)"
       run(dir, env, 'docker', [
         'run',
         '--rm',
-        '--network',
-        'rid_default',
+        '--add-host',
+        'host.docker.internal:host-gateway',
         '-v',
         `${dir}:/guide`,
         '-w',

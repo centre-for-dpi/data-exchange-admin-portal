@@ -1,9 +1,10 @@
-import { ErrorCode } from '@rid/contracts';
+import { ErrorCode, type FieldErrorDetail } from '@rid/contracts';
 
-export interface FieldError {
-  path: string;
-  message: string;
-}
+/**
+ * A field error: the English message for API clients, and the key and parameters the portal
+ * translates (M6-02, packages/contracts errors.ts).
+ */
+export type FieldError = FieldErrorDetail;
 
 /** Base class for errors the API turns into RFC 9457 problem details. */
 export class DomainError extends Error {
@@ -43,8 +44,9 @@ export class ForbiddenError extends DomainError {
 }
 
 export class ConflictError extends DomainError {
-  constructor(message: string) {
-    super(ErrorCode.Conflict, message);
+  /** `reason`: a key the portal words for the user (ADR-0025), for conflicts worth explaining. */
+  constructor(message: string, reason?: Omit<FieldError, 'path' | 'message'>) {
+    super(ErrorCode.Conflict, message, reason ? [{ path: '', message, ...reason }] : undefined);
   }
 }
 

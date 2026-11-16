@@ -4,11 +4,13 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Lora, Outfit } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import type { CSSProperties, ReactNode } from 'react';
+import { SessionTimeout } from '../../components/session-timeout';
 import { SiteFooter } from '../../components/site-footer';
 import { SiteHeader } from '../../components/site-header';
 import { SkipLink } from '../../components/skip-link';
 import { routing } from '../../i18n/routing';
 import { getSite } from '../../lib/site';
+import { getViewer } from '../../lib/viewer';
 import '../globals.css';
 
 // Brand typefaces (SIL OFL 1.1). next/font downloads them at build time and serves them from our
@@ -24,6 +26,12 @@ interface LayoutProps {
   children: ReactNode;
   params: Promise<{ locale: string }>;
 }
+
+/** Keycloak's ssoSessionIdleTimeout of the realm rid-portal (30 minutes by default). */
+const sessionIdleSeconds = (): number => {
+  const value = Number(process.env.RID_SESSION_IDLE_SECONDS);
+  return Number.isInteger(value) && value > 180 ? value : 1800;
+};
 
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { locale } = await params;
@@ -58,6 +66,10 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
             {children}
           </main>
           <SiteFooter />
+          {/* WCAG 2.2.1 (M6-02): the realm's idle timeout, RID_SESSION_IDLE_SECONDS. */}
+          {(await getViewer()).authenticated ? (
+            <SessionTimeout idleSeconds={sessionIdleSeconds()} />
+          ) : null}
         </NextIntlClientProvider>
       </body>
     </html>

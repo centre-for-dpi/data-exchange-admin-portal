@@ -64,10 +64,13 @@ function OperationChecks({
                 value={o.operationId}
                 defaultChecked={checked.includes(o.operationId)}
               />
-              <span className="font-mono">
+              {/* Long paths wrap anywhere: nothing scrolls sideways at 320 px (WCAG 1.4.10). */}
+              <span className="font-mono [overflow-wrap:anywhere]">
                 {o.method} {o.path}
               </span>
-              <span className="text-muted-foreground">({o.operationId})</span>
+              <span className="text-muted-foreground [overflow-wrap:anywhere]">
+                ({o.operationId})
+              </span>
             </label>
           </li>
         ))}

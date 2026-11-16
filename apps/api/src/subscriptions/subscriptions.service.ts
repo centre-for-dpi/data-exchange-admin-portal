@@ -1,3 +1,4 @@
+import { FieldErrorKey } from '@rid/contracts';
 import { Injectable } from '@nestjs/common';
 import { getCountryConfig } from '@rid/config';
 import type {
@@ -324,7 +325,13 @@ export class SubscriptionsService {
       where: { id: data.applicationId },
     });
     if (!application)
-      throw new ValidationError([{ path: 'applicationId', message: 'unknown application' }]);
+      throw new ValidationError([
+        {
+          path: 'applicationId',
+          message: 'unknown application',
+          key: FieldErrorKey.UnknownApplication,
+        },
+      ]);
     if (application.status !== 'active') {
       throw new ConflictError('Only active applications can request access');
     }
@@ -341,12 +348,20 @@ export class SubscriptionsService {
 
     const errors: FieldError[] = [];
     if (!version.allowedPurposes.some((p) => p.purposeCode === data.purposeCode)) {
-      errors.push({ path: 'purposeCode', message: 'this API version does not allow that purpose' });
+      errors.push({
+        path: 'purposeCode',
+        message: 'this API version does not allow that purpose',
+        key: FieldErrorKey.PurposeNotAllowed,
+      });
     }
     const purpose = await this.prisma.purpose.findUnique({ where: { code: data.purposeCode } });
     if (purpose && !purpose.active) {
       // Deactivated in the catalogue (M2-10): no new requests; existing subscriptions keep it.
-      errors.push({ path: 'purposeCode', message: 'that purpose is no longer offered' });
+      errors.push({
+        path: 'purposeCode',
+        message: 'that purpose is no longer offered',
+        key: FieldErrorKey.PurposeRetired,
+      });
     }
     const known = new Set(operationsOf(version.openapiSpec).map((o) => o.operationId));
     const unknown = data.requestedOperations.filter((id) => !known.has(id));
@@ -354,6 +369,8 @@ export class SubscriptionsService {
       errors.push({
         path: 'requestedOperations',
         message: `unknown operations: ${unknown.join(', ')}`,
+        key: FieldErrorKey.UnknownOperations,
+        params: { operations: unknown.join(', ') },
       });
     }
     if (
@@ -363,6 +380,7 @@ export class SubscriptionsService {
       errors.push({
         path: 'requestedOperations',
         message: 'this version has no read-only operations; choose the operations you need',
+        key: FieldErrorKey.NoReadOnlyOperations,
       });
     }
     const max = maxValidityMonths(version.api.classification);
@@ -370,6 +388,8 @@ export class SubscriptionsService {
       errors.push({
         path: 'validityMonths',
         message: `at most ${max} months for this classification`,
+        key: FieldErrorKey.MaxValidityMonths,
+        params: { max },
       });
     }
     // Sandbox applications (M4-08) only reach a version's sandbox, with synthetic data.
@@ -378,6 +398,7 @@ export class SubscriptionsService {
       errors.push({
         path: 'apiVersionId',
         message: 'this API version has no sandbox; use a production application',
+        key: FieldErrorKey.NoSandbox,
       });
     }
     if (errors.length > 0) throw new ValidationError(errors);
@@ -391,7 +412,11 @@ export class SubscriptionsService {
       });
       if (!original) {
         throw new ValidationError([
-          { path: 'renewsSubscriptionId', message: 'unknown subscription' },
+          {
+            path: 'renewsSubscriptionId',
+            message: 'unknown subscription',
+            key: FieldErrorKey.UnknownSubscription,
+          },
         ]);
       }
       if (
@@ -403,6 +428,7 @@ export class SubscriptionsService {
           {
             path: 'renewsSubscriptionId',
             message: 'a renewal keeps the application, API version and purpose',
+            key: FieldErrorKey.RenewalKeepsTerms,
           },
         ]);
       }
@@ -557,13 +583,20 @@ export class SubscriptionsService {
     const errors: FieldError[] = [];
     const extra = operations.filter((id) => !requested.includes(id));
     if (extra.length > 0) {
-      errors.push({ path: 'approvedOperations', message: `not requested: ${extra.join(', ')}` });
+      errors.push({
+        path: 'approvedOperations',
+        message: `not requested: ${extra.join(', ')}`,
+        key: FieldErrorKey.OperationsNotRequested,
+        params: { operations: extra.join(', ') },
+      });
     }
     const months = data.validityMonths ?? before.requestedValidityMonths;
     if (months > before.requestedValidityMonths) {
       errors.push({
         path: 'validityMonths',
         message: `at most the ${before.requestedValidityMonths} months requested`,
+        key: FieldErrorKey.AtMostRequestedMonths,
+        params: { months: before.requestedValidityMonths },
       });
     }
     const ceiling = before.requestedRateLimit ?? before.apiVersion.defaultRateLimit;
@@ -572,6 +605,8 @@ export class SubscriptionsService {
       errors.push({
         path: 'rateLimitPerMinute',
         message: `at most ${ceiling} requests per minute`,
+        key: FieldErrorKey.AtMostRatePerMinute,
+        params: { max: ceiling },
       });
     }
     if (errors.length > 0) throw new ValidationError(errors);

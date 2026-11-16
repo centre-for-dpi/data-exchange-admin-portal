@@ -5,6 +5,7 @@ import {
   type BootcampItem,
   manualBootcampItemSchema,
   updateBootcampItemSchema,
+  FieldErrorKey,
 } from '@rid/contracts';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
@@ -86,7 +87,11 @@ export class BootcampService {
     const data = updateBootcampItemSchema.parse(input);
     if (data.manualStepsAvoided != null && item !== 'use_case') {
       throw new ValidationError([
-        { path: 'manualStepsAvoided', message: 'Only the use case counts manual steps' },
+        {
+          path: 'manualStepsAvoided',
+          message: 'Only the use case counts manual steps',
+          key: FieldErrorKey.ManualStepsUseCaseOnly,
+        },
       ]);
     }
     await this.prisma.$transaction(async (tx) => {

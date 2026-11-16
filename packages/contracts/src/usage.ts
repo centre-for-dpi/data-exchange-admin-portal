@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationMessage } from './validation-messages.js';
 
 /** Longest period a usage query covers, in days. */
 export const USAGE_MAX_DAYS = 366;
@@ -21,7 +22,7 @@ export const usageQuerySchema = z
     environment: z.enum(['production', 'sandbox']).default('production'),
   })
   .refine((q) => !q.from || !q.to || q.from <= q.to, {
-    message: '`from` must not be after `to`',
+    message: ValidationMessage.period_reversed,
     path: ['from'],
   });
 export type UsageQuery = z.infer<typeof usageQuerySchema>;
@@ -91,7 +92,7 @@ export const consumedUsageQuerySchema = z
     applicationId: z.uuid().optional(),
   })
   .refine((q) => !q.from || !q.to || q.from <= q.to, {
-    message: '`from` must not be after `to`',
+    message: ValidationMessage.period_reversed,
     path: ['from'],
   });
 export type ConsumedUsageQuery = z.infer<typeof consumedUsageQuerySchema>;

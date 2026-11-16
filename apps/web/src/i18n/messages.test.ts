@@ -1,3 +1,4 @@
+import { ErrorCode, FieldErrorKey, ValidationMessage } from '@rid/contracts';
 import { describe, expect, it } from 'vitest';
 import en from '../../messages/en.json';
 import es from '../../messages/es.json';
@@ -70,5 +71,14 @@ describe('i18n messages', () => {
       expect(lookup(es, key).trim(), key).not.toBe('');
       expect(lookup(en, key).trim(), key).not.toBe('');
     }
+  });
+
+  it('words every field error key and problem code of the API (M6-02)', () => {
+    const keys = flatten(es);
+    const fields = [...Object.values(FieldErrorKey), ...Object.keys(ValidationMessage)];
+    expect(fields.filter((k) => !keys.includes(`apiErrors.fields.${k}`))).toEqual([]);
+    expect(Object.values(ErrorCode).filter((c) => !keys.includes(`apiErrors.codes.${c}`))).toEqual(
+      [],
+    );
   });
 });

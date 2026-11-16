@@ -1,4 +1,4 @@
-import { USAGE_DEFAULT_DAYS, USAGE_MAX_DAYS } from '@rid/contracts';
+import { USAGE_DEFAULT_DAYS, USAGE_MAX_DAYS, FieldErrorKey } from '@rid/contracts';
 import { getCountryConfig } from '@rid/config';
 import { ServiceUnavailableError, ValidationError } from '../common/errors.js';
 import { localDay, nextDay, startOfLocalDay } from '../common/local-day.js';
@@ -39,7 +39,12 @@ export function resolvePeriod(
   const days = daysIn(from, to);
   if (days < 1 || days > USAGE_MAX_DAYS) {
     throw new ValidationError([
-      { path: 'from', message: `The period must be 1 to ${USAGE_MAX_DAYS} days` },
+      {
+        path: 'from',
+        message: `The period must be 1 to ${USAGE_MAX_DAYS} days`,
+        key: FieldErrorKey.PeriodTooLong,
+        params: { days: USAGE_MAX_DAYS },
+      },
     ]);
   }
   return { from, to, timeZone };

@@ -2,6 +2,7 @@
 
 import '@scalar/api-reference-react/style.css';
 import dynamic from 'next/dynamic';
+import { useEffect, useRef } from 'react';
 import { config as zodConfig } from 'zod';
 
 // Scalar validates its configuration with zod, whose JIT probes `Function("")`. The CSP forbids
@@ -30,6 +31,12 @@ const accessibleColors = `
   --scalar-color-yellow: #854d0e;
   --scalar-color-purple: #6d28d9;
 }
+/* Its download link keeps its text whole with more text spacing (WCAG 1.4.12, M6-02). */
+.download-button {
+  white-space: normal !important;
+  overflow: visible !important;
+  max-width: 100%;
+}
 `;
 
 /**
@@ -38,8 +45,24 @@ const accessibleColors = `
  * sandbox exists, and nothing is loaded from third-party hosts (fonts, telemetry).
  */
 export function ApiDocs({ spec }: { spec: Record<string, unknown> }) {
+  const container = useRef<HTMLDivElement>(null);
+  // Scalar titles the document with an h1; the page already has its own (the API's name). Its
+  // headings go one level down, so the page keeps a single level-1 heading (WCAG 1.3.1, M6-02).
+  useEffect(() => {
+    const root = container.current;
+    if (!root) return;
+    const demote = () => {
+      for (const heading of root.querySelectorAll('h1:not([aria-level])')) {
+        heading.setAttribute('aria-level', '2');
+      }
+    };
+    demote();
+    const observer = new MutationObserver(demote);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
   return (
-    <div className="card overflow-hidden">
+    <div ref={container} className="card overflow-hidden">
       <ApiReferenceReact
         configuration={{
           content: spec,

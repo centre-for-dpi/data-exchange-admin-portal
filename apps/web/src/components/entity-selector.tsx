@@ -24,7 +24,8 @@ export function EntitySelector({
   const pathname = usePathname();
   const id = useId();
   return (
-    <form action={setActiveEntityAction} className="flex items-center gap-2">
+    // Wraps on narrow screens: nothing scrolls sideways at 320 CSS pixels (WCAG 1.4.10, M6-02).
+    <form action={setActiveEntityAction} className="flex max-w-full flex-wrap items-center gap-2">
       <label htmlFor={id} className="text-sm text-muted-foreground">
         {t('label')}
       </label>
@@ -32,7 +33,7 @@ export function EntitySelector({
         id={id}
         name="entityId"
         defaultValue={activeEntityId}
-        className="h-9 rounded-full border border-border-control bg-background px-3 text-sm text-foreground-strong hover:border-foreground"
+        className="h-9 max-w-full min-w-0 rounded-full border border-border-control bg-background px-3 text-sm text-foreground-strong hover:border-foreground"
       >
         {memberships.map((m) => (
           <option key={m.entity.id} value={m.entity.id}>

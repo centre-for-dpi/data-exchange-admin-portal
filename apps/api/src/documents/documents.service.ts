@@ -1,3 +1,4 @@
+import { FieldErrorKey } from '@rid/contracts';
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -60,7 +61,9 @@ export class DocumentsService {
   ): Promise<StoredDocument> {
     const { bytes } = input;
     if (bytes.length === 0) {
-      throw new ValidationError([{ path: 'body', message: 'The document is empty' }]);
+      throw new ValidationError([
+        { path: 'body', message: 'The document is empty', key: FieldErrorKey.EmptyDocument },
+      ]);
     }
     if (bytes.length > documentMaxBytes()) {
       throw new PayloadTooLargeError(`The document exceeds ${documentMaxBytes()} bytes`);

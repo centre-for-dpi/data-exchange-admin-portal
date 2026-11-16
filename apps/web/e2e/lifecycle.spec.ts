@@ -60,7 +60,7 @@ test.describe('API version lifecycle (M2-05)', () => {
     });
     await publisher.getByLabel('O pega el documento OpenAPI').fill(breaking);
     await publisher.getByRole('button', { name: 'Publicar revisión' }).click();
-    await expect(publisher.getByText(/needs a new major version/).first()).toBeVisible();
+    await expect(publisher.getByText(/requiere una nueva versión mayor/).first()).toBeVisible();
     await expect(publisher.getByRole('heading', { level: 1 })).toContainText('1.1');
 
     // Deprecation with the earliest date the notice allows.

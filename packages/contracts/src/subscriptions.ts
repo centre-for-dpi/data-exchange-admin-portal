@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationMessage } from './validation-messages.js';
 import { classificationSchema, operationSchema } from './apis.js';
 import { catalogPurposeSchema } from './catalog.js';
 import { documentSummarySchema } from './entities.js';
@@ -24,7 +25,7 @@ const operationIdSchema = z.string().trim().min(1).max(200);
 const operationListSchema = z
   .array(operationIdSchema)
   .max(200)
-  .refine((ids) => new Set(ids).size === ids.length, 'operations must not repeat');
+  .refine((ids) => new Set(ids).size === ids.length, ValidationMessage.operations_repeat);
 
 /** Access request by an app developer of the consumer entity (SPEC.md §4.4, step 1). */
 export const createSubscriptionSchema = z.strictObject({
@@ -60,17 +61,13 @@ export const approveSubscriptionSchema = z.strictObject({
 export type ApproveSubscriptionInput = z.input<typeof approveSubscriptionSchema>;
 
 export const rejectSubscriptionSchema = z.strictObject({
-  comment: z
-    .string()
-    .trim()
-    .min(10, 'explain why the request is rejected (10+ characters)')
-    .max(2_000),
+  comment: z.string().trim().min(10, ValidationMessage.explain_rejection).max(2_000),
 });
 export type RejectSubscriptionInput = z.input<typeof rejectSubscriptionSchema>;
 
 /** Revocation by the provider's data steward: final, with a reason the consumer reads. */
 export const revokeSubscriptionSchema = z.strictObject({
-  comment: z.string().trim().min(10, 'explain why access is revoked (10+ characters)').max(2_000),
+  comment: z.string().trim().min(10, ValidationMessage.explain_revocation).max(2_000),
 });
 export type RevokeSubscriptionInput = z.input<typeof revokeSubscriptionSchema>;
 
@@ -194,7 +191,7 @@ export const regulatorDecisionSchema = z.strictObject({
 });
 /** Sending a version back or rejecting a request always carries a reason. */
 export const regulatorReasonSchema = z.strictObject({
-  comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
+  comment: z.string().trim().min(10, ValidationMessage.explain_reason).max(2_000),
 });
 export const subscriptionIdParamsSchema = z.strictObject({ subscriptionId: z.uuid() });
 
@@ -222,7 +219,7 @@ export const reactivateSubscriptionSchema = z.strictObject({
 
 /** Deletion of a document's bytes by legal order (SPEC.md §5, M2-07). */
 export const purgeDocumentSchema = z.strictObject({
-  order: z.string().trim().min(5, 'reference the legal order').max(500),
+  order: z.string().trim().min(5, ValidationMessage.reference_legal_order).max(500),
 });
 export const documentIdParamsSchema = z.strictObject({ documentId: z.uuid() });
 export const purgedDocumentSchema = z.object({ id: z.uuid(), purgedAt: z.iso.datetime() });

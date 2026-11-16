@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationMessage } from './validation-messages.js';
 
 const isoDate = z.iso.date();
 
@@ -6,7 +7,7 @@ const isoDate = z.iso.date();
 export const indicatorsQuerySchema = z
   .object({ from: isoDate.optional(), to: isoDate.optional() })
   .refine((q) => !q.from || !q.to || q.from <= q.to, {
-    message: '`from` must not be after `to`',
+    message: ValidationMessage.period_reversed,
     path: ['from'],
   });
 export type IndicatorsQuery = z.infer<typeof indicatorsQuerySchema>;

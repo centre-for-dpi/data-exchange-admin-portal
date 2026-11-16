@@ -88,7 +88,8 @@ export interface Problem {
   code?: string;
   title?: string;
   detail?: string;
-  errors?: Array<{ path: string; message: string }>;
+  /** Field errors; `key` and `params` let the portal word them in the user's language. */
+  errors?: Array<{ path: string; message: string; key?: string; params?: Record<string, unknown> }>;
 }
 
 /** Writes to the API. Errors are returned (not thrown) so forms can show them next to fields. */

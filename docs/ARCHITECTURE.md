@@ -443,6 +443,7 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
   - `X-Forwarded-For` solo se cree a la dirección del proxy (`RID_TRUST_PROXY`).
   - Las subidas verifican el token antes de recibir el archivo.
   - Tamaño máximo de cuerpo, validación zod en todas las entradas y problem+json sin trazas internas.
+  - Cada error de campo lleva `key` y `params` además del `message` en inglés, y la web lo muestra en el idioma del usuario (ADR-0025, M6-02). `params` nunca lleva lo que escribió el usuario.
   - Cabeceras de seguridad en toda respuesta (`nosniff`, CSP `default-src 'none'`, `no-store` salvo indicación del endpoint, HSTS).
   - Un evento JSON `request_refused` por cada rechazo (400, 401, 403, 404, 409, 429) con `sub`, IP, plantilla de ruta y código. Nunca la query, el token ni el cuerpo.
 - **Keycloak (M6-01).** Política de contraseñas (12 caracteres mínimo, distinta del usuario y del correo, sin repetir las 5 anteriores), URIs de redirección exactas, eventos de ingreso, cierre, registro y errores, y eventos de administración.

@@ -39,4 +39,36 @@ describe('problemToFormState', () => {
       formError: 'Unrecognized key',
     });
   });
+
+  it('words every text in the language of the user when given a translation (M6-02)', () => {
+    const state = problemToFormState(
+      {
+        code: 'conflict',
+        detail: 'The request changed meanwhile; reload it',
+        errors: [
+          {
+            path: 'validityMonths',
+            message: 'at most 6 months',
+            key: 'max_validity_months',
+            params: { max: 6 },
+          },
+        ],
+      },
+      'fallback',
+      {
+        translation: {
+          field: (e) => `campo ${e.key ?? ''} ${JSON.stringify(e.params?.max)}`,
+          code: (code) => `código ${code}`,
+        },
+      },
+    );
+    expect(state.fieldErrors).toEqual({ validityMonths: ['campo max_validity_months 6'] });
+    const general = problemToFormState(
+      { code: 'conflict', detail: 'The request changed meanwhile; reload it' },
+      'fallback',
+      { translation: { field: (e) => e.message, code: (code) => `código ${code}` } },
+    );
+    // The API's English detail is not shown: the code's text is.
+    expect(general.formError).toBe('código conflict');
+  });
 });

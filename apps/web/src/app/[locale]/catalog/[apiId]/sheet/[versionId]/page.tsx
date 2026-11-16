@@ -135,24 +135,26 @@ export default async function ServiceSheetPage({ params }: PageProps) {
         {version.exposedFields.length === 0 ? (
           <p>{t('catalog.noPersonalData')}</p>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th scope="col">{t('serviceSheet.field')}</th>
-                <th scope="col">{t('serviceSheet.personal')}</th>
-                <th scope="col">{t('serviceSheet.sensitive')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {version.exposedFields.map((f) => (
-                <tr key={f.name}>
-                  <td className="font-mono">{f.name}</td>
-                  <td>{f.personal ? t('version.detail.yes') : t('version.detail.no')}</td>
-                  <td>{f.sensitive ? t('version.detail.yes') : t('version.detail.no')}</td>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('serviceSheet.field')}</th>
+                  <th scope="col">{t('serviceSheet.personal')}</th>
+                  <th scope="col">{t('serviceSheet.sensitive')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {version.exposedFields.map((f) => (
+                  <tr key={f.name}>
+                    <td className="font-mono">{f.name}</td>
+                    <td>{f.personal ? t('version.detail.yes') : t('version.detail.no')}</td>
+                    <td>{f.sensitive ? t('version.detail.yes') : t('version.detail.no')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -160,26 +162,28 @@ export default async function ServiceSheetPage({ params }: PageProps) {
         <h2 id="sheet-operations" className="text-xl font-semibold">
           {t('serviceSheet.operations')}
         </h2>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th scope="col">{t('serviceSheet.method')}</th>
-              <th scope="col">{t('serviceSheet.path')}</th>
-              <th scope="col">{t('serviceSheet.operation')}</th>
-              <th scope="col">{t('serviceSheet.subject')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {version.operations.map((o) => (
-              <tr key={o.operationId}>
-                <td className="font-mono">{o.method}</td>
-                <td className="font-mono break-all">{o.path}</td>
-                <td className="font-mono">{o.operationId}</td>
-                <td>{dataSubjectLabel(t, o.dataSubject)}</td>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">{t('serviceSheet.method')}</th>
+                <th scope="col">{t('serviceSheet.path')}</th>
+                <th scope="col">{t('serviceSheet.operation')}</th>
+                <th scope="col">{t('serviceSheet.subject')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {version.operations.map((o) => (
+                <tr key={o.operationId}>
+                  <td className="font-mono">{o.method}</td>
+                  <td className="font-mono break-all">{o.path}</td>
+                  <td className="font-mono">{o.operationId}</td>
+                  <td>{dataSubjectLabel(t, o.dataSubject)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section aria-labelledby="sheet-description" className="space-y-3">

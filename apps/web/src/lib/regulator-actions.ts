@@ -4,7 +4,8 @@ import { reviewDetailSchema, subscriptionDetailSchema } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 
 export type RegulatorTarget = 'api-versions' | 'subscriptions';
 export type RegulatorDecision = 'approve' | 'request-changes' | 'reject';
@@ -27,7 +28,7 @@ export async function regulatorDecideAction(
   );
   if (!result.ok) {
     const t = await getTranslations('forms');
-    return problemToFormState(result.problem, t('unexpected'));
+    return await formStateFromProblem(result.problem, t('unexpected'));
   }
   revalidatePath('/', 'layout');
   return { done: true };

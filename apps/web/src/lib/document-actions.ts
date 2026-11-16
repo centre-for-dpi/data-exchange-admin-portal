@@ -4,7 +4,8 @@ import { purgedDocumentSchema } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 
 /** Platform admin: delete a document's bytes by legal order (M2-07). */
 export async function purgeDocumentAction(
@@ -27,7 +28,10 @@ export async function purgeDocumentAction(
   );
   if (!result.ok)
     return {
-      ...problemToFormState(result.problem, (await getTranslations('forms'))('unexpected')),
+      ...(await formStateFromProblem(
+        result.problem,
+        (await getTranslations('forms'))('unexpected'),
+      )),
       values: { order },
     };
   revalidatePath('/', 'layout');

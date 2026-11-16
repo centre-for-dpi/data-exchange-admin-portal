@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationMessage } from './validation-messages.js';
 import { isPublicHostname } from './net.js';
 import { pageOf } from './session.js';
 
@@ -19,9 +20,7 @@ export const API_VERSION_STATUSES = [
 export const apiVersionStatusSchema = z.enum(API_VERSION_STATUSES);
 export type ApiVersionStatus = z.infer<typeof apiVersionStatusSchema>;
 
-const slug = z
-  .string()
-  .regex(/^[a-z][a-z0-9-]{1,38}[a-z0-9]$/, 'lower-case letters, digits and hyphens (3-40)');
+const slug = z.string().regex(/^[a-z][a-z0-9-]{1,38}[a-z0-9]$/, ValidationMessage.api_slug_format);
 
 /**
  * Where the data subject of an operation is (OpenAPI extension `x-rid-data-subject`, ADR-0015,
@@ -69,7 +68,7 @@ export const xroadPartSchema = z
     'letters, digits, spaces and . _ - : ~ only',
   )
   // Only dots would be a path segment the Security Server could resolve as `.` or `..`.
-  .refine((part) => !/^\.+$/.test(part), { error: 'cannot be only dots' });
+  .refine((part) => !/^\.+$/.test(part), { error: ValidationMessage.not_only_dots });
 
 /**
  * Path after an X-Road serviceId: empty, or segments of letters, digits and `. _ ~ -`, none empty
@@ -112,9 +111,9 @@ export const upstreamSchema = z.discriminatedUnion('type', [
     type: z.literal('direct'),
     /** Existing HTTPS API of the entity. */
     url: z
-      .url({ protocol: /^https$/, error: 'must be an https:// URL' })
+      .url({ protocol: /^https$/, error: ValidationMessage.https_url })
       .refine((value) => isPublicHostname(new URL(value).hostname), {
-        error: 'must be a public host name or IP, not an internal address',
+        error: ValidationMessage.public_host_required,
       }),
     mtls: z.boolean().default(false),
   }),
@@ -126,7 +125,7 @@ export const upstreamSchema = z.discriminatedUnion('type', [
      */
     nodeId: z.uuid().optional(),
     /** Path of the service on the node, e.g. /salud */
-    servicePath: z.string().regex(/^\/[A-Za-z0-9._~\-/]*$/, 'must be an absolute path'),
+    servicePath: z.string().regex(/^\/[A-Za-z0-9._~\-/]*$/, ValidationMessage.absolute_path),
   }),
   z.strictObject({
     type: z.literal('xroad'),
@@ -167,7 +166,7 @@ export type CreateApiInput = z.input<typeof createApiSchema>;
 export const openapiSourceSchema = z.string().min(20).max(900_000);
 
 export const createApiVersionSchema = z.strictObject({
-  version: z.string().regex(/^[1-9][0-9]{0,2}\.[0-9]{1,3}$/, 'major.minor, e.g. 1.0'),
+  version: z.string().regex(/^[1-9][0-9]{0,2}\.[0-9]{1,3}$/, ValidationMessage.version_format),
   openapi: openapiSourceSchema,
   upstream: upstreamSchema,
   /** Optional test upstream with synthetic data (M4-06, M4-08). */
@@ -374,7 +373,7 @@ export const approveVersionSchema = z.strictObject({
   comment: z.string().trim().max(2_000).optional(),
 });
 export const requestChangesSchema = z.strictObject({
-  comment: z.string().trim().min(10, 'explain what has to change (10+ characters)').max(2_000),
+  comment: z.string().trim().min(10, ValidationMessage.explain_changes).max(2_000),
 });
 export const versionIdParamsSchema = z.strictObject({ versionId: z.uuid() });
 
@@ -406,7 +405,7 @@ export const purposeAdminListSchema = z.object({ items: z.array(purposeAdminSche
 export const createPurposeSchema = z.strictObject({
   code: z
     .string()
-    .regex(/^[a-z][a-z0-9]*(_[a-z0-9]+)*$/, 'lower snake_case, e.g. benefit_targeting')
+    .regex(/^[a-z][a-z0-9]*(_[a-z0-9]+)*$/, ValidationMessage.purpose_code_format)
     .max(60),
   name: purposeText(3, 120),
   description: purposeText(10, 1_000),
@@ -421,5 +420,5 @@ export const setVersionPurposesSchema = z.strictObject({
     .array(z.string().regex(/^[a-z0-9_]+$/))
     .min(1)
     .max(50)
-    .refine((codes) => new Set(codes).size === codes.length, 'each purpose once'),
+    .refine((codes) => new Set(codes).size === codes.length, ValidationMessage.each_purpose_once),
 });

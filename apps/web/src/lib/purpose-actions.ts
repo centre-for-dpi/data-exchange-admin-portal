@@ -4,7 +4,8 @@ import { apiVersionDetailSchema, purposeAdminListSchema } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 import { getViewer } from './viewer';
 
 const text = (formData: FormData, name: string): string => {
@@ -18,11 +19,15 @@ const purposeBody = (formData: FormData) => ({
   ...(text(formData, 'legalReference') ? { legalReference: text(formData, 'legalReference') } : {}),
 });
 
-async function done(result: { ok: boolean; problem?: Parameters<typeof problemToFormState>[0] }) {
+async function done(result: { ok: boolean; problem?: Parameters<typeof formStateFromProblem>[0] }) {
   if (!result.ok) {
-    return problemToFormState(result.problem, (await getTranslations('forms'))('unexpected'), {
-      fullPath: true,
-    });
+    return await formStateFromProblem(
+      result.problem,
+      (await getTranslations('forms'))('unexpected'),
+      {
+        fullPath: true,
+      },
+    );
   }
   revalidatePath('/', 'layout');
   return { done: true };

@@ -38,7 +38,8 @@ export async function SubscriptionFacts({
       <dl className="facts">
         <dt>{t('subscriptions.status')}</dt>
         <dd>
-          <StatusBadge status={detail.status} data-testid="subscription-status">
+          {/* A live region: the page refreshes while access is applied (WCAG 4.1.3, M6-02). */}
+          <StatusBadge status={detail.status} role="status" data-testid="subscription-status">
             {t(`subscriptionStatus.${detail.status}`)}
           </StatusBadge>
         </dd>

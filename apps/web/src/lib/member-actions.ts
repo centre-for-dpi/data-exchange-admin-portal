@@ -4,7 +4,8 @@ import { ENTITY_ROLES, entityInvitationSchema, entityMemberSchema } from '@rid/c
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend, type Problem } from './api';
-import { type FormState, problemToFormState } from './forms';
+import type { FormState } from './forms';
+import { formStateFromProblem } from './problem-form-state';
 
 const rolesOf = (formData: FormData): string[] =>
   formData
@@ -16,7 +17,7 @@ const rolesOf = (formData: FormData): string[] =>
 async function done(result: { ok: true } | { ok: false; problem?: Problem }): Promise<FormState> {
   if (!result.ok) {
     const t = await getTranslations('forms');
-    return problemToFormState(result.problem, t('unexpected'));
+    return await formStateFromProblem(result.problem, t('unexpected'));
   }
   revalidatePath('/', 'layout');
   return { done: true };

@@ -739,6 +739,16 @@
                 },
                 "message": {
                   "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "params": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
                 }
               },
               "required": [

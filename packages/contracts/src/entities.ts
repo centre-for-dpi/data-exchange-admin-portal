@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { xroadMemberSchema } from './apis.js';
 import { type EntityRole, entityRoleSchema, platformRoleSchema } from './roles.js';
+import { ValidationMessage } from './validation-messages.js';
 
 /** SPEC.md §4.1. */
 export const ENTITY_STATUSES = [
@@ -58,8 +59,11 @@ export const entitySlugSchema = z
   .string()
   .min(2)
   .max(40)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'lower-case letters, digits and single hyphens')
-  .refine((s) => !(RESERVED_ENTITY_SLUGS as readonly string[]).includes(s), 'reserved name');
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, ValidationMessage.entity_slug_format)
+  .refine(
+    (s) => !(RESERVED_ENTITY_SLUGS as readonly string[]).includes(s),
+    ValidationMessage.reserved_slug,
+  );
 
 /** E-mail addresses are compared and stored in lower case. */
 export const emailSchema = z
@@ -84,7 +88,7 @@ export const entityRequestInputSchema = z.strictObject({
   taxId: z
     .string()
     .trim()
-    .regex(/^[0-9A-Za-z][0-9A-Za-z.-]{2,29}$/, 'digits, letters, dots and hyphens'),
+    .regex(/^[0-9A-Za-z][0-9A-Za-z.-]{2,29}$/, ValidationMessage.tax_id_format),
   kind: entityKindSchema,
   /** A sector code from the country config. */
   sector: z.string().trim().min(1).max(40),
@@ -185,7 +189,7 @@ export const approveEntitySchema = z.strictObject({
 });
 /** Asking for corrections or rejecting always needs a reason the applicant can read. */
 export const entityDecisionWithReasonSchema = z.strictObject({
-  comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
+  comment: z.string().trim().min(10, ValidationMessage.explain_reason).max(2_000),
 });
 
 /** Name shown for an uploaded file; never used as a path. */
@@ -200,7 +204,7 @@ export const documentFileNameQuerySchema = z.strictObject({
       (name) =>
         !/[/\\]/.test(name) &&
         ![...name].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f),
-      'a file name without path separators or control characters',
+      ValidationMessage.file_name_format,
     )
     .default('document.pdf'),
 });
@@ -227,9 +231,9 @@ export const invitationIdParamsSchema = z.strictObject({ invitationId: z.uuid() 
 
 const entityRolesSchema = z
   .array(entityRoleSchema)
-  .min(1, 'choose at least one role')
+  .min(1, ValidationMessage.choose_a_role)
   .max(5)
-  .refine((roles) => new Set(roles).size === roles.length, 'each role once');
+  .refine((roles) => new Set(roles).size === roles.length, ValidationMessage.each_role_once);
 
 export const inviteMemberSchema = z.strictObject({
   email: emailSchema,
@@ -290,7 +294,7 @@ export const adminEntityQuerySchema = z.strictObject({
 });
 
 export const suspendEntitySchema = z.strictObject({
-  comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
+  comment: z.string().trim().min(10, ValidationMessage.explain_reason).max(2_000),
   /** Also stop serving the entity's APIs to other entities (an explicit decision). */
   alsoAsProvider: z.boolean().default(false),
 });
@@ -301,7 +305,7 @@ export const reactivateEntitySchema = z.strictObject({
   comment: z.string().trim().max(2_000).optional(),
 });
 export const offboardEntitySchema = z.strictObject({
-  comment: z.string().trim().min(10, 'explain the reason (10+ characters)').max(2_000),
+  comment: z.string().trim().min(10, ValidationMessage.explain_reason).max(2_000),
 });
 /**
  * Direct registration by the operator (SPEC.md §4.1 step 1): the same data as a request, plus
@@ -310,7 +314,7 @@ export const offboardEntitySchema = z.strictObject({
  */
 export const createEntitySchema = entityRequestInputSchema.extend({
   admin: designeeInputSchema,
-  basis: z.string().trim().min(10, 'reference the act or decision (10+ characters)').max(500),
+  basis: z.string().trim().min(10, ValidationMessage.reference_act).max(500),
 });
 export type CreateEntityInput = z.input<typeof createEntitySchema>;
 

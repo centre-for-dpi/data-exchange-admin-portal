@@ -15,3 +15,4 @@ export * from './bootcamp.js';
 export * from './usage.js';
 export * from './indicators.js';
 export * from './sync.js';
+export * from './validation-messages.js';

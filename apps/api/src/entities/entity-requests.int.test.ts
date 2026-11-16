@@ -250,6 +250,11 @@ describe('entity onboarding (M2-01)', () => {
         input(person('d'), person('t')),
       );
       expect(fourth.statusCode).toBe(409);
+      // The portal words the reason in the user's language (ADR-0025).
+      expect(fourth.json()).toMatchObject({
+        code: 'conflict',
+        errors: [{ path: '', key: 'too_many_open_requests', params: { max: 3 } }],
+      });
     });
 
     it('edits the request, attaches a PDF and cannot submit without it', async () => {
