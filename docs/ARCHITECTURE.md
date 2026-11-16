@@ -417,7 +417,15 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 
 ## 12. Seguridad
 
-- Admin API de APISIX y etcd solo en red interna, con clave de administrador y mTLS.
+- Revisión OWASP ASVS 5.0 nivel 2 con sus correcciones y pendientes: `docs/security/ASVS-L2.md` (M6-01).
+- **Redes (M6-01).**
+  - `gateway`: el plano de control del gateway. APISIX, etcd y OPA, más los componentes de la plataforma que los usan (Keycloak, los Fluent Bit, Prometheus y, en el piloto, el API).
+  - `providers`: los upstreams del gateway (proveedores de prueba, hub de nodos) y el runner de contrato.
+  - `default`: la plataforma (base de datos, CA, OpenSearch, correo, portal).
+  - etcd y OPA no tienen autenticación propia en el piloto, por eso solo están en `gateway`: ni los upstreams ni el runner los alcanzan. El gateway no alcanza la base de datos, la CA, OpenSearch ni el correo. La prueba es `tests/infra/src/networks.int.test.ts`.
+- Admin API de APISIX solo en red interna y con clave de administrador. En producción también mTLS de etcd y autenticación de OPA (M6-05).
+- **Claves privadas en etcd** (TLS del gateway, aserciones de S-6). Se cifran con el `data_encryption.keyring` propio del despliegue (`RID_APISIX_KEYRING`), nunca con el de fábrica de APISIX, que es público.
+- **Plugins de APISIX.** APISIX solo carga los que usan las rutas del portal: una ruta que pida otro, como las funciones serverless, se rechaza.
 - El bundle OPA se sirve con token de servicio y por red interna.
 - Secretos por variables de entorno en dev; en producción, OpenBao (MPL-2.0).
 - **Web (M3-09).**
@@ -429,8 +437,14 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
   - Las rutas que no son páginas (Auth.js, el logo) llevan una CSP que no carga nada. Las descargas de `/files` llevan su `sandbox`.
   - Toda respuesta lleva HSTS de dos años con `includeSubDomains`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, COOP/CORP `same-origin` y una `Permissions-Policy` cerrada. Sin `X-Powered-By`.
   - Cookies: las de Auth.js son `HttpOnly`, `SameSite=Lax`, de un solo host y, sobre HTTPS, `Secure` con prefijo `__Secure-` o `__Host-`. Las propias del portal (entidad activa, escalado de sesión) siguen las mismas reglas. CSRF por Auth.js y por las server actions (comprobación de `Origin`).
-- API: rate limit por usuario, tamaño máximo de cuerpo, validación zod en todas las entradas, problem+json sin trazas internas.
-- Dependencias: `pnpm audit` y verificación de licencias en CI.
+- **API (M6-01).**
+  - Límite de peticiones antes de leer el cuerpo: por token o por dirección, y una cuota estricta por usuario en las rutas costosas. El proxy suma un límite por dirección.
+  - Las subidas verifican el token antes de recibir el archivo.
+  - Tamaño máximo de cuerpo, validación zod en todas las entradas y problem+json sin trazas internas.
+  - Cabeceras de seguridad en toda respuesta (`nosniff`, CSP `default-src 'none'`, `no-store` salvo indicación del endpoint, HSTS).
+  - Un evento JSON `request_refused` por cada rechazo (400, 401, 403, 404, 409, 429) con `sub`, IP, plantilla de ruta y código. Nunca la query, el token ni el cuerpo.
+- **Keycloak (M6-01).** Política de contraseñas (12 caracteres mínimo, distinta del usuario y del correo, sin repetir las 5 anteriores), URIs de redirección exactas, eventos de ingreso, cierre, registro y errores, y eventos de administración.
+- **Dependencias.** `pnpm audit --audit-level high` y verificación de licencias en CI. Plazos de corrección en `docs/security/ASVS-L2.md`.
 
 ## 13. Transparencia para el titular (ADR-0015, ADR-0016)
 

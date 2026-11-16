@@ -12,6 +12,7 @@ x-healthcheck-defaults: &healthcheck-defaults
 services:
   postgres:
     image: postgres:18.6-alpine
+    networks: [default]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -30,6 +31,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.0
+    networks: [default, gateway]
     command:
       - start-dev
       - --import-realm
@@ -81,6 +83,7 @@ services:
 
   etcd:
     image: quay.io/coreos/etcd:v3.6.16
+    networks: [gateway]
     command:
       - etcd
       - --name=etcd0
@@ -99,7 +102,10 @@ services:
 
   apisix:
     image: apache/apisix:3.19.0-debian
+    networks: [gateway, providers]
     environment:
+      # The deployment's own key for the private keys APISIX keeps in etcd (M6-01).
+      RID_APISIX_KEYRING: ${RID_APISIX_KEYRING:?set RID_APISIX_KEYRING in .env (16 characters)}
       APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?set APISIX_ADMIN_KEY in .env}
     volumes:
       - ../apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
@@ -131,6 +137,7 @@ services:
 
   opa:
     image: openpolicyagent/opa:1.21.4-static
+    networks: [gateway]
     command:
       - run
       - --server
@@ -162,6 +169,7 @@ services:
 
   step-ca:
     image: smallstep/step-ca:0.30.2
+    networks: [default]
     environment:
       DOCKER_STEPCA_INIT_NAME: RID Dev CA
       DOCKER_STEPCA_INIT_DNS_NAMES: localhost,step-ca
@@ -189,6 +197,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:3.9.0
+    networks: [default]
     profiles: [observability]
     environment:
       discovery.type: single-node
@@ -216,6 +225,7 @@ services:
 
   fluent-bit:
     image: fluent/fluent-bit:5.1.5-debug
+    networks: [default, gateway]
     profiles: [observability]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/fluent-bit.yaml']
     volumes:
@@ -234,6 +244,7 @@ services:
   # Alertmanager mails them to the operator; Grafana shows the operator's dashboard.
   prometheus:
     image: prom/prometheus:v3.15.1
+    networks: [default, gateway]
     profiles: [observability]
     # Prometheus does not expand variables in its configuration: the token goes to the file its
     # scrape job reads (credentials_file), then Prometheus itself runs.
@@ -261,6 +272,7 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.34.2
+    networks: [default]
     profiles: [observability]
     command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager']
     volumes:
@@ -275,6 +287,7 @@ services:
   grafana:
     # AGPL-3.0: a separate service, never linked with our code (CLAUDE.md, rule 1).
     image: grafana/grafana:13.3.0
+    networks: [default]
     profiles: [observability]
     environment:
       GF_SECURITY_ADMIN_USER: admin
@@ -302,6 +315,7 @@ services:
   # would not see the calls. Buffers on disk and retries while the collector is unreachable.
   fluent-bit-transparency:
     image: fluent/fluent-bit:5.1.5-debug
+    networks: [default, gateway]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/transparency.yaml']
     environment:
       RID_TRANSPARENCY_INGEST_TOKEN: ${RID_TRANSPARENCY_INGEST_TOKEN:?set RID_TRANSPARENCY_INGEST_TOKEN in .env}
@@ -323,6 +337,7 @@ services:
   # gateway-errors.yaml). Base profile: APISIX needs it to start.
   fluent-bit-errors:
     image: fluent/fluent-bit:5.1.5-debug
+    networks: [gateway]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/gateway-errors.yaml']
     volumes:
       - ../fluent-bit:/fluent-bit/etc/rid:ro
@@ -337,6 +352,7 @@ services:
   # accredited TSA.
   tsa-init:
     image: smallstep/step-ca:0.30.2
+    networks: [default]
     entrypoint: ['sh', '/init/init.sh']
     user: root
     volumes:
@@ -345,6 +361,7 @@ services:
 
   tsa:
     image: ghcr.io/sigstore/timestamp-server:v2.1.4
+    networks: [default]
     command:
       [
         'timestamp-server',
@@ -367,6 +384,7 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.32.0
+    networks: [default]
     ports:
       - 127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025
       - 127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025
@@ -378,6 +396,7 @@ services:
     build: &mock-build
       context: ../..
       dockerfile: infra/mock-providers/Dockerfile
+    networks: [providers]
     image: rid/mock-providers:dev
     environment:
       PROVIDER: salud
@@ -391,6 +410,7 @@ services:
   mock-socioeconomico:
     # Same image as mock-salud (the build is cached); the provider is chosen by PROVIDER.
     build: *mock-build
+    networks: [providers]
     image: rid/mock-providers:dev
     environment:
       PROVIDER: socioeconomico
@@ -405,6 +425,7 @@ services:
     # forwards packets: nodes only answer the connections it opens.
     build:
       context: ../wg-hub
+    networks: [default, providers]
     image: rid/wg-hub:dev
     cap_add: [NET_ADMIN]
     devices: ['/dev/net/tun:/dev/net/tun']
@@ -429,6 +450,7 @@ services:
     # the gateway's check routes. Internal API on :8096; only parsed results come back.
     build:
       context: ../contract-runner
+    networks: [providers]
     image: rid/contract-runner:dev
     environment:
       RID_CONTRACT_RUNNER_TOKEN: ${RID_CONTRACT_RUNNER_TOKEN:?set RID_CONTRACT_RUNNER_TOKEN in .env}
@@ -443,6 +465,7 @@ services:
     # waits for an enrollment token in /var/lib/mock-node/token (or RID_ENROLLMENT_TOKEN), then
     # enrolls, joins the hub and serves mock-salud over mTLS on its tunnel address.
     profiles: [nodes]
+    networks: [providers]
     build:
       context: ../mock-node
     image: rid/mock-node:dev
@@ -461,6 +484,15 @@ services:
         condition: service_healthy
       mock-salud:
         condition: service_healthy
+
+# Network segmentation (M6-01). `default` is the platform (database, identity, CA, analytics,
+# the portal). `gateway` is the gateway's control plane: etcd and OPA have no authentication of
+# their own, so only the gateway and the platform's components reach them. `providers` are the
+# gateway's upstreams (mock providers, the node hub) and the contract runner: none of them reaches
+# etcd, OPA or the database, and the gateway reaches nothing of the platform but what it needs.
+networks:
+  gateway:
+  providers:
 
 volumes:
   pg-data:

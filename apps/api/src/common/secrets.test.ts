@@ -29,6 +29,15 @@ describe('client secrets', () => {
     expect(() => open(parts.join('.'), 'credential-1')).toThrow();
   });
 
+  it('refuses a truncated authentication tag (M6-01)', () => {
+    const parts = seal('s3cr3t', 'credential-1').split('.');
+    // The tag is the third part: keep only its first 4 bytes.
+    parts[2] = Buffer.from(parts[2] ?? '', 'base64url')
+      .subarray(0, 4)
+      .toString('base64url');
+    expect(() => open(parts.join('.'), 'credential-1')).toThrow();
+  });
+
   it('hashes deterministically', () => {
     expect(hashSecret('x')).toBe(hashSecret('x'));
     expect(hashSecret('x')).toMatch(/^[0-9a-f]{64}$/);

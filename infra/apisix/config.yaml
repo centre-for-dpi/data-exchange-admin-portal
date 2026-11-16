@@ -15,6 +15,16 @@ apisix:
   status:
     ip: 0.0.0.0
     port: 7085
+  # Private keys in etcd (the gateway's TLS keys, the assertion key of rid-assertion) are encrypted
+  # with this keyring (M6-01, S-6). The first key encrypts and is the deployment's own secret
+  # (16 characters, RID_APISIX_KEYRING); APISIX's factory key, which is public, only stays to read
+  # what was written before it, until the reconciler rewrites those objects (certificate renewal,
+  # at most 90 days): then it is removed from here.
+  data_encryption:
+    enable_encrypt_fields: true
+    keyring:
+      - '${{RID_APISIX_KEYRING}}'
+      - qeddd145sfvddff3
 
 deployment:
   role: traditional
@@ -64,121 +74,24 @@ plugin_attr:
       ip: 0.0.0.0
       port: 9091
 
-# Declaring one plugin replaces APISIX's default list: these are the defaults of 3.19 plus ours.
-# (Trimming the list to what routes use is hardening for M6.)
+# Only the plugins the portal's routes use (M6-01, ASVS 15.2.3): the reconciler's chain
+# (desired-state.ts) and ours. Without them in the list, a route that asked for anything else -
+# serverless functions above all, which run arbitrary Lua - is refused by APISIX. fault-injection
+# stays for the tests that simulate a provider's errors. (The S-3 spike prototype used
+# serverless-pre-function; that plugin is now rid-client-cert.)
 plugins:
-  - real-ip
-  - ai
-  - client-control
-  - proxy-buffering
-  - proxy-control
   - request-id
-  - zipkin
-  - ext-plugin-pre-req
-  - fault-injection
-  - mocking
-  - serverless-pre-function
-  - cors
-  - ip-restriction
-  - ua-restriction
-  - referer-restriction
-  - csrf
-  - uri-blocker
-  - request-validation
-  - chaitin-waf
-  - multi-auth
-  - openid-connect
-  - saml-auth
-  - cas-auth
-  - authz-casbin
-  - authz-casdoor
-  - wolf-rbac
-  - ldap-auth-advanced
-  - ldap-auth
-  - hmac-auth
-  - basic-auth
-  - jwt-auth
-  - jwe-decrypt
-  - key-auth
-  - dingtalk-auth
-  - feishu-auth
-  - acl
-  - consumer-restriction
-  - attach-consumer-label
-  - forward-auth
-  - opa
-  - authz-keycloak
-  - data-mask
-  - proxy-cache
-  - body-transformer
-  - ai-prompt-template
-  - ai-prompt-decorator
-  - ai-prompt-guard
-  - ai-rag
-  - ai-rate-limiting
-  - ai-proxy-multi
-  - ai-proxy
-  - ai-cache
-  - ai-aws-content-moderation
-  - ai-aliyun-content-moderation
-  - ai-lakera-guard
-  - proxy-mirror
-  - graphql-proxy-cache
-  - proxy-rewrite
-  - workflow
-  - api-breaker
-  - graphql-limit-count
-  - limit-conn
-  - limit-count
-  - limit-req
-  - gzip
-  - server-info
-  - traffic-label
-  - traffic-split
-  - redirect
-  - response-rewrite
-  - openapi-to-mcp
-  - oas-validator
-  - mcp-bridge
-  - degraphql
-  - kafka-proxy
-  - websocket-proxy
-  - grpc-transcode
-  - grpc-web
-  - http-dubbo
-  - public-api
-  - prometheus
-  - datadog
-  - lago
-  - loki-logger
-  - elasticsearch-logger
-  - echo
-  - loggly
-  - http-logger
-  - splunk-hec-logging
-  - skywalking-logger
-  - google-cloud-logging
-  - sls-logger
-  - tcp-logger
-  - kafka-logger
-  - rocketmq-logger
-  - syslog
-  - udp-logger
-  - file-logger
-  - clickhouse-logger
-  - tencent-cloud-cls
-  - inspect
-  - example-plugin
-  - aws-lambda
-  - azure-functions
-  - openwhisk
-  - openfunction
-  - serverless-post-function
-  - ext-plugin-post-req
-  - ext-plugin-post-resp
-  - ai-request-rewrite
-  - rid-data-subject
-  - rid-client-cert
-  - rid-rate-limited
   - rid-header-guard
+  - openid-connect
+  - rid-client-cert
+  - rid-data-subject
+  - proxy-rewrite
+  - opa
   - rid-assertion
+  - limit-count
+  - rid-rate-limited
+  - response-rewrite
+  - fault-injection
+  - prometheus
+  - http-logger
+  - tcp-logger

@@ -16,6 +16,12 @@ http:
     rid-no-client-cert-headers:
       headers:
         customRequestHeaders: { SSL_CLIENT_CERT: '', ssl-client-verify: '' }
+    # Per source address, in front of the API's own limits (M6-01, ASVS 2.4.1). Generous: a
+    # government office often reaches the portal from one address.
+    rid-rate-api:
+      rateLimit: { average: 50, burst: 100, period: 1s }
+    rid-rate-auth:
+      rateLimit: { average: 20, burst: 60, period: 1s }
 
   routers:
     rid-web:
@@ -27,12 +33,13 @@ http:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/api/v1`) && !PathPrefix(`/api/v1/internal`) && !PathPrefix(`/api/v1/opa`)'
       entryPoints: [websecure]
       service: rid-api
+      middlewares: [rid-rate-api]
       tls: @TLS@
     rid-auth:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/auth`)'
       entryPoints: [websecure]
       service: rid-keycloak
-      middlewares: [rid-no-client-cert-headers]
+      middlewares: [rid-no-client-cert-headers, rid-rate-auth]
       tls: @TLS@
     rid-gw:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/gw`)'
@@ -50,6 +57,13 @@ http:
       entryPoints: [websecure]
       service: rid-carpeta
       tls: @TLS@
+    rid-grafana:
+      # The operator's dashboard (M5-06), with Grafana's own login.
+      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/grafana`)'
+      entryPoints: [websecure]
+      service: rid-grafana
+      middlewares: [rid-rate-auth]
+      tls: @TLS@
     rid-tsa:
       rule: 'Host(`@PORTAL_HOST@`) && Path(`/tsa/api/v1/timestamp/certchain`)'
       entryPoints: [websecure]
@@ -65,6 +79,7 @@ http:
     rid-mailpit: { loadBalancer: { servers: [{ url: 'http://rid-mailpit:8025' }] } }
     rid-carpeta: { loadBalancer: { servers: [{ url: 'http://rid-carpeta:3100' }] } }
     rid-tsa: { loadBalancer: { servers: [{ url: 'http://rid-tsa:3004' }] } }
+    rid-grafana: { loadBalancer: { servers: [{ url: 'http://rid-grafana:3000' }] } }
 
 # The gateway's name: TLS goes through untouched to APISIX, which presents its step-ca certificate
 # and asks for the client certificate (applications and kit nodes).

@@ -355,11 +355,22 @@ describe('entity onboarding (M2-01)', () => {
 
     it('lets only the operator (not the regulator, auditor or members) see the queue and decide', async () => {
       const { request } = await submitted();
-      const queue = await call('GET', '/review/entities', 'ana.operadora');
-      expect(queue.statusCode).toBe(200);
-      expect(queue.json<{ items: Array<{ id: string }> }>().items.map((i) => i.id)).toContain(
-        request.id,
-      );
+      // The whole queue, page by page: the newest request is on the last one.
+      const ids: string[] = [];
+      let cursor: string | null | undefined = undefined;
+      do {
+        const page = await call(
+          'GET',
+          `/review/entities?limit=200${cursor ? `&cursor=${cursor}` : ''}`,
+          'ana.operadora',
+        );
+        expect(page.statusCode).toBe(200);
+        const body = page.json<{ items: Array<{ id: string }>; nextCursor?: string | null }>();
+        ids.push(...body.items.map((i) => i.id));
+        cursor = body.nextCursor;
+      } while (cursor);
+      expect(ids).toContain(request.id);
+      expect(new Set(ids).size).toBe(ids.length);
       expect((await call('GET', '/review/entities', 'marta.regulador')).statusCode).toBe(200);
       for (const who of ['sofia.auditora', 'elena.admin', person('nadie')]) {
         expect((await call('GET', '/review/entities', who)).statusCode).toBe(403);

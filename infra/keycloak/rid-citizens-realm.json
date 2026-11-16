@@ -129,11 +129,11 @@
       "frontchannelLogout": true,
       "fullScopeAllowed": false,
       "rootUrl": "${RID_CARPETA_URL:http://localhost:3100}",
-      "redirectUris": ["${RID_CARPETA_URL:http://localhost:3100}/*"],
+      "redirectUris": ["${RID_CARPETA_URL:http://localhost:3100}/auth/callback"],
       "webOrigins": ["${RID_CARPETA_URL:http://localhost:3100}"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${RID_CARPETA_URL:http://localhost:3100}/*"
+        "post.logout.redirect.uris": "${RID_CARPETA_URL:http://localhost:3100}/"
       },
       "defaultClientScopes": ["basic", "citizen-document", "rid-transparency-audience"],
       "optionalClientScopes": []

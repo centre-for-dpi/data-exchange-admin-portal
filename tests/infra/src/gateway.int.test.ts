@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createDecipheriv, generateKeyPairSync, randomUUID } from 'node:crypto';
 import { createConnection } from 'node:net';
 import { afterAll, describe, expect, it } from 'vitest';
 import { env } from './env.js';
@@ -65,6 +65,67 @@ describe('APISIX (M0-04)', () => {
     );
     await new Promise((r) => setTimeout(r, 1_000));
     expect(containerLogsSince('rid-apisix-1', since)).not.toContain(identifier);
+  });
+
+  it('refuses plugins outside its list, serverless functions above all (M6-01)', async () => {
+    const res = await asAdmin(`/routes/rid-test-serverless-${randomUUID()}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        uri: '/__rid-test/serverless/*',
+        plugins: {
+          'serverless-pre-function': {
+            phase: 'rewrite',
+            functions: ['return function() ngx.say(1) end'],
+          },
+        },
+        upstream: { type: 'roundrobin', nodes: { '127.0.0.1:1': 1 } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('unknown plugin');
+  });
+
+  it("encrypts the private keys it keeps in etcd with the deployment's keyring (M6-01)", async () => {
+    // APISIX's data_encryption: AES-128-CBC, the key as IV, base64 (apisix/plugin.lua).
+    const decrypts = (value: string, key: string) => {
+      try {
+        const d = createDecipheriv('aes-128-cbc', Buffer.from(key), Buffer.from(key));
+        return Buffer.concat([d.update(Buffer.from(value, 'base64')), d.final()])
+          .toString()
+          .startsWith('-----BEGIN');
+      } catch {
+        return false;
+      }
+    };
+    const pem = generateKeyPairSync('ec', { namedCurve: 'P-256' })
+      .privateKey.export({ format: 'pem', type: 'pkcs8' })
+      .toString();
+    const put = await asAdmin('/plugin_metadata/rid-assertion', {
+      method: 'PUT',
+      body: JSON.stringify({ issuer: 'test', kid: 'k-test', private_key: pem }),
+    });
+    expect([200, 201]).toContain(put.status);
+    try {
+      const stored = spawnSync(
+        'docker',
+        [
+          'exec',
+          'rid-etcd-1',
+          'etcdctl',
+          'get',
+          '/apisix/plugin_metadata/rid-assertion',
+          '--print-value-only',
+        ],
+        { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } },
+      ).stdout;
+      const value = (JSON.parse(stored) as { private_key: string }).private_key;
+      expect(value).not.toContain('BEGIN');
+      expect(decrypts(value, env('RID_APISIX_KEYRING'))).toBe(true);
+      // Not with APISIX's factory key, which is public.
+      expect(decrypts(value, 'qeddd145sfvddff3')).toBe(false);
+    } finally {
+      await asAdmin('/plugin_metadata/rid-assertion', { method: 'DELETE' });
+    }
   });
 
   it('a real error reaches the operator masked, never with the path (M5-01)', async () => {

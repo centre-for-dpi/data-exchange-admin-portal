@@ -5,8 +5,8 @@ import {
   entityRequestIdParamsSchema,
   entityRequestListSchema,
   entityRequestSchema,
+  type EntityReviewQueueQuery,
   entityReviewQueueQuerySchema,
-  type EntityStatus,
 } from '@rid/contracts';
 import { z } from 'zod';
 import { type AuthenticatedRequest, CurrentPrincipal, PlatformAccess } from '../auth/decorators.js';
@@ -32,10 +32,8 @@ export class EntityReviewsController {
     responses: { 200: { description: 'The queue', schema: entityRequestListSchema } },
     errors: [400, 401, 403],
   })
-  queue(
-    @Query(new ZodValidationPipe(entityReviewQueueQuerySchema)) query: { status: EntityStatus },
-  ) {
-    return this.requests.queue(query.status);
+  queue(@Query(new ZodValidationPipe(entityReviewQueueQuerySchema)) query: EntityReviewQueueQuery) {
+    return this.requests.queue(query.status, query.limit, query.cursor);
   }
 
   @Post(':requestId/approve')

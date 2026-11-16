@@ -53,8 +53,10 @@ services:
     restart: unless-stopped
     # The gateway has no business reaching the host (development tests only).
     extra_hosts: !reset []
-    networks:
-      default: {}
+    # Not on the platform network (M6-01): only the gateway's control plane and its upstreams.
+    networks: !override
+      gateway: {}
+      providers: {}
       edge:
         aliases: [rid-apisix]
 
@@ -171,6 +173,8 @@ services:
         condition: service_started
     networks:
       default: {}
+      gateway: {}
+      providers: {}
       edge:
         aliases: [rid-portal-api]
 

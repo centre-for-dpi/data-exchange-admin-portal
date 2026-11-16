@@ -10,6 +10,7 @@ import { getViewer } from '../../../lib/viewer';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 const REVIEW_ROLES = ['platform_admin', 'platform_reviewer', 'regulator'];
 
-export default async function OperatorPage({ params }: PageProps) {
+export default async function OperatorPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations();
@@ -28,9 +29,12 @@ export default async function OperatorPage({ params }: PageProps) {
   const viewer = await getViewer();
   if (!viewer.platformRoles.some((r) => REVIEW_ROLES.includes(r))) notFound();
 
+  // The onboarding queue by pages, oldest first (M6-01): ?after= is the last request seen.
+  const after = (await searchParams).after;
+  const cursor = typeof after === 'string' && /^[0-9a-f-]{36}$/.test(after) ? after : undefined;
   const [queue, onboarding] = await Promise.all([
     apiGet('/review/api-versions', reviewQueueSchema),
-    apiGet('/review/entities', entityRequestListSchema),
+    apiGet(`/review/entities${cursor ? `?cursor=${cursor}` : ''}`, entityRequestListSchema),
   ]);
 
   return (
@@ -105,6 +109,13 @@ export default async function OperatorPage({ params }: PageProps) {
             </table>
           </div>
         )}
+        {onboarding.nextCursor ? (
+          <p className="mt-3">
+            <Link href={`/operator?after=${onboarding.nextCursor}`} className="link">
+              {t('operator.entitiesNext')}
+            </Link>
+          </p>
+        ) : null}
       </Section>
       <Section title={t('operator.queueTitle')}>
         {queue.items.length === 0 ? (

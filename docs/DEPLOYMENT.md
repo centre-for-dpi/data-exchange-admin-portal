@@ -297,8 +297,21 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 | `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET` | Solo se aplican al importar el realm (§3.3) |
 | `STEP_CA_PASSWORD` | Cifra las claves de la CA y de los provisioners `rid-portal` y `rid-gateway-tls` ya creadas |
 | `AUTH_SECRET` | Cierra todas las sesiones de la web |
+| `RID_APISIX_KEYRING` (16 caracteres) | APISIX no puede leer las claves privadas que cifró con el anterior (TLS del gateway, aserciones). Para rotarlo, se agrega el nuevo **primero** en `data_encryption.keyring` dejando el anterior detrás, hasta que el reconciliador reescriba esos objetos |
 
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
+
+Seguridad del API (M6-01):
+- `RID_TRUST_PROXY`: cuántos saltos de proxy creer en `X-Forwarded-For`. Es 1 en el piloto, detrás de Traefik.
+- `RID_RATE_LIMIT_PER_MINUTE` (600 por token o dirección) y `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 por usuario en subidas, versiones nuevas, solicitudes de alta e invitaciones).
+
+**Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`, y el API está en las tres; ver `ARCHITECTURE.md §12`.
+
+**Desplegar M6-01 sobre un piloto existente:**
+1. Agregar `RID_APISIX_KEYRING` (16 caracteres al azar) y `RID_TRUST_PROXY=1` al `.env`.
+2. Recrear todo con `up -d`: cambian las redes.
+3. Aplicar al realm `rid-portal` ya importado la política de contraseñas, las URIs exactas y los eventos (con `kcadm`, como en §3.3), y las URIs exactas al realm `rid-citizens`.
+4. Si el Traefik es propio, agregar los límites `rid-rate-api` y `rid-rate-auth` de `infra/edge/rid.yml.template`.
 
 Analítica (M5): `RID_OPENSEARCH_URL` (OpenSearch como lo alcanza el API) y opcional `RID_OPENSEARCH_AUTH`.
 

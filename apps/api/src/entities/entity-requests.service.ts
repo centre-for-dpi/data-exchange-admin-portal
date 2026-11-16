@@ -185,14 +185,22 @@ export class EntityRequestsService {
     return { items: rows.map((row) => EntityRequestsService.item(row)) };
   }
 
-  /** Operator queue: requests in one status, oldest submission first. */
-  async queue(status: EntityStatus): Promise<EntityRequestList> {
+  /**
+   * Operator queue: requests in one status, oldest submission first, by pages (M6-01: a fixed cap
+   * hid every request after the 200th).
+   */
+  async queue(status: EntityStatus, limit = 50, cursor?: string): Promise<EntityRequestList> {
     const rows = await this.prisma.entity.findMany({
       where: { status, applicantId: { not: null } },
-      orderBy: [{ submittedAt: 'asc' }, { createdAt: 'asc' }],
-      take: 200,
+      orderBy: [{ submittedAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    return { items: rows.map((row) => EntityRequestsService.item(row)) };
+    const items = rows.slice(0, limit);
+    return {
+      items: items.map((row) => EntityRequestsService.item(row)),
+      nextCursor: rows.length > limit ? (items.at(-1)?.id ?? null) : null,
+    };
   }
 
   /** The designation document, for the applicant and the operator. */

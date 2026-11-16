@@ -10,6 +10,7 @@
   "resetPasswordAllowed": true,
   "rememberMe": false,
   "bruteForceProtected": true,
+  "passwordPolicy": "length(12) and maxLength(128) and notUsername and notEmail and passwordHistory(5)",
   "internationalizationEnabled": true,
   "supportedLocales": ["es", "en"],
   "defaultLocale": "es",
@@ -37,11 +38,11 @@
       "serviceAccountsEnabled": false,
       "frontchannelLogout": true,
       "rootUrl": "${RID_WEB_URL:http://localhost:3000}",
-      "redirectUris": ["${RID_WEB_URL:http://localhost:3000}/*"],
+      "redirectUris": ["${RID_WEB_URL:http://localhost:3000}/api/auth/callback/keycloak"],
       "webOrigins": ["${RID_WEB_URL:http://localhost:3000}"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${RID_WEB_URL:http://localhost:3000}/*"
+        "post.logout.redirect.uris": "${RID_WEB_URL:http://localhost:3000}/##${RID_WEB_URL:http://localhost:3000}/en"
       },
       "protocolMappers": [
         {
@@ -342,6 +343,23 @@
   ],
   "eventsEnabled": true,
   "eventsExpiration": 7776000,
-  "enabledEventTypes": ["UPDATE_CREDENTIAL", "REMOVE_CREDENTIAL", "UPDATE_PASSWORD", "LOGIN_ERROR"],
-  "eventsListeners": ["jboss-logging", "email"]
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "LOGOUT_ERROR",
+    "REGISTER",
+    "REGISTER_ERROR",
+    "CODE_TO_TOKEN_ERROR",
+    "REFRESH_TOKEN_ERROR",
+    "UPDATE_CREDENTIAL",
+    "REMOVE_CREDENTIAL",
+    "UPDATE_PASSWORD",
+    "RESET_PASSWORD",
+    "RESET_PASSWORD_ERROR",
+    "VERIFY_EMAIL"
+  ],
+  "eventsListeners": ["jboss-logging", "email"],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false
 }

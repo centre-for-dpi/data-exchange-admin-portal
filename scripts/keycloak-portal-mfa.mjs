@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Applies the second-factor setup of infra/keycloak/rid-portal-realm.json (M3-08, ADR-0021) to a
-// Keycloak that imported the realm before it existed: --import-realm skips existing realms.
+// Applies the second-factor setup of infra/keycloak/rid-portal-realm.json (M3-08, ADR-0021) and
+// the hardening of M6-01 (password policy, events, exact redirect URIs of the portal and the
+// citizens' folder) to a Keycloak that imported the realms before: --import-realm skips them.
 //
 //   node scripts/keycloak-portal-mfa.mjs              # realm settings and the login flow
 //   node scripts/keycloak-portal-mfa.mjs --demo-otp   # also the demo users' TOTP (dev and demo only)
@@ -83,10 +84,53 @@ await admin('PUT', '', {
   eventsExpiration: realmFile.eventsExpiration,
   enabledEventTypes: realmFile.enabledEventTypes,
   eventsListeners: realmFile.eventsListeners,
+  // M6-01: the password policy and the administrators' events.
+  passwordPolicy: realmFile.passwordPolicy,
+  adminEventsEnabled: realmFile.adminEventsEnabled,
+  adminEventsDetailsEnabled: realmFile.adminEventsDetailsEnabled,
   // Unbound while the flow is rebuilt: a bound flow cannot be deleted.
   ...(current.browserFlow === flowAlias ? { browserFlow: 'browser' } : {}),
 });
-console.log(`${realm}: acr.loa.map, OTP policy and credential events applied`);
+console.log(`${realm}: acr.loa.map, OTP and password policies, and the events applied`);
+
+// 1b. The exact redirect URIs of the clients (M6-01), from this file and the citizens' realm.
+const resolveFile = (file) =>
+  JSON.parse(
+    readFileSync(resolve(root, 'infra/keycloak', file), 'utf8').replace(
+      /\$\{([A-Z0-9_]+)(?::([^}]*))?\}/g,
+      (_, name, fallback) => JSON.stringify(process.env[name] ?? fallback ?? '').slice(1, -1),
+    ),
+  );
+for (const [realmName, file, clientId] of [
+  [realm, 'rid-portal-realm.json', 'rid-portal-web'],
+  ['rid-citizens', 'rid-citizens-realm.json', 'carpeta-ciudadana'],
+]) {
+  const wanted = resolveFile(file).clients.find((c) => c.clientId === clientId);
+  if (!wanted) continue;
+  const res = await fetch(
+    `${url}/admin/realms/${realmName}/clients?clientId=${encodeURIComponent(clientId)}`,
+    { headers: { authorization: `Bearer ${token}` } },
+  );
+  const [client] = res.ok ? await res.json() : [];
+  if (!client) {
+    console.log(`${realmName}: client ${clientId} not found, skipped`);
+    continue;
+  }
+  const put = await fetch(`${url}/admin/realms/${realmName}/clients/${client.id}`, {
+    method: 'PUT',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      ...client,
+      redirectUris: wanted.redirectUris,
+      attributes: {
+        ...client.attributes,
+        'post.logout.redirect.uris': wanted.attributes['post.logout.redirect.uris'],
+      },
+    }),
+  });
+  if (!put.ok) throw new Error(`${realmName}/${clientId}: ${put.status} ${await put.text()}`);
+  console.log(`${realmName}: ${clientId} redirect URIs set to ${wanted.redirectUris.join(', ')}`);
+}
 
 // 2. The browser flow, rebuilt from the file (deleting a flow deletes its sub-flows and configs).
 const flows = realmFile.authenticationFlows;

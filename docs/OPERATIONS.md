@@ -176,6 +176,8 @@ SELECT seq, tree_size, sealed_at FROM transparency_checkpoint ORDER BY seq DESC 
 | API | `dc logs -f api` | Errores de reconciliación, de la CA, de la TSA |
 | OPA | `dc logs opa` | Descarga del bundle (`--log-format=json`); sin decision logs a propósito |
 | APISIX | `dc logs apisix` | Solo el arranque. Sin access log (privacidad), y sus errores van a `fluent-bit-errors` |
+| Rechazos del API | `dc logs api \| grep request_refused` | Una línea JSON por cada 400/401/403/404/409/429: `sub`, IP, ruta y código (M6-01). Una racha de 403/404 de un mismo `sub` o IP es un sondeo |
+| Ingresos y administración de Keycloak | `dc logs keycloak \| grep -E "type=(LOGIN\|LOGOUT\|REGISTER)"` | Eventos del realm `rid-portal` (M6-01); 90 días en la base de Keycloak |
 | Errores del gateway | `dc logs fluent-bit-errors` | El error log de nginx, con la línea de la petición, la URI del upstream y los números enmascarados (M5-01) |
 | Keycloak | `dc logs keycloak` | Arranque e importación de realms |
 

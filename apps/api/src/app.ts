@@ -1,6 +1,8 @@
 import type { Type } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { TOKEN_VERIFIER, type TokenVerifier } from './auth/token-verifier.js';
+import { registerRateLimit } from './common/rate-limit.js';
 import { METRICS_PATH, MetricsService, metricsTokenMatches } from './metrics/metrics.service.js';
 import { AppModule } from './app.module.js';
 import { PROBLEM_CONTENT_TYPE, toProblem } from './common/problem.js';
@@ -18,10 +20,39 @@ export const API_PREFIX = 'api/v1';
 /** Maximum JSON body (CLAUDE.md, ARCHITECTURE.md §12). Document uploads get their own limit. */
 export const BODY_LIMIT_BYTES = 1024 * 1024;
 
+/** The portal's token verifier, set once the app exists (configureApp); none in bare adapters. */
+let uploadVerifier: TokenVerifier | undefined;
+const uploadTokenValid = async (token: string): Promise<boolean> => {
+  if (!uploadVerifier) return true;
+  try {
+    await uploadVerifier.verify(token);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export function createAdapter(): FastifyAdapter {
-  const adapter = new FastifyAdapter({ bodyLimit: BODY_LIMIT_BYTES });
+  // Behind the pilot's proxy (RID_TRUST_PROXY=1, the hops to trust): request.ip is the caller's
+  // address from X-Forwarded-For, for rate limits and security events (M6-01).
+  const hops = Number(process.env.RID_TRUST_PROXY ?? 0);
+  const adapter = new FastifyAdapter({
+    bodyLimit: BODY_LIMIT_BYTES,
+    trustProxy: (_address: string, hop: number) => Number.isInteger(hops) && hop < hops,
+  });
   // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
   adapter.getInstance().removeContentTypeParser('text/plain');
+  // Security headers on every answer (M6-01, ASVS V3/V4): nothing here is a page to frame or
+  // sniff, nor to keep in a shared cache unless the endpoint says so (the network CA does). The
+  // Scalar reference writes its own response (hijacked), outside these hooks.
+  adapter.getInstance().addHook('onSend', (_request, reply, payload, done) => {
+    reply.header('x-content-type-options', 'nosniff');
+    reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+    reply.header('referrer-policy', 'no-referrer');
+    reply.header('strict-transport-security', 'max-age=63072000; includeSubDomains');
+    if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
+    done(null, payload);
+  });
   // Documents (SPEC.md §3: PDF only) arrive as the raw body. Other routes get a Buffer that their
   // zod validation rejects, within the default 1 MiB limit.
   adapter
@@ -42,7 +73,10 @@ export function createAdapter(): FastifyAdapter {
       route.onRequest = [
         ...existing,
         async (request, reply) => {
-          if (/^Bearer \S+$/.test(request.headers.authorization ?? '')) return;
+          // The token is verified here, before the body is read (M6-01): a made-up one does not
+          // get to send megabytes. The guard checks the caller's roles after.
+          const token = /^Bearer (\S+)$/.exec(request.headers.authorization ?? '')?.[1];
+          if (token && (await uploadTokenValid(token))) return;
           const problem = toProblem({ statusCode: 401 }, instancePath(request.url));
           await reply.code(401).type(PROBLEM_CONTENT_TYPE).send(problem);
         },
@@ -74,6 +108,12 @@ export async function configureApp(app: NestFastifyApplication): Promise<NestFas
   app.setGlobalPrefix(API_PREFIX);
   app.useGlobalFilters(new ProblemDetailsFilter());
   registerMetrics(app);
+  await registerRateLimit(app);
+  try {
+    uploadVerifier = app.get<TokenVerifier>(TOKEN_VERIFIER, { strict: false });
+  } catch {
+    uploadVerifier = undefined;
+  }
   await app.init();
   registerApiDocs(app, API_PREFIX);
   return app;

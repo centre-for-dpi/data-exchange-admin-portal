@@ -164,14 +164,21 @@ export const entityRequestItemSchema = z.object({
   submittedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
 });
-export const entityRequestListSchema = z.object({ items: z.array(entityRequestItemSchema) });
+export const entityRequestListSchema = z.object({
+  items: z.array(entityRequestItemSchema),
+  /** The operator's queue pages (M6-01); the applicant's own list has none. */
+  nextCursor: z.uuid().nullable().optional(),
+});
 export type EntityRequestList = z.infer<typeof entityRequestListSchema>;
 
 export const entityRequestIdParamsSchema = z.strictObject({ requestId: z.uuid() });
 
 export const entityReviewQueueQuerySchema = z.strictObject({
   status: z.enum(['requested', 'under_review', 'active', 'rejected']).default('under_review'),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });
+export type EntityReviewQueueQuery = z.infer<typeof entityReviewQueueQuerySchema>;
 
 export const approveEntitySchema = z.strictObject({
   comment: z.string().trim().max(2_000).optional(),

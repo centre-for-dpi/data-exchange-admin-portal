@@ -274,7 +274,8 @@
       "decided": "This version is no longer in review."
     },
     "entitiesTitle": "Entity onboarding to review",
-    "entitiesEmpty": "There are no onboarding requests to review."
+    "entitiesEmpty": "There are no onboarding requests to review.",
+    "entitiesNext": "See the next requests"
   },
   "catalog": {
     "lead": "APIs published by the network entities. Each one shows the personal data it exposes and the purposes for which access can be requested.",

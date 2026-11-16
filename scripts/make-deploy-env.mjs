@@ -106,6 +106,10 @@ const set = {
   // Metrics and alerts (M5-06): Prometheus scrapes the API's /metrics with this token; the
   // indicators read the gateway's availability from Prometheus; Grafana at /grafana.
   RID_METRICS_TOKEN: secret(32),
+  // APISIX's data_encryption key for the private keys in etcd: 16 characters (M6-01).
+  RID_APISIX_KEYRING: secret(12),
+  // The API sits behind one proxy (Traefik): the caller's address comes from X-Forwarded-For.
+  RID_TRUST_PROXY: '1',
   RID_PROMETHEUS_URL: 'http://prometheus:9090',
   GRAFANA_ADMIN_PASSWORD: secret(16),
   GRAFANA_ROOT_URL: `${publicUrl.replace(/\/$/, '')}/grafana/`,

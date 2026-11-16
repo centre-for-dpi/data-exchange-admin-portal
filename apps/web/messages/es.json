@@ -274,7 +274,8 @@
       "decided": "Esta versión ya no está en revisión."
     },
     "entitiesTitle": "Altas de entidades por revisar",
-    "entitiesEmpty": "No hay solicitudes de alta por revisar."
+    "entitiesEmpty": "No hay solicitudes de alta por revisar.",
+    "entitiesNext": "Ver las siguientes solicitudes"
   },
   "catalog": {
     "lead": "APIs publicadas por las entidades de la red. Cada una indica qué datos personales expone y con qué finalidades se puede solicitar acceso.",
