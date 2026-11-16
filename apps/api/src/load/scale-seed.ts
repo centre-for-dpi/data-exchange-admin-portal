@@ -11,6 +11,8 @@ import { getCountryConfig } from '@rid/config';
 import type { Prisma } from '../generated/prisma/client.js';
 import { lintOpenApi } from '../apis/lint/openapi-lint.js';
 import { type AuditActor, AuditService } from '../audit/audit.service.js';
+import { generateClientSecret, hashSecret, seal } from '../common/secrets.js';
+import { uuidv7 } from '../common/uuidv7.js';
 import { loadDevEnv } from '../dev-env.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -31,6 +33,7 @@ export interface ScaleSummary {
   entities: number;
   apis: number;
   applications: number;
+  credentials: number;
   subscriptions: number;
 }
 
@@ -54,7 +57,13 @@ export async function seedScale(
   });
   if (!parsed.report.valid) throw new Error(`${options.openapiFile} does not pass the lint`);
   const operations = parsed.operations.filter((o) => o.method === 'GET').map((o) => o.operationId);
-  const created: ScaleSummary = { entities: 0, apis: 0, applications: 0, subscriptions: 0 };
+  const created: ScaleSummary = {
+    entities: 0,
+    apis: 0,
+    applications: 0,
+    credentials: 0,
+    subscriptions: 0,
+  };
   const now = new Date();
   // Who "requested" the synthetic subscriptions: a disabled user with no Keycloak account.
   const requester = await syntheticRequester(prisma, audit);
@@ -159,6 +168,10 @@ export async function seedScale(
     );
   }
 
+  // Each application's client secret, sealed like the API does: without it the Keycloak reconciler
+  // cannot create the application's client and retries for ever.
+  created.credentials = await ensureCredentials(prisma, audit);
+
   // Subscriptions: each application asks for APIs of the other entities, round robin, until the
   // network has the target. They are approved: OPA activates them when it confirms the bundle.
   const apps = await prisma.application.findMany({
@@ -205,6 +218,42 @@ export async function seedScale(
     created.subscriptions += chunk.length;
   }
   return created;
+}
+
+/** A client-secret credential for each synthetic application that has none. */
+async function ensureCredentials(prisma: PrismaService, audit: AuditService): Promise<number> {
+  const apps = await prisma.application.findMany({
+    where: {
+      keycloakClientId: { startsWith: `rid-app-${LOAD_PREFIX}-` },
+      credentials: { none: { kind: 'client_secret', status: 'active' } },
+    },
+    select: { id: true },
+  });
+  for (const app of apps) {
+    await prisma.$transaction(async (tx) => {
+      const id = uuidv7();
+      const secret = generateClientSecret();
+      const credential = await tx.credential.create({
+        data: {
+          id,
+          applicationId: app.id,
+          kind: 'client_secret',
+          status: 'active',
+          secretHash: hashSecret(secret),
+          sealedSecret: seal(secret, id),
+          createdBy: ACTOR.id,
+        },
+      });
+      await audit.record(tx, {
+        actor: ACTOR,
+        action: 'credential.created',
+        target: { type: 'credential', id: credential.id },
+        // Domain fields only: neither the secret, its hash nor the sealed copy.
+        after: { id, applicationId: app.id, kind: credential.kind, status: credential.status },
+      });
+    });
+  }
+  return apps.length;
 }
 
 async function syntheticRequester(prisma: PrismaService, audit: AuditService): Promise<string> {

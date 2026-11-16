@@ -291,6 +291,15 @@ describe('OPA bundle and activation (M1-09)', () => {
         servicePath: '/salud',
       });
       const synthetic = { application: { keycloakClientId: { startsWith: 'rid-app-carga-' } } };
+      // Each synthetic application has its client secret: the Keycloak reconciler needs it.
+      expect(
+        await prisma.application.count({
+          where: {
+            keycloakClientId: { startsWith: 'rid-app-carga-' },
+            credentials: { none: { kind: 'client_secret', status: 'active' } },
+          },
+        }),
+      ).toBe(0);
       // A backlog, as after an OPA outage: an earlier run of this test left them active.
       await prisma.subscription.updateMany({ where: synthetic, data: { status: 'approved' } });
       const ids = (
