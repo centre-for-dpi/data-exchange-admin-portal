@@ -205,7 +205,8 @@ describe('transparency evidence (MT-04)', () => {
           expect((await call('GET', path, who)).statusCode, `${who} ${path}`).toBe(200);
         }
       }
-    });
+      // The re-check walks every record of rid_test, which keeps those of every earlier run.
+    }, 180_000);
   });
 
   describe('sealing', () => {
