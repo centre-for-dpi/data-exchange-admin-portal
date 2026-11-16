@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { loadCountryConfig } from '@rid/config';
-import { networkIndicatorsSchema } from '@rid/contracts';
+import { exchangeMapSchema, networkIndicatorsSchema } from '@rid/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -116,6 +116,7 @@ describe("the network's indicators (M5-04)", () => {
       status,
       method: 'GET',
       latency_ms: 10,
+      consumer_entity: 'programas-sociales',
       ...extra,
     });
     const docs = [
@@ -251,6 +252,55 @@ describe("the network's indicators (M5-04)", () => {
     const { approvalTime } = networkIndicatorsSchema.parse(res.json());
     expect(approvalTime.decisions).toBeGreaterThanOrEqual(1);
     expect(approvalTime.medianHours).not.toBeNull();
+  });
+
+  it('maps who exchanges with whom: calls, and active subscriptions without calls (M5-05)', async () => {
+    const socioeconomico = await prisma.entity.findFirstOrThrow({
+      where: { slug: 'socioeconomico' },
+    });
+    const application = await prisma.application.create({
+      data: {
+        entityId: socioeconomico.id,
+        name: `Mapa ${run}`,
+        description: 'Aplicación de prueba.',
+        environment: 'production',
+        keycloakClientId: `rid-app-test-${randomUUID()}`,
+        technicalContact: 'dev@example.org',
+        createdBy: 'test',
+      },
+    });
+    const version = await prisma.apiVersion.findFirstOrThrow({ where: { apiId } });
+    await prisma.subscription.create({
+      data: {
+        applicationId: application.id,
+        apiVersionId: version.id,
+        purposeCode: 'eligibility_check',
+        purposeDetail: 'Prueba del mapa.',
+        legalBasisText: 'Prueba.',
+        requestedValidityMonths: 3,
+        validFrom: new Date(),
+        validUntil: new Date(Date.now() + 90 * 24 * 3_600_000),
+        status: 'active',
+        requestedBy: (await prisma.user.findFirstOrThrow()).id,
+        createdBy: 'test',
+      },
+    });
+
+    const res = await get('/network/exchanges?from=2025-06-01&to=2025-06-30', 'marta.regulador');
+    expect(res.statusCode, res.body).toBe(200);
+    const map = exchangeMapSchema.parse(res.json());
+    const toMine = map.exchanges.filter((e) => e.providerId === entityId);
+    // Every production call of programas-sociales, refused ones included; not the sandbox's.
+    expect(toMine.find((e) => e.consumerName.match(/Programas/))).toMatchObject({
+      calls: 6,
+      errors: 3,
+    });
+    // An agreed exchange with no calls yet.
+    expect(toMine.find((e) => e.consumerId === socioeconomico.id)).toMatchObject({
+      calls: 0,
+      activeSubscriptions: 1,
+    });
+    expect((await get('/network/exchanges', 'carlos.dev')).statusCode).toBe(403);
   });
 
   it('only the regulator and the operator see them', async () => {

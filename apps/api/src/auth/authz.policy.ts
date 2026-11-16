@@ -167,6 +167,8 @@ export const PLATFORM_PERMISSIONS = {
   'bootcamp.list': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** The network's indicators (SPEC.md §8, M5-04): the regulator and the operator. */
   'network.indicators.read': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** The exchange map (M5-05): which entity consumes from which, with volume. */
+  'network.map.read': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;

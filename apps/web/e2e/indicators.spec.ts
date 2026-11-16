@@ -64,6 +64,51 @@ test.describe("the network's indicators (M5-04)", () => {
     await expectNoAccessibilityViolations(page);
   });
 
+  test('the exchange map shows who consumes from whom, with volume (M5-05)', async ({
+    browser,
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    const slug = `mapa-${Date.now().toString(36)}`;
+    const name = `Afiliación mapa ${slug}`;
+    await publishNewApi(browser, { slug, name });
+    await signIn(page, 'ana.operadora', '/catalog');
+    const { versionId } = await publishedIds(page, name);
+    // August 2025: no other traffic in the store for that month.
+    await indexAccessLogs(
+      index,
+      ['2025-08-04', '2025-08-05', '2025-08-06'].map((day) => ({
+        route_id: `rid-route-${versionId}`,
+        ts: `${day}T15:00:00Z`,
+        status: 200,
+        consumer_entity: 'programas-sociales',
+        latency_ms: 10,
+      })),
+    );
+
+    await page.goto('/regulator/indicators');
+    await page.getByRole('link', { name: 'Mapa de intercambios' }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Mapa de intercambios' }),
+    ).toBeVisible();
+    await page.getByLabel('Desde').fill('2025-08-01');
+    await page.getByLabel('Hasta').fill('2025-08-31');
+    await page.getByRole('button', { name: 'Aplicar' }).click();
+    await page.waitForURL(/from=2025-08-01/);
+
+    const row = page
+      .getByRole('region', { name: 'Intercambios' })
+      .getByRole('row', { name: /Programas Sociales.*Salud/ });
+    await expect(row).toContainText('3');
+    // The link, reachable with the keyboard, says the same.
+    const link = page.getByRole('img', {
+      name: /Programas Sociales \(ficticia\) consume de Salud \(ficticia\): 3 llamadas/,
+    });
+    await link.focus();
+    await expect(page.locator('.usage-chart-tooltip')).toContainText('3');
+    await expectNoAccessibilityViolations(page);
+  });
+
   test('a developer does not get them', async ({ page }) => {
     await signIn(page, 'carlos.dev', '/');
     const res = await page.goto('/regulator/indicators');

@@ -76,3 +76,24 @@ export const networkIndicatorsSchema = z.object({
   manualStepsAvoided: z.object({ total: z.number().int(), useCases: z.number().int() }),
 });
 export type NetworkIndicators = z.infer<typeof networkIndicatorsSchema>;
+
+/**
+ * Who exchanges data with whom (M5-05): consumer entity → provider entity, with the volume of
+ * production calls in the period and the active subscriptions between them (an agreed exchange
+ * may have no calls yet).
+ */
+export const exchangeMapSchema = z.object({
+  period: z.object({ from: isoDate, to: isoDate, timeZone: z.string() }),
+  exchanges: z.array(
+    z.object({
+      consumerId: z.uuid(),
+      consumerName: z.string(),
+      providerId: z.uuid(),
+      providerName: z.string(),
+      calls: z.number().int(),
+      errors: z.number().int(),
+      activeSubscriptions: z.number().int(),
+    }),
+  ),
+});
+export type ExchangeMap = z.infer<typeof exchangeMapSchema>;

@@ -1382,5 +1382,24 @@
       "newHeader": "Primera API publicada",
       "cumulativeHeader": "Total acumulado"
     }
+  },
+  "exchangeMap": {
+    "title": "Mapa de intercambios",
+    "lead": "Qué entidad consume datos de cuál: llamadas de producción del periodo y suscripciones activas entre ellas.",
+    "chartTitle": "Entidades consumidoras y proveedoras",
+    "consumers": "Consumidoras",
+    "providers": "Proveedoras",
+    "legend": {
+      "calls": "Llamadas en el periodo (el grosor es el volumen)",
+      "idle": "Suscripción activa, sin llamadas en el periodo"
+    },
+    "link": "{consumer} consume de {provider}: {calls} llamadas, {errors} con error, {subscriptions} suscripciones activas",
+    "tooltip": {
+      "calls": "llamadas",
+      "detail": "{errors} con error · {subscriptions} suscripciones activas"
+    },
+    "table": "Intercambios",
+    "subscriptions": "Suscripciones activas",
+    "empty": "No hay intercambios en este periodo: ni llamadas de producción ni suscripciones activas."
   }
 }

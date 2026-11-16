@@ -347,6 +347,43 @@
     font-size: 11px;
     font-variant-numeric: tabular-nums;
   }
+  /* Exchange map (M5-05): links carry volume by width, one hue; idle agreements dotted gray. */
+  .exchange-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    margin: 0.5rem 0;
+    color: var(--muted-foreground);
+    & span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+  .exchange-link {
+    stroke: var(--chart-1);
+    stroke-opacity: 0.55;
+    &.is-idle {
+      stroke: var(--border-control);
+      stroke-opacity: 1;
+      stroke-dasharray: 2 4;
+    }
+    &.is-active {
+      stroke-opacity: 0.95;
+    }
+  }
+  .exchange-hit:focus-visible .exchange-link {
+    stroke-opacity: 0.95;
+  }
+  .exchange-node {
+    fill: var(--muted-foreground);
+    stroke: var(--background);
+    stroke-width: 2px;
+  }
+  .exchange-label {
+    fill: var(--foreground);
+    font-size: 12px;
+  }
   .usage-chart-tooltip {
     position: absolute;
     top: 0;

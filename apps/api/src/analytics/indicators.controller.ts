@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import {
+  exchangeMapSchema,
   type IndicatorsQuery,
   indicatorsQuerySchema,
   networkIndicatorsSchema,
@@ -31,5 +32,22 @@ export class IndicatorsController {
   })
   network(@Query(new ZodValidationPipe(indicatorsQuerySchema)) query: IndicatorsQuery) {
     return this.indicators.network(query);
+  }
+
+  @Get('exchanges')
+  @PlatformAccess('network.map.read')
+  @ApiOperation({
+    operationId: 'getExchangeMap',
+    summary: 'Who exchanges data with whom: consumer entity → provider entity, with volume',
+    description:
+      'Production calls of the period by consumer and provider entity, and the active ' +
+      'subscriptions between them. 503 when the analytics store is not available.',
+    tags: ['indicators'],
+    query: indicatorsQuerySchema,
+    responses: { 200: { description: 'The map', schema: exchangeMapSchema } },
+    errors: [400, 401, 403, 503],
+  })
+  exchanges(@Query(new ZodValidationPipe(indicatorsQuerySchema)) query: IndicatorsQuery) {
+    return this.indicators.exchanges(query);
   }
 }

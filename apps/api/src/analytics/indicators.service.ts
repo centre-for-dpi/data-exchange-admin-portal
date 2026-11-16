@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { IndicatorsQuery, NetworkIndicators } from '@rid/contracts';
+import type { ExchangeMap, IndicatorsQuery, NetworkIndicators } from '@rid/contracts';
 import { localDay, nextDay, startOfLocalDay } from '../common/local-day.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ROUTE_PREFIX } from '../reconcilers/apisix/desired-state.js';
@@ -117,6 +117,103 @@ export class IndicatorsService {
       approvalTime,
       gatewayAvailability: { percent: availability },
       manualStepsAvoided: steps,
+    };
+  }
+
+  /**
+   * Who exchanges with whom (M5-05): production calls of the period by consumer entity and the
+   * route's provider, joined with the active subscriptions between them.
+   */
+  async exchanges(query: IndicatorsQuery): Promise<ExchangeMap> {
+    const period = resolvePeriod(query);
+    const result = await searchAccessLogs(this.openSearch, {
+      query: { bool: { filter: [periodRange(period), PRODUCTION] } },
+      aggs: {
+        consumers: {
+          terms: { field: 'consumer_entity', size: 1_000 },
+          aggs: {
+            routes: {
+              terms: { field: 'route_id', size: ROUTES },
+              aggs: { errors: { filter: { range: { status: { gte: 400 } } } } },
+            },
+          },
+        },
+      },
+    });
+    const consumers = buckets(result.aggregations, 'consumers');
+    const versionIds = new Set<string>();
+    for (const c of consumers) {
+      for (const r of buckets(c as Record<string, unknown>, 'routes')) {
+        const id = versionIdOf(String(r.key));
+        if (id) versionIds.add(id);
+      }
+    }
+    const [entities, versions, subscriptions] = await Promise.all([
+      this.prisma.entity.findMany({
+        where: { slug: { in: consumers.map((c) => String(c.key)) } },
+        select: { id: true, slug: true, shortName: true },
+      }),
+      this.prisma.apiVersion.findMany({
+        where: { id: { in: [...versionIds] } },
+        select: {
+          id: true,
+          api: { select: { entity: { select: { id: true, shortName: true } } } },
+        },
+      }),
+      this.prisma.subscription.findMany({
+        where: { status: 'active', application: { environment: 'production' } },
+        select: {
+          application: { select: { entity: { select: { id: true, shortName: true } } } },
+          apiVersion: {
+            select: { api: { select: { entity: { select: { id: true, shortName: true } } } } },
+          },
+        },
+      }),
+    ]);
+    const bySlug = new Map(entities.map((e) => [e.slug, e]));
+    const providerOf = new Map(versions.map((v) => [v.id, v.api.entity]));
+    type Exchange = ExchangeMap['exchanges'][number];
+    const exchanges = new Map<string, Exchange>();
+    const edge = (
+      consumer: { id: string; shortName: string },
+      provider: { id: string; shortName: string },
+    ) => {
+      const key = `${consumer.id}:${provider.id}`;
+      let row = exchanges.get(key);
+      if (!row) {
+        row = {
+          consumerId: consumer.id,
+          consumerName: consumer.shortName,
+          providerId: provider.id,
+          providerName: provider.shortName,
+          calls: 0,
+          errors: 0,
+          activeSubscriptions: 0,
+        };
+        exchanges.set(key, row);
+      }
+      return row;
+    };
+    for (const c of consumers) {
+      const consumer = bySlug.get(String(c.key));
+      if (!consumer) continue;
+      for (const r of buckets(c as Record<string, unknown>, 'routes')) {
+        const id = versionIdOf(String(r.key));
+        const provider = id ? providerOf.get(id) : undefined;
+        if (!provider) continue;
+        const row = edge(consumer, provider);
+        row.calls += r.doc_count;
+        row.errors += r.errors?.doc_count ?? 0;
+      }
+    }
+    for (const s of subscriptions) {
+      edge(s.application.entity, s.apiVersion.api.entity).activeSubscriptions += 1;
+    }
+    return {
+      period,
+      exchanges: [...exchanges.values()].sort(
+        (a, b) => b.calls - a.calls || b.activeSubscriptions - a.activeSubscriptions,
+      ),
     };
   }
 

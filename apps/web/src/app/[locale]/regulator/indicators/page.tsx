@@ -39,9 +39,14 @@ export default async function IndicatorsPage({ params, searchParams }: PageProps
       title={t('indicators.title')}
       description={t('indicators.lead')}
       actions={
-        <Link href={back} className="link">
-          {t(back === '/regulator' ? 'nav.regulator' : 'nav.operator')}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/regulator/exchange-map" className="link">
+            {t('exchangeMap.title')}
+          </Link>
+          <Link href={back} className="link">
+            {t(back === '/regulator' ? 'nav.regulator' : 'nav.operator')}
+          </Link>
+        </div>
       }
     />
   );

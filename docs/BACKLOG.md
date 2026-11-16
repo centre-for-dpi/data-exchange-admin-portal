@@ -706,7 +706,10 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Tiempo de aprobación.** Mediana de horas entre la solicitud y la primera decisión `approved`/`rejected` de una persona, según la auditoría. Las aprobaciones automáticas del sandbox no cuentan.
     - **Disponibilidad.** `avg_over_time(up{job="apisix"})` en Prometheus (`RID_PROMETHEUS_URL`); sin Prometheus, "sin datos". La provee M5-06.
     - **Pasos manuales evitados.** Es un campo nuevo del caso de uso del bootcamp (`manualStepsAvoided`, migración `20261208000000`), que el indicador suma.
-- [ ] **M5-05 — Mapa de intercambios**: grafo entidad consumidora → entidad proveedora con volumen.
+- [x] **M5-05 — Mapa de intercambios**: grafo entidad consumidora → entidad proveedora con volumen.
+  - _Notas de implementación:_ endpoint `GET /network/exchanges?from&to`, con el permiso `network.map.read` (los mismos roles que los indicadores). Pantalla `/regulator/exchange-map`, enlazada desde los indicadores.
+    - **Aristas.** Salen de las llamadas de producción del periodo (entidad consumidora del log, entidad proveedora de la versión de la ruta). Se unen con las suscripciones activas de aplicaciones de producción: un intercambio acordado sin llamadas también aparece, con volumen 0.
+    - **Gráfico.** Grafo bipartito con las consumidoras a la izquierda y las proveedoras a la derecha. El grosor es el volumen (escala de raíz, un solo tono) y lo acordado sin llamadas va en línea punteada gris, con leyenda. Cada enlace tiene tooltip con mouse y teclado, y debajo va la tabla con todos los valores.
 - [ ] **M5-06 — Métricas y alertas**: Prometheus + Alertmanager con las alertas de `ARCHITECTURE.md §9`; Grafana con un tablero de operador.
 - [ ] **M5-07 — Consola de sincronización**: estado de `sync_state`, deriva detectada, reintento manual.
 - [ ] **M5-08 — Guía de integración ampliada**: snippets curl, Java, Python, C#, Node con mTLS + token + cabeceras RID.

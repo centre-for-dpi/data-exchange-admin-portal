@@ -1382,5 +1382,24 @@
       "newHeader": "First API published",
       "cumulativeHeader": "Cumulative total"
     }
+  },
+  "exchangeMap": {
+    "title": "Exchange map",
+    "lead": "Which entity consumes data from which: production calls of the period and active subscriptions between them.",
+    "chartTitle": "Consumer and provider entities",
+    "consumers": "Consumers",
+    "providers": "Providers",
+    "legend": {
+      "calls": "Calls in the period (width is the volume)",
+      "idle": "Active subscription, no calls in the period"
+    },
+    "link": "{consumer} consumes from {provider}: {calls} calls, {errors} with an error, {subscriptions} active subscriptions",
+    "tooltip": {
+      "calls": "calls",
+      "detail": "{errors} with an error · {subscriptions} active subscriptions"
+    },
+    "table": "Exchanges",
+    "subscriptions": "Active subscriptions",
+    "empty": "No exchanges in this period: no production calls and no active subscriptions."
   }
 }
