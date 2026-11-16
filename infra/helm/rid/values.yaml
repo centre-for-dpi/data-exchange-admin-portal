@@ -300,9 +300,19 @@ prometheus:
     retention: 30d
     persistentVolume: { size: 20Gi }
     extraConfigmapMounts:
-      - { name: rid-rules, mountPath: /etc/rid-rules, configMap: rid-prometheus-rules, readOnly: true }
+      - {
+          name: rid-rules,
+          mountPath: /etc/rid-rules,
+          configMap: rid-prometheus-rules,
+          readOnly: true,
+        }
     extraSecretMounts:
-      - { name: metrics-token, mountPath: /etc/rid-metrics, secretName: rid-prometheus, readOnly: true }
+      - {
+          name: metrics-token,
+          mountPath: /etc/rid-metrics,
+          secretName: rid-prometheus,
+          readOnly: true,
+        }
   serverFiles:
     prometheus.yml:
       rule_files:
@@ -313,14 +323,22 @@ prometheus:
       metrics_path: /apisix/prometheus/metrics
       kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
       relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+        - source_labels:
+            [
+              __meta_kubernetes_pod_label_app_kubernetes_io_name,
+              __meta_kubernetes_pod_container_port_name,
+            ]
           regex: rid-gateway;metrics
           action: keep
     opa:
       job_name: opa
       kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
       relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+        - source_labels:
+            [
+              __meta_kubernetes_pod_label_app_kubernetes_io_name,
+              __meta_kubernetes_pod_container_port_name,
+            ]
           regex: rid-gateway;opa-diag
           action: keep
     api:
@@ -329,14 +347,22 @@ prometheus:
       authorization: { type: Bearer, credentials_file: /etc/rid-metrics/RID_METRICS_TOKEN }
       kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
       relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+        - source_labels:
+            [
+              __meta_kubernetes_pod_label_app_kubernetes_io_name,
+              __meta_kubernetes_pod_container_port_name,
+            ]
           regex: rid-api;http
           action: keep
     keycloak:
       job_name: keycloak
       kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
       relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_container_port_name]
+        - source_labels:
+            [
+              __meta_kubernetes_pod_label_app_kubernetes_io_name,
+              __meta_kubernetes_pod_container_port_name,
+            ]
           regex: rid-keycloak;management
           action: keep
   # The operator's mail: the server's password is ALERTMANAGER_SMTP_PASSWORD (rid-alertmanager).
@@ -387,7 +413,15 @@ grafana:
     datasources.yaml:
       apiVersion: 1
       datasources:
-        - { name: Prometheus, uid: prometheus, type: prometheus, access: proxy, url: 'http://rid-prometheus', isDefault: true, editable: false }
+        - {
+            name: Prometheus,
+            uid: prometheus,
+            type: prometheus,
+            access: proxy,
+            url: 'http://rid-prometheus',
+            isDefault: true,
+            editable: false,
+          }
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1
