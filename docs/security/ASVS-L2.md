@@ -10,7 +10,7 @@ El núcleo cumple: autorización en el backend con aislamiento por entidad, vali
 
 M6-01 corrigió lo que podía corregirse sin cambiar la topología: límites de peticiones, cabeceras del API, eventos de seguridad, política de contraseñas, URIs exactas de OIDC, segmentación de red, keyring propio de APISIX, lista mínima de plugins, escaneo de dependencias y la cola paginada del operador.
 
-Lo que exige otra topología (TLS y autenticación entre componentes internos, Keycloak en modo producción, bóveda de secretos) queda para los charts de producción (M6-05). El antivirus de documentos queda en M6-08.
+Lo que exigía otra topología (TLS y autenticación entre componentes internos, Keycloak en modo producción, bóveda de secretos), el SBOM y los logs del API en el pipeline central quedaron en el chart de Helm de M6-05 (correcciones 14 a 19), que falta instalar. El antivirus de documentos queda en M6-08.
 
 ## Correcciones de M6-01
 
@@ -30,6 +30,19 @@ Lo que exige otra topología (TLS y autenticación entre componentes internos, K
 | 12 | Etiqueta GCM truncada aceptada (por confirmar) | `authTagLength: 16` al abrir secretos sellados | `common/secrets.test.ts` |
 | 13 | La cola de altas del operador mostraba solo las 200 más antiguas | Paginación por cursor en API y consola | `entities/entity-requests.int.test.ts` |
 
+## Correcciones de M6-05 (chart de Helm)
+
+Están en `infra/helm/rid` y se validaron solo de forma estática (`helm template` y kubeconform). El chart no se ha instalado en ningún clúster (`DEPLOYMENT.md §9`).
+
+| # | Pendiente | Corrección | Prueba |
+| :-- | :-- | :-- | :-- |
+| 14 | Componentes internos sin TLS ni autenticación propia (12.3.x, 13.2.1) | PKI interna con cert-manager:<br>• etcd con mTLS y una CA propia, que solo firma a sus miembros y al gateway;<br>• OpenSearch con TLS y su plugin de seguridad, con un usuario por cliente y solo los permisos que usa;<br>• Postgres con `sslmode=verify-full`;<br>• la API de OPA solo en el loopback del pod del gateway, con la escucha de diagnóstico aparte | `helm template` + kubeconform |
+| 15 | Keycloak en `start-dev` y realms con usuarios de prueba (13.4.2) | `start` con realms de producción: `pnpm helm:sync` quita las personas y pone el SMTP del despliegue | `tests/infra/src/helm-files.test.ts` |
+| 16 | Secretos en `.env` (13.3.x) | Un Secret por componente con solo sus claves, desde OpenBao con External Secrets | `helm template` |
+| 17 | Salida de red sin límite | NetworkPolicies de entrada y de salida por componente. Hacia fuera, solo direcciones públicas en los puertos que usa cada uno | `helm template` + kubeconform |
+| 18 | Sin SBOM ni escaneo de imágenes (15.1.2, 15.2.1) | SBOM CycloneDX y Trivy en CI: una vulnerabilidad alta o crítica con arreglo detiene la publicación. Imágenes del API y la web sin dependencias de desarrollo ni gestor de paquetes | `.github/workflows/images.yml` |
+| 19 | Logs del API fuera del pipeline central, sin enmascarar (16.4.3, 14.x) | Cada línea enmascarada (queries, números de 6 dígitos o más, correos, credenciales en URL). En el chart, JSON para el colector de logs del clúster | `common/logger.test.ts` |
+
 ## Estado por capítulo
 
 | Capítulo | Estado | Notas |
@@ -45,22 +58,19 @@ Lo que exige otra topología (TLS y autenticación entre componentes internos, K
 | V9 Tokens autocontenidos | Cumple | RS256 contra el JWKS del emisor, `exp`/`iss`/`aud`; el gateway valida antes de OPA |
 | V10 OAuth/OIDC | Cumple · Corregido | Código con PKCE S256, sin implícito ni password grant, clientes confidenciales con token ligado al certificado. **Corregido:** URIs exactas (7) |
 | V11 Criptografía | Cumple · Parcial | AES-256-GCM con IV aleatorio y AAD, aleatoriedad del sistema, comparaciones en tiempo constante. **Corregido:** etiqueta GCM (12). **Parcial:** una sola `RID_SECRETS_KEY` sin identificador de clave ni rotación (M6-05) |
-| V12 Comunicaciones | Cumple · **Pendiente M6-05** | TLS externo, verificación de certificados hacia proveedores, mTLS de aplicaciones y nodos. **Pendiente:** TLS entre componentes internos (etcd, OPA, OpenSearch, Postgres `verify-full`) |
-| V13 Configuración | Corregido · **Pendiente M6-05** | **Corregido:** segmentación (8), keyring (9), plugins (10). Rol de base de datos de mínimo privilegio. **Pendiente:**<br>• autenticación propia de etcd (mTLS) y OpenSearch (plugin de seguridad);<br>• Keycloak en `start --optimized` en lugar de `start-dev`;<br>• imagen de Fluent Bit sin `-debug`;<br>• secretos en bóveda en lugar de `.env` |
-| V14 Protección de datos | Cumple · Corregido | Sin datos sensibles en URLs ni logs; sin cuerpos; lista blanca de campos; seudónimos con clave. **Corregido:** la clave de seudónimos en los datos de OPA ya no es alcanzable desde los upstreams (8). Lo que falta es la autenticación propia de OPA (M6-05) |
-| V15 Codificación segura | Corregido · Parcial | Contenedores sin root, `select` explícito, bloqueos de concurrencia. **Corregido:** escaneo de dependencias (11). **Parcial:** sin SBOM (M6-05) |
-| V16 Logs y errores | Corregido · Parcial | Inventario de logs (§8), bitácora protegida y anclada, errores genéricos. **Corregido:** eventos de seguridad del API y de Keycloak (4, 5). **Parcial:** las líneas del API van a la salida del contenedor; enviarlas al mismo pipeline que el gateway es parte de M6-05 |
+| V12 Comunicaciones | Cumple · Corregido en el chart | TLS externo, verificación de certificados hacia proveedores, mTLS de aplicaciones y nodos. **Corregido en el chart de Helm (M6-05, 14):** etcd con mTLS y CA propia, OpenSearch con TLS, Postgres con `verify-full`, OPA solo en el loopback del pod. El piloto con Compose sigue con la red interna como única barrera |
+| V13 Configuración | Corregido · Corregido en el chart | **Corregido:** segmentación (8), keyring (9), plugins (10). Rol de base de datos de mínimo privilegio. **Corregido en el chart (14 a 17):**<br>• etcd con mTLS y OpenSearch con su plugin de seguridad;<br>• Keycloak en `start` (modo producción) con realms sin usuarios de prueba;<br>• imagen de Fluent Bit sin `-debug`;<br>• secretos desde OpenBao con External Secrets;<br>• NetworkPolicies de entrada y de salida por componente |
+| V14 Protección de datos | Cumple · Corregido | Sin datos sensibles en URLs ni logs; sin cuerpos; lista blanca de campos; seudónimos con clave. **Corregido:** la clave de seudónimos en los datos de OPA ya no es alcanzable desde los upstreams (8). En el chart, la API de OPA solo escucha en el loopback del pod del gateway (14) |
+| V15 Codificación segura | Corregido | Contenedores sin root, `select` explícito, bloqueos de concurrencia. **Corregido:** escaneo de dependencias (11); SBOM y escaneo de imágenes con Trivy en CI, e imágenes de producción sin dependencias de desarrollo ni gestor de paquetes (18) |
+| V16 Logs y errores | Corregido · Parcial | Inventario de logs (§8), bitácora protegida y anclada, errores genéricos. **Corregido:** eventos de seguridad del API y de Keycloak (4, 5). **Corregido:** las líneas del API van enmascaradas y, en el chart, en JSON para el colector de logs del clúster, que las lleva al sistema central del operador (19) |
 
 ## Pendientes y su destino
 
 | Pendiente | ASVS | Destino |
 | :-- | :-- | :-- |
 | Segundo factor para `entity_admin` y `api_publisher` | 6.3.3 | Decisión del operador. Si se adopta, es configuración y una guía para las entidades |
-| TLS y autenticación entre componentes internos: etcd mTLS, autenticación de OPA, plugin de seguridad de OpenSearch, Postgres `verify-full` | 12.3.x, 13.2.1 | M6-05 (topología de producción) |
-| Keycloak en modo producción; Fluent Bit sin imagen de depuración | 13.4.2 | M6-05 |
-| Bóveda de secretos, identificador de clave y rotación de `RID_SECRETS_KEY` | 11.1.x, 13.3.x | M6-05 |
-| SBOM y escaneo de imágenes (Trivy) | 15.1.2 | M6-05 |
-| Logs del API en el pipeline central | 16.4.3 | M6-05 |
+| Comprobar en un clúster lo corregido en el chart (14 a 19): no se ha instalado | 12.3.x, 13.x, 16.4.3 | M6-05 (instalación) |
+| Identificador de clave y rotación de `RID_SECRETS_KEY` | 11.1.x | Pendiente: hoy una sola clave, en la bóveda en el chart |
 | Antivirus de documentos | 5.4.3 | M6-08 |
 | Tope de re-subidas del documento de designación | 2.3.2 | Mejora menor (hoy limitado por tasa) |
 | Retirar la clave de fábrica del keyring de APISIX | 11.x | Operación: después de la primera renovación de certificados del despliegue |

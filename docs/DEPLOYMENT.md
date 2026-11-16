@@ -542,14 +542,14 @@ En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.d
 
 ## 9. Kubernetes: charts de Helm (M6-05, en curso)
 
-> **Estado (2026-11-16).** Los charts están escritos y validados de forma estática: `helm lint`, más `helm template` y kubeconform estricto contra Kubernetes 1.31 (59 recursos válidos). **Todavía no se instalaron en ningún clúster.** `pnpm helm:kind` lo hará en kind cuando se decida, y es de esperar que haya ajustes en esa primera instalación.
+> **Estado (2026-11-16).** Los charts están completos y validados de forma estática: `helm lint`, más `helm template` y kubeconform estricto contra Kubernetes 1.31 (112 recursos válidos). Las imágenes se construyeron y escanearon en local, sin hallazgos altos ni críticos. **Todavía no se instalaron en ningún clúster.** `pnpm helm:kind` lo hará en kind cuando se decida, y es de esperar que haya ajustes en esa primera instalación.
 
 ### 9.1 Los dos charts
 
 | Chart | Qué instala | Cuándo |
 | :-- | :-- | :-- |
 | `infra/helm/rid-platform` | Los operadores del clúster: CloudNativePG 0.29.1 (PostgreSQL con réplicas), External Secrets 2.14.0 (secretos desde OpenBao u otro almacén) y cert-manager v1.21.3 | Una vez por clúster, antes de `rid`, en el namespace `rid-platform` |
-| `infra/helm/rid` | Todo RID: web y API, el gateway (APISIX con su OPA y los Fluent Bit de transparencia y de errores en cada pod), etcd, Keycloak, las dos bases de datos, step-ca, el hub de nodos, el runner de contrato, el pipeline de acceso y las NetworkPolicies | Un `helm install` |
+| `infra/helm/rid` | Todo RID: web y API, el gateway (APISIX con su OPA y los Fluent Bit de transparencia y de errores en cada pod), etcd con mTLS, Keycloak, las dos bases de datos, step-ca, el hub de nodos, el runner de contrato, el pipeline de acceso, OpenSearch con su plugin de seguridad, Prometheus con Alertmanager, Grafana, la PKI interna (cert-manager) y las NetworkPolicies de entrada y de salida | Un `helm install` |
 
 Son dos porque Helm no puede crear un operador y sus recursos en la misma instalación: los recursos (un `Cluster` de base de datos, un `ExternalSecret`) llegan al webhook del operador antes de que este responda.
 
@@ -558,12 +558,18 @@ Son dos porque Helm no puede crear un operador y sus recursos en la misma instal
 - **Una StorageClass con `ReadWriteMany`** para los documentos subidos (`api.documents`). Las demás piezas usan `ReadWriteOnce`.
 - **Un balanceador de red (`LoadBalancer`)** para el gateway, que termina el mTLS de las aplicaciones (no pasa por el ingress), y para el UDP del hub de nodos.
 - **OpenBao** (o cualquier almacén de External Secrets) con un `ClusterSecretStore`: `secrets.externalSecrets.secretStoreRef`.
+- **Un colector de logs del clúster** (un DaemonSet de Fluent Bit, Vector u otro) que lleve la salida de los contenedores al sistema central del operador. Ahí llegan los logs del API, en JSON enmascarado (`ARCHITECTURE.md §8`), y el error log enmascarado del gateway. El chart no lo instala: es de la plataforma, como para cualquier otra carga.
+- **Un CNI que aplique NetworkPolicies** (Calico, Cilium). Sin él, las políticas del chart no tienen efecto.
 
 ### 9.2 Secretos
 
 Cada componente tiene su Secret `rid-<componente>`, solo con las claves que usa. Con `secrets.mode: externalSecrets`, todas son propiedades de una sola entrada del almacén (`secrets.externalSecrets.remoteKey`, por omisión `rid/platform`). External Secrets arma los Secrets y además deriva las URL de conexión y los Secrets `basic-auth` de CloudNativePG a partir de las contraseñas, para que nunca se guarde un mismo valor dos veces. Con `secrets.mode: existing`, el operador crea esos Secrets con esos nombres. La lista exacta de claves está en `templates/_helpers.tpl` (`rid.secrets`), y son las mismas de `.env.example`, salvo:
 - `DB_OWNER_PASSWORD` y `DB_APP_PASSWORD`, de las que se derivan `DATABASE_MIGRATION_URL` y `DATABASE_URL`;
-- `KEYCLOAK_SMTP_USER` y `KEYCLOAK_SMTP_PASSWORD`, para el correo del realm.
+- `KEYCLOAK_SMTP_USER` y `KEYCLOAK_SMTP_PASSWORD`, para el correo del realm;
+- `ALERTMANAGER_SMTP_PASSWORD`, la del servidor de correo de las alertas (`prometheus.alertmanager.config.global`);
+- `OPENSEARCH_INTERNAL_USERS_YML`, el `internal_users.yml` del plugin de seguridad de OpenSearch con tres usuarios: `admin`, `rid-logs` (Fluent Bit: `OPENSEARCH_USER` y `OPENSEARCH_PASSWORD`) y `rid-api` (el portal: `RID_OPENSEARCH_AUTH`, `usuario:contraseña`). Lleva solo los hashes bcrypt, hechos con `plugins/opensearch-security/tools/hash.sh` de la imagen de OpenSearch. El índice de seguridad se crea desde él en el primer arranque; cambios posteriores van con `securityadmin.sh` y el certificado `rid-opensearch-admin`.
+
+`GRAFANA_ADMIN_PASSWORD` es la de `.env.example`; el usuario es `admin`.
 
 Las URL de conexión usan `sslmode=verify-full` con el certificado de la CA de cada base de datos. Nunca se monta su clave.
 
@@ -587,9 +593,25 @@ Helm solo lee archivos dentro del chart. `pnpm helm:sync` copia a `infra/helm/ri
 
 `tests/infra` falla si una copia no coincide con su fuente. Las configuraciones cuyo host cambia en Kubernetes (la de APISIX, la del pipeline de acceso) son plantillas del chart. Si cambia la fuente, se cambia también la plantilla.
 
-### 9.5 Pendiente en M6-05
+### 9.5 Valores que fija cada despliegue
+
+Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
+- `stepCa.rootFingerprint` y `stepCa.pkiSecret` (§9.3);
+- `keycloak.smtp` (servidor y remitente del realm) y `prometheus.alertmanager.config` (servidor, remitente y destinatarios de las alertas);
+- `grafana."grafana.ini".server.root_url`: `<publicUrl>/grafana/`. Sin él, Grafana redirige a `localhost`;
+- `networkPolicy`: el namespace del ingress (`ingressControllerNamespace`), y las redes privadas que el gateway (`gatewayExtraEgressCidrs`: proveedores dentro de la red del operador, un Security Server de X-Road) o el API y Keycloak (`servicesEgressCidrs`: el correo, la TSA) deban alcanzar. Por omisión solo salen a direcciones públicas.
+
+### 9.6 Imágenes
+
+`.github/workflows/images.yml` construye las cuatro imágenes propias del chart: `rid-portal-api`, `rid-portal-web`, `rid-wg-hub` y `rid-contract-runner`.
+- **SBOM.** Guarda un SBOM CycloneDX de cada una como artefacto de la ejecución, por 90 días.
+- **Escaneo.** Las escanea con Trivy (0.76.1, fijado por digest). Una vulnerabilidad alta o crítica con arreglo disponible detiene la publicación. Una excepción aceptada va en `.trivyignore`, con su razón y fecha de vencimiento.
+- **Publicación.** Con una etiqueta `vX.Y.Z` publica en `ghcr.io/centre-for-dpi/<imagen>:X.Y.Z` (el `appVersion` del chart), con las atestaciones de SBOM y de procedencia de BuildKit. A mano (`workflow_dispatch`) solo construye y escanea, salvo que se marque `publish`.
+- **Acciones fijadas.** Las acciones de terceros están fijadas por commit.
+
+Las imágenes del API y de la web son de varias etapas. La de ejecución lleva solo las dependencias de producción (`pnpm deploy --prod`) y los archivos del repositorio que lee el proceso: la configuración del país y, en el API, las políticas de OPA y el realm del seed del piloto. No lleva gestor de paquetes. El contenedor de migraciones corre `node_modules/.bin/prisma migrate deploy`.
+
+### 9.7 Pendiente en M6-05
 
 - **Instalar** en kind (`pnpm helm:kind`) y luego en el entorno tipo producción del operador. El chart nunca se ha instalado.
-- **Componentes:** OpenSearch con su plugin de seguridad y TLS (cert-manager); Prometheus, Alertmanager y Grafana como subcharts.
-- **Seguridad:** etcd con mTLS; restringir la salida de red de los demás componentes; SBOM y escaneo de imágenes en CI; los logs del API en el pipeline central.
-- **Publicar nuestras imágenes** (`ghcr.io/centre-for-dpi/rid-*`) desde CI. Hoy no se publican.
+- **Publicar la primera versión** de las imágenes (una etiqueta `v0.1.0`), cuando se decida.
