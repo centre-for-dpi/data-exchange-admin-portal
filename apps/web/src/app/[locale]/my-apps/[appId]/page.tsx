@@ -1,4 +1,6 @@
 import { getCountryConfig } from '@rid/config';
+import { IntegrationGuide } from '../../../../components/apps/integration-guide';
+import { guideSnippets } from '../../../../lib/integration-guide';
 import { applicationDetailSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
@@ -68,27 +70,17 @@ export default async function ApplicationPage({ params }: PageProps) {
     `  -subj "/CN=${app.clientId}"`,
   ].join('\n');
   const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
-  // With mTLS (M3-10) both calls present the application's certificate, and trust the gateway's
-  // certificate through the network CA: the token comes bound to that certificate.
-  const tls = mtlsRequired
-    ? [
-        `  --cert ${app.clientId}.crt --key ${app.clientId}.key \\`,
-        '  --cacert rid-network-ca.pem \\',
-      ]
-    : [];
-  const tokenCommand = [
-    `TOKEN=$(curl -s -u "${app.clientId}:TU_SECRETO" \\`,
-    ...tls,
-    '  -d grant_type=client_credentials \\',
-    `  ${app.tokenUrl} | jq -r .access_token)`,
-  ].join('\n');
-  const callCommand = [
-    `curl ${gateway}/{entidad}/{api}/v1/... \\`,
-    ...tls,
-    '  -H "Authorization: Bearer $TOKEN" \\',
-    '  -H "X-RID-Purpose: {finalidad}" \\',
-    '  -H "X-RID-End-User: {funcionario}"',
-  ].join('\n');
+  // The guide's programs (M5-08); with mTLS (M3-10) both calls present the application's
+  // certificate and trust the gateway through the network CA.
+  const snippets = guideSnippets({
+    clientId: app.clientId,
+    tokenUrl: app.tokenUrl,
+    gateway,
+    mtls: mtlsRequired,
+    path: t('guide.path'),
+    purpose: t('guide.purpose'),
+    endUser: t('guide.endUser'),
+  });
 
   return (
     <Page>
@@ -256,26 +248,8 @@ export default async function ApplicationPage({ params }: PageProps) {
       </Section>
 
       <Section title={t('detail.guide')}>
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <p className="text-sm">{t('detail.guideToken')}</p>
-            <pre
-              className="overflow-x-auto rounded-2xl bg-surface-inverse p-5 text-sm leading-relaxed text-[#f6f8fa]"
-              tabIndex={0}
-            >
-              <code>{tokenCommand}</code>
-            </pre>
-          </div>
-          <div className="space-y-3">
-            <p className="text-sm">{t('detail.guideCall')}</p>
-            <pre
-              className="overflow-x-auto rounded-2xl bg-surface-inverse p-5 text-sm leading-relaxed text-[#f6f8fa]"
-              tabIndex={0}
-            >
-              <code>{callCommand}</code>
-            </pre>
-          </div>
-        </div>
+        <p className="text-sm">{t('guide.lead')}</p>
+        <IntegrationGuide snippets={snippets} />
         <p className="text-sm text-muted-foreground">{t('detail.guideNote')}</p>
         {mtlsRequired ? (
           <p className="text-sm text-muted-foreground">

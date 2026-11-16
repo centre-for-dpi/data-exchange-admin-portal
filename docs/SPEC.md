@@ -227,7 +227,7 @@ enrollment_issued → enrolled → online ⇄ offline
 - Detalle de API: descripción, ficha del servicio, documentación interactiva (Scalar) con "probar en sandbox", versiones, finalidades permitidas, estado del nodo, botón "Solicitar acceso".
 - Mi entidad: datos, miembros e invitaciones, nodos, acuerdos.
 - Mis APIs (proveedor): lista, crear/editar versión, envío a revisión, solicitudes recibidas, consumidores activos, uso.
-- Mis aplicaciones (consumidor): credenciales, certificados, suscripciones y su estado, uso, guía de integración (snippets curl/Java/Python/C#).
+- Mis aplicaciones (consumidor): credenciales, certificados, suscripciones y su estado, uso, guía de integración (programas en curl, Python, Node.js, Java y C#).
 - Bandeja de solicitudes (responsable de datos): pendientes, historial, acciones de aprobar/rechazar/suspender/revocar.
 
 **Consola del operador**

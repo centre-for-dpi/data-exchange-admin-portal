@@ -369,9 +369,7 @@
       "created": "Creada",
       "pendingNote": "Estamos creando las credenciales en el servidor de identidad. Esto toma unos segundos.",
       "guide": "Guía de integración",
-      "guideToken": "1. Obtén un token de acceso (dura 5 minutos):",
-      "guideCall": "2. Llama a una API con el token y la finalidad de tu solicitud aprobada:",
-      "guideNote": "Reemplaza TU_SECRETO por el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada.",
+      "guideNote": "Define RID_CLIENT_SECRET con el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada.",
       "guideLimit": "Cada suscripción tiene un límite de peticiones por minuto. Al superarlo, el gateway responde 429 en application/problem+json (código rate_limited); las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset dicen el límite, lo que queda y en cuántos segundos se reinicia.",
       "guideEndUser": "X-RID-End-User identifica al funcionario que hace la consulta. Es obligatorio en las APIs con datos personales o sensibles: de 1 a 128 caracteres visibles, sin espacios (por ejemplo, su usuario o su correo institucional). El gateway lo convierte en un hash con la sal de la red: ni el proveedor ni los registros ven el valor.",
       "guideMtls": "La red exige mTLS: las dos llamadas presentan el certificado de la aplicación (sección Certificado de cliente) y su clave privada. El token queda ligado a ese certificado y solo sirve con él. El certificado del gateway lo emite la autoridad de certificación de la red:",
@@ -421,6 +419,24 @@
       "revokeConfirm": "Revocar ahora",
       "revoked": "Credencial revocada.",
       "conflict": "La credencial cambió mientras tanto o no se puede hacer esta operación. Recarga la página."
+    },
+    "guide": {
+      "lead": "Un programa completo en cada lenguaje: pide el token y llama a una API con las cabeceras RID. El secreto se lee de la variable de entorno RID_CLIENT_SECRET, nunca del código. Reemplaza la ruta, la finalidad y el funcionario por los de tu solicitud aprobada.",
+      "languages": "Lenguajes",
+      "language": {
+        "curl": "curl",
+        "python": "Python",
+        "node": "Node.js",
+        "java": "Java",
+        "csharp": "C#"
+      },
+      "saveAs": "Guárdalo como {file}.",
+      "copy": "Copiar el código de {language}",
+      "copied": "Copiado.",
+      "code": "Código de {language}",
+      "path": "/'{entidad}'/'{api}'/v1/...",
+      "purpose": "'{finalidad}'",
+      "endUser": "'{funcionario}'"
     }
   },
   "subscriptionStatus": {

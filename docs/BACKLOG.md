@@ -716,7 +716,11 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Deriva.** Es una escritura con el estado deseado ya aplicado; el detalle está en `ARCHITECTURE.md §4`. Columnas nuevas `drift_detected_at` y `drift_count` (migración `20261209000000`). Hoy la detectan APISIX (versiones) y Keycloak (clientes).
     - **Reintento.** Encola el trabajo del reconciliador dueño del objetivo y emite el evento de auditoría `sync.retry_requested`. OpenSearch tiene su propio tema (`opensearch.sync`).
     - **Filtro.** El filtro por defecto es "con problemas": no sincronizado, o con deriva en las últimas 24 horas.
-- [ ] **M5-08 — Guía de integración ampliada**: snippets curl, Java, Python, C#, Node con mTLS + token + cabeceras RID.
+- [x] **M5-08 — Guía de integración ampliada**: snippets curl, Java, Python, C#, Node con mTLS + token + cabeceras RID.
+  - _Notas de implementación:_
+    - **Programas.** En la página de cada aplicación hay un programa completo por lenguaje, en pestañas accesibles, cada una con su nombre de archivo y un botón de copiar. Cada uno pide el token con `client_credentials` y llama a la API con `X-RID-Purpose` y `X-RID-End-User`. Con mTLS presentan el certificado de la aplicación y confían en la CA de la red. El secreto se lee de `RID_CLIENT_SECRET`, nunca del código.
+    - **Dependencias.** Ninguna fuera de la plataforma: Node usa `undici`, Python usa `requests` y Java parsea el token con un patrón.
+    - **Prueba.** El e2e `guide.spec.ts` copia los cinco programas de la página y los ejecuta contra el gateway real con una suscripción activa. curl corre en un contenedor con OpenSSL, porque el curl de Windows (Schannel) no toma `--cert`/`--key`; la guía lo advierte.
 
 **Cierre M5:** el regulador ve los indicadores de un mes simulado (generador de tráfico sintético).
 
