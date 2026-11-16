@@ -21,7 +21,13 @@ function placeholders(text: string): string[] {
     while (i < text.length) {
       const c = text[i];
       if (c === '}' && closing) return i + 1;
-      if (c === '{') i = argument(i + 1);
+      // ICU quoting: '' is an apostrophe; an apostrophe before { or } starts literal text up to
+      // the next apostrophe ('{entidad}' is a placeholder shown as is, not an argument).
+      if (c === "'" && text[i + 1] === "'") i += 2;
+      else if (c === "'" && (text[i + 1] === '{' || text[i + 1] === '}')) {
+        const end = text.indexOf("'", i + 1);
+        i = end === -1 ? text.length : end + 1;
+      } else if (c === '{') i = argument(i + 1);
       else i += 1;
     }
     return i;

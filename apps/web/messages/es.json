@@ -726,6 +726,9 @@
       },
       "bootcamp": {
         "item_updated": "Requisito del bootcamp actualizado"
+      },
+      "sync": {
+        "retry_requested": "Reintento de sincronización pedido por el operador"
       }
     },
     "filters": {

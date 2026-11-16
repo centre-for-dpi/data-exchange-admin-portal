@@ -726,6 +726,9 @@
       },
       "bootcamp": {
         "item_updated": "Bootcamp prerequisite updated"
+      },
+      "sync": {
+        "retry_requested": "Sync retry requested by the operator"
       }
     },
     "filters": {
