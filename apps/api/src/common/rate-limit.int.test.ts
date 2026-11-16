@@ -76,6 +76,34 @@ describe('rate limits of the portal API (M6-01)', () => {
     }
   });
 
+  it('made-up tokens are not quotas of their own: they share their address', async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/me',
+        remoteAddress: '10.1.0.1',
+        headers: { authorization: `Bearer made-up-${i}` },
+      });
+      statuses.push(res.statusCode);
+    }
+    expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
+    expect(statuses[5]).toBe(429);
+  });
+
+  it("a node's enrollment is on the tight quota, by address (only its control routes are exempt)", async () => {
+    const enroll = () =>
+      app.inject({
+        method: 'POST',
+        url: '/api/v1/nodes/enroll',
+        remoteAddress: '10.1.0.2',
+        payload: {},
+      });
+    expect((await enroll()).statusCode).not.toBe(429);
+    expect((await enroll()).statusCode).not.toBe(429);
+    expect((await enroll()).statusCode).toBe(429);
+  });
+
   it('an upload with a made-up token is refused before its body is read', async () => {
     const res = await app.inject({
       method: 'PUT',

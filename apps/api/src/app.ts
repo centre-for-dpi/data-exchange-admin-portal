@@ -21,24 +21,42 @@ export const API_PREFIX = 'api/v1';
 export const BODY_LIMIT_BYTES = 1024 * 1024;
 
 /** The portal's token verifier, set once the app exists (configureApp); none in bare adapters. */
-let uploadVerifier: TokenVerifier | undefined;
-const uploadTokenValid = async (token: string): Promise<boolean> => {
-  if (!uploadVerifier) return true;
+let tokenVerifier: TokenVerifier | undefined;
+/** The `sub` of a token the API accepts, or null: the rate limits' key (M6-01). */
+const verifiedSubject = async (token: string): Promise<string | null> => {
+  if (!tokenVerifier) return null;
   try {
-    await uploadVerifier.verify(token);
-    return true;
+    return (await tokenVerifier.verify(token)).sub;
   } catch {
-    return false;
+    return null;
   }
 };
+const uploadTokenValid = async (token: string): Promise<boolean> =>
+  !tokenVerifier || (await verifiedSubject(token)) !== null;
+
+/**
+ * Who may set X-Forwarded-For (RID_TRUST_PROXY, M6-01): request.ip is then the caller's address,
+ * for rate limits and security events. The proxy's addresses or networks, comma-separated
+ * (`172.30.0.0/16`), so that another container that reaches the API directly cannot pick the
+ * address it is logged and limited under. A number trusts that many hops whoever sends them:
+ * only where nothing but the proxy reaches the API. Empty: nobody.
+ */
+export function trustedProxies(
+  value: string | undefined,
+): string | ((address: string, hop: number) => boolean) | false {
+  const setting = value?.trim() ?? '';
+  if (!setting || setting === '0') return false;
+  if (/^\d+$/.test(setting)) {
+    const hops = Number(setting);
+    return (_address: string, hop: number) => hop < hops;
+  }
+  return setting;
+}
 
 export function createAdapter(): FastifyAdapter {
-  // Behind the pilot's proxy (RID_TRUST_PROXY=1, the hops to trust): request.ip is the caller's
-  // address from X-Forwarded-For, for rate limits and security events (M6-01).
-  const hops = Number(process.env.RID_TRUST_PROXY ?? 0);
   const adapter = new FastifyAdapter({
     bodyLimit: BODY_LIMIT_BYTES,
-    trustProxy: (_address: string, hop: number) => Number.isInteger(hops) && hop < hops,
+    trustProxy: trustedProxies(process.env.RID_TRUST_PROXY),
   });
   // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
   adapter.getInstance().removeContentTypeParser('text/plain');
@@ -108,12 +126,12 @@ export async function configureApp(app: NestFastifyApplication): Promise<NestFas
   app.setGlobalPrefix(API_PREFIX);
   app.useGlobalFilters(new ProblemDetailsFilter());
   registerMetrics(app);
-  await registerRateLimit(app);
   try {
-    uploadVerifier = app.get<TokenVerifier>(TOKEN_VERIFIER, { strict: false });
+    tokenVerifier = app.get<TokenVerifier>(TOKEN_VERIFIER, { strict: false });
   } catch {
-    uploadVerifier = undefined;
+    tokenVerifier = undefined;
   }
+  await registerRateLimit(app, verifiedSubject);
   await app.init();
   registerApiDocs(app, API_PREFIX);
   return app;

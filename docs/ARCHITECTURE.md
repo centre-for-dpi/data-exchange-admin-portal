@@ -421,6 +421,7 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 - **Redes (M6-01).**
   - `gateway`: el plano de control del gateway. APISIX, etcd y OPA, más los componentes de la plataforma que los usan (Keycloak, los Fluent Bit, Prometheus y, en el piloto, el API).
   - `providers`: los upstreams del gateway (proveedores de prueba, hub de nodos) y el runner de contrato.
+  - `runner` (piloto): el API y el runner de contrato. El API no está en `providers`, así que ningún upstream lo alcanza sin pasar por el proxy.
   - `default`: la plataforma (base de datos, CA, OpenSearch, correo, portal).
   - etcd y OPA no tienen autenticación propia en el piloto, por eso solo están en `gateway`: ni los upstreams ni el runner los alcanzan. El gateway no alcanza la base de datos, la CA, OpenSearch ni el correo. La prueba es `tests/infra/src/networks.int.test.ts`.
 - Admin API de APISIX solo en red interna y con clave de administrador. En producción también mTLS de etcd y autenticación de OPA (M6-05).
@@ -438,7 +439,8 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
   - Toda respuesta lleva HSTS de dos años con `includeSubDomains`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, COOP/CORP `same-origin` y una `Permissions-Policy` cerrada. Sin `X-Powered-By`.
   - Cookies: las de Auth.js son `HttpOnly`, `SameSite=Lax`, de un solo host y, sobre HTTPS, `Secure` con prefijo `__Secure-` o `__Host-`. Las propias del portal (entidad activa, escalado de sesión) siguen las mismas reglas. CSRF por Auth.js y por las server actions (comprobación de `Origin`).
 - **API (M6-01).**
-  - Límite de peticiones antes de leer el cuerpo: por token o por dirección, y una cuota estricta por usuario en las rutas costosas. El proxy suma un límite por dirección.
+  - Límite de peticiones antes de leer el cuerpo: por usuario verificado (un token inventado no es una cuota propia) o por dirección, y una cuota estricta en las rutas costosas y en el enrolamiento de nodos. Solo las rutas de control de los servicios de la plataforma, cada una con su credencial, quedan fuera, y se reconocen por plantilla de ruta. El proxy suma un límite por dirección.
+  - `X-Forwarded-For` solo se cree a la dirección del proxy (`RID_TRUST_PROXY`).
   - Las subidas verifican el token antes de recibir el archivo.
   - Tamaño máximo de cuerpo, validación zod en todas las entradas y problem+json sin trazas internas.
   - Cabeceras de seguridad en toda respuesta (`nosniff`, CSP `default-src 'none'`, `no-store` salvo indicación del endpoint, HSTS).

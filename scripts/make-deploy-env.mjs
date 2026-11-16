@@ -108,8 +108,10 @@ const set = {
   RID_METRICS_TOKEN: secret(32),
   // APISIX's data_encryption key for the private keys in etcd: 16 characters (M6-01).
   RID_APISIX_KEYRING: secret(12),
-  // The API sits behind one proxy (Traefik): the caller's address comes from X-Forwarded-For.
-  RID_TRUST_PROXY: '1',
+  // The proxy's address or network (M6-01): only it may set X-Forwarded-For, the caller's address
+  // for rate limits and security events. Pass it when generating (RID_TRUST_PROXY=172.30.0.2
+  // node scripts/make-deploy-env.mjs ...); empty, the API trusts nobody (DEPLOYMENT.md).
+  RID_TRUST_PROXY: process.env.RID_TRUST_PROXY ?? '',
   RID_PROMETHEUS_URL: 'http://prometheus:9090',
   GRAFANA_ADMIN_PASSWORD: secret(16),
   GRAFANA_ROOT_URL: `${publicUrl.replace(/\/$/, '')}/grafana/`,

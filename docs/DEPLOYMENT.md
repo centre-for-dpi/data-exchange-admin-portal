@@ -302,13 +302,17 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
 
 Seguridad del API (M6-01):
-- `RID_TRUST_PROXY`: cuántos saltos de proxy creer en `X-Forwarded-For`. Es 1 en el piloto, detrás de Traefik.
-- `RID_RATE_LIMIT_PER_MINUTE` (600 por token o dirección) y `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 por usuario en subidas, versiones nuevas, solicitudes de alta e invitaciones).
+- `RID_TRUST_PROXY`: quién puede fijar `X-Forwarded-For`, la dirección del llamante en los límites y en los eventos de seguridad.
+  - La dirección del proxy o su red, separadas por comas (`172.30.0.2`). En el piloto es la dirección de Traefik en la red `edge`: `docker inspect -f '{{(index .NetworkSettings.Networks "lab-router_default").IPAddress}}' <contenedor-de-traefik>`. Si Traefik cambia de dirección al reiniciarse, se fija con `ipv4_address` en su Compose.
+  - La red completa solo si en ella no hay más contenedores que el proxy y el portal: cualquier otro podría elegir con qué dirección se registra y se limita.
+  - Un número confía en ese número de saltos, venga de donde venga: solo donde nada más que el proxy alcanza el API.
+  - Vacío (lo que genera `make-deploy-env.mjs` si no se le pasa): nadie. Los llamantes sin sesión comparten entonces la cuota de la dirección del proxy.
+- `RID_RATE_LIMIT_PER_MINUTE` (600 por usuario verificado, o por dirección sin un token válido) y `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 en subidas, versiones nuevas, solicitudes de alta, invitaciones y enrolamiento de nodos).
 
-**Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`, y el API está en las tres; ver `ARCHITECTURE.md §12`.
+**Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`. El API no está en `providers`: comparte con el runner de contrato la red `runner`, solo de ellos dos. Ver `ARCHITECTURE.md §12`.
 
 **Desplegar M6-01 sobre un piloto existente:**
-1. Agregar `RID_APISIX_KEYRING` (16 caracteres al azar) y `RID_TRUST_PROXY=1` al `.env`.
+1. Agregar `RID_APISIX_KEYRING` (16 caracteres al azar) y `RID_TRUST_PROXY` (la dirección de Traefik, arriba) al `.env`.
 2. Recrear todo con `up -d`: cambian las redes.
 3. Aplicar al realm `rid-portal` ya importado la política de contraseñas, las URIs exactas y los eventos (con `kcadm`, como en §3.3), y las URIs exactas al realm `rid-citizens`.
 4. Si el Traefik es propio, agregar los límites `rid-rate-api` y `rid-rate-auth` de `infra/edge/rid.yml.template`.

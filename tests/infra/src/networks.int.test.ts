@@ -60,9 +60,21 @@ describe('network segmentation of the stack (M6-01)', () => {
     });
 
     it(`${name}: upstreams and the contract runner reach neither the control plane nor the platform`, () => {
-      for (const service of ['mock-salud', 'mock-socioeconomico', 'contract-runner', 'mock-node']) {
+      for (const service of ['mock-salud', 'mock-socioeconomico', 'mock-node']) {
         expect(networksOf(compose, service), service).toEqual(['providers']);
       }
+      expect(networksOf(compose, 'contract-runner')).toEqual(
+        name === 'pilot' ? ['providers', 'runner'] : ['providers'],
+      );
     });
   }
+
+  it('pilot: no upstream reaches the API without the proxy', () => {
+    const [, pilot] = stacks[1];
+    expect(networksOf(pilot, 'api')).toEqual(['default', 'edge', 'gateway', 'runner']);
+    const onRunner = Object.keys(pilot.services).filter((s) =>
+      networksOf(pilot, s).includes('runner'),
+    );
+    expect(onRunner.sort()).toEqual(['api', 'contract-runner']);
+  });
 });

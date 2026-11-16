@@ -132,6 +132,7 @@ services:
   contract-runner:
     <<: *no-ports
     restart: unless-stopped
+    networks: [providers, runner]
 
   wg-hub:
     restart: unless-stopped
@@ -171,10 +172,12 @@ services:
         condition: service_healthy
       tsa:
         condition: service_started
+    # Not on providers (M6-01): a container there could reach the API without the proxy. The
+    # contract runner, the only one there it calls, shares a network of its own with it.
     networks:
       default: {}
       gateway: {}
-      providers: {}
+      runner: {}
       edge:
         aliases: [rid-portal-api]
 
@@ -225,6 +228,8 @@ volumes:
   api-documents:
 
 networks:
+  # The API and the contract runner only (the runner's results come back to the API).
+  runner:
   edge:
     name: ${TRAEFIK_NETWORK:-lab-router_default}
     external: true
