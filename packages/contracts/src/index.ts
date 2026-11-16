@@ -12,3 +12,4 @@ export * from './entities.js';
 export * from './notifications.js';
 export * from './nodes.js';
 export * from './bootcamp.js';
+export * from './usage.js';

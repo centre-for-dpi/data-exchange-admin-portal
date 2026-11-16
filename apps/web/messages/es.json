@@ -1234,5 +1234,73 @@
     "subject": "Titular de los datos",
     "description": "Descripción",
     "generated": "Generada desde el portal el {date}."
+  },
+  "usage": {
+    "unavailable": "La analítica de uso no está disponible en este momento. El tráfico del gateway no se afecta; vuelve a intentarlo más tarde.",
+    "badPeriod": "El periodo no es válido: la fecha inicial debe ser anterior a la final y el periodo no puede pasar de un año.",
+    "reset": "Ver los últimos 30 días",
+    "periodLine": "Del {from} al {to}, en la hora de {timeZone}. Solo metadatos de las llamadas: nunca la ruta, la consulta ni el contenido.",
+    "noCalls": "No hay llamadas en este periodo.",
+    "unknownConsumer": "Sin identificar (token inválido o cliente desconocido)",
+    "noOperation": "Ninguna (negada antes de identificar la operación)",
+    "filters": {
+      "label": "Filtros del uso",
+      "presets": "Periodos rápidos",
+      "lastDays": "Últimos {days} días",
+      "from": "Desde",
+      "to": "Hasta",
+      "apply": "Aplicar",
+      "api": "API",
+      "allApis": "Todas las APIs",
+      "application": "Aplicación",
+      "allApplications": "Todas las aplicaciones",
+      "environment": "Entorno",
+      "production": "Producción",
+      "sandbox": "Sandbox (datos sintéticos)"
+    },
+    "stats": {
+      "calls": "Llamadas",
+      "ok": "Respuestas exitosas (2xx)",
+      "denied": "Negadas por el gateway",
+      "deniedHint": "No llegaron al proveedor",
+      "errors": "Errores",
+      "errorsHint": "{client} de cliente (4xx) y {server} de servidor (5xx)",
+      "p50": "Latencia mediana",
+      "p95": "Latencia p95"
+    },
+    "chart": {
+      "title": "Llamadas por día",
+      "point": "{date}: {calls} llamadas, {errors} con error",
+      "calls": "llamadas",
+      "errors": "con error",
+      "asTable": "Ver los datos como tabla",
+      "date": "Día",
+      "callsHeader": "Llamadas",
+      "errorsHeader": "Con error"
+    },
+    "columns": {
+      "consumer": "Entidad consumidora",
+      "purpose": "Finalidad",
+      "api": "API y versión",
+      "operation": "Operación",
+      "calls": "Llamadas",
+      "errors": "Con error",
+      "p95": "Latencia p95",
+      "status": "Código de respuesta",
+      "application": "Aplicación",
+      "provider": "Entidad proveedora",
+      "reason": "Razón",
+      "denials": "Negadas"
+    },
+    "provided": {
+      "title": "Uso de mis APIs",
+      "lead": "Quién llama a las APIs de tu entidad, para qué finalidad, a qué operaciones y cómo responden.",
+      "link": "Ver el uso",
+      "noAccess": "El uso de las APIs lo ven quienes administran, publican o responden por los datos de la entidad.",
+      "byConsumer": "Por entidad consumidora",
+      "byPurpose": "Por finalidad",
+      "byOperation": "Por operación",
+      "byStatus": "Por código de respuesta"
+    }
   }
 }

@@ -686,7 +686,11 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **OpenSearch.** El API mantiene la plantilla `rid-access` (tipada, `dynamic: strict`) y la retención ISM desde `retention.accessLogMonths`, como un reconciliador más (`sync_state`).
     - **Error log de nginx** (lo pendiente de §8). Va por syslog a `fluent-bit-errors`, que enmascara la línea de la petición, la URI del upstream y los números.
     - **Pruebas.** Cubren el filtro en un Fluent Bit real (`tests/infra`), el pipeline completo con la llamada permitida y la negada (`apps/api/src/analytics/access-log.int.test.ts`: ningún documento tiene la ruta, la query ni el número) y el error enmascarado.
-- [ ] **M5-02 — Uso para proveedores**: llamadas por consumidor, finalidad, operación, códigos de respuesta, latencia; filtros por fecha.
+- [x] **M5-02 — Uso para proveedores**: llamadas por consumidor, finalidad, operación, códigos de respuesta, latencia; filtros por fecha.
+  - _Notas de implementación:_ endpoint `GET /entities/:id/usage/provided?from&to&apiId&environment`, con el permiso `usage.provided.read` (los mismos roles que la bandeja de solicitudes, más el operador y el regulador). Pantalla `/my-apis/usage`.
+    - **Contenido.** Totales: exitosas, negadas por el gateway, errores 4xx/5xx y latencia p50/p95. Llamadas por día, en la zona del país. Desgloses por entidad consumidora, finalidad, operación (con p95) y código.
+    - **Sandbox aparte.** El tráfico del sandbox se ve por separado: es otra ruta.
+    - **Interpretación.** "Latencia" es la del gateway (`latency_ms`); la del proveedor queda en el log (`upstream_latency_ms`) para M5-04. Una llamada sin consumidor identificable (401) aparece como "sin identificar".
 - [ ] **M5-03 — Uso para consumidores**: llamadas por aplicación y API, errores de autorización con su razón.
 - [ ] **M5-04 — Indicadores de la red**: los de `SPEC.md §8` para regulador y operador.
 - [ ] **M5-05 — Mapa de intercambios**: grafo entidad consumidora → entidad proveedora con volumen.

@@ -36,11 +36,23 @@ export default async function MyApisPage({ params }: PageProps) {
 
   const canWrite = entity.roles.includes('api_publisher');
   const page = await apiGetAll(`/entities/${entity.entity.id}/apis`, apiPageSchema);
-  const newApi = canWrite ? (
-    <Button asChild>
-      <Link href="/my-apis/new">{t('myApis.newApi')}</Link>
-    </Button>
-  ) : null;
+  const seesUsage = entity.roles.some((r) =>
+    ['data_steward', 'entity_admin', 'entity_viewer', 'api_publisher'].includes(r),
+  );
+  const newApi = (
+    <div className="flex flex-wrap items-center gap-3">
+      {seesUsage && (
+        <Link href="/my-apis/usage" className="link">
+          {t('usage.provided.link')}
+        </Link>
+      )}
+      {canWrite && (
+        <Button asChild>
+          <Link href="/my-apis/new">{t('myApis.newApi')}</Link>
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <Page>

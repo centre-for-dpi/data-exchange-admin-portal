@@ -18,6 +18,8 @@ import { ApisService } from './apis/apis.service.js';
 import { VersionLifecycleService } from './apis/version-lifecycle.service.js';
 import { AccessLogIndexReconciler } from './analytics/access-log-index.js';
 import { HttpOpenSearch, OPENSEARCH, openSearchUrl } from './analytics/opensearch.js';
+import { UsageController } from './analytics/usage.controller.js';
+import { UsageService } from './analytics/usage.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CatalogController } from './catalog/catalog.controller.js';
 import { CatalogService } from './catalog/catalog.service.js';
@@ -117,6 +119,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     NodeControlController,
     BootcampController,
     AdminBootcampController,
+    UsageController,
   ],
   providers: [
     StorageService,
@@ -158,6 +161,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     CitizenGuard,
     { provide: OPENSEARCH, useFactory: () => new HttpOpenSearch(openSearchUrl()) },
     AccessLogIndexReconciler,
+    UsageService,
     {
       provide: CITIZEN_TOKEN_VERIFIER,
       useFactory: () => createCitizenTokenVerifier(citizenTokenOptions()),

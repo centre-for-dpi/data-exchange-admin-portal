@@ -1,0 +1,119 @@
+import { randomUUID } from 'node:crypto';
+import { expect, type Page, test } from '@playwright/test';
+import { openCatalogApi, publishNewApi, signIn } from './flows';
+import { expectNoAccessibilityViolations } from './helpers';
+
+const OPENSEARCH = process.env.RID_OPENSEARCH_URL ?? 'http://localhost:9200';
+
+/** The API and version ids of a published API, from its service-sheet link in the catalogue. */
+export async function publishedIds(page: Page, name: string) {
+  await openCatalogApi(page, name);
+  const href =
+    (await page.getByRole('link', { name: /^Ficha del servicio 1\.0/ }).getAttribute('href')) ?? '';
+  const [, apiId = '', versionId = ''] = /\/catalog\/([^/]+)\/sheet\/([^/?#]+)/.exec(href) ?? [];
+  return { apiId, versionId };
+}
+
+/** Access-log documents as Fluent Bit leaves them, into an index of the test's own. */
+export async function indexAccessLogs(index: string, docs: Array<Record<string, unknown>>) {
+  const body =
+    docs
+      .flatMap((d) => [
+        JSON.stringify({ index: { _index: index } }),
+        JSON.stringify({ request_id: randomUUID(), method: 'GET', gateway_node: 'e2e', ...d }),
+      ])
+      .join('\n') + '\n';
+  const res = await fetch(`${OPENSEARCH}/_bulk?refresh=true`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-ndjson' },
+    body,
+  });
+  expect(((await res.json()) as { errors: boolean }).errors).toBe(false);
+}
+
+export const dropIndex = (index: string) => fetch(`${OPENSEARCH}/${index}`, { method: 'DELETE' });
+
+// M5-02: usage of the entity's APIs for the provider, from the access logs.
+test.describe('usage of my APIs (M5-02)', () => {
+  const index = `rid-access-e2e-usage-${Date.now().toString(36)}`;
+  test.afterAll(async () => {
+    await dropIndex(index);
+  });
+
+  test('the data steward sees who calls the API, for what and how it answers', async ({
+    browser,
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    const slug = `uso-${Date.now().toString(36)}`;
+    const name = `Afiliación uso ${slug}`;
+    await publishNewApi(browser, { slug, name });
+    await signIn(page, 'lucia.datos', '/catalog');
+    const { apiId, versionId } = await publishedIds(page, name);
+    const route = `rid-route-${versionId}`;
+    const ok = {
+      route_id: route,
+      status: 200,
+      operation: 'getAfiliado',
+      purpose: 'eligibility_check',
+    };
+    await indexAccessLogs(index, [
+      { ...ok, ts: '2026-03-02T14:00:00Z', consumer_entity: 'programas-sociales', latency_ms: 10 },
+      { ...ok, ts: '2026-03-02T15:00:00Z', consumer_entity: 'programas-sociales', latency_ms: 20 },
+      { ...ok, ts: '2026-03-03T14:00:00Z', consumer_entity: 'programas-sociales', latency_ms: 30 },
+      {
+        route_id: route,
+        ts: '2026-03-03T15:00:00Z',
+        status: 403,
+        consumer_entity: 'programas-sociales',
+        purpose: 'benefit_targeting',
+        deny_reason: 'purpose_not_allowed',
+        latency_ms: 2,
+      },
+    ]);
+
+    await page.goto('/my-apis');
+    await page.getByRole('link', { name: 'Ver el uso' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Uso de mis APIs' })).toBeVisible();
+    // The period and the API, in the filters row.
+    await page.getByLabel('Desde').fill('2026-03-02');
+    await page.getByLabel('Hasta').fill('2026-03-03');
+    await page.getByLabel('API', { exact: true }).selectOption(apiId);
+    await page.getByRole('button', { name: 'Aplicar' }).click();
+    await page.waitForURL(/from=2026-03-02/);
+
+    const stats = page.locator('.usage-stats');
+    await expect(stats.getByText('Llamadas', { exact: true }).locator('..')).toContainText('4');
+    await expect(stats.getByText('Negadas por el gateway').locator('..')).toContainText('1');
+    const section = (title: string) =>
+      page.locator('section', { has: page.getByRole('heading', { name: title }) });
+    await expect(
+      section('Por entidad consumidora').getByRole('row', { name: /Programas Sociales/ }),
+    ).toContainText('4');
+    const byPurpose = section('Por finalidad');
+    await expect(byPurpose.getByRole('row', { name: /Verificación de requisitos/ })).toContainText(
+      '3',
+    );
+    const byOperation = section('Por operación');
+    await expect(byOperation.getByRole('row', { name: /getAfiliado/ })).toContainText('3');
+    const byStatus = section('Por código de respuesta');
+    await expect(byStatus.getByRole('row', { name: /403/ })).toContainText('1');
+    await expectNoAccessibilityViolations(page);
+
+    // The chart: each day is reachable with the keyboard and says its values.
+    const day = page.getByRole('img', { name: /: 2 llamadas/ }).first();
+    await day.focus();
+    await expect(page.locator('.usage-chart-tooltip')).toContainText('2');
+    // Every value also without hovering, in the table view.
+    await page.getByText('Ver los datos como tabla').click();
+    const table = page.locator('.usage-chart table');
+    await expect(table.getByRole('row')).toHaveCount(3);
+  });
+
+  test('a developer of a consumer entity does not see it', async ({ page }) => {
+    await signIn(page, 'carlos.dev', '/my-apis/usage');
+    await expect(
+      page.getByText('El uso de las APIs lo ven quienes administran, publican o responden'),
+    ).toBeVisible();
+  });
+});

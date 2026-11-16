@@ -1234,5 +1234,73 @@
     "subject": "Data subject",
     "description": "Description",
     "generated": "Generated from the portal on {date}."
+  },
+  "usage": {
+    "unavailable": "Usage analytics are not available right now. Gateway traffic is not affected; try again later.",
+    "badPeriod": "The period is not valid: the start date must be before the end date and the period cannot exceed a year.",
+    "reset": "See the last 30 days",
+    "periodLine": "From {from} to {to}, in {timeZone} time. Call metadata only: never the path, the query or the content.",
+    "noCalls": "No calls in this period.",
+    "unknownConsumer": "Unidentified (invalid token or unknown client)",
+    "noOperation": "None (denied before the operation was identified)",
+    "filters": {
+      "label": "Usage filters",
+      "presets": "Quick periods",
+      "lastDays": "Last {days} days",
+      "from": "From",
+      "to": "To",
+      "apply": "Apply",
+      "api": "API",
+      "allApis": "All APIs",
+      "application": "Application",
+      "allApplications": "All applications",
+      "environment": "Environment",
+      "production": "Production",
+      "sandbox": "Sandbox (synthetic data)"
+    },
+    "stats": {
+      "calls": "Calls",
+      "ok": "Successful responses (2xx)",
+      "denied": "Denied by the gateway",
+      "deniedHint": "They never reached the provider",
+      "errors": "Errors",
+      "errorsHint": "{client} client (4xx) and {server} server (5xx)",
+      "p50": "Median latency",
+      "p95": "p95 latency"
+    },
+    "chart": {
+      "title": "Calls per day",
+      "point": "{date}: {calls} calls, {errors} with an error",
+      "calls": "calls",
+      "errors": "with an error",
+      "asTable": "See the data as a table",
+      "date": "Day",
+      "callsHeader": "Calls",
+      "errorsHeader": "With an error"
+    },
+    "columns": {
+      "consumer": "Consumer entity",
+      "purpose": "Purpose",
+      "api": "API and version",
+      "operation": "Operation",
+      "calls": "Calls",
+      "errors": "With an error",
+      "p95": "p95 latency",
+      "status": "Response code",
+      "application": "Application",
+      "provider": "Provider entity",
+      "reason": "Reason",
+      "denials": "Denied"
+    },
+    "provided": {
+      "title": "Usage of my APIs",
+      "lead": "Who calls your entity's APIs, for which purpose, which operations and how they answer.",
+      "link": "See the usage",
+      "noAccess": "The usage of the APIs is visible to those who administer, publish or answer for the entity's data.",
+      "byConsumer": "By consumer entity",
+      "byPurpose": "By purpose",
+      "byOperation": "By operation",
+      "byStatus": "By response code"
+    }
   }
 }

@@ -105,6 +105,14 @@ export const ENTITY_PERMISSIONS = {
     entityRoles: ['entity_admin'],
     platformRoles: ['platform_admin'],
   },
+  /**
+   * Usage of the entity's APIs (M5-02): who calls them, for what and how they answer. Like the
+   * provider inbox: whoever looks after the entity's APIs, and the operator and the regulator.
+   */
+  'usage.provided.read': {
+    entityRoles: ['data_steward', 'entity_admin', 'entity_viewer', 'api_publisher'],
+    platformRoles: ['platform_admin', 'platform_reviewer', 'regulator'],
+  },
   /** Timeline of the entity's own objects (its APIs, subscriptions it asked for or received). */
   'audit.entity.read': {
     entityRoles: ENTITY_ROLES,
