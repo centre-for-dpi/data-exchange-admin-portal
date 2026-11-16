@@ -103,6 +103,13 @@ const set = {
   RID_GATEWAY_INTERNAL_URL: 'http://apisix:9080',
   // Access-log analytics (M5): the API reads OpenSearch and keeps its index template.
   RID_OPENSEARCH_URL: 'http://opensearch:9200',
+  // Metrics and alerts (M5-06): Prometheus scrapes the API's /metrics with this token; the
+  // indicators read the gateway's availability from Prometheus; Grafana at /grafana.
+  RID_METRICS_TOKEN: secret(32),
+  RID_PROMETHEUS_URL: 'http://prometheus:9090',
+  GRAFANA_ADMIN_PASSWORD: secret(16),
+  GRAFANA_ROOT_URL: `${publicUrl.replace(/\/$/, '')}/grafana/`,
+  GRAFANA_SERVE_FROM_SUB_PATH: 'true',
   RID_CONTRACT_RUNNER_URL: 'http://contract-runner:8096',
   RID_CONTRACT_RUNNER_TOKEN: secret(32),
   RID_CONTRACT_RUNNER_GATEWAY_URL: 'http://apisix:9080',

@@ -1,0 +1,179 @@
+# promtool test rules (M5-06): each alert of rules/rid.rules.yml fires on the series it is for,
+# and not on the healthy ones. Run by tests/infra (prometheus image).
+rule_files:
+  - ../rules/rid.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: gateway 5xx over 2 %
+    interval: 1m
+    input_series:
+      - series: 'apisix_http_status{code="200",route="r"}'
+        values: '0+97x20'
+      - series: 'apisix_http_status{code="502",route="r"}'
+        values: '0+3x20'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: RidGateway5xxRate
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: 'Más del 2 % de las respuestas del gateway son 5xx'
+              description: '3% de respuestas 5xx en los últimos 5 minutos.'
+
+  - name: gateway 5xx at 1 % is fine
+    interval: 1m
+    input_series:
+      - series: 'apisix_http_status{code="200",route="r"}'
+        values: '0+99x20'
+      - series: 'apisix_http_status{code="500",route="r"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: RidGateway5xxRate
+        exp_alerts: []
+
+  - name: gateway p95 over 200 ms
+    interval: 1m
+    input_series:
+      - series: 'apisix_http_latency_bucket{type="request",le="100"}'
+        values: '0+50x20'
+      - series: 'apisix_http_latency_bucket{type="request",le="250"}'
+        values: '0+100x20'
+      - series: 'apisix_http_latency_bucket{type="request",le="+Inf"}'
+        values: '0+100x20'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: RidGatewayLatencyHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'La latencia p95 del gateway pasa de 200 ms'
+              description: 'p95 de 235 ms en los últimos 5 minutos.'
+
+  - name: a target down
+    interval: 1m
+    input_series:
+      - series: 'up{job="api",instance="api:4000"}'
+        values: '0x10'
+      - series: 'up{job="apisix",instance="apisix:9091"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: RidTargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: api
+              instance: 'api:4000'
+            exp_annotations:
+              summary: 'api no responde a Prometheus'
+              description: 'El objetivo api:4000 lleva 2 minutos sin responder.'
+
+  - name: OPA behind the current bundle
+    interval: 1m
+    input_series:
+      - series: 'rid_opa_bundle_lag_seconds{job="api"}'
+        values: '0 0 300 300 300 300'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: RidOpaBundleBehind
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: RidOpaBundleBehind
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: api
+            exp_annotations:
+              summary: 'OPA aplica un bundle con más de 2 minutos de atraso'
+              description: 'Las suscripciones aprobadas o revocadas no llegan al gateway (5m 0s).'
+
+  - name: OPA stopped fetching the bundle
+    interval: 1m
+    input_series:
+      - series: 'last_success_bundle_request{job="opa",name="rid"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: RidOpaBundleFetchFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: opa
+              name: rid
+            exp_annotations:
+              summary: 'OPA no descarga el bundle del portal hace más de 2 minutos'
+              description: 'Última descarga exitosa hace 5m 0s.'
+
+  - name: reconciliation failing
+    interval: 1m
+    input_series:
+      - series: 'rid_sync_targets{job="api",system="apisix",status="error"}'
+        values: '2x15'
+      - series: 'rid_sync_targets{job="api",system="keycloak",status="in_sync"}'
+        values: '5x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: RidReconcileFailing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              system: apisix
+            exp_annotations:
+              summary: 'La reconciliación con apisix está fallando'
+              description: '2 objetos en error: ver la consola de sincronización del operador.'
+
+  - name: a node offline
+    interval: 1m
+    input_series:
+      - series: 'rid_nodes{job="api",status="offline"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: RidNodeOffline
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: api
+              status: offline
+            exp_annotations:
+              summary: 'Hay nodos del kit fuera de línea'
+              description: '1 nodos sin heartbeat: ver la consola de nodos.'
+
+  - name: the gateway certificate close to expiry; an application's is the entity's
+    interval: 1m
+    input_series:
+      - series: 'rid_certificate_soonest_expiry_seconds{job="api",kind="gateway"}'
+        values: '864000x70'
+      - series: 'rid_certificate_soonest_expiry_seconds{job="api",kind="application"}'
+        values: '1x70'
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: RidCertificateExpiring
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: api
+              kind: gateway
+            exp_annotations:
+              summary: 'Un certificado de tipo gateway vence en menos de 14 días'
+              description: 'Vence en 10d 0h 0m 0s.'
+
+  - name: background queue piling up
+    interval: 1m
+    input_series:
+      - series: 'rid_queue_jobs{job="api",queue="apisix.sync",state="created"}'
+        values: '150x20'
+    alert_rule_test:
+      - eval_time: 17m
+        alertname: RidQueueBacklog
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'La cola de trabajos en segundo plano se acumula'
+              description: '150 trabajos esperando desde hace 15 minutos.'

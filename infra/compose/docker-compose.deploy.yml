@@ -16,6 +16,7 @@
 #       /mail        -> rid-mailpit:8025      (Mailpit, demo mail, behind MAILPIT_UI_AUTH)
 #       /carpeta     -> rid-carpeta:3100      (reference citizen folder, MT-07)
 #       /tsa/api/v1/timestamp/certchain -> rid-tsa:3004 (the TSA certificates, for verifiers)
+#       /grafana     -> rid-grafana:3000      (operator dashboard, M5-06; Grafana's own login)
 #   - the API and the web app run in containers (apps/*/Dockerfile); the API applies migrations
 #     and the idempotent seed on start (RID_ALLOW_SEED=true).
 
@@ -77,6 +78,25 @@ services:
 
   fluent-bit-errors:
     restart: unless-stopped
+
+  prometheus:
+    <<: *no-ports
+    restart: unless-stopped
+    # The API runs in a container here: api resolves to it, not to the host.
+    extra_hosts: !reset []
+
+  alertmanager:
+    <<: *no-ports
+    restart: unless-stopped
+
+  grafana:
+    <<: *no-ports
+    restart: unless-stopped
+    # For the operator, behind the proxy at /grafana (GRAFANA_ROOT_URL with the sub-path).
+    networks:
+      default: {}
+      edge:
+        aliases: [rid-grafana]
 
   tsa:
     <<: *no-ports

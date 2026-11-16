@@ -24,6 +24,7 @@ import { HttpPrometheus, PROMETHEUS, prometheusUrl } from './analytics/prometheu
 import { UsageController } from './analytics/usage.controller.js';
 import { UsageService } from './analytics/usage.service.js';
 import { AuthModule } from './auth/auth.module.js';
+import { MetricsService } from './metrics/metrics.service.js';
 import { SyncConsoleController } from './sync/sync-console.controller.js';
 import { SyncConsoleService } from './sync/sync-console.service.js';
 import { CatalogController } from './catalog/catalog.controller.js';
@@ -168,6 +169,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     CitizenGuard,
     { provide: OPENSEARCH, useFactory: () => new HttpOpenSearch(openSearchUrl()) },
     AccessLogIndexReconciler,
+    MetricsService,
     SyncConsoleService,
     UsageService,
     IndicatorsService,

@@ -130,7 +130,18 @@ Todos corren dentro del proceso `api`. Con `RID_WORKER=off` no corre ninguno.
 | Búfer de Fluent Bit | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/metrics` | Sin reintentos acumulados |
 | Disco | `docker system df -v` | Volúmenes `rid_*` con margen |
 
-No hay alertas automáticas todavía (Prometheus y Alertmanager son M5-06; la consola de `sync_state` es M5-07). Estas comprobaciones son manuales.
+Desde M5-06 las alertas de `ARCHITECTURE.md §9` llegan por correo al operador (Alertmanager), y el tablero `RID · Operador` de Grafana resume el estado. Esta lista queda para la revisión manual y para cuando falte el perfil `observability`. La sincronización también se ve en `/operator/sync` (M5-07).
+
+| Alerta | Primera acción |
+| :-- | :-- |
+| `RidGateway5xxRate` | `dc logs fluent-bit-errors` (errores del gateway, enmascarados); el uso del proveedor afectado (`/my-apis/usage`) |
+| `RidGatewayLatencyHigh` | El panel de latencia: si sube la petición completa pero no la del gateway, es el proveedor |
+| `RidTargetDown` | `dc ps` y los logs del servicio |
+| `RidOpaBundleBehind`, `RidOpaBundleFetchFailing` | `dc logs opa`; que OPA alcance `OPA_PORTAL_URL` con su token |
+| `RidReconcileFailing` | `/operator/sync`, filtro "con problemas": el último error y reintentar |
+| `RidNodeOffline` | `/operator/nodes`; la entidad dueña del nodo recibe su propio aviso |
+| `RidCertificateExpiring` | La renovación automática falló: logs del API y `dc ps step-ca` |
+| `RidQueueBacklog` | Logs del API; SQL 2 (§4.2) |
 
 ### 4.2 Consultas de diagnóstico
 

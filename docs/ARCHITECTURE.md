@@ -347,10 +347,29 @@ deny_reason
 
 ## 9. Observabilidad
 
-Objetivo de M5-06. Hoy solo existe el plugin `prometheus` en cada ruta de APISIX (exportado en el puerto interno 9091); no hay Prometheus, Alertmanager ni `/metrics` en el API.
+M5-06. Prometheus, Alertmanager y Grafana corren en el perfil `observability`. La configuración está en `infra/prometheus`, `infra/alertmanager` e `infra/grafana`.
 
-- Métricas: plugin `prometheus` de APISIX, `/metrics` de `apps/api` (latencia por endpoint, jobs pendientes, edad del último bundle OPA, deriva de sync), métricas de OPA.
-- Alertas mínimas: gateway 5xx > 2 % 5 min, p95 de latencia del gateway > 200 ms, bundle OPA con más de 2 min de antigüedad, reconciliación fallando, nodo offline, certificado por vencer, cola pg-boss acumulada.
+- **Métricas.** Prometheus recoge tres fuentes:
+  - El plugin `prometheus` de APISIX (puerto interno 9091): `apisix_http_status`, `apisix_http_latency_bucket{type}` y `apisix_etcd_reachable`.
+  - `GET /metrics` del API (fuera de `/api/v1`, con `RID_METRICS_TOKEN`; sin token responde 404). Publica `rid_api_http_request_duration_seconds` por plantilla de ruta, nunca con ids. También publica indicadores que se leen de PostgreSQL en cada recolección: `rid_queue_jobs{queue,state}` (pg-boss), `rid_sync_targets{system,status}`, `rid_opa_bundle_lag_seconds` (cuánto lleva OPA con un bundle anterior al vigente), `rid_nodes{status}` y `rid_certificate_soonest_expiry_seconds{kind}` (gateway, nodos, aplicaciones).
+  - Las métricas de OPA, con su estado de bundles (`status.prometheus: true`: `last_success_bundle_request`).
+- **Alertas** (`infra/prometheus/rules/rid.rules.yml`, probadas con `promtool test rules` en CI y en `tests/infra`):
+
+  | Alerta | Condición |
+  | :-- | :-- |
+  | `RidGateway5xxRate` | 5xx > 2 % durante 5 min |
+  | `RidGatewayLatencyHigh` | p95 de la petición completa > 200 ms durante 5 min |
+  | `RidTargetDown` | APISIX, el API u OPA sin responder a Prometheus durante 2 min |
+  | `RidOpaBundleBehind` | OPA con más de 2 min de atraso respecto del bundle vigente |
+  | `RidOpaBundleFetchFailing` | OPA sin descargar el bundle desde hace más de 2 min |
+  | `RidReconcileFailing` | objetos de `sync_state` en `error` durante 10 min |
+  | `RidNodeOffline` | nodos fuera de línea durante 5 min |
+  | `RidCertificateExpiring` | certificado del gateway o de un nodo a menos de 14 días; se renuevan solos, así que esto es una renovación que falla |
+  | `RidQueueBacklog` | más de 100 trabajos esperando durante 15 min |
+
+- **Alertmanager** agrupa por alerta, sistema y tipo, y avisa por correo al operador: Mailpit en desarrollo y en el piloto, el SMTP del operador en producción.
+- **Grafana** tiene un tablero de operador aprovisionado desde archivo (`RID · Operador`), con gateway, política, sincronización, cola, nodos, certificados y alertas activas. Su login es el propio de Grafana y es AGPL en su propio contenedor. Los colores del tablero siguen los umbrales de las alertas.
+- **Disponibilidad del gateway.** Es el indicador de `SPEC.md §8` y se calcula como `avg_over_time(up{job="apisix"})`: el API la lee de Prometheus con `RID_PROMETHEUS_URL`.
 
 ## 10. Contrato con el kit (nodos)
 

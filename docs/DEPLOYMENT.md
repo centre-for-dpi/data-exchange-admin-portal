@@ -65,6 +65,9 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `mock-node` | `rid/mock-node:dev` (build local, `infra/mock-node`) | 8443 en su dirección del túnel | no se publica | anónimo | `nodes` | — |
 | `opensearch` | `opensearchproject/opensearch:3.9.0` | 9200 | `OPENSEARCH_PORT` 9200 | `opensearch-data` | `observability` | `_cluster/health` amarillo |
 | `fluent-bit` | `fluent/fluent-bit:5.1.5-debug` | 9880 (HTTP), 2020 | no se publica | — | `observability` | `GET /api/v1/health` en 2020 |
+| `prometheus` | `prom/prometheus:v3.15.1` | 9090 | `PROMETHEUS_PORT` 9090 en `127.0.0.1` | `prometheus-data` | `observability` | `GET /-/ready` |
+| `alertmanager` | `prom/alertmanager:v0.34.2` | 9093 | `ALERTMANAGER_PORT` 9093 en `127.0.0.1` | `alertmanager-data` | `observability` | `GET /-/ready` |
+| `grafana` | `grafana/grafana:13.3.0` (AGPL, contenedor propio) | 3000 | `GRAFANA_PORT` 3001 en `127.0.0.1` | `grafana-data` | `observability` | `GET /api/health` |
 | `api` | `rid/portal-api:deploy` (`apps/api/Dockerfile`) | 4000 | — (en dev corre en el host) | `api-documents`, `step-ca-data` (solo `certs/`, lectura) | solo piloto | `GET /api/v1/health` |
 | `web` | `rid/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (en dev corre en el host) | — | solo piloto | `GET /api/auth/providers` |
 | `carpeta` | `rid/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (en dev corre en el host) | `carpeta-data` | solo piloto | — |
@@ -200,6 +203,17 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 - **Al desplegar M5 sobre un OpenSearch que ya tenía datos:** los índices `rid-access-*` anteriores tienen un mapeo dinámico (números como texto) que la plantilla no cambia. En el piloto se borran: `curl -X DELETE 'http://opensearch:9200/rid-access-*'`, desde un contenedor de la red. Son logs de la demo.
 - `pnpm infra:up:core` levanta todo sin este perfil. Las rutas siguen enviando a `fluent-bit:9880`; sin ese servicio, esos logs se pierden y el tráfico no se afecta.
 
+### 3.8.1 Métricas y alertas: Prometheus, Alertmanager y Grafana (perfil `observability`, M5-06)
+
+**Función de `prometheus` en el despliegue.** Recoge las métricas de APISIX, del API (`GET /metrics` con `RID_METRICS_TOKEN`) y de OPA, y evalúa las alertas de `ARCHITECTURE.md §9`. También da al API la disponibilidad del gateway, que es uno de los indicadores de la red. Sin él no hay alertas y ese indicador queda "sin datos"; el tráfico no se afecta.
+
+**Función de `alertmanager` en el despliegue.** Agrupa las alertas y las manda por correo al operador. En desarrollo y en el piloto llegan a Mailpit (`operaciones@rid.example`). En producción se monta un `alertmanager.yml` propio con el SMTP y la dirección del operador.
+
+**Función de `grafana` en el despliegue.** Muestra el tablero del operador (`RID · Operador`), aprovisionado desde `infra/grafana`, sin edición en la interfaz: los cambios van por el repositorio. Su usuario es `admin`, con `GRAFANA_ADMIN_PASSWORD`. En el piloto queda detrás del proxy en `/grafana` (`GRAFANA_ROOT_URL`, `GRAFANA_SERVE_FROM_SUB_PATH=true`).
+
+- Prometheus no expande variables en su configuración. Su entrada escribe `RID_METRICS_TOKEN` en el archivo que lee su trabajo `api` (`credentials_file`). En desarrollo, `api` apunta al API del host (`extra_hosts`); en el piloto, al contenedor.
+- Retención de métricas: `PROMETHEUS_RETENTION` (30 días por defecto).
+
 ### 3.9 Mailpit
 
 **Función en el despliegue.** Hace de servidor de correo de pruebas: captura todo el correo saliente sin entregarlo a nadie y lo muestra en una bandeja web. Eso incluye las invitaciones, las notificaciones del portal, los anclajes enviados a los reguladores, los correos de verificación y recuperación de Keycloak y los avisos de la carpeta ciudadana. Ocupa el lugar del SMTP real del operador.
@@ -287,6 +301,13 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
 
 Analítica (M5): `RID_OPENSEARCH_URL` (OpenSearch como lo alcanza el API) y opcional `RID_OPENSEARCH_AUTH`.
+
+Métricas y alertas (M5-06):
+- `RID_METRICS_TOKEN`, el token con que Prometheus lee `/metrics` del API; sin él, el endpoint no existe.
+- `RID_PROMETHEUS_URL`, Prometheus como lo alcanza el API, para la disponibilidad del gateway.
+- `GRAFANA_ADMIN_PASSWORD`, y en el piloto `GRAFANA_ROOT_URL` y `GRAFANA_SERVE_FROM_SUB_PATH`.
+
+`make-deploy-env` las genera.
 
 Validaciones al enviar a revisión (M4-06): `RID_VALIDATION_TOKEN` (las rutas de verificación de APISIX solo existen con él), `RID_GATEWAY_INTERNAL_URL` (APISIX como lo alcanza el API), `RID_CONTRACT_RUNNER_URL` y `RID_CONTRACT_RUNNER_TOKEN` (el runner de Schemathesis), `RID_CONTRACT_RUNNER_GATEWAY_URL` (APISIX como lo alcanza el runner) y opcionales `RID_CONTRACT_MAX_EXAMPLES` (20) y `RID_CONTRACT_TIMEOUT_SECONDS` (120). Sin el token, la healthcheck falla y el operador no puede aprobar; sin el runner, la prueba de contrato se omite.
 

@@ -31,6 +31,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm license:check
+      # The alerts of ARCHITECTURE.md §9 (M5-06): each fires on its series, none on healthy ones.
+      - run: docker run --rm -v "$PWD/infra/prometheus:/p:ro" -w /p/tests --entrypoint promtool prom/prometheus:v3.15.1 test rules rid.rules.test.yml
 
   api-integration:
     name: API integration tests (PostgreSQL)

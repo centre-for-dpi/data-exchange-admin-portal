@@ -229,6 +229,74 @@ services:
       # The -debug image ships curl; the plain image has no tools at all.
       test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:2020/api/v1/health']
 
+  # Metrics and alerts (ARCHITECTURE.md §9, M5-06): Prometheus scrapes the gateway, the portal
+  # API (with RID_METRICS_TOKEN) and OPA, and evaluates the alerts of infra/prometheus/rules;
+  # Alertmanager mails them to the operator; Grafana shows the operator's dashboard.
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    profiles: [observability]
+    # Prometheus does not expand variables in its configuration: the token goes to the file its
+    # scrape job reads (credentials_file), then Prometheus itself runs.
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - >-
+        mkdir -p /tmp/rid && printf %s "$$RID_METRICS_TOKEN" > /tmp/rid/metrics-token &&
+        exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml
+        --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=$$PROMETHEUS_RETENTION
+    environment:
+      RID_METRICS_TOKEN: ${RID_METRICS_TOKEN:?set RID_METRICS_TOKEN in .env}
+      PROMETHEUS_RETENTION: ${PROMETHEUS_RETENTION:-30d}
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      # The portal API runs on the host during development: its scrape target is api:4000.
+      - api:host-gateway
+    ports:
+      - 127.0.0.1:${PROMETHEUS_PORT:-9090}:9090
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9090/-/ready']
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.2
+    profiles: [observability]
+    command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager']
+    volumes:
+      - ../alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - 127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9093/-/ready']
+
+  grafana:
+    # AGPL-3.0: a separate service, never linked with our code (CLAUDE.md, rule 1).
+    image: grafana/grafana:13.3.0
+    profiles: [observability]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_USERS_DEFAULT_LANGUAGE: es-ES
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001/}
+      GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_SERVE_FROM_SUB_PATH:-false}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/rid-operator.json
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - 127.0.0.1:${GRAFANA_PORT:-3001}:3000
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3000/api/health']
+
   # Transparency register (ADR-0015, MT-03): APISIX tcp-logger -> this Fluent Bit -> portal
   # collector. Base profile, separate from the analytics pipeline above: without it, citizens
   # would not see the calls. Buffers on disk and retries while the collector is unreachable.
@@ -402,3 +470,6 @@ volumes:
   transparency-buffer:
   tsa-data:
   wg-hub-data:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:

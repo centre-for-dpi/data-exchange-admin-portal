@@ -22,6 +22,9 @@ bundles:
 # The report holds bundle and plugin state, never decision inputs.
 status:
   service: portal
+  # Bundle state as Prometheus metrics on /metrics (M5-06): last_success_bundle_request and
+  # friends (Unix ns), for the stale-bundle alert.
+  prometheus: true
 
 # Decision logs are intentionally NOT configured: each decision input carries request headers
 # (Authorization, X-RID-End-User in clear). Access metadata goes through APISIX -> Fluent Bit.

@@ -1,6 +1,7 @@
 import type { Type } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { METRICS_PATH, MetricsService, metricsTokenMatches } from './metrics/metrics.service.js';
 import { AppModule } from './app.module.js';
 import { PROBLEM_CONTENT_TYPE, toProblem } from './common/problem.js';
 import { instancePath, ProblemDetailsFilter } from './common/problem.filter.js';
@@ -72,6 +73,7 @@ export function createAdapter(): FastifyAdapter {
 export async function configureApp(app: NestFastifyApplication): Promise<NestFastifyApplication> {
   app.setGlobalPrefix(API_PREFIX);
   app.useGlobalFilters(new ProblemDetailsFilter());
+  registerMetrics(app);
   await app.init();
   registerApiDocs(app, API_PREFIX);
   return app;
@@ -83,4 +85,35 @@ export async function createApp(module: Type = AppModule): Promise<NestFastifyAp
     logger: ['error', 'warn', 'log'],
   });
   return configureApp(app);
+}
+
+/**
+ * Prometheus metrics (M5-06): every request's latency by route template, and GET /metrics,
+ * outside the public prefix and only with RID_METRICS_TOKEN (404 otherwise). Before init():
+ * Fastify takes no hooks or routes once it is ready.
+ */
+function registerMetrics(app: NestFastifyApplication): void {
+  let metrics: MetricsService;
+  try {
+    metrics = app.get(MetricsService, { strict: false });
+  } catch {
+    return;
+  }
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook('onResponse', (request, reply, done) => {
+    metrics.observe(
+      request.method,
+      request.routeOptions.url,
+      reply.statusCode,
+      reply.elapsedTime / 1000,
+    );
+    done();
+  });
+  fastify.get(METRICS_PATH, async (request, reply) => {
+    if (!metricsTokenMatches(request.headers.authorization)) {
+      const problem = toProblem({ statusCode: 404 }, instancePath(request.url));
+      return reply.code(404).type(PROBLEM_CONTENT_TYPE).send(problem);
+    }
+    return reply.type(metrics.contentType).send(await metrics.metrics());
+  });
 }

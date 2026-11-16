@@ -1,0 +1,98 @@
+# Alerts of the RID portal + gateway (ARCHITECTURE.md §9, M5-06). Tested with promtool
+# (infra/prometheus/tests/rid.rules.test.yml, run by tests/infra). Texts for the operator.
+groups:
+  - name: rid-gateway
+    rules:
+      - alert: RidGateway5xxRate
+        # More than 2 % of the gateway's answers were 5xx over 5 minutes.
+        expr: |
+          sum(rate(apisix_http_status{code=~"5.."}[5m]))
+            / clamp_min(sum(rate(apisix_http_status[5m])), 1e-9) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Más del 2 % de las respuestas del gateway son 5xx'
+          description: '{{ $value | humanizePercentage }} de respuestas 5xx en los últimos 5 minutos.'
+
+      - alert: RidGatewayLatencyHigh
+        # p95 of the whole request at the gateway, upstream included, in milliseconds.
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(apisix_http_latency_bucket{type="request"}[5m]))) > 200
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'La latencia p95 del gateway pasa de 200 ms'
+          description: 'p95 de {{ $value | humanize }} ms en los últimos 5 minutos.'
+
+      - alert: RidTargetDown
+        expr: up{job=~"apisix|api|opa"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.job }} no responde a Prometheus'
+          description: 'El objetivo {{ $labels.instance }} lleva 2 minutos sin responder.'
+
+  - name: rid-policy
+    rules:
+      - alert: RidOpaBundleBehind
+        # OPA still runs an older bundle more than 2 minutes after the current one was built.
+        expr: rid_opa_bundle_lag_seconds > 120
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'OPA aplica un bundle con más de 2 minutos de atraso'
+          description: 'Las suscripciones aprobadas o revocadas no llegan al gateway ({{ $value | humanizeDuration }}).'
+
+      - alert: RidOpaBundleFetchFailing
+        # OPA has not fetched the bundle from the portal for more than 2 minutes.
+        expr: time() - last_success_bundle_request{name="rid"} / 1e9 > 120
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'OPA no descarga el bundle del portal hace más de 2 minutos'
+          description: 'Última descarga exitosa hace {{ $value | humanizeDuration }}.'
+
+  - name: rid-portal
+    rules:
+      - alert: RidReconcileFailing
+        expr: sum by (system) (rid_sync_targets{status="error"}) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'La reconciliación con {{ $labels.system }} está fallando'
+          description: '{{ $value }} objetos en error: ver la consola de sincronización del operador.'
+
+      - alert: RidNodeOffline
+        expr: rid_nodes{status="offline"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Hay nodos del kit fuera de línea'
+          description: '{{ $value }} nodos sin heartbeat: ver la consola de nodos.'
+
+      - alert: RidCertificateExpiring
+        # The gateway's certificate and the nodes' renew themselves: one this close to expiry means
+        # the renewal is failing.
+        expr: rid_certificate_soonest_expiry_seconds{kind=~"gateway|node"} < 14 * 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Un certificado de tipo {{ $labels.kind }} vence en menos de 14 días'
+          description: 'Vence en {{ $value | humanizeDuration }}.'
+
+      - alert: RidQueueBacklog
+        expr: sum(rid_queue_jobs{state=~"created|retry"}) > 100
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'La cola de trabajos en segundo plano se acumula'
+          description: '{{ $value }} trabajos esperando desde hace 15 minutos.'

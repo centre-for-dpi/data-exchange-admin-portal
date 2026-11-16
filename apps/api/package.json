@@ -42,6 +42,7 @@
     "pg": "^8.23.1",
     "pg-boss": "^12.38.1",
     "pkijs": "4.0.1",
+    "prom-client": "15.1.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "yaml": "^2.9.1",

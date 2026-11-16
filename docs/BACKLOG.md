@@ -710,7 +710,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
   - _Notas de implementación:_ endpoint `GET /network/exchanges?from&to`, con el permiso `network.map.read` (los mismos roles que los indicadores). Pantalla `/regulator/exchange-map`, enlazada desde los indicadores.
     - **Aristas.** Salen de las llamadas de producción del periodo (entidad consumidora del log, entidad proveedora de la versión de la ruta). Se unen con las suscripciones activas de aplicaciones de producción: un intercambio acordado sin llamadas también aparece, con volumen 0.
     - **Gráfico.** Grafo bipartito con las consumidoras a la izquierda y las proveedoras a la derecha. El grosor es el volumen (escala de raíz, un solo tono) y lo acordado sin llamadas va en línea punteada gris, con leyenda. Cada enlace tiene tooltip con mouse y teclado, y debajo va la tabla con todos los valores.
-- [ ] **M5-06 — Métricas y alertas**: Prometheus + Alertmanager con las alertas de `ARCHITECTURE.md §9`; Grafana con un tablero de operador.
+- [x] **M5-06 — Métricas y alertas**: Prometheus + Alertmanager con las alertas de `ARCHITECTURE.md §9`; Grafana con un tablero de operador.
+  - _Notas de implementación:_ detalle en `ARCHITECTURE.md §9` y `DEPLOYMENT.md §3.8.1`.
+    - **Métricas del API.** `GET /metrics`, fuera de `/api/v1` y solo con `RID_METRICS_TOKEN`, con `prom-client` (Apache-2.0). Publica la latencia por plantilla de ruta y lee de PostgreSQL en cada recolección la cola, `sync_state`, el atraso del bundle de OPA, los nodos y el vencimiento más próximo de certificados. OPA publica el estado de sus bundles (`status.prometheus`).
+    - **Alertas.** Son las nueve de §9, con `promtool test rules` (cada una se dispara con su serie y ninguna con las sanas) en CI y en `tests/infra`.
+    - **Alertmanager** avisa por correo al operador. Comprobado de punta a punta: `RidNodeOffline` llegó a Mailpit con los nodos fuera de línea del entorno de desarrollo.
+    - **Grafana** tiene un tablero de operador aprovisionado desde archivo, con colores por umbral de alerta.
+    - **Indicadores.** La disponibilidad del gateway de M5-04 sale de Prometheus (`RID_PROMETHEUS_URL`).
 - [x] **M5-07 — Consola de sincronización**: estado de `sync_state`, deriva detectada, reintento manual.
   - _Notas de implementación:_ `GET /admin/sync?system&status&q&cursor` (`sync.read`: `platform_admin`, `platform_reviewer`) y `POST /admin/sync/retry` (`sync.retry`: `platform_admin`). Pantalla `/operator/sync`.
     - **Deriva.** Es una escritura con el estado deseado ya aplicado; el detalle está en `ARCHITECTURE.md §4`. Columnas nuevas `drift_detected_at` y `drift_count` (migración `20261209000000`). Hoy la detectan APISIX (versiones) y Keycloak (clientes).

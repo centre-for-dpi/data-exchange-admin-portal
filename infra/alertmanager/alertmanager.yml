@@ -1,0 +1,25 @@
+# Alertmanager of the RID portal + gateway (M5-06). Groups the alerts of
+# infra/prometheus/rules/rid.rules.yml and sends them by e-mail to the operator. Development and
+# the pilot deliver to Mailpit; production mounts its own file with the operator's SMTP server and
+# address (DEPLOYMENT.md).
+global:
+  smtp_smarthost: 'mailpit:1025'
+  smtp_from: 'alertas@rid.example'
+  smtp_require_tls: false
+
+route:
+  receiver: operator
+  group_by: ['alertname', 'system', 'kind']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: ['severity="critical"']
+      receiver: operator
+      repeat_interval: 1h
+
+receivers:
+  - name: operator
+    email_configs:
+      - to: 'operaciones@rid.example'
+        send_resolved: true
