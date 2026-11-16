@@ -17,7 +17,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:pgboss-migration": "node scripts/pgboss-migration.mjs",
     "db:seed": "tsx src/seed/main.ts",
-    "test:dist": "node scripts/smoke-dist.mjs"
+    "test:dist": "node scripts/smoke-dist.mjs",
+    "traffic:simulate": "tsx src/analytics/simulate-traffic.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.4.2",

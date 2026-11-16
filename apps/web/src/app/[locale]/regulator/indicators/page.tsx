@@ -24,6 +24,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 /** Roles that see the network's indicators (network.indicators.read). */
 const ROLES = ['platform_admin', 'platform_reviewer', 'regulator'];
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+/** The APIs in use listed, the busiest first; the rest are counted. */
+const TOP_APIS = 25;
 
 /** The network's indicators (SPEC.md §8, M5-04) for the regulator and the operator. */
 export default async function IndicatorsPage({ params, searchParams }: PageProps) {
@@ -170,16 +172,23 @@ export default async function IndicatorsPage({ params, searchParams }: PageProps
       />
 
       <div className="usage-grid">
-        <BreakdownTable
-          title={t('indicators.apisInUse.table')}
-          rows={apisInUse.items}
-          rowKey={(r) => r.apiId}
-          columns={[
-            { header: t('usage.columns.api'), cell: (r) => r.apiName },
-            { header: t('usage.columns.provider'), cell: (r) => r.providerName },
-            { header: t('usage.columns.calls'), cell: (r) => n(r.calls), numeric: true },
-          ]}
-        />
+        <div className="space-y-2">
+          <BreakdownTable
+            title={t('indicators.apisInUse.table')}
+            rows={apisInUse.items.slice(0, TOP_APIS)}
+            rowKey={(r) => r.apiId}
+            columns={[
+              { header: t('usage.columns.api'), cell: (r) => r.apiName },
+              { header: t('usage.columns.provider'), cell: (r) => r.providerName },
+              { header: t('usage.columns.calls'), cell: (r) => n(r.calls), numeric: true },
+            ]}
+          />
+          {apisInUse.items.length > TOP_APIS ? (
+            <p className="text-sm text-muted-foreground">
+              {t('indicators.apisInUse.more', { count: apisInUse.items.length - TOP_APIS })}
+            </p>
+          ) : null}
+        </div>
         <BreakdownTable
           title={t('indicators.successful.refusedTable')}
           rows={calls.refusedByReason}

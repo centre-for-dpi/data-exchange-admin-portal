@@ -1365,7 +1365,8 @@
       "label": "APIs in real use",
       "value": "{inUse} of {published}",
       "hint": "Published with at least one successful production call",
-      "table": "APIs in real use in the period"
+      "table": "APIs in real use in the period",
+      "more": "And {count} more APIs in real use in the period."
     },
     "approval": {
       "label": "Approval time",

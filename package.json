@@ -30,7 +30,8 @@
     "db:deploy": "pnpm --filter @rid/api db:deploy",
     "db:seed": "pnpm --filter @rid/api db:seed",
     "demo": "node scripts/demo.mjs",
-    "demo:otp": "node scripts/totp.mjs"
+    "demo:otp": "node scripts/totp.mjs",
+    "traffic:simulate": "pnpm --filter @rid/api traffic:simulate"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1365,7 +1365,8 @@
       "label": "APIs con consumo real",
       "value": "{inUse} de {published}",
       "hint": "Publicadas con al menos una llamada exitosa de producción",
-      "table": "APIs con consumo real en el periodo"
+      "table": "APIs con consumo real en el periodo",
+      "more": "Y {count} APIs más con consumo real en el periodo."
     },
     "approval": {
       "label": "Tiempo de aprobación",

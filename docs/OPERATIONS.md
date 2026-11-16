@@ -164,7 +164,8 @@ SELECT seq, tree_size, sealed_at FROM transparency_checkpoint ORDER BY seq DESC 
 | :-- | :-- | :-- |
 | API | `dc logs -f api` | Errores de reconciliación, de la CA, de la TSA |
 | OPA | `dc logs opa` | Descarga del bundle (`--log-format=json`); sin decision logs a propósito |
-| APISIX | `dc logs apisix` | Solo errores; sin access log (privacidad) |
+| APISIX | `dc logs apisix` | Solo el arranque. Sin access log (privacidad), y sus errores van a `fluent-bit-errors` |
+| Errores del gateway | `dc logs fluent-bit-errors` | El error log de nginx, con la línea de la petición, la URI del upstream y los números enmascarados (M5-01) |
 | Keycloak | `dc logs keycloak` | Arranque e importación de realms |
 
 Los logs no contienen cuerpos, rutas reales ni query strings, y no deben contenerlos. Si se ve un número de documento en un log, es un incidente de privacidad (regla 2 de `CLAUDE.md`).
@@ -192,7 +193,15 @@ dc restart <servicio>        # o: dc up -d <servicio> si cambió su configuraci�
 
 ### 5.2 Forzar la reconciliación
 
-No hay botón todavía (M5-07). Reiniciar el API lanza una reconciliación completa de APISIX y Keycloak; si no, la pasada periódica corre cada 5 minutos. **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte (regla 5).
+En la consola de sincronización (`/operator/sync`, M5-07), un `platform_admin` reintenta un objeto: se encola el trabajo de su reconciliador. La consola también muestra la deriva que se encontró, es decir, cambios hechos fuera del portal que el reconciliador deshizo. Reiniciar el API lanza una reconciliación completa de APISIX y Keycloak; si no, la pasada periódica corre cada 5 minutos. **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte (regla 5).
+
+### 5.2.1 Tráfico sintético para demos
+
+`pnpm traffic:simulate [--from AAAA-MM-DD] [--days 30] [--scale 1] [--seed 42]` genera un mes de llamadas simuladas de las suscripciones activas de producción, para mostrar los indicadores, el uso y el mapa de intercambios sin tráfico real. Las llamadas tienen patrón de días hábiles y horario de oficina, negaciones con su razón y errores del proveedor.
+
+- **Dónde quedan.** Escribe documentos con la forma del log de acceso en `rid-access-synthetic-AAAA.MM`, con `gateway_node: synthetic`. Nunca hacen llamadas reales ni llevan datos personales.
+- **Borrarlo.** `--clear` borra todo; `--tag` lo separa (las pruebas usan uno propio).
+- **Restricción.** Solo desarrollo y demos: en producción exige `RID_ALLOW_SYNTHETIC_TRAFFIC=true`. En el piloto se corre dentro del contenedor del API.
 
 ### 5.3 Cambios en un realm de Keycloak existente
 

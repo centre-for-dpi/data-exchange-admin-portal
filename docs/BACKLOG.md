@@ -724,6 +724,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
 **Cierre M5:** el regulador ve los indicadores de un mes simulado (generador de tráfico sintético).
 
+- _Hecho (`apps/web/e2e/closing-m5.spec.ts`, verde):_
+  1. `pnpm traffic:simulate` genera octubre de 2025 para las suscripciones activas de la red, bajo una etiqueta propia;
+  2. el regulador ve los indicadores del mes: consultas exitosas (entre 90 % y 100 %), APIs con consumo real, las negaciones por razón y el mapa de intercambios, con axe sin violaciones;
+  3. la responsable de datos de salud ve quién consume sus APIs ese mes, y el desarrollador de programas sociales ve las negaciones de sus aplicaciones con su razón;
+  4. la etiqueta se borra al terminar.
+- Disponibilidad del gateway: "sin datos" hasta que Prometheus (M5-06) lleve tiempo midiendo. El generador no la simula.
+
 ---
 
 ## M6 — Endurecimiento y producción
