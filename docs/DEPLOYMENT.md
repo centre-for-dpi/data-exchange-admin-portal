@@ -309,6 +309,7 @@ Seguridad del API (M6-01):
   - La red completa solo si en ella no hay más contenedores que el proxy y el portal: cualquier otro podría elegir con qué dirección se registra y se limita.
   - Un número confía en ese número de saltos, venga de donde venga: solo donde nada más que el proxy alcanza el API.
   - Vacío (lo que genera `make-deploy-env.mjs` si no se le pasa): nadie. Los llamantes sin sesión comparten entonces la cuota de la dirección del proxy.
+- `RID_LOG_FORMAT`: `text` (por omisión) o `json`, un objeto por línea para un colector de logs (el chart de Helm fija `json`). Las líneas van enmascaradas en los dos formatos (`ARCHITECTURE.md §8`).
 - `RID_RATE_LIMIT_PER_MINUTE` (600 por usuario verificado, o por dirección sin un token válido) y `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 en subidas, versiones nuevas, solicitudes de alta, invitaciones y enrolamiento de nodos).
 
 **Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`. El API no está en `providers`: comparte con el runner de contrato la red `runner`, solo de ellos dos. Ver `ARCHITECTURE.md §12`.

@@ -132,6 +132,8 @@ Bit run in every gateway pod, on 127.0.0.1).
 - { name: NODE_ENV, value: production }
 - { name: API_PORT, value: {{ .Values.api.port | quote }} }
 - { name: RID_COUNTRY, value: {{ .Values.country | quote }} }
+# One masked JSON object per line, for the cluster's log collector (ASVS 16.4.3).
+- { name: RID_LOG_FORMAT, value: json }
 - { name: RID_WEB_URL, value: {{ .Values.publicUrl | quote }} }
 - { name: KEYCLOAK_URL, value: {{ printf "%s/auth" .Values.publicUrl | quote }} }
 - { name: RID_CITIZEN_ISSUER, value: {{ printf "%s/auth/realms/rid-citizens" .Values.publicUrl | quote }} }

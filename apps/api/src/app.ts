@@ -15,6 +15,7 @@ import {
   SUBJECT_ACCESS_BODY_LIMIT_BYTES,
   SUBJECT_ACCESS_PATH,
 } from './transparency/subject-access.controller.js';
+import { RidLogger, logFormat } from './common/logger.js';
 
 export const API_PREFIX = 'api/v1';
 /** Maximum JSON body (CLAUDE.md, ARCHITECTURE.md §12). Document uploads get their own limit. */
@@ -140,7 +141,8 @@ export async function configureApp(app: NestFastifyApplication): Promise<NestFas
 /** Builds and initialises the application without listening. */
 export async function createApp(module: Type = AppModule): Promise<NestFastifyApplication> {
   const app = await NestFactory.create<NestFastifyApplication>(module, createAdapter(), {
-    logger: ['error', 'warn', 'log'],
+    // Masked lines, JSON with RID_LOG_FORMAT=json (common/logger.ts).
+    logger: new RidLogger(logFormat(), ['error', 'warn', 'log']),
   });
   return configureApp(app);
 }
