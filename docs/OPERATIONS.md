@@ -2,7 +2,7 @@
 
 Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en curso)
 
-Qué hace cada componente al arrancar, qué tiene que hacer o correr el operador para dejarlo operativo, cómo comprobar que funciona y qué revisar en el día a día. Cómo se despliega cada pieza está en [`DEPLOYMENT.md`](DEPLOYMENT.md). El runbook completo de incidentes, rotación de la CA intermedia y revocación masiva es M6-07.
+Qué hace cada componente al arrancar, qué tiene que hacer o correr el operador para dejarlo operativo, cómo comprobar que funciona y qué revisar en el día a día. Cómo se despliega cada pieza está en [`DEPLOYMENT.md`](DEPLOYMENT.md). El alta de entidades, la respuesta a incidentes, la rotación de la CA intermedia y la revocación masiva de certificados están en el runbook del operador ([`RUNBOOK.md`](RUNBOOK.md)).
 
 ## 0. Convenciones
 
@@ -311,7 +311,7 @@ La rotación y la revocación de los secretos y certificados de las aplicaciones
 | `RID_TRANSPARENCY_SIGNING_JWK` | Clave nueva con otro `kid`; la pública anterior va a `RID_TRANSPARENCY_RETIRED_JWKS`. Procedimiento completo pendiente para producción |
 | Certificados del gateway (servidor y clientes hacia proveedores) | Los renueva solo el reconciliador de APISIX; para forzarlo, reiniciar el API tras borrar la fila de `gateway_certificate` correspondiente |
 | `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | **No se rotan**: rompen el vínculo con los registros anteriores (`DEPLOYMENT.md §4.1`) |
-| CA intermedia | Runbook de M6-07 |
+| CA intermedia | `RUNBOOK.md §3` |
 
 ## 6. Respaldos
 

@@ -927,6 +927,7 @@ sudo ./install.sh</code></pre></div>
       <ul class="ticks">
         <li><b>Cada día:</b> servicios sanos, nada fuera de sincronía con el gateway (Consola del operador → Sincronización del gateway), cadena de auditoría íntegra (Consola → Auditoría → "Verificar integridad") y registro de transparencia íntegro.</li>
         <li><b>Alertas:</b> con la observabilidad activada llegan por correo (en el piloto, a <code>/mail</code>). El tablero está en <code>/grafana/</code>.</li>
+        <li><b>Incidentes, rotación de la CA intermedia y revocación masiva de certificados:</b> el runbook del operador (<code>docs/RUNBOOK.md</code>). La revocación masiva está en la consola: "Revocación masiva de certificados".</li>
         <li><b>Nunca</b> se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte. Si algo no cuadra, se mira "Sincronización del gateway" en la consola del operador y se reintenta desde ahí.</li>
       </ul>
     </section>

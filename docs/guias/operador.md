@@ -239,6 +239,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 - **Respaldos:** la base se respalda sola (pgBackRest): cada cambio queda archivado a los pocos minutos y hay un respaldo cada día, con un mes de historia. `sudo ./install.sh backup` antes de cada actualización y con regularidad, para llevar una copia fuera del servidor. Guarda también fuera del servidor la clave `PGBACKREST_REPO1_CIPHER_PASS` del `.env`: sin ella no se restaura nada.
 - **Restaurar:** `sudo ./install.sh restore` vuelve al último estado; `sudo ./install.sh restore "2026-11-20 14:30:00-05"`, a ese instante (`OPERATIONS.md §6`).
 - **Actualizar:** `sudo ./install.sh update`, que respalda, actualiza, recompila y reinicia.
+- **Incidentes, rotación de la CA intermedia y revocación masiva de certificados:** el runbook del operador (`RUNBOOK.md`). La revocación masiva está en la consola: Revocación masiva de certificados.
 - **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte. Si algo no cuadra, se mira `sync_state` (`OPERATIONS.md §4.2`).
 - **Alertas** (con la observabilidad activada): Prometheus vigila el gateway, el API y OPA, y Alertmanager avisa por correo al operador (en el piloto, a `/mail`) cuando hay muchos 5xx o latencia alta, un servicio no responde, OPA se atrasa con la política, falla una reconciliación, hay nodos fuera de línea, vence pronto un certificado o se acumula la cola de trabajos. El tablero del operador está en `https://<portal>/grafana/`.
 

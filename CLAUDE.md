@@ -27,6 +27,7 @@ Documentos que mandan (léelos antes de tocar un área):
 | `docs/adr/` | Decisiones tomadas. No las contradigas sin escribir un ADR nuevo |
 | `docs/DEMO.md` | Guion de la demo del hito M1 |
 | `docs/DEPLOYMENT.md` / `docs/OPERATIONS.md` | Despliegue por componente; puesta en marcha y operación. Actualízalos si cambias un servicio, una variable de entorno, un volumen o un paso manual |
+| `docs/RUNBOOK.md` | Runbook del operador: alta de entidad, incidentes, rotación de la CA intermedia, revocación masiva |
 
 ## Reglas de oro (no negociables)
 

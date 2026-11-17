@@ -4,9 +4,9 @@
 The network's CA (ARCHITECTURE §11): issues the applications', the gateway's and the nodes'
 certificates. Its root is offline: the operator brings the root's certificate and the intermediate
 (certificate and key, encrypted with the CA's password) in the Secret stepCa.pkiSecret; the root
-key never reaches the cluster. On its first start, `configure` writes ca.json from them and creates
-the three provisioners of infra/step-ca/configure.sh (same templates and durations); later starts
-keep it. One replica on its own disk: issuance is not on the call path (the gateway serves with
+key never reaches the cluster. On every start `configure` copies them from the Secret; on the first
+it also writes ca.json and creates the three provisioners of infra/step-ca/configure.sh (same
+templates and durations), which later starts keep. One replica on its own disk: issuance is not on the call path (the gateway serves with
 certificates it already holds).
 */}}
 apiVersion: v1
@@ -26,10 +26,12 @@ data:
     set -eu
     STEPPATH=/home/step
     CONFIG="$STEPPATH/config/ca.json"
-    if [ -f "$CONFIG" ]; then echo "ca.json exists: kept"; exit 0; fi
     mkdir -p "$STEPPATH/config" "$STEPPATH/certs" "$STEPPATH/secrets" "$STEPPATH/db"
+    # The PKI Secret is the source of truth on every start, not only the first: rotating the
+    # intermediate is replacing it in stepCa.pkiSecret and restarting (RUNBOOK.md §3).
     cp /pki/root_ca.crt /pki/intermediate_ca.crt "$STEPPATH/certs/"
     cp /pki/intermediate_ca_key "$STEPPATH/secrets/intermediate_ca_key"
+    if [ -f "$CONFIG" ]; then echo "ca.json exists: kept, PKI refreshed"; exit 0; fi
     printf %s "$RID_STEP_CA_PROVISIONER_PASSWORD" > /tmp/password
     cat > "$CONFIG" <<EOF
     {
