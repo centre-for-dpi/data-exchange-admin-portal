@@ -32,11 +32,11 @@ El Portal DEN gobierna una red de intercambio de datos entre entidades públicas
 
 ### 2.1 Roles de plataforma (no pertenecen a una entidad)
 
-| Rol | Quién (Colombia) | Puede |
+| Rol | Quién (típicamente) | Puede |
 | :-- | :-- | :-- |
-| `platform_admin` | Equipo técnico del operador (AND) | Todo lo operativo: aprobar entidades, revisar y publicar APIs, gestionar nodos, suspender cualquier cosa, ver toda la analítica |
+| `platform_admin` | Equipo técnico del operador (la agencia digital nacional o equivalente) | Todo lo operativo: aprobar entidades, revisar y publicar APIs, gestionar nodos, suspender cualquier cosa, ver toda la analítica |
 | `platform_reviewer` | Analistas del operador | Revisar publicaciones y altas de entidades; no gestiona infraestructura |
-| `regulator` | MinTIC | Ver todo en solo lectura; aprobar publicaciones y suscripciones cuando la política lo exige (datos sensibles); ver indicadores; exportar auditoría |
+| `regulator` | La autoridad que gobierna la red (por ejemplo, el ministerio a cargo del gobierno digital) | Ver todo en solo lectura; aprobar publicaciones y suscripciones cuando la política lo exige (datos sensibles); ver indicadores; exportar auditoría |
 | `auditor` | Órganos de control, auditor externo | Solo lectura de auditoría y analítica; sin acceso a configuración |
 
 ### 2.2 Roles dentro de una entidad
@@ -57,7 +57,7 @@ Puede ver la página pública del catálogo **solo** si `features.publicCatalog:
 
 ### 2.4 Titular de los datos (ciudadano)
 
-No usa el portal. Ve **quién consultó sus datos**, cuándo, qué dato, para qué y con qué funcionario (como referencia), desde la Carpeta Ciudadana Digital del país, autenticado con la identidad digital nacional. También activa avisos y descarga un comprobante verificable de cada consulta. En esta versión solo ve las consultas que pasan por el gateway (ADR-0015).
+No usa el portal. Ve **quién consultó sus datos**, cuándo, qué dato, para qué y con qué funcionario (como referencia), desde la app ciudadana del país (en Colombia, la Carpeta Ciudadana Digital), autenticado con la identidad digital nacional. También activa avisos y descarga un comprobante verificable de cada consulta. En esta versión solo ve las consultas que pasan por el gateway (ADR-0015).
 
 ## 3. Modelo de dominio
 
@@ -212,7 +212,7 @@ enrollment_issued → enrolled → online ⇄ offline
 1. Al publicar una versión de una API `personal` o `sensitive`, cada operación declara dónde está el titular (`x-den-data-subject`) o que no tiene titular (`none`).
 2. En cada llamada autorizada, el gateway calcula un seudónimo del titular y registra la consulta: entidad y aplicación que consultaron, entidad proveedora, API y datos expuestos, operación, finalidad, funcionario (hash), fecha y resultado. Nunca registra el contenido ni el número de documento.
 3. Las consultas se agrupan en lotes sellados (firma del operador y sello de tiempo de una TSA independiente). Cada consulta tiene un comprobante que cualquiera puede verificar.
-4. El ciudadano ve sus consultas en la Carpeta Ciudadana Digital. El portal solo responde a la Carpeta con el token del ciudadano, y le avisa de consultas nuevas si el ciudadano lo pidió.
+4. El ciudadano ve sus consultas en la app ciudadana del país. El portal solo responde a esa app con el token del ciudadano, y le avisa de consultas nuevas si el ciudadano lo pidió.
 
 ## 5. Reglas de negocio transversales
 
@@ -260,10 +260,10 @@ En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobad
 ## 9. Puntos de extensión previstos
 
 - **Consentimiento:** el modelo de suscripción admite `consentRequired: bool`. Cuando se active, OPA consultará un servicio de consentimiento antes de permitir. No se implementa en el MVP; la interfaz de política ya recibe la cabecera `X-DEN-Consent-Ref` si viene.
-- **Instancias territoriales** (p. ej. Bogotá): una instancia del gateway con su propio subconjunto de rutas, gobernada desde el mismo portal (`Gateway` como entidad de primer nivel en una versión futura).
+- **Instancias territoriales** (p. ej. una ciudad capital): una instancia del gateway con su propio subconjunto de rutas, gobernada desde el mismo portal (`Gateway` como entidad de primer nivel en una versión futura).
 - **Credenciales verificables:** una entidad proveedora podrá marcar una API como "fuente de emisión" para un emisor de credenciales; fuera del MVP.
 
-## 10. Configuración por país (ejemplo abreviado)
+## 10. Configuración por país (ejemplo abreviado: `co.yaml`)
 
 ```yaml
 country:

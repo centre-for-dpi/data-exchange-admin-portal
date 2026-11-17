@@ -200,6 +200,6 @@ Otros códigos: `401` (token vencido o inválido; dura 5 minutos), `404` (no hay
 
 ## 7. Contactos y soporte
 
-- **Operador (AND):** altas de entidades, revisión de APIs, problemas de conexión con el gateway.
-- **Regulador (MinTIC):** aprobaciones de datos sensibles, marco normativo.
+- **Operador:** altas de entidades, revisión de APIs, problemas de conexión con el gateway.
+- **Regulador:** aprobaciones de datos sensibles, marco normativo.
 - **Dentro de la entidad:** el `entity_admin` gestiona su gente y sus nodos; el `data_steward` decide los accesos.

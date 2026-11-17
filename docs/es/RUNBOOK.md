@@ -2,7 +2,7 @@
 
 > English version (official): [docs/RUNBOOK.md](../RUNBOOK.md)
 
-Procedimientos del operador de la red (en Colombia, la AND) para lo que no es rutina: dar de alta una entidad, responder a un incidente, rotar la CA intermedia y revocar certificados en masa. La operación diaria, los respaldos y los problemas frecuentes están en [`OPERATIONS.md`](OPERATIONS.md); el despliegue, en [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Procedimientos del operador de la red para lo que no es rutina: dar de alta una entidad, responder a un incidente, rotar la CA intermedia y revocar certificados en masa. La operación diaria, los respaldos y los problemas frecuentes están en [`OPERATIONS.md`](OPERATIONS.md); el despliegue, en [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 Convenciones:
 
@@ -57,7 +57,7 @@ Comprobación: la entidad figura activa en Consola → Entidades, su nodo en lí
 
    | Severidad | Ejemplos | Respuesta |
    | :-- | :-- | :-- |
-   | **Crítica** | Fuga de datos personales; clave o certificado comprometido en uso; gateway caído para toda la red; cadena de auditoría alterada | Inmediata, a cualquier hora. Avisar al regulador (MinTIC) y a las entidades afectadas |
+   | **Crítica** | Fuga de datos personales; clave o certificado comprometido en uso; gateway caído para toda la red; cadena de auditoría alterada | Inmediata, a cualquier hora. Avisar al regulador y a las entidades afectadas |
    | **Alta** | Una entidad o aplicación comprometida; portal caído (el gateway sigue); respaldos fallando | En la hora, en horario extendido |
    | **Media** | Un nodo de entidad fuera de línea; reconciliación con errores; certificado por vencer | En el día hábil |
    | **Baja** | Errores aislados sin efecto en el tráfico | En la siguiente ventana planificada |

@@ -4,12 +4,12 @@ Este archivo es el contexto permanente para Claude Code. Léelo completo al inic
 
 ## Qué estamos construyendo
 
-El **Portal DEN** es el portal de desarrolladores y la consola de gobierno de una red nacional de intercambio de datos entre entidades públicas. El primer despliegue es Colombia (gateway operado por la AND y gobernado por MinTIC), pero el producto debe ser **reutilizable en cualquier país**: nada específico de Colombia va en el código, todo va en `config/country/*.yaml`.
+El **Portal DEN** es el portal de desarrolladores y la consola de gobierno de una red nacional de intercambio de datos entre entidades públicas. El producto es **reutilizable en cualquier país**: nada específico de un país va en el código, todo va en `config/country/*.yaml`. El primer despliegue es Colombia (`co.yaml`), que sirve de configuración de referencia.
 
 El portal NO es el gateway. El gateway es **Apache APISIX**. El portal es la capa de gobierno encima:
 
 - Las entidades **proveedoras** registran sus APIs (OpenAPI + dónde vive el servicio).
-- El **operador** (AND) revisa y aprueba la publicación; el **regulador** (MinTIC) supervisa y, según la clasificación, también aprueba.
+- El **operador** de la red revisa y aprueba la publicación; el **regulador** supervisa y, según la clasificación, también aprueba.
 - Las entidades **consumidoras** crean aplicaciones y solicitan acceso declarando una **finalidad**.
 - El **responsable de datos** de la entidad proveedora aprueba o rechaza cada solicitud.
 - El portal traduce ese estado a configuración de **APISIX**, datos de política para **OPA** y clientes en **Keycloak**.
@@ -90,7 +90,7 @@ den-portal/
 │   ├── step-ca/             # init de la CA de dev
 │   ├── fluent-bit/          # pipeline de logs con enmascarado
 │   ├── mock-providers/      # servicios de ejemplo (Fastify + datos sintéticos, ADR-0009)
-│   └── mock-citizen-app/    # carpeta ciudadana de referencia (MT-07): consultas, avisos, comprobantes
+│   └── mock-citizen-app/    # app ciudadana de referencia (MT-07): consultas, avisos, comprobantes
 ├── tests/infra/             # pruebas de la configuración de infra (privacidad de logs, realms)
 ├── scripts/                 # license-check, demo, make-deploy-env, opa-test (el seed vive en apps/api/src/seed)
 └── docs/
@@ -121,7 +121,7 @@ pnpm license:check       # falla si hay una licencia no permitida
 pnpm demo                # ejecuta el guion de docs/DEMO.md de forma automatizada
 ```
 
-Puertos de desarrollo: web 3000, api 4000, Keycloak 8080, APISIX proxy 9080/9443, APISIX admin 9180, OPA 8181, step-ca 9000, OpenSearch 9200, Mailpit 8025, Postgres 5432, TSA de desarrollo 3004, carpeta ciudadana de referencia 3100.
+Puertos de desarrollo: web 3000, api 4000, Keycloak 8080, APISIX proxy 9080/9443, APISIX admin 9180, OPA 8181, step-ca 9000, OpenSearch 9200, Mailpit 8025, Postgres 5432, TSA de desarrollo 3004, app ciudadana de referencia 3100.
 
 ## Cómo trabajar
 

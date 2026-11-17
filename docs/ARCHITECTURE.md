@@ -10,8 +10,8 @@ Version 0.1 · November 2026
 flowchart TB
   subgraph People
     U1[Entity officials]
-    U2[Operator AND]
-    U3[Regulator MinTIC]
+    U2[Operator]
+    U3[Regulator]
   end
   subgraph Governance_plane["Governance plane (portal)"]
     WEB[apps/web · Next.js]
@@ -415,7 +415,7 @@ The kit is specified in another repository; this contract is the boundary. In de
 
 **Development:** `infra/compose/docker-compose.yml` with all the services, seed data and imported realms; web and API on the host.
 
-**Pilots and demos:** the same file plus `infra/compose/docker-compose.deploy.yml` (web, API and citizen folder in containers, with no published ports, behind a reverse proxy; `docker-compose.edge.yml` provides one). Interactive installer: `install.sh` (`docs/INSTALL.md`). Per-component detail in `docs/DEPLOYMENT.md`; setup and operation in `docs/OPERATIONS.md`.
+**Pilots and demos:** the same file plus `infra/compose/docker-compose.deploy.yml` (web, API and citizen app in containers, with no published ports, behind a reverse proxy; `docker-compose.edge.yml` provides one). Interactive installer: `install.sh` (`docs/INSTALL.md`). Per-component detail in `docs/DEPLOYMENT.md`; setup and operation in `docs/OPERATIONS.md`.
 
 **Production (M6):**
 - Gateway: ≥ 2 APISIX nodes in different zones, a local OPA on each, etcd in a 3-member cluster with mTLS.
@@ -472,7 +472,7 @@ Consumer ─▶ APISIX ─(opa: X-DEN-Subject-Ref = HMAC(key, country|type|numbe
                                                        │ Merkle batches + JWS signature + RFC 3161 TSA timestamp
                                                        ▼
                                              transparency_checkpoint ─▶ audit log (anchor)
-Carpeta Ciudadana ─(citizen's token)─▶ API: /data-subjects/me/accesses, receipts, alerts (webhook)
+Citizen app ─(citizen's token)───────▶ API: /data-subjects/me/accesses, receipts, alerts (webhook)
 ```
 
 - **Data subject in the OpenAPI.** It is declared with `x-den-data-subject` on each operation (MT-01): a path parameter, a JSON pointer into the body (`in: body`) or `none`. The bundle carries, per operation, how to extract it from the path (an expression with capture groups) and the document type.
@@ -496,7 +496,7 @@ Carpeta Ciudadana ─(citizen's token)─▶ API: /data-subjects/me/accesses, re
   - **Incremental verification.** `GET /transparency/verify?fromSeq=N` checks from checkpoint N, chained to the hash of N-1. A monitor that has already verified the earlier part only checks what is new; without `fromSeq` the full record is checked, which in memory takes about 30 s per 80,000 records.
   - **Pending for production.** Rotation of the signing key: the previous one moves to `DEN_TRANSPARENCY_RETIRED_JWKS`.
 - **Citizen identity (MT-05).** It is provided by the configured digital identity issuer (`DEN_CITIZEN_ISSUER`; in development, the `den-citizens` realm, which simulates the country's digital authentication).
-  - **Accepted token.** RS256 signature against the issuer's JWKS, issuer, audience `DEN_CITIZEN_AUDIENCE` (`den-transparency-api`), validity, and `azp` within `DEN_CITIZEN_CLIENTS` (only the authorized citizen applications, such as the Carpeta). Any other token, including a portal token, gets 401; a citizen token does not open any portal endpoint either.
+  - **Accepted token.** RS256 signature against the issuer's JWKS, issuer, audience `DEN_CITIZEN_AUDIENCE` (`den-transparency-api`), validity, and `azp` within `DEN_CITIZEN_CLIENTS` (only the authorized citizen applications, such as the reference citizen app). Any other token, including a portal token, gets 401; a citizen token does not open any portal endpoint either.
   - **Pseudonym.** The API takes the document type and number from the claims (`DEN_CITIZEN_DOCUMENT_TYPE_CLAIM`, `DEN_CITIZEN_DOCUMENT_NUMBER_CLAIM`; without a type, the first one in `identifiers.person`). It normalizes the same way OPA does and computes the same HMAC with `DEN_SUBJECT_REF_KEY`. A vector shared between the Rego tests and the API tests ties the two implementations together, and the e2e test checks it end to end: the demo citizen sees exactly the calls the gateway recorded with her number. The API never receives the number as a parameter, does not store it, does not log it and does not return it.
   - **`den-citizens` realm.** Client `citizen-app`, confidential, with code + PKCE and no password grant. The access token carries only `sub`, the audience and the document, with no name or email. Citizens cannot edit their document: the user profile only lets the administrator edit it, and there are no undeclared attributes.
   - **API.** `GET /api/v1/data-subjects/me/accesses` lists, from newest to oldest and with an opaque cursor, who queried (entity and application), which entity answered, which API, operation and exposed data, for what purpose, through which official (their hash, as a reference), the result and whether it is already sealed. `GET /api/v1/data-subjects/me/accesses/:id/receipt` returns the receipt (409 while it has no batch). If the query does not belong to the data subject asking, it responds 404, without revealing that it exists. In the OpenAPI they carry the `citizenBearer` security scheme.
@@ -506,7 +506,7 @@ Carpeta Ciudadana ─(citizen's token)─▶ API: /data-subjects/me/accesses, re
   - **Delivery.** A pg-boss worker POSTs to the citizen application (`DEN_CITIZEN_APPS`: webhook URL and secret per `client_id`, operator configuration). The signature follows Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature: v1,…`, secret `whsec_…`), so the application can verify it with any library for the standard. The `webhook-id` is stable across retries. If the response is not 2xx, the queue retries with exponential backoff (up to 20 times, with at most 1 h between attempts). Before sending, the worker checks that the alert is still active for that classification.
   - **Content.** `{type: subject_access.created, timestamp, data: {alertId, accessId, occurredAt, classification}}`: no document number, no contact data, no names. The application notifies the person and, when they sign in, shows the detail with their own token.
 
-- **Reference folder (MT-07, `infra/mock-citizen-app`).** A minimal citizen application that shows what any of the country's citizen folders has to do with the portal. It is demo tooling, not a product.
+- **Reference citizen app (MT-07, `infra/mock-citizen-app`).** A minimal citizen application that shows what any of the country's citizen apps has to do with the portal. It is demo tooling, not a product.
   - It authenticates the citizen with the digital identity (code + PKCE, confidential client `citizen-app`) and keeps the tokens on the server.
   - It shows "Who queried my data?" using the data subject API.
   - It stores the citizen's email and the mapping between the alert's opaque identifier and its user: the portal never sees the email. It verifies the webhooks with the Standard Webhooks reference library and turns them into emails (Mailpit in development).

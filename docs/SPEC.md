@@ -32,11 +32,11 @@ The DEN Portal governs a data exchange network between public entities. It lets 
 
 ### 2.1 Platform roles (not tied to an entity)
 
-| Role | Who (Colombia) | Can |
+| Role | Who (typically) | Can |
 | :-- | :-- | :-- |
-| `platform_admin` | Operator's technical team (AND) | Everything operational: approve entities, review and publish APIs, manage nodes, suspend anything, see all analytics |
+| `platform_admin` | Operator's technical team (the national digital agency or equivalent) | Everything operational: approve entities, review and publish APIs, manage nodes, suspend anything, see all analytics |
 | `platform_reviewer` | Operator's analysts | Review publications and entity registrations; does not manage infrastructure |
-| `regulator` | MinTIC | See everything read-only; approve publications and subscriptions when policy requires it (sensitive data); see indicators; export the audit log |
+| `regulator` | The authority that governs the network (for example, the ministry in charge of digital government) | See everything read-only; approve publications and subscriptions when policy requires it (sensitive data); see indicators; export the audit log |
 | `auditor` | Oversight bodies, external auditor | Read-only access to audit and analytics; no access to configuration |
 
 ### 2.2 Roles within an entity
@@ -57,7 +57,7 @@ Can see the public catalog page **only** if `features.publicCatalog: true` in th
 
 ### 2.4 Data subject (citizen)
 
-Does not use the portal. Sees **who queried their data**, when, which data, for what purpose and through which official (as a reference), from the country's Carpeta Ciudadana Digital (digital citizen folder), authenticated with the national digital identity. They can also turn on alerts and download a verifiable receipt for each query. In this version they only see the queries that go through the gateway (ADR-0015).
+Does not use the portal. Sees **who queried their data**, when, which data, for what purpose and through which official (as a reference), from the country's citizen app (in Colombia, the Carpeta Ciudadana Digital), authenticated with the national digital identity. They can also turn on alerts and download a verifiable receipt for each query. In this version they only see the queries that go through the gateway (ADR-0015).
 
 ## 3. Domain model
 
@@ -212,7 +212,7 @@ enrollment_issued → enrolled → online ⇄ offline
 1. When a version of a `personal` or `sensitive` API is published, each operation declares where the data subject is (`x-den-data-subject`) or that it has no data subject (`none`).
 2. On each authorized call, the gateway computes a pseudonym for the data subject and records the query: the entity and application that queried, the provider entity, the API and the exposed data, the operation, the purpose, the official (hash), the date and the result. It never records the content or the document number.
 3. Queries are grouped into sealed batches (operator signature and a timestamp from an independent TSA). Each query has a receipt that anyone can verify.
-4. Citizens see their queries in the Carpeta Ciudadana Digital. The portal only answers the Carpeta with the citizen's token, and alerts the citizen about new queries if the citizen asked for it.
+4. Citizens see their queries in the country's citizen app. The portal only answers that app with the citizen's token, and alerts the citizen about new queries if the citizen asked for it.
 
 ## 5. Cross-cutting business rules
 
@@ -260,10 +260,10 @@ In the portal and by email. Minimum events: invitation to an entity, registratio
 ## 9. Planned extension points
 
 - **Consent:** the subscription model supports `consentRequired: bool`. When it is enabled, OPA will query a consent service before allowing. It is not implemented in the MVP; the policy interface already receives the `X-DEN-Consent-Ref` header if present.
-- **Territorial instances** (e.g. Bogotá): a gateway instance with its own subset of routes, governed from the same portal (`Gateway` as a first-class entity in a future version).
+- **Territorial instances** (e.g. a capital city): a gateway instance with its own subset of routes, governed from the same portal (`Gateway` as a first-class entity in a future version).
 - **Verifiable credentials:** a provider entity will be able to mark an API as an "issuance source" for a credential issuer; out of the MVP.
 
-## 10. Per-country configuration (abridged example)
+## 10. Per-country configuration (abridged example: `co.yaml`)
 
 ```yaml
 country:

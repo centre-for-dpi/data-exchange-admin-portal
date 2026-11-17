@@ -10,12 +10,12 @@ Duration: 15 minutes. Everything runs locally with `pnpm infra:up && pnpm dev`. 
 
 | User | Entity | Role |
 | :-- | :-- | :-- |
-| `ana.operadora` | Operator (AND) | `platform_reviewer` |
+| `ana.operadora` | Operator | `platform_reviewer` |
 | `pedro.publicador` | Health entity (fictitious) | `api_publisher` |
 | `lucia.datos` | Health entity (fictitious) | `data_steward` |
 | `carlos.dev` | Social Programs entity (fictitious) | `app_developer` |
-| `marta.regulador` | Regulator (MinTIC) | `regulator` |
-| `ciudadana.demo` | Data subject (CC 1000000001), in the reference citizen folder; realm `den-citizens` | — |
+| `marta.regulador` | Regulator | `regulator` |
+| `ciudadana.demo` | Data subject (CC 1000000001), in the reference citizen app; realm `den-citizens` | — |
 
 **Second factor (M3-08).** `ana.operadora`, `lucia.datos` and `marta.regulador`, like every platform role and `data_steward`, sign in with the password and then with a one-time code. `pnpm demo:otp` prints the current code. To show it on a phone, add the key that the same command prints to an authenticator app (TOTP, SHA-1, 6 digits, 30 s). Each code works only once; if it has already been used, wait for the next one.
 
@@ -49,12 +49,12 @@ Duration: 15 minutes. Everything runs locally with `pnpm infra:up && pnpm dev`. 
    ```
    **Revoke the certificate** (carlos.dev, M3-10): on the application page, "Revoke the certificate" with a reason. With the same loop, the response changes to `403 certificate_revoked` in under 60 s. The certificate is still from the CA, so the handshake succeeds, but it is no longer valid for the application.
 10. **Audit** (marta.regulador): in "Audit", open the subscription from the recent events and show its timeline: requested, approved, active on the gateway, revoked, by whom and why. Then click "Verify integrity" to show that the hash chain is intact.
-11. **Who accessed my data?** (ciudadana.demo, in the reference citizen folder, `http://localhost:3100`). To show the notice, do the first part before step 7.
+11. **Who accessed my data?** (ciudadana.demo, in the reference citizen app, `http://localhost:3100`). To show the notice, do the first part before step 7.
     - Sign in with the simulated digital identity (`ciudadana.demo`, document CC 1000000001, the same one queried in step 7).
     - Under "Notices", check "Personal data" and enter an email address. The portal does not know that address: it only stores the choice and an opaque identifier.
     - After step 7, Mailpit (`http://localhost:8025`) shows the notice "An entity accessed your data", with no data about the person or the query.
     - The query appears under "Who accessed my data?": Social Programs, which API and which data, for "Verificación de requisitos de un trámite", with the official as a reference.
-    - When it no longer says "Being sealed" (a few seconds), click "Verify". The citizen folder checks on its own the operator's signature, the inclusion in the sealed batch and the TSA timestamp, without trusting the portal. The receipt can also be downloaded and verified with `den-verify-receipt`.
+    - When it no longer says "Being sealed" (a few seconds), click "Verify". The citizen app checks on its own the operator's signature, the inclusion in the sealed batch and the TSA timestamp, without trusting the portal. The receipt can also be downloaded and verified with `den-verify-receipt`.
 
 ## Key messages for the audience
 

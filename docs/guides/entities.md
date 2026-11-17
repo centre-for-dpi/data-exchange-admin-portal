@@ -200,6 +200,6 @@ Other codes: `401` (token expired or invalid; it lasts 5 minutes), `404` (no API
 
 ## 7. Contacts and support
 
-- **Operator (AND):** entity registrations, API reviews, connection problems with the gateway.
-- **Regulator (MinTIC):** approvals for sensitive data, regulatory framework.
+- **Operator:** entity registrations, API reviews, connection problems with the gateway.
+- **Regulator:** approvals for sensitive data, regulatory framework.
 - **Within the entity:** the `entity_admin` manages its people and its nodes; the `data_steward` decides on access.

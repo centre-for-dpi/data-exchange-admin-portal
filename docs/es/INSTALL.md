@@ -68,7 +68,7 @@ El script hace las preguntas una por una, muestra un resumen y pide confirmació
 | Paso | Pregunta | Qué responder |
 | :-- | :-- | :-- |
 | 1 | — | Verificación del servidor: sistema, CPU, RAM, disco, Docker, `/dev/net/tun`. Se detiene si falta algo imprescindible |
-| 2 | **País** | El código de `config/country/<código>.yaml`. Para Colombia, `co` |
+| 2 | **País** | El código de `config/country/<código>.yaml`. Por ejemplo, `co` (Colombia) |
 | 3 | **Nombre del portal** | Solo el nombre, sin `https://` (p. ej. `portal.den.example`) |
 | 3 | **Nombre del gateway** | Por defecto `gw.<portal>`. Debe ser distinto del portal |
 | 4 | **Proxy de entrada** | `1` Incluido (recomendado): el instalador pone Traefik en 80/443. `2` Ya tengo Traefik: se une a su red de Docker y le escribe las rutas del portal y del gateway (proveedor de archivos). Pregunta el entryPoint HTTPS (`websecure`), el certResolver del certificado del portal (`-`: tu Traefik ya lo tiene) y la carpeta dinámica de Traefik en este servidor (`-`: solo escribe `infra/edge/den-external.yml`, para que lo copies) |
@@ -101,7 +101,7 @@ Luego, sin más preguntas:
 | `https://<gateway>` | **Gateway**: tráfico entre entidades con mTLS, tokens en `/oauth/token`, canal de control de los nodos | Sistemas de las entidades |
 | `<gateway>:51820/udp` | Hub WireGuard: túneles de los nodos del kit | Nodos |
 | `https://<portal>/mail` | Correo de pruebas (Mailpit): todo el correo del piloto llega aquí, con usuario y contraseña | Operador |
-| `https://<portal>/citizen-app` | Carpeta ciudadana de referencia (demo de transparencia) | Demos |
+| `https://<portal>/citizen-app` | App ciudadana de referencia (demo de transparencia) | Demos |
 | `https://<portal>/grafana/` | Tablero del operador (con la observabilidad activada), con su propio usuario `admin` | Operador |
 
 Los demás servicios (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, el runner de contratos, los proveedores de prueba) no se publican. La explicación de cada uno está en [`guides/operator.md`](guides/operator.md).
@@ -132,7 +132,7 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 | `sudo ./install.sh credentials` | Usuarios de demo, administrador de Keycloak, usuario del correo de pruebas y de Grafana |
 | `sudo ./install.sh otp` | Código vigente de segundo factor de los usuarios de demo con rol crítico |
 | `sudo ./install.sh logs [servicio]` | Logs (p. ej. `logs api`) |
-| `sudo ./install.sh backup` | Respaldo completo de pgBackRest y copia en `backups/<fecha>/`: volcados de `den` y `keycloak`, el repositorio de respaldos (cifrado), los volúmenes de la CA, la TSA, documentos y carpeta, y `.env`. Los respaldos diarios ya corren solos (`OPERATIONS.md §6`) |
+| `sudo ./install.sh backup` | Respaldo completo de pgBackRest y copia en `backups/<fecha>/`: volcados de `den` y `keycloak`, el repositorio de respaldos (cifrado), los volúmenes de la CA, la TSA, documentos y app ciudadana, y `.env`. Los respaldos diarios ya corren solos (`OPERATIONS.md §6`) |
 | `sudo ./install.sh restore [instante]` | Restaura la base al último estado archivado, o al instante dado (`"2026-11-20 14:30:00-05"`). Detiene y arranca todo |
 | `sudo ./install.sh update` | Respaldo, `git pull --ff-only`, recompilación y reinicio |
 | `sudo ./install.sh stop` / `start` | Detiene o arranca todo, sin perder datos |

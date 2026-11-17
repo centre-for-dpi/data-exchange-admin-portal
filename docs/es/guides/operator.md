@@ -2,11 +2,11 @@
 
 > English version (official): [docs/guides/operator.md](../../guides/operator.md)
 
-Versión 1.2 · noviembre 2026 · código con el hito M6 (endurecimiento) cerrado · para la sesión de arquitectura y despliegue con el operador (AND) y el regulador (MinTIC)
+Versión 1.2 · noviembre 2026 · código con el hito M6 (endurecimiento) cerrado · para el operador de la red y el regulador
 
 Esta guía explica **qué es cada pieza de la plataforma, por qué está y quién la opera**, y cómo se despliega la infraestructura central. Para el detalle técnico remite a `ARCHITECTURE.md`, `DEPLOYMENT.md` y `OPERATIONS.md`; la instalación paso a paso está en [`INSTALL.md`](../INSTALL.md).
 
-## Agenda sugerida (martes)
+## Agenda sugerida (sesión de un día)
 
 | Bloque | Contenido | Sección |
 | :-- | :-- | :-- |
@@ -27,33 +27,33 @@ La red de intercambio de datos DEN (Data Exchange Network) permite que una entid
 - **Todo queda auditado.** Cada cambio (quién aprobó qué, cuándo) va a una bitácora encadenada por hash y sellada a diario por una autoridad de sellado de tiempo: no se puede reescribir sin que se note.
 - **El ciudadano ve quién consultó sus datos**, para qué y cuándo, con un comprobante verificable.
 - **Solo software libre** con licencia aprobada por la OSI: sin costos de licencia ni dependencia de un proveedor.
-- **Reutilizable en cualquier país:** todo lo propio de Colombia (autoridades, tipos de documento, sectores, marco legal) está en `config/country/co.yaml`.
+- **Reutilizable en cualquier país:** todo lo propio de un país (autoridades, tipos de documento, sectores, marco legal) está en `config/country/<código>.yaml`; `co.yaml` (Colombia) es la referencia.
 
 ## 2. Quién hace qué
 
 ```mermaid
 flowchart LR
   subgraph Plataforma
-    AND["Operador (AND)<br/>opera la plataforma,<br/>revisa y publica APIs"]
-    MIN["Regulador (MinTIC)<br/>supervisa, aprueba lo sensible,<br/>recibe los anclajes de auditoría"]
+    OP["Operador<br/>opera la plataforma,<br/>revisa y publica APIs"]
+    REG["Regulador<br/>supervisa, aprueba lo sensible,<br/>recibe los anclajes de auditoría"]
   end
   subgraph Entidades
     P["Entidad proveedora<br/>publica APIs,<br/>su responsable de datos aprueba accesos"]
     C["Entidad consumidora<br/>crea aplicaciones,<br/>pide acceso con una finalidad"]
   end
   CIU["Ciudadano<br/>ve quién consultó sus datos"]
-  P -- "publica" --> AND
-  AND -- "sensible" --> MIN
+  P -- "publica" --> OP
+  OP -- "sensible" --> REG
   C -- "solicita" --> P
   C == "consulta por el gateway" ==> P
-  CIU -. "transparencia" .- AND
+  CIU -. "transparencia" .- OP
 ```
 
 | Rol | Quién | Puede |
 | :-- | :-- | :-- |
-| `platform_admin` | Equipo técnico de la AND | Todo lo operativo: aprobar entidades, publicar, gestionar nodos, suspender |
-| `platform_reviewer` | Analistas de la AND | Revisar altas de entidades y publicaciones de APIs |
-| `regulator` | MinTIC | Ver todo en solo lectura; aprobar publicaciones y accesos a datos **sensibles**; indicadores; auditoría |
+| `platform_admin` | Equipo técnico del operador | Todo lo operativo: aprobar entidades, publicar, gestionar nodos, suspender |
+| `platform_reviewer` | Analistas del operador | Revisar altas de entidades y publicaciones de APIs |
+| `regulator` | Regulador | Ver todo en solo lectura; aprobar publicaciones y accesos a datos **sensibles**; indicadores; auditoría |
 | `auditor` | Órganos de control | Solo lectura de auditoría |
 | `entity_admin` | Cada entidad | Su gente y sus roles, sus nodos |
 | `api_publisher` | Cada entidad | Registrar y enviar a revisión sus APIs |
@@ -147,7 +147,7 @@ Para cada uno: **qué hace**, **qué pasa si cae** y **qué guarda**. Todos corr
 ### 4.4 Utilería del piloto (no va a producción)
 
 - **Proveedores de prueba** (`mock-salud`, `mock-socioeconomico`): simulan dos entidades con datos sintéticos.
-- **Carpeta ciudadana de referencia** (`/citizen-app`): muestra lo que debe implementar la carpeta real del país (consultas, avisos, comprobantes).
+- **App ciudadana de referencia** (`/citizen-app`): muestra lo que debe implementar la app ciudadana real del país (consultas, avisos, comprobantes).
 - **Datos semilla:** tres entidades ficticias y los usuarios de demo.
 
 ## 5. Cómo fluye todo
@@ -160,7 +160,7 @@ borrador → en revisión → aprobada por el operador → [aprobada por el regu
 
 1. El publicador de la entidad sube el contrato OpenAPI, dice dónde vive el servicio, qué datos expone, la base legal y las finalidades permitidas.
 2. Al enviarla a revisión, el portal prueba la conectividad (a través del gateway) y el contrato contra el sandbox.
-3. La AND revisa la ficha y la minimización de datos. Si la clasificación es **sensible**, MinTIC también aprueba.
+3. El operador revisa la ficha y la minimización de datos. Si la clasificación es **sensible**, el regulador también aprueba.
 4. Al publicarla, la ruta aparece en el gateway en segundos, **cerrada**: sin suscripciones, nadie entra.
 
 ### 5.2 Pedir y conceder acceso
@@ -198,7 +198,7 @@ El proveedor recibe en cada consulta la entidad y la aplicación consumidoras, l
 
 ### 5.4 Rendición de cuentas al ciudadano
 
-Cada consulta autorizada a datos de una persona queda en el registro de transparencia con el seudónimo del titular. Cada 10 segundos se agrupan en lotes firmados por el operador y sellados por la TSA. Desde su carpeta, el ciudadano ve quién lo consultó y para qué, recibe avisos y descarga un comprobante que **cualquiera puede verificar sin confiar en el portal** (verificador abierto `den-verify-receipt`).
+Cada consulta autorizada a datos de una persona queda en el registro de transparencia con el seudónimo del titular. Cada 10 segundos se agrupan en lotes firmados por el operador y sellados por la TSA. Desde la app ciudadana, el ciudadano ve quién lo consultó y para qué, recibe avisos y descarga un comprobante que **cualquiera puede verificar sin confiar en el portal** (verificador abierto `den-verify-receipt`).
 
 ## 6. Seguridad y privacidad: qué garantiza la plataforma
 
@@ -236,13 +236,13 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 
 | Secreto | Por qué importa | Custodia sugerida |
 | :-- | :-- | :-- |
-| `.env` completo | Sin él no se recuperan los datos ni se verifican comprobantes | AND, copia cifrada fuera del servidor |
-| `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | Definen los seudónimos; **no se rotan** | AND |
-| Volumen de step-ca | Llaves de la CA de la red | AND (respaldo cifrado) |
-| `PGBACKREST_REPO1_CIPHER_PASS` | Cifra los respaldos de la base: sin ella no se restaura ninguno | AND, copia fuera del servidor, junto al `.env` |
-| `DEN_SECRETS_KEY` | Sella los secretos de los clientes y la clave con la que firma el gateway | AND, dentro del `.env` |
-| Administrador de Keycloak | Control de las identidades | AND, dos personas |
-| Usuarios con rol `regulator` | Supervisión | MinTIC |
+| `.env` completo | Sin él no se recuperan los datos ni se verifican comprobantes | Operador, copia cifrada fuera del servidor |
+| `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | Definen los seudónimos; **no se rotan** | Operador |
+| Volumen de step-ca | Llaves de la CA de la red | Operador (respaldo cifrado) |
+| `PGBACKREST_REPO1_CIPHER_PASS` | Cifra los respaldos de la base: sin ella no se restaura ninguno | Operador, copia fuera del servidor, junto al `.env` |
+| `DEN_SECRETS_KEY` | Sella los secretos de los clientes y la clave con la que firma el gateway | Operador, dentro del `.env` |
+| Administrador de Keycloak | Control de las identidades | Operador, dos personas |
+| Usuarios con rol `regulator` | Supervisión | Regulador |
 
 ## 8. Operación del día a día
 
@@ -297,7 +297,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 - **¿Qué pasa si se cae el portal?** El tráfico entre entidades sigue con la última configuración y la última política. Solo se detienen los cambios (nuevas aprobaciones, publicaciones). Está probado: con el portal caído, las llamadas siguen; OPA y APISIX reinician sin él, y al volver el portal recupera los registros de transparencia de la caída.
 - **¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?** Por la aserción firmada (`X-DEN-Assertion`): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.
 - **¿Cuánto tráfico aguanta?** En la máquina de desarrollo, 200 consultas por segundo con un p95 de 13 ms agregados por el gateway. La meta, 500 por segundo, se valida en un entorno tipo producción. La capacidad crece con más nodos de gateway: cada uno cuenta los límites por su lado y la política le da su parte.
-- **¿El portal está en inglés?** Sí, completo, además del español, que es el idioma por omisión. Los correos y la carpeta ciudadana también son bilingües.
+- **¿El portal está en inglés?** Sí, completo, además del español, que es el idioma por omisión. Los correos y la app ciudadana también son bilingües.
 - **¿Una entidad tiene que abrir puertos de entrada?** No, si usa el kit: el nodo abre el túnel hacia afuera (UDP 51820). Con una API existente, la entidad debe permitir que el gateway llegue a ella.
 - **¿Se puede integrar con X-Road?** Sí: el gateway puede usar un Security Server del operador como cliente X-Road (`ARCHITECTURE.md §10`).
 - **¿Quién aprueba el acceso a datos sensibles?** El responsable de datos de la entidad dueña y, además, el regulador.

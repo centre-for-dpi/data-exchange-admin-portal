@@ -68,7 +68,7 @@ The script asks its questions one at a time, shows a summary and asks for confir
 | Step | Question | What to answer |
 | :-- | :-- | :-- |
 | 1 | — | Server check: system, CPU, RAM, disk, Docker, `/dev/net/tun`. It stops if something essential is missing |
-| 2 | **Country** | The code of `config/country/<code>.yaml`. For Colombia, `co` |
+| 2 | **Country** | The code of `config/country/<code>.yaml`. For example, `co` (Colombia) |
 | 3 | **Portal name** | Just the name, without `https://` (e.g. `portal.den.example`) |
 | 3 | **Gateway name** | Defaults to `gw.<portal>`. It must differ from the portal |
 | 4 | **Inbound proxy** | `1` Bundled (recommended): the installer puts Traefik on 80/443. `2` I already have Traefik: it joins its Docker network and writes the routes of the portal and the gateway for it (file provider). It asks for the HTTPS entryPoint (`websecure`), the certResolver for the portal's certificate (`-`: your Traefik already has it) and Traefik's dynamic folder on this server (`-`: it only writes `infra/edge/den-external.yml`, for you to copy) |
@@ -101,7 +101,7 @@ Then, with no more questions:
 | `https://<gateway>` | **Gateway**: traffic between entities with mTLS, tokens at `/oauth/token`, control channel for the nodes | Entity systems |
 | `<gateway>:51820/udp` | WireGuard hub: tunnels from the kit nodes | Nodes |
 | `https://<portal>/mail` | Test mailbox (Mailpit): all the pilot's email arrives here, behind a user and password | Operator |
-| `https://<portal>/citizen-app` | Reference citizen folder (transparency demo) | Demos |
+| `https://<portal>/citizen-app` | Reference citizen app (transparency demo) | Demos |
 | `https://<portal>/grafana/` | Operator dashboard (with observability enabled), with its own `admin` user | Operator |
 
 The other services (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, the contract runner, the test providers) are not published. Each one is explained in [`guides/operator.md`](guides/operator.md).
@@ -132,7 +132,7 @@ The pilot **always** loads the seed: three fictitious entities (the operator, a 
 | `sudo ./install.sh credentials` | Demo users, Keycloak administrator, test mailbox user and Grafana user |
 | `sudo ./install.sh otp` | Current second-factor code for the demo users with a critical role |
 | `sudo ./install.sh logs [service]` | Logs (e.g. `logs api`) |
-| `sudo ./install.sh backup` | Full pgBackRest backup and a copy in `backups/<date>/`: dumps of `den` and `keycloak`, the backup repository (encrypted), the CA, TSA, documents and citizen folder volumes, and `.env`. Daily backups already run on their own (`OPERATIONS.md §6`) |
+| `sudo ./install.sh backup` | Full pgBackRest backup and a copy in `backups/<date>/`: dumps of `den` and `keycloak`, the backup repository (encrypted), the CA, TSA, documents and citizen app volumes, and `.env`. Daily backups already run on their own (`OPERATIONS.md §6`) |
 | `sudo ./install.sh restore [instant]` | Restores the database to the last archived state, or to the given instant (`"2026-11-20 14:30:00-05"`). Stops and starts everything |
 | `sudo ./install.sh update` | Backup, `git pull --ff-only`, rebuild and restart |
 | `sudo ./install.sh stop` / `start` | Stops or starts everything, without losing data |

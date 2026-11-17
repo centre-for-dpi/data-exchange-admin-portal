@@ -297,11 +297,11 @@ details.faq[open] summary { color: var(--gov); }
 
 <header class="hero">
   <div class="hero-inner">
-    <span class="eyebrow">Architecture and deployment session · Tuesday, November 17, 2026</span>
+    <span class="eyebrow">Operator guide · Architecture and deployment</span>
     <h1>How the platform works and how it is installed</h1>
     <p class="lede">What each piece of the Data Exchange Network is, why it is there and who runs it. At the end, the installation of the central infrastructure on the operator's server, step by step.</p>
     <div class="meta">
-      <span><b>For</b> the operator (AND) and the regulator (MinTIC)</span>
+      <span><b>For</b> the network operator and the regulator</span>
       <span><b>Version</b> 1.2 · November 2026</span>
       <span><b>Code</b> with milestone M6 (hardening) closed</span>
       <span><b>Topology</b> single-server pilot</span>
@@ -369,7 +369,7 @@ details.faq[open] summary { color: var(--gov); }
         <div class="principle"><b>Everything is audited</b><span>Every change goes into a hash-chained audit log that a timestamping authority seals daily.</span></div>
         <div class="principle"><b>Citizens see who queried them</b><span>What for and when, with a receipt that anyone can verify without trusting the portal.</span></div>
         <div class="principle"><b>Only free software</b><span>OSI-approved licenses: no license costs and no vendor lock-in.</span></div>
-        <div class="principle"><b>Reusable in another country</b><span>Everything specific to Colombia (authorities, documents, sectors, legal framework) is in <code>config/country/co.yaml</code>.</span></div>
+        <div class="principle"><b>Reusable in another country</b><span>Everything specific to a country (authorities, documents, sectors, legal framework) is in <code>config/country/&lt;code&gt;.yaml</code>; <code>co.yaml</code> (Colombia) is the reference.</span></div>
       </div>
     </section>
 
@@ -386,10 +386,10 @@ details.faq[open] summary { color: var(--gov); }
             <text x="95" y="46" text-anchor="middle" class="d-tb">Citizen</text>
             <text x="95" y="64" text-anchor="middle" class="d-ts">sees who queried them</text>
             <rect x="270" y="22" width="190" height="56" rx="8" class="d-gov"></rect>
-            <text x="365" y="46" text-anchor="middle" class="d-tb">Operator (AND)</text>
+            <text x="365" y="46" text-anchor="middle" class="d-tb">Operator</text>
             <text x="365" y="64" text-anchor="middle" class="d-ts">runs, reviews and publishes</text>
             <rect x="560" y="22" width="190" height="56" rx="8" class="d-gov"></rect>
-            <text x="655" y="46" text-anchor="middle" class="d-tb">Regulator (MinTIC)</text>
+            <text x="655" y="46" text-anchor="middle" class="d-tb">Regulator</text>
             <text x="655" y="64" text-anchor="middle" class="d-ts">supervises, approves sensitive data</text>
             <line x1="270" y1="50" x2="172" y2="50" class="d-line" marker-end="url(#r-ah)"></line>
             <text x="221" y="42" text-anchor="middle" class="d-ts">transparency</text>
@@ -422,9 +422,9 @@ details.faq[open] summary { color: var(--gov); }
       </figure>
 
       <div class="roles">
-        <div class="role"><header><code>platform_admin</code><span class="tag mfa">2nd factor</span></header><span class="who">AND technical team</span><p>Everything operational: approve entities, publish, manage nodes, suspend.</p></div>
-        <div class="role"><header><code>platform_reviewer</code><span class="tag mfa">2nd factor</span></header><span class="who">AND analysts</span><p>Review entity registrations and API publications.</p></div>
-        <div class="role"><header><code>regulator</code><span class="tag mfa">2nd factor</span></header><span class="who">MinTIC</span><p>See everything read-only; approve publications of and access to <b>sensitive</b> data; indicators; audit.</p></div>
+        <div class="role"><header><code>platform_admin</code><span class="tag mfa">2nd factor</span></header><span class="who">Operator's technical team</span><p>Everything operational: approve entities, publish, manage nodes, suspend.</p></div>
+        <div class="role"><header><code>platform_reviewer</code><span class="tag mfa">2nd factor</span></header><span class="who">Operator's analysts</span><p>Review entity registrations and API publications.</p></div>
+        <div class="role"><header><code>regulator</code><span class="tag mfa">2nd factor</span></header><span class="who">Regulator</span><p>See everything read-only; approve publications of and access to <b>sensitive</b> data; indicators; audit.</p></div>
         <div class="role"><header><code>auditor</code><span class="tag mfa">2nd factor</span></header><span class="who">Oversight bodies</span><p>Read-only access to the audit.</p></div>
         <div class="role"><header><code>entity_admin</code></header><span class="who">Each entity</span><p>Its people and their roles, its kit nodes.</p></div>
         <div class="role"><header><code>api_publisher</code></header><span class="who">Each entity</span><p>Register its APIs and submit them for review.</p></div>
@@ -686,7 +686,7 @@ details.faq[open] summary { color: var(--gov); }
       <h3>Pilot tooling (does not go to production)</h3>
       <ul class="ticks">
         <li><b>Test providers</b> (<code>mock-salud</code>, <code>mock-socioeconomico</code>): they simulate two entities with synthetic data.</li>
-        <li><b>Reference citizen folder</b> (<code>/citizen-app</code>): shows what the country's real citizen folder must implement.</li>
+        <li><b>Reference citizen app</b> (<code>/citizen-app</code>): shows what the country's real citizen app must implement.</li>
         <li><b>Seed data:</b> three fictitious entities and the demo users.</li>
       </ul>
     </section>
@@ -706,7 +706,7 @@ details.faq[open] summary { color: var(--gov); }
         <ol class="steps">
           <li><span>The entity's publisher uploads the OpenAPI contract and states where the service lives, which data it exposes, the legal basis and the allowed purposes.</span></li>
           <li><span>When it is submitted for review, the portal tests connectivity through the gateway and the contract against the sandbox.</span></li>
-          <li><span>The AND reviews the API's details and data minimization. If the classification is <b>sensitive</b>, MinTIC approves too.</span></li>
+          <li><span>The operator reviews the API's details and data minimization. If the classification is <b>sensitive</b>, the regulator approves too.</span></li>
           <li><span>Once published, the route appears in the gateway within seconds, <b>closed</b>: with no subscriptions, nobody gets in.</span></li>
         </ol>
       </div>
@@ -859,7 +859,7 @@ sudo ./install.sh</code></pre></div>
 
       <div class="qs">
         <div class="q"><div class="qn">Step<b>1</b></div><div><h4>Server check</h4><p class="auto">No questions. System, CPU, RAM, disk, Docker and Compose ≥ 2.26, <code>/dev/net/tun</code>, free ports and DNS. It stops if anything essential is missing.</p></div></div>
-        <div class="q"><div class="qn">Step<b>2</b></div><div><h4>Country</h4><p>The code of <code>config/country/&lt;code&gt;.yaml</code>. For Colombia, <code>co</code>.</p></div></div>
+        <div class="q"><div class="qn">Step<b>2</b></div><div><h4>Country</h4><p>The code of <code>config/country/&lt;code&gt;.yaml</code>. For example, <code>co</code> (Colombia).</p></div></div>
         <div class="q"><div class="qn">Step<b>3</b></div><div><h4>Portal and gateway names</h4><p>Just the name, without <code>https://</code>. The gateway's defaults to <code>gw.&lt;portal&gt;</code> and must be different from the portal's.</p></div></div>
         <div class="q"><div class="qn">Step<b>4</b></div><div><h4>Entry proxy and portal certificate</h4>
           <div class="opts">
@@ -903,7 +903,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td><code>https://&lt;portal&gt;/mail</code></td><td class="wrap">Test mailbox: all the pilot's email arrives here, behind a username and password</td><td>Operator</td></tr>
             <tr><td><code>https://&lt;portal&gt;/grafana/</code></td><td class="wrap">The operator's dashboard, with its own <code>admin</code> user (with observability)</td><td>Operator</td></tr>
             <tr><td><code>https://&lt;portal&gt;/api/v1/gateway/jwks</code></td><td class="wrap">Public keys that providers use to verify the gateway assertion</td><td>Providers</td></tr>
-            <tr><td><code>https://&lt;portal&gt;/citizen-app</code></td><td class="wrap">Reference citizen folder (transparency demo)</td><td>Demos</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/citizen-app</code></td><td class="wrap">Reference citizen app (transparency demo)</td><td>Demos</td></tr>
           </tbody>
         </table>
       </div>
@@ -929,13 +929,13 @@ sudo ./install.sh</code></pre></div>
         <table class="t">
           <thead><tr><th>Secret</th><th>Why it matters</th><th>Suggested custodian</th></tr></thead>
           <tbody>
-            <tr><td>The full <code>.env</code></td><td class="wrap">Without it, the data cannot be recovered and receipts cannot be verified</td><td class="wrap">AND, encrypted copy off the server</td></tr>
-            <tr><td><code>DEN_SUBJECT_REF_KEY</code><br><code>DEN_END_USER_HASH_SALT</code></td><td class="wrap">They define the pseudonyms; <b>they are not rotated</b></td><td>AND</td></tr>
-            <tr><td>The step-ca volume</td><td class="wrap">The network CA's keys</td><td class="wrap">AND, encrypted backup</td></tr>
-            <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Encrypts the database backups: without it, none of them can be restored</td><td class="wrap">AND, copy off the server, next to the <code>.env</code></td></tr>
-            <tr><td><code>DEN_SECRETS_KEY</code></td><td class="wrap">Seals the clients' secrets and the key the gateway signs with</td><td class="wrap">AND, inside the <code>.env</code></td></tr>
-            <tr><td>Keycloak administrator</td><td class="wrap">Control over identities</td><td class="wrap">AND, two people</td></tr>
-            <tr><td><code>regulator</code> users</td><td class="wrap">Oversight</td><td>MinTIC</td></tr>
+            <tr><td>The full <code>.env</code></td><td class="wrap">Without it, the data cannot be recovered and receipts cannot be verified</td><td class="wrap">Operator, encrypted copy off the server</td></tr>
+            <tr><td><code>DEN_SUBJECT_REF_KEY</code><br><code>DEN_END_USER_HASH_SALT</code></td><td class="wrap">They define the pseudonyms; <b>they are not rotated</b></td><td>Operator</td></tr>
+            <tr><td>The step-ca volume</td><td class="wrap">The network CA's keys</td><td class="wrap">Operator, encrypted backup</td></tr>
+            <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Encrypts the database backups: without it, none of them can be restored</td><td class="wrap">Operator, copy off the server, next to the <code>.env</code></td></tr>
+            <tr><td><code>DEN_SECRETS_KEY</code></td><td class="wrap">Seals the clients' secrets and the key the gateway signs with</td><td class="wrap">Operator, inside the <code>.env</code></td></tr>
+            <tr><td>Keycloak administrator</td><td class="wrap">Control over identities</td><td class="wrap">Operator, two people</td></tr>
+            <tr><td><code>regulator</code> users</td><td class="wrap">Oversight</td><td>Regulator</td></tr>
           </tbody>
         </table>
       </div>
@@ -950,7 +950,7 @@ sudo ./install.sh</code></pre></div>
         <div class="cmd"><code>sudo ./install.sh credentials</code><button class="copy" type="button">Copy</button><span>Demo users, Keycloak administrator, test mailbox and Grafana.</span></div>
         <div class="cmd"><code>sudo ./install.sh otp</code><button class="copy" type="button">Copy</button><span>Current second-factor code for the demo users with a critical role.</span></div>
         <div class="cmd"><code>sudo ./install.sh logs api</code><button class="copy" type="button">Copy</button><span>Logs for one service (<code>api</code>, <code>apisix</code>, <code>keycloak</code>, <code>edge</code>…), or for all of them with no argument.</span></div>
-        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copy</button><span>Full backup and a copy in <code>backups/&lt;date&gt;/</code>: dumps of <code>den</code> and <code>keycloak</code>, the (encrypted) backup repository, the volumes for the CA, the TSA, documents and the citizen folder, and <code>.env</code>. The files go off the server. Daily backups already run on their own.</span></div>
+        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copy</button><span>Full backup and a copy in <code>backups/&lt;date&gt;/</code>: dumps of <code>den</code> and <code>keycloak</code>, the (encrypted) backup repository, the volumes for the CA, the TSA, documents and the citizen app, and <code>.env</code>. The files go off the server. Daily backups already run on their own.</span></div>
         <div class="cmd"><code>sudo ./install.sh restore</code><button class="copy" type="button">Copy</button><span>Restores the database to the latest archived state; with a point in time (<code>"2026-11-20 14:30:00-05"</code>), to that moment. It stops and starts everything.</span></div>
         <div class="cmd"><code>sudo ./install.sh update</code><button class="copy" type="button">Copy</button><span>Backup, <code>git pull --ff-only</code>, rebuild and restart.</span></div>
         <div class="cmd"><code>sudo ./install.sh stop</code><button class="copy" type="button">Copy</button><span>Stops everything without losing data; <code>start</code> starts it again.</span></div>
@@ -1038,7 +1038,7 @@ sudo ./install.sh</code></pre></div>
         <details class="faq"><summary>What happens if the portal goes down?</summary><p>Traffic between entities keeps flowing with the latest configuration and the latest policy. Only changes stop: new approvals and publications. It is tested: with the portal down, calls keep going; OPA and APISIX restart without it, and when the portal comes back it recovers the transparency records from the outage.</p></details>
         <details class="faq"><summary>How does the provider know a request really comes from the gateway?</summary><p>Through the signed assertion (<code>X-DEN-Assertion</code>): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.</p></details>
         <details class="faq"><summary>How much traffic can it handle?</summary><p>On the development machine, 200 requests per second with a p95 of 13 ms added by the gateway. The target, 500 per second, will be validated in a production-like environment. Capacity grows with more gateway nodes: each one counts limits on its own, and the policy gives it its share.</p></details>
-        <details class="faq"><summary>Is the portal available in English?</summary><p>Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen folder are bilingual too.</p></details>
+        <details class="faq"><summary>Is the portal available in English?</summary><p>Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen app are bilingual too.</p></details>
         <details class="faq"><summary>Does an entity have to open inbound ports?</summary><p>Not if it uses the kit: the node opens the tunnel outbound (UDP 51820). With an existing API, the entity must allow the gateway to reach it.</p></details>
         <details class="faq"><summary>Can it be integrated with X-Road?</summary><p>Yes: the gateway can use an operator's Security Server as an X-Road client.</p></details>
         <details class="faq"><summary>Who approves access to sensitive data?</summary><p>The data steward of the entity that owns the data and, in addition, the regulator.</p></details>

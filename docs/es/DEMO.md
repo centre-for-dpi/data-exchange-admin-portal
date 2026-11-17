@@ -10,12 +10,12 @@ Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todo
 
 | Usuario | Entidad | Rol |
 | :-- | :-- | :-- |
-| `ana.operadora` | Operador (AND) | `platform_reviewer` |
+| `ana.operadora` | Operador | `platform_reviewer` |
 | `pedro.publicador` | Entidad de Salud (ficticia) | `api_publisher` |
 | `lucia.datos` | Entidad de Salud (ficticia) | `data_steward` |
 | `carlos.dev` | Entidad de Programas Sociales (ficticia) | `app_developer` |
-| `marta.regulador` | Regulador (MinTIC) | `regulator` |
-| `ciudadana.demo` | Titular de los datos (CC 1000000001), en la Carpeta de referencia; realm `den-citizens` | — |
+| `marta.regulador` | Regulador | `regulator` |
+| `ciudadana.demo` | Titular de los datos (CC 1000000001), en la app ciudadana de referencia; realm `den-citizens` | — |
 
 **Segundo factor (M3-08).** `ana.operadora`, `lucia.datos` y `marta.regulador`, como todo rol de plataforma y `data_steward`, entran con la contraseña y después con un código de un solo uso. `pnpm demo:otp` imprime el código vigente. Para mostrarlo con un teléfono, agrega en una app autenticadora la clave que imprime el mismo comando (TOTP, SHA-1, 6 dígitos, 30 s). Cada código sirve una sola vez; si ya se usó, espera al siguiente.
 
@@ -49,12 +49,12 @@ Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todo
    ```
    **Revocar el certificado** (carlos.dev, M3-10): en la ficha de la aplicación, "Revocar el certificado" con un motivo. Con el mismo bucle, la respuesta pasa a `403 certificate_revoked` en menos de 60 s. El certificado sigue siendo de la CA, así que el handshake pasa, pero ya no es válido para la aplicación.
 10. **Auditar** (marta.regulador): en "Auditoría", abrir la suscripción desde los eventos recientes y mostrar su línea de tiempo: solicitada, aprobada, activa en el gateway, revocada, con quién y por qué. Luego pulsar "Verificar integridad" para mostrar que la cadena de hash está íntegra.
-11. **¿Quién consultó mis datos?** (ciudadana.demo, en la Carpeta de referencia, `http://localhost:3100`). Para mostrar el aviso, hacer la primera parte antes del paso 7.
+11. **¿Quién consultó mis datos?** (ciudadana.demo, en la app ciudadana de referencia, `http://localhost:3100`). Para mostrar el aviso, hacer la primera parte antes del paso 7.
     - Ingresar con la identidad digital simulada (`ciudadana.demo`, documento CC 1000000001, el mismo que consulta el paso 7).
     - En "Avisos", marcar "Datos personales" y escribir un correo. El portal no conoce ese correo: solo guarda la elección y un identificador opaco.
     - Tras el paso 7, Mailpit (`http://localhost:8025`) muestra el aviso "Una entidad consultó tus datos", sin datos de la persona ni de la consulta.
     - En "¿Quién consultó mis datos?" aparece la consulta: Programas Sociales, qué API y qué datos, para "Verificación de requisitos de un trámite", con el funcionario como referencia.
-    - Cuando deja de decir "En sellado" (unos segundos), pulsar "Verificar". La Carpeta comprueba por su cuenta la firma del operador, la inclusión en el lote sellado y el sello de tiempo de la TSA, sin confiar en el portal. El comprobante se puede descargar y verificar también con `den-verify-receipt`.
+    - Cuando deja de decir "En sellado" (unos segundos), pulsar "Verificar". La app ciudadana comprueba por su cuenta la firma del operador, la inclusión en el lote sellado y el sello de tiempo de la TSA, sin confiar en el portal. El comprobante se puede descargar y verificar también con `den-verify-receipt`.
 
 ## Mensajes clave para la audiencia
 

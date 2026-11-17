@@ -297,11 +297,11 @@ details.faq[open] summary { color: var(--gov); }
 
 <header class="hero">
   <div class="hero-inner">
-    <span class="eyebrow">Sesión de arquitectura y despliegue · martes 17 de noviembre de 2026</span>
+    <span class="eyebrow">Guía del operador · Arquitectura y despliegue</span>
     <h1>Cómo funciona la plataforma y cómo se instala</h1>
     <p class="lede">Qué es cada pieza de la Red de Intercambio de Datos, por qué está y quién la opera. Al final, la instalación de la infraestructura central en el servidor del operador, paso a paso.</p>
     <div class="meta">
-      <span><b>Para</b> el operador (AND) y el regulador (MinTIC)</span>
+      <span><b>Para</b> el operador de la red y el regulador</span>
       <span><b>Versión</b> 1.2 · noviembre 2026</span>
       <span><b>Código</b> con el hito M6 (endurecimiento) cerrado</span>
       <span><b>Topología</b> piloto en un servidor</span>
@@ -369,7 +369,7 @@ details.faq[open] summary { color: var(--gov); }
         <div class="principle"><b>Todo queda auditado</b><span>Cada cambio va a una bitácora encadenada por hash y sellada a diario por una autoridad de sellado de tiempo.</span></div>
         <div class="principle"><b>El ciudadano ve quién lo consultó</b><span>Para qué y cuándo, con un comprobante que cualquiera puede verificar sin confiar en el portal.</span></div>
         <div class="principle"><b>Solo software libre</b><span>Licencias aprobadas por la OSI: sin costos de licencia ni dependencia de un proveedor.</span></div>
-        <div class="principle"><b>Reutilizable en otro país</b><span>Todo lo propio de Colombia (autoridades, documentos, sectores, marco legal) está en <code>config/country/co.yaml</code>.</span></div>
+        <div class="principle"><b>Reutilizable en otro país</b><span>Todo lo propio de un país (autoridades, documentos, sectores, marco legal) está en <code>config/country/&lt;código&gt;.yaml</code>; <code>co.yaml</code> (Colombia) es la referencia.</span></div>
       </div>
     </section>
 
@@ -386,10 +386,10 @@ details.faq[open] summary { color: var(--gov); }
             <text x="95" y="46" text-anchor="middle" class="d-tb">Ciudadano</text>
             <text x="95" y="64" text-anchor="middle" class="d-ts">ve quién lo consultó</text>
             <rect x="270" y="22" width="190" height="56" rx="8" class="d-gov"></rect>
-            <text x="365" y="46" text-anchor="middle" class="d-tb">Operador (AND)</text>
+            <text x="365" y="46" text-anchor="middle" class="d-tb">Operador</text>
             <text x="365" y="64" text-anchor="middle" class="d-ts">opera, revisa y publica</text>
             <rect x="560" y="22" width="190" height="56" rx="8" class="d-gov"></rect>
-            <text x="655" y="46" text-anchor="middle" class="d-tb">Regulador (MinTIC)</text>
+            <text x="655" y="46" text-anchor="middle" class="d-tb">Regulador</text>
             <text x="655" y="64" text-anchor="middle" class="d-ts">supervisa, aprueba lo sensible</text>
             <line x1="270" y1="50" x2="172" y2="50" class="d-line" marker-end="url(#r-ah)"></line>
             <text x="221" y="42" text-anchor="middle" class="d-ts">transparencia</text>
@@ -422,9 +422,9 @@ details.faq[open] summary { color: var(--gov); }
       </figure>
 
       <div class="roles">
-        <div class="role"><header><code>platform_admin</code><span class="tag mfa">2.º factor</span></header><span class="who">Equipo técnico de la AND</span><p>Todo lo operativo: aprobar entidades, publicar, gestionar nodos, suspender.</p></div>
-        <div class="role"><header><code>platform_reviewer</code><span class="tag mfa">2.º factor</span></header><span class="who">Analistas de la AND</span><p>Revisar altas de entidades y publicaciones de APIs.</p></div>
-        <div class="role"><header><code>regulator</code><span class="tag mfa">2.º factor</span></header><span class="who">MinTIC</span><p>Ver todo en solo lectura; aprobar publicaciones y accesos a datos <b>sensibles</b>; indicadores; auditoría.</p></div>
+        <div class="role"><header><code>platform_admin</code><span class="tag mfa">2.º factor</span></header><span class="who">Equipo técnico del operador</span><p>Todo lo operativo: aprobar entidades, publicar, gestionar nodos, suspender.</p></div>
+        <div class="role"><header><code>platform_reviewer</code><span class="tag mfa">2.º factor</span></header><span class="who">Analistas del operador</span><p>Revisar altas de entidades y publicaciones de APIs.</p></div>
+        <div class="role"><header><code>regulator</code><span class="tag mfa">2.º factor</span></header><span class="who">Regulador</span><p>Ver todo en solo lectura; aprobar publicaciones y accesos a datos <b>sensibles</b>; indicadores; auditoría.</p></div>
         <div class="role"><header><code>auditor</code><span class="tag mfa">2.º factor</span></header><span class="who">Órganos de control</span><p>Solo lectura de la auditoría.</p></div>
         <div class="role"><header><code>entity_admin</code></header><span class="who">Cada entidad</span><p>Su gente y sus roles, sus nodos del kit.</p></div>
         <div class="role"><header><code>api_publisher</code></header><span class="who">Cada entidad</span><p>Registrar sus APIs y enviarlas a revisión.</p></div>
@@ -686,7 +686,7 @@ details.faq[open] summary { color: var(--gov); }
       <h3>Utilería del piloto (no va a producción)</h3>
       <ul class="ticks">
         <li><b>Proveedores de prueba</b> (<code>mock-salud</code>, <code>mock-socioeconomico</code>): simulan dos entidades con datos sintéticos.</li>
-        <li><b>Carpeta ciudadana de referencia</b> (<code>/citizen-app</code>): muestra lo que debe implementar la carpeta real del país.</li>
+        <li><b>App ciudadana de referencia</b> (<code>/citizen-app</code>): muestra lo que debe implementar la app ciudadana real del país.</li>
         <li><b>Datos semilla:</b> tres entidades ficticias y los usuarios de demo.</li>
       </ul>
     </section>
@@ -706,7 +706,7 @@ details.faq[open] summary { color: var(--gov); }
         <ol class="steps">
           <li><span>El publicador de la entidad sube el contrato OpenAPI, dice dónde vive el servicio, qué datos expone, la base legal y las finalidades permitidas.</span></li>
           <li><span>Al enviarla a revisión, el portal prueba la conectividad a través del gateway y el contrato contra el sandbox.</span></li>
-          <li><span>La AND revisa la ficha y la minimización de datos. Si la clasificación es <b>sensible</b>, MinTIC también aprueba.</span></li>
+          <li><span>El operador revisa la ficha y la minimización de datos. Si la clasificación es <b>sensible</b>, el regulador también aprueba.</span></li>
           <li><span>Al publicarla, la ruta aparece en el gateway en segundos, <b>cerrada</b>: sin suscripciones, nadie entra.</span></li>
         </ol>
       </div>
@@ -784,7 +784,7 @@ details.faq[open] summary { color: var(--gov); }
 
       <div class="flowcard">
         <h3>Rendición de cuentas al ciudadano</h3>
-        <p class="prose">Cada consulta autorizada a datos de una persona queda en el registro de transparencia con el seudónimo del titular. Cada 10 segundos se agrupan en lotes firmados por el operador y sellados por la TSA. Desde su carpeta, el ciudadano ve quién lo consultó y para qué, recibe avisos y descarga un comprobante que <b>cualquiera puede verificar sin confiar en el portal</b>, con el verificador abierto <code>den-verify-receipt</code>.</p>
+        <p class="prose">Cada consulta autorizada a datos de una persona queda en el registro de transparencia con el seudónimo del titular. Cada 10 segundos se agrupan en lotes firmados por el operador y sellados por la TSA. Desde la app ciudadana, el ciudadano ve quién lo consultó y para qué, recibe avisos y descarga un comprobante que <b>cualquiera puede verificar sin confiar en el portal</b>, con el verificador abierto <code>den-verify-receipt</code>.</p>
       </div>
     </section>
 
@@ -859,7 +859,7 @@ sudo ./install.sh</code></pre></div>
 
       <div class="qs">
         <div class="q"><div class="qn">Paso<b>1</b></div><div><h4>Verificación del servidor</h4><p class="auto">Sin preguntas. Sistema, CPU, RAM, disco, Docker y Compose ≥ 2.26, <code>/dev/net/tun</code>, puertos libres y DNS. Se detiene si falta algo imprescindible.</p></div></div>
-        <div class="q"><div class="qn">Paso<b>2</b></div><div><h4>País</h4><p>El código de <code>config/country/&lt;código&gt;.yaml</code>. Para Colombia, <code>co</code>.</p></div></div>
+        <div class="q"><div class="qn">Paso<b>2</b></div><div><h4>País</h4><p>El código de <code>config/country/&lt;código&gt;.yaml</code>. Por ejemplo, <code>co</code> (Colombia).</p></div></div>
         <div class="q"><div class="qn">Paso<b>3</b></div><div><h4>Nombres del portal y del gateway</h4><p>Solo el nombre, sin <code>https://</code>. El del gateway es por defecto <code>gw.&lt;portal&gt;</code> y debe ser distinto del portal.</p></div></div>
         <div class="q"><div class="qn">Paso<b>4</b></div><div><h4>Proxy de entrada y certificado del portal</h4>
           <div class="opts">
@@ -903,7 +903,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td><code>https://&lt;portal&gt;/mail</code></td><td class="wrap">Correo de pruebas: todo el correo del piloto llega aquí, con usuario y contraseña</td><td>Operador</td></tr>
             <tr><td><code>https://&lt;portal&gt;/grafana/</code></td><td class="wrap">Tablero del operador, con su propio usuario <code>admin</code> (con observabilidad)</td><td>Operador</td></tr>
             <tr><td><code>https://&lt;portal&gt;/api/v1/gateway/jwks</code></td><td class="wrap">Claves públicas con las que los proveedores verifican la aserción del gateway</td><td>Proveedores</td></tr>
-            <tr><td><code>https://&lt;portal&gt;/citizen-app</code></td><td class="wrap">Carpeta ciudadana de referencia (demo de transparencia)</td><td>Demos</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/citizen-app</code></td><td class="wrap">App ciudadana de referencia (demo de transparencia)</td><td>Demos</td></tr>
           </tbody>
         </table>
       </div>
@@ -929,13 +929,13 @@ sudo ./install.sh</code></pre></div>
         <table class="t">
           <thead><tr><th>Secreto</th><th>Por qué importa</th><th>Custodia sugerida</th></tr></thead>
           <tbody>
-            <tr><td><code>.env</code> completo</td><td class="wrap">Sin él no se recuperan los datos ni se verifican comprobantes</td><td class="wrap">AND, copia cifrada fuera del servidor</td></tr>
-            <tr><td><code>DEN_SUBJECT_REF_KEY</code><br><code>DEN_END_USER_HASH_SALT</code></td><td class="wrap">Definen los seudónimos; <b>no se rotan</b></td><td>AND</td></tr>
-            <tr><td>Volumen de step-ca</td><td class="wrap">Llaves de la CA de la red</td><td class="wrap">AND, respaldo cifrado</td></tr>
-            <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Cifra los respaldos de la base: sin ella no se restaura ninguno</td><td class="wrap">AND, copia fuera del servidor, junto al <code>.env</code></td></tr>
-            <tr><td><code>DEN_SECRETS_KEY</code></td><td class="wrap">Sella los secretos de los clientes y la clave con la que firma el gateway</td><td class="wrap">AND, dentro del <code>.env</code></td></tr>
-            <tr><td>Administrador de Keycloak</td><td class="wrap">Control de las identidades</td><td class="wrap">AND, dos personas</td></tr>
-            <tr><td>Usuarios <code>regulator</code></td><td class="wrap">Supervisión</td><td>MinTIC</td></tr>
+            <tr><td><code>.env</code> completo</td><td class="wrap">Sin él no se recuperan los datos ni se verifican comprobantes</td><td class="wrap">Operador, copia cifrada fuera del servidor</td></tr>
+            <tr><td><code>DEN_SUBJECT_REF_KEY</code><br><code>DEN_END_USER_HASH_SALT</code></td><td class="wrap">Definen los seudónimos; <b>no se rotan</b></td><td>Operador</td></tr>
+            <tr><td>Volumen de step-ca</td><td class="wrap">Llaves de la CA de la red</td><td class="wrap">Operador, respaldo cifrado</td></tr>
+            <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Cifra los respaldos de la base: sin ella no se restaura ninguno</td><td class="wrap">Operador, copia fuera del servidor, junto al <code>.env</code></td></tr>
+            <tr><td><code>DEN_SECRETS_KEY</code></td><td class="wrap">Sella los secretos de los clientes y la clave con la que firma el gateway</td><td class="wrap">Operador, dentro del <code>.env</code></td></tr>
+            <tr><td>Administrador de Keycloak</td><td class="wrap">Control de las identidades</td><td class="wrap">Operador, dos personas</td></tr>
+            <tr><td>Usuarios <code>regulator</code></td><td class="wrap">Supervisión</td><td>Regulador</td></tr>
           </tbody>
         </table>
       </div>
@@ -950,7 +950,7 @@ sudo ./install.sh</code></pre></div>
         <div class="cmd"><code>sudo ./install.sh credentials</code><button class="copy" type="button">Copiar</button><span>Usuarios de demo, administrador de Keycloak, correo de pruebas y Grafana.</span></div>
         <div class="cmd"><code>sudo ./install.sh otp</code><button class="copy" type="button">Copiar</button><span>Código vigente de segundo factor de los usuarios de demo con rol crítico.</span></div>
         <div class="cmd"><code>sudo ./install.sh logs api</code><button class="copy" type="button">Copiar</button><span>Logs de un servicio (<code>api</code>, <code>apisix</code>, <code>keycloak</code>, <code>edge</code>…), o de todos sin argumento.</span></div>
-        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copiar</button><span>Respaldo completo y copia en <code>backups/&lt;fecha&gt;/</code>: volcados de <code>den</code> y <code>keycloak</code>, el repositorio de respaldos (cifrado), volúmenes de la CA, la TSA, documentos y carpeta, y <code>.env</code>. Los archivos van fuera del servidor. Los respaldos diarios ya corren solos.</span></div>
+        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copiar</button><span>Respaldo completo y copia en <code>backups/&lt;fecha&gt;/</code>: volcados de <code>den</code> y <code>keycloak</code>, el repositorio de respaldos (cifrado), volúmenes de la CA, la TSA, documentos y app ciudadana, y <code>.env</code>. Los archivos van fuera del servidor. Los respaldos diarios ya corren solos.</span></div>
         <div class="cmd"><code>sudo ./install.sh restore</code><button class="copy" type="button">Copiar</button><span>Restaura la base al último estado archivado; con un instante (<code>"2026-11-20 14:30:00-05"</code>), a ese momento. Detiene y arranca todo.</span></div>
         <div class="cmd"><code>sudo ./install.sh update</code><button class="copy" type="button">Copiar</button><span>Respaldo, <code>git pull --ff-only</code>, recompilación y reinicio.</span></div>
         <div class="cmd"><code>sudo ./install.sh stop</code><button class="copy" type="button">Copiar</button><span>Detiene todo sin perder datos; <code>start</code> lo vuelve a arrancar.</span></div>
@@ -1038,7 +1038,7 @@ sudo ./install.sh</code></pre></div>
         <details class="faq"><summary>¿Qué pasa si se cae el portal?</summary><p>El tráfico entre entidades sigue con la última configuración y la última política. Solo se detienen los cambios: nuevas aprobaciones y publicaciones. Está probado: con el portal caído, las llamadas siguen; OPA y APISIX reinician sin él, y al volver el portal recupera los registros de transparencia de la caída.</p></details>
         <details class="faq"><summary>¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?</summary><p>Por la aserción firmada (<code>X-DEN-Assertion</code>): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.</p></details>
         <details class="faq"><summary>¿Cuánto tráfico aguanta?</summary><p>En la máquina de desarrollo, 200 consultas por segundo con un p95 de 13 ms agregados por el gateway. La meta, 500 por segundo, se valida en un entorno tipo producción. La capacidad crece con más nodos de gateway: cada uno cuenta los límites por su lado y la política le da su parte.</p></details>
-        <details class="faq"><summary>¿El portal está en inglés?</summary><p>Sí, completo, además del español, que es el idioma por omisión. Los correos y la carpeta ciudadana también son bilingües.</p></details>
+        <details class="faq"><summary>¿El portal está en inglés?</summary><p>Sí, completo, además del español, que es el idioma por omisión. Los correos y la app ciudadana también son bilingües.</p></details>
         <details class="faq"><summary>¿Una entidad tiene que abrir puertos de entrada?</summary><p>No, si usa el kit: el nodo abre el túnel hacia afuera (UDP 51820). Con una API existente, la entidad debe permitir que el gateway llegue a ella.</p></details>
         <details class="faq"><summary>¿Se puede integrar con X-Road?</summary><p>Sí: el gateway puede usar un Security Server del operador como cliente X-Road.</p></details>
         <details class="faq"><summary>¿Quién aprueba el acceso a datos sensibles?</summary><p>El responsable de datos de la entidad dueña y, además, el regulador.</p></details>

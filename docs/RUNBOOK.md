@@ -2,7 +2,7 @@
 
 > Versión en español: [docs/es/RUNBOOK.md](es/RUNBOOK.md)
 
-Procedures for the network operator (in Colombia, the AND) for what is not routine: onboarding an entity, responding to an incident, rotating the intermediate CA and mass-revoking certificates. Daily operation, backups and common problems are in [`OPERATIONS.md`](OPERATIONS.md); deployment, in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+Procedures for the network operator for what is not routine: onboarding an entity, responding to an incident, rotating the intermediate CA and mass-revoking certificates. Daily operation, backups and common problems are in [`OPERATIONS.md`](OPERATIONS.md); deployment, in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 Conventions:
 
@@ -57,7 +57,7 @@ Check: the entity shows as active in Console → Entities, its node online in Co
 
    | Severity | Examples | Response |
    | :-- | :-- | :-- |
-   | **Critical** | Personal data leak; compromised key or certificate in use; gateway down for the whole network; audit chain tampered with | Immediate, at any hour. Notify the regulator (MinTIC) and the affected entities |
+   | **Critical** | Personal data leak; compromised key or certificate in use; gateway down for the whole network; audit chain tampered with | Immediate, at any hour. Notify the regulator and the affected entities |
    | **High** | One entity or application compromised; portal down (the gateway keeps working); backups failing | Within the hour, during extended hours |
    | **Medium** | One entity node offline; reconciliation with errors; certificate about to expire | Within the business day |
    | **Low** | Isolated errors with no effect on traffic | In the next planned window |

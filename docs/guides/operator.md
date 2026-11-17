@@ -2,11 +2,11 @@
 
 > Versión en español: [docs/es/guides/operator.md](../es/guides/operator.md)
 
-Version 1.2 · November 2026 · code with milestone M6 (hardening) closed · for the architecture and deployment session with the operator (AND) and the regulator (MinTIC)
+Version 1.2 · November 2026 · code with milestone M6 (hardening) closed · for the network operator and the regulator
 
 This guide explains **what each piece of the platform is, why it is there and who runs it**, and how the central infrastructure is deployed. For technical detail it refers to `ARCHITECTURE.md`, `DEPLOYMENT.md` and `OPERATIONS.md`; the step-by-step installation is in [`INSTALL.md`](../INSTALL.md).
 
-## Suggested agenda (Tuesday)
+## Suggested agenda (one-day session)
 
 | Block | Content | Section |
 | :-- | :-- | :-- |
@@ -27,33 +27,33 @@ The Data Exchange Network (DEN) lets a public entity **query another entity's da
 - **Everything is audited.** Every change (who approved what, and when) goes into a hash-chained audit log that a timestamping authority seals daily: it cannot be rewritten without anyone noticing.
 - **Citizens see who queried their data**, what for and when, with a verifiable receipt.
 - **Only free software** with an OSI-approved license: no license costs and no vendor lock-in.
-- **Reusable in any country:** everything specific to Colombia (authorities, document types, sectors, legal framework) is in `config/country/co.yaml`.
+- **Reusable in any country:** everything specific to a country (authorities, document types, sectors, legal framework) is in `config/country/<code>.yaml`; `co.yaml` (Colombia) is the reference.
 
 ## 2. Who does what
 
 ```mermaid
 flowchart LR
   subgraph Platform
-    AND["Operator (AND)<br/>runs the platform,<br/>reviews and publishes APIs"]
-    MIN["Regulator (MinTIC)<br/>supervises, approves sensitive data,<br/>receives the audit anchors"]
+    OP["Operator<br/>runs the platform,<br/>reviews and publishes APIs"]
+    REG["Regulator<br/>supervises, approves sensitive data,<br/>receives the audit anchors"]
   end
   subgraph Entities
     P["Provider entity<br/>publishes APIs,<br/>its data steward approves access"]
     C["Consumer entity<br/>creates applications,<br/>requests access with a purpose"]
   end
   CIU["Citizen<br/>sees who queried their data"]
-  P -- "publishes" --> AND
-  AND -- "sensitive" --> MIN
+  P -- "publishes" --> OP
+  OP -- "sensitive" --> REG
   C -- "requests" --> P
   C == "queries through the gateway" ==> P
-  CIU -. "transparency" .- AND
+  CIU -. "transparency" .- OP
 ```
 
 | Role | Who | Can |
 | :-- | :-- | :-- |
-| `platform_admin` | AND technical team | Everything operational: approve entities, publish, manage nodes, suspend |
-| `platform_reviewer` | AND analysts | Review entity registrations and API publications |
-| `regulator` | MinTIC | See everything read-only; approve publications of and access to **sensitive** data; indicators; audit |
+| `platform_admin` | Operator's technical team | Everything operational: approve entities, publish, manage nodes, suspend |
+| `platform_reviewer` | Operator's analysts | Review entity registrations and API publications |
+| `regulator` | Regulator | See everything read-only; approve publications of and access to **sensitive** data; indicators; audit |
 | `auditor` | Oversight bodies | Read-only access to the audit |
 | `entity_admin` | Each entity | Its people and their roles, its nodes |
 | `api_publisher` | Each entity | Register its APIs and submit them for review |
@@ -147,7 +147,7 @@ For each one: **what it does**, **what happens if it goes down** and **what it s
 ### 4.4 Pilot tooling (does not go to production)
 
 - **Test providers** (`mock-salud`, `mock-socioeconomico`): they simulate two entities with synthetic data.
-- **Reference citizen folder** (`/citizen-app`): shows what the country's real citizen folder must implement (requests, notifications, receipts).
+- **Reference citizen app** (`/citizen-app`): shows what the country's real citizen app must implement (requests, notifications, receipts).
 - **Seed data:** three fictitious entities and the demo users.
 
 ## 5. How everything flows
@@ -160,7 +160,7 @@ draft → in review → approved by the operator → [approved by the regulator,
 
 1. The entity's publisher uploads the OpenAPI contract and states where the service lives, which data it exposes, the legal basis and the allowed purposes.
 2. When it is submitted for review, the portal tests connectivity (through the gateway) and the contract against the sandbox.
-3. The AND reviews the API's details and data minimization. If the classification is **sensitive**, MinTIC approves too.
+3. The operator reviews the API's details and data minimization. If the classification is **sensitive**, the regulator approves too.
 4. Once published, the route appears in the gateway within seconds, **closed**: with no subscriptions, nobody gets in.
 
 ### 5.2 Requesting and granting access
@@ -236,13 +236,13 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 
 | Secret | Why it matters | Suggested custodian |
 | :-- | :-- | :-- |
-| The full `.env` | Without it, the data cannot be recovered and receipts cannot be verified | AND, encrypted copy off the server |
-| `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | They define the pseudonyms; **they are not rotated** | AND |
-| The step-ca volume | The network CA's keys | AND (encrypted backup) |
-| `PGBACKREST_REPO1_CIPHER_PASS` | Encrypts the database backups: without it, none of them can be restored | AND, copy off the server, next to the `.env` |
-| `DEN_SECRETS_KEY` | Seals the clients' secrets and the key the gateway signs with | AND, inside the `.env` |
-| Keycloak administrator | Control over identities | AND, two people |
-| Users with the `regulator` role | Oversight | MinTIC |
+| The full `.env` | Without it, the data cannot be recovered and receipts cannot be verified | Operator, encrypted copy off the server |
+| `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | They define the pseudonyms; **they are not rotated** | Operator |
+| The step-ca volume | The network CA's keys | Operator (encrypted backup) |
+| `PGBACKREST_REPO1_CIPHER_PASS` | Encrypts the database backups: without it, none of them can be restored | Operator, copy off the server, next to the `.env` |
+| `DEN_SECRETS_KEY` | Seals the clients' secrets and the key the gateway signs with | Operator, inside the `.env` |
+| Keycloak administrator | Control over identities | Operator, two people |
+| Users with the `regulator` role | Oversight | Regulator |
 
 ## 8. Day-to-day operations
 
@@ -297,7 +297,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 - **What happens if the portal goes down?** Traffic between entities keeps flowing with the latest configuration and the latest policy. Only changes stop (new approvals, publications). It is tested: with the portal down, calls keep going; OPA and APISIX restart without it, and when the portal comes back it recovers the transparency records from the outage.
 - **How does the provider know a request really comes from the gateway?** Through the signed assertion (`X-DEN-Assertion`): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.
 - **How much traffic can it handle?** On the development machine, 200 requests per second with a p95 of 13 ms added by the gateway. The target, 500 per second, will be validated in a production-like environment. Capacity grows with more gateway nodes: each one counts limits on its own, and the policy gives it its share.
-- **Is the portal available in English?** Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen folder are bilingual too.
+- **Is the portal available in English?** Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen app are bilingual too.
 - **Does an entity have to open inbound ports?** Not if it uses the kit: the node opens the tunnel outbound (UDP 51820). With an existing API, the entity must allow the gateway to reach it.
 - **Can it be integrated with X-Road?** Yes: the gateway can use an operator's Security Server as an X-Road client (`ARCHITECTURE.md §10`).
 - **Who approves access to sensitive data?** The data steward of the entity that owns the data and, in addition, the regulator.
