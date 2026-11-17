@@ -1,6 +1,6 @@
 name: Images
 
-# Our container images for the Helm chart (infra/helm/rid, values.yaml images.*): built, scanned
+# Our container images for the Helm chart (infra/helm/den, values.yaml images.*): built, scanned
 # for known vulnerabilities and published with their SBOM (M6-05, ASVS 15.1.2 and 15.2.1).
 # Runs on a release tag (v1.2.3 publishes 1.2.3, the chart's appVersion) or by hand, where it
 # only builds and scans unless `publish` is set.
@@ -39,11 +39,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: rid-portal-api, context: ., dockerfile: apps/api/Dockerfile }
-          - { name: rid-portal-web, context: ., dockerfile: apps/web/Dockerfile }
-          - { name: rid-wg-hub, context: infra/wg-hub, dockerfile: infra/wg-hub/Dockerfile }
+          - { name: den-portal-api, context: ., dockerfile: apps/api/Dockerfile }
+          - { name: den-portal-web, context: ., dockerfile: apps/web/Dockerfile }
+          - { name: den-wg-hub, context: infra/wg-hub, dockerfile: infra/wg-hub/Dockerfile }
           - {
-              name: rid-contract-runner,
+              name: den-contract-runner,
               context: infra/contract-runner,
               dockerfile: infra/contract-runner/Dockerfile,
             }

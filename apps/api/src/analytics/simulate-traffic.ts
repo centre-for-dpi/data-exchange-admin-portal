@@ -1,9 +1,9 @@
 // `pnpm traffic:simulate [--from YYYY-MM-DD] [--days 30] [--scale 1] [--seed 42]`: a simulated
 // month of the network's traffic for demos and the closing of M5 (synthetic-traffic.ts). Writes
-// access-log documents into rid-access-synthetic-YYYY.MM (part of the analytics, deleted apart:
+// access-log documents into den-access-synthetic-YYYY.MM (part of the analytics, deleted apart:
 // `--clear`). Development and demo deployments only.
 import { parseArgs } from 'node:util';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { localDay } from '../common/local-day.js';
 import { loadDevEnv } from '../dev-env.js';
@@ -19,13 +19,13 @@ import {
 } from './synthetic-traffic.js';
 import { addDays } from './usage-query.js';
 
-const INDEX_PREFIX = 'rid-access-synthetic-';
+const INDEX_PREFIX = 'den-access-synthetic-';
 const BATCH = 5_000;
 
 async function main(): Promise<void> {
   loadDevEnv();
-  if (process.env.NODE_ENV === 'production' && process.env.RID_ALLOW_SYNTHETIC_TRAFFIC !== 'true') {
-    throw new Error('Refusing synthetic traffic in production (RID_ALLOW_SYNTHETIC_TRAFFIC=true)');
+  if (process.env.NODE_ENV === 'production' && process.env.DEN_ALLOW_SYNTHETIC_TRAFFIC !== 'true') {
+    throw new Error('Refusing synthetic traffic in production (DEN_ALLOW_SYNTHETIC_TRAFFIC=true)');
   }
   const { values } = parseArgs({
     options: {
@@ -34,7 +34,7 @@ async function main(): Promise<void> {
       scale: { type: 'string', default: '1' },
       seed: { type: 'string', default: '42' },
       clear: { type: 'boolean', default: false },
-      // A tag of its own (tests): rid-access-synthetic-<tag>-YYYY.MM, cleared apart.
+      // A tag of its own (tests): den-access-synthetic-<tag>-YYYY.MM, cleared apart.
       tag: { type: 'string' },
     },
   });

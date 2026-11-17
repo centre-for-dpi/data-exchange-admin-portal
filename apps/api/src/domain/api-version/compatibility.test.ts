@@ -16,7 +16,7 @@ const base = () => ({
     '/afiliados/{numero}': {
       get: {
         operationId: 'consultarAfiliado',
-        'x-rid-data-subject': { in: 'path', name: 'numero' },
+        'x-den-data-subject': { in: 'path', name: 'numero' },
         parameters: [
           { name: 'numero', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'fecha', in: 'query', schema: { type: 'string' } },
@@ -113,8 +113,8 @@ describe('OpenAPI compatibility (ADR-0019)', () => {
   });
 
   it('rejects changes to the data subject declaration and to security', () => {
-    const subject = changed((d) => void (op(d)['x-rid-data-subject'] = 'none'));
-    expect(breakingChanges(base(), subject)[0]).toContain('x-rid-data-subject');
+    const subject = changed((d) => void (op(d)['x-den-data-subject'] = 'none'));
+    expect(breakingChanges(base(), subject)[0]).toContain('x-den-data-subject');
     const security = changed((d) => void (op(d).security = [{ oauth: [] }]));
     expect(breakingChanges(base(), security)[0]).toContain('security');
   });
@@ -124,10 +124,10 @@ describe('OpenAPI compatibility (ADR-0019)', () => {
     // operations only: the operation would lose its data subject.
     const moved = changed((d) => {
       const item = d.paths['/afiliados/{numero}'] as Record<string, unknown>;
-      item['x-rid-data-subject'] = op(d)['x-rid-data-subject'];
-      delete op(d)['x-rid-data-subject'];
+      item['x-den-data-subject'] = op(d)['x-den-data-subject'];
+      delete op(d)['x-den-data-subject'];
     });
-    expect(breakingChanges(base(), moved).join(' ')).toContain('x-rid-data-subject');
+    expect(breakingChanges(base(), moved).join(' ')).toContain('x-den-data-subject');
     // A path item behind $ref is not an operation for the gateway.
     const referenced = changed((d) => {
       (d.components as Record<string, unknown>).pathItems = {

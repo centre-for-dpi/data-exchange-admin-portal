@@ -1,7 +1,7 @@
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { IntegrationGuide } from '../../../../components/apps/integration-guide';
 import { guideSnippets } from '../../../../lib/integration-guide';
-import { applicationDetailSchema } from '@rid/contracts';
+import { applicationDetailSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -69,7 +69,7 @@ export default async function ApplicationPage({ params }: PageProps) {
     `  -keyout ${app.clientId}.key -out ${app.clientId}.csr \\`,
     `  -subj "/CN=${app.clientId}"`,
   ].join('\n');
-  const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
+  const gateway = process.env.DEN_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
   // The guide's programs (M5-08); with mTLS (M3-10) both calls present the application's
   // certificate and trust the gateway through the network CA.
   const snippets = guideSnippets({

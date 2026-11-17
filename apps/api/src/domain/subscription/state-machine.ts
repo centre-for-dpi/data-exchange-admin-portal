@@ -1,4 +1,4 @@
-import type { SubscriptionStatus } from '@rid/contracts';
+import type { SubscriptionStatus } from '@den/contracts';
 import { InvalidTransitionError } from '../../common/errors.js';
 
 /**

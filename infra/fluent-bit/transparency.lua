@@ -27,7 +27,7 @@ end
 
 -- Only calls OPA let through to the provider (an upstream answered or was tried) and that carry
 -- the data-subject reference OPA computed. A client cannot forge either: $upstream_status is
--- set by nginx when it proxies, and the gateway removes client-sent X-RID-Subject-Ref before OPA.
+-- set by nginx when it proxies, and the gateway removes client-sent X-DEN-Subject-Ref before OPA.
 local function keep(entry)
   if type(entry) ~= "table" then
     return nil

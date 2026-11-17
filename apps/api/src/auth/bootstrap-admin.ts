@@ -3,7 +3,7 @@ import type { AuditService } from '../audit/audit.service.js';
 
 /**
  * The network's first platform administrator in production (M6-05), where there is no seed: the
- * operator sets RID_BOOTSTRAP_ADMIN_EMAIL before that person's first sign-in. When someone
+ * operator sets DEN_BOOTSTRAP_ADMIN_EMAIL before that person's first sign-in. When someone
  * registers with exactly that address, verified by the identity provider, and the network has no
  * platform administrator at all, they get the role, audited. From then on the setting does nothing:
  * further roles are granted from the console (and the variable should be removed).
@@ -37,7 +37,7 @@ export async function bootstrapPlatformAdmin(
     actor: BOOTSTRAP_ACTOR,
     action: 'platform_role.granted',
     target: { type: 'user', id: candidate.userId },
-    after: { role: 'platform_admin', reason: 'RID_BOOTSTRAP_ADMIN_EMAIL' },
+    after: { role: 'platform_admin', reason: 'DEN_BOOTSTRAP_ADMIN_EMAIL' },
     requestId,
   });
   return true;

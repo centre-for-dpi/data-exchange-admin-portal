@@ -1,10 +1,10 @@
 --
--- rid-client-cert: passes OPA the thumbprint of the client certificate verified in the TLS
+-- den-client-cert: passes OPA the thumbprint of the client certificate verified in the TLS
 -- handshake (SPIKE S-3, ARCHITECTURE.md §3.2).
 --
 -- RFC 8705 x5t#S256: base64url (no padding) of the SHA-256 of the certificate's DER. nginx's
 -- $ssl_client_fingerprint is the SHA-1 and cannot be used. The value goes in
--- X-RID-Client-Cert-S256, after removing whatever the client sent in that header, and only when
+-- X-DEN-Client-Cert-S256, after removing whatever the client sent in that header, and only when
 -- nginx verified the certificate against the network CA (ssl_client_verify = SUCCESS). OPA compares
 -- it with the token's cnf["x5t#S256"] and with the application's valid certificates, and never
 -- returns it, so the opa plugin removes it before the upstream (SPIKE S-1).
@@ -16,7 +16,7 @@ local core = require("apisix.core")
 local ngx_ssl = require("ngx.ssl")
 local resty_sha256 = require("resty.sha256")
 
-local HEADER = "X-RID-Client-Cert-S256"
+local HEADER = "X-DEN-Client-Cert-S256"
 
 local schema = {
     type = "object",
@@ -27,7 +27,7 @@ local schema = {
 local _M = {
     version = 0.1,
     priority = 1025,
-    name = "rid-client-cert",
+    name = "den-client-cert",
     schema = schema,
 }
 

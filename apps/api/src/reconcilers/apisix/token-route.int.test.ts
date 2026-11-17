@@ -42,17 +42,17 @@ const cnfOf = (token: string | undefined) =>
 describe('token route of the gateway: tokens bound to the client certificate (M3-10)', () => {
   const settings: GatewaySettings = {
     keycloakDiscoveryUrl:
-      'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-    audience: 'rid-gateway',
+      'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+    audience: 'den-gateway',
     opaUrl: 'http://opa:8181',
     accessLogUrl: 'http://fluent-bit:9880/',
     transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     resolveHost: () => Promise.resolve([]),
-    tls: { hosts: ['localhost'], mtlsRequired: true, clientName: 'rid-gateway' },
+    tls: { hosts: ['localhost'], mtlsRequired: true, clientName: 'den-gateway' },
   };
   const ca = new StepCaClient();
-  const clientId = `rid-app-m3-10-${randomUUID()}`;
+  const clientId = `den-app-m3-10-${randomUUID()}`;
   const secret = randomBytes(32).toString('base64url');
   let app: NestFastifyApplication;
   let root = '';
@@ -135,7 +135,7 @@ describe('token route of the gateway: tokens bound to the client certificate (M3
     await reconciler.reconcileTokenRoute();
     root = await ca.rootCertificate();
     mine = await issue(clientId);
-    other = await issue(`rid-app-m3-10-other-${randomUUID()}`);
+    other = await issue(`den-app-m3-10-other-${randomUUID()}`);
     // The client as the Keycloak reconciler makes it with features.mtls.required.
     await app.get<KeycloakGatewayAdmin>(KEYCLOAK_ADMIN).createClient({
       clientId,
@@ -147,7 +147,7 @@ describe('token route of the gateway: tokens bound to the client certificate (M3
       standardFlowEnabled: false,
       directAccessGrantsEnabled: false,
       implicitFlowEnabled: false,
-      attributes: { 'rid.managed': 'true', [BOUND_TOKENS_ATTRIBUTE]: 'true' },
+      attributes: { 'den.managed': 'true', [BOUND_TOKENS_ATTRIBUTE]: 'true' },
       secret,
     });
     // APISIX applies what etcd says within moments.
@@ -162,7 +162,7 @@ describe('token route of the gateway: tokens bound to the client certificate (M3
 
   afterAll(async () => {
     const token = await masterToken();
-    const admin = `${KEYCLOAK}/admin/realms/rid-gateway/clients`;
+    const admin = `${KEYCLOAK}/admin/realms/den-gateway/clients`;
     const found = (await (
       await fetch(`${admin}?clientId=${clientId}`, {
         headers: { authorization: `Bearer ${token}` },
@@ -205,7 +205,7 @@ describe('token route of the gateway: tokens bound to the client certificate (M3
     expect(overHttp.body.access_token).toBeUndefined();
     // Straight to Keycloak without a certificate: refused as well.
     const direct = await tokenOverHttp(
-      `${KEYCLOAK}/realms/rid-gateway/protocol/openid-connect/token`,
+      `${KEYCLOAK}/realms/den-gateway/protocol/openid-connect/token`,
     );
     expect(direct.status).toBe(400);
     expect(direct.body.access_token).toBeUndefined();

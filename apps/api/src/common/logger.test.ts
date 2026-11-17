@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RidLogger, logFormat, maskLogText } from './logger.js';
+import { DenLogger, logFormat, maskLogText } from './logger.js';
 
 describe('maskLogText', () => {
   it('masks query strings, which may carry identification numbers', () => {
@@ -26,13 +26,13 @@ describe('maskLogText', () => {
   });
 
   it('masks the credentials of a URL', () => {
-    expect(maskLogText('connect postgresql://rid_app:s3cr3t@db:5432/rid refused')).toBe(
-      'connect postgresql://[masked]@db:5432/rid refused',
+    expect(maskLogText('connect postgresql://den_app:s3cr3t@db:5432/den refused')).toBe(
+      'connect postgresql://[masked]@db:5432/den refused',
     );
   });
 
   it('leaves a question mark in prose alone', () => {
-    expect(maskLogText('Is RID_COUNTRY set? It is not.')).toBe('Is RID_COUNTRY set? It is not.');
+    expect(maskLogText('Is DEN_COUNTRY set? It is not.')).toBe('Is DEN_COUNTRY set? It is not.');
   });
 
   it('masks the whole query, quotes included', () => {
@@ -43,16 +43,16 @@ describe('maskLogText', () => {
 describe('logFormat', () => {
   it('is text by default and json on request', () => {
     expect(logFormat({})).toBe('text');
-    expect(logFormat({ RID_LOG_FORMAT: 'JSON' })).toBe('json');
-    expect(logFormat({ RID_LOG_FORMAT: ' text ' })).toBe('text');
+    expect(logFormat({ DEN_LOG_FORMAT: 'JSON' })).toBe('json');
+    expect(logFormat({ DEN_LOG_FORMAT: ' text ' })).toBe('text');
   });
 
   it('rejects anything else', () => {
-    expect(() => logFormat({ RID_LOG_FORMAT: 'yaml' })).toThrow(/RID_LOG_FORMAT/);
+    expect(() => logFormat({ DEN_LOG_FORMAT: 'yaml' })).toThrow(/DEN_LOG_FORMAT/);
   });
 });
 
-describe('RidLogger', () => {
+describe('DenLogger', () => {
   afterEach(() => vi.restoreAllMocks());
 
   function capture() {
@@ -68,7 +68,7 @@ describe('RidLogger', () => {
 
   it('writes one masked JSON object per line in json format', () => {
     const lines = capture();
-    new RidLogger('json', ['log']).log('lookup ?numero=1032456789 done', 'Probe');
+    new DenLogger('json', ['log']).log('lookup ?numero=1032456789 done', 'Probe');
     expect(lines).toHaveLength(1);
     const record = JSON.parse(lines[0]!) as Record<string, unknown>;
     expect(record).toMatchObject({
@@ -80,7 +80,7 @@ describe('RidLogger', () => {
 
   it('masks the stack of an error in json format', () => {
     const lines = capture();
-    new RidLogger('json', ['error']).error(
+    new DenLogger('json', ['error']).error(
       'upstream failed',
       'Error: GET /v1/personas/1032456789\n    at f (file.js:1:2)',
       'Proxy',
@@ -92,7 +92,7 @@ describe('RidLogger', () => {
 
   it('masks messages and stacks in text format, without colors', () => {
     const lines = capture();
-    const logger = new RidLogger('text', ['error']);
+    const logger = new DenLogger('text', ['error']);
     logger.error(
       'mail to ana@entidad.gov.co failed',
       'Error: x\n    at y (/srv/1032456789.js:1:1)',
@@ -107,7 +107,7 @@ describe('RidLogger', () => {
 
   it('honours the levels it is given', () => {
     const lines = capture();
-    new RidLogger('json', ['error']).log('not printed');
+    new DenLogger('json', ['error']).log('not printed');
     expect(lines).toHaveLength(0);
   });
 });

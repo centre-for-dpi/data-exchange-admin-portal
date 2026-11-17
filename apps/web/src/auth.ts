@@ -10,15 +10,15 @@ const required = (name: string): string => {
 
 /** Issuer of the people realm; must match the `iss` Keycloak puts in tokens (KC_HOSTNAME). */
 export const keycloakIssuer = (): string =>
-  `${process.env.KEYCLOAK_URL ?? 'http://localhost:8080'}/realms/rid-portal`;
+  `${process.env.KEYCLOAK_URL ?? 'http://localhost:8080'}/realms/den-portal`;
 
-const clientId = () => process.env.RID_PORTAL_WEB_CLIENT_ID ?? 'rid-portal-web';
+const clientId = () => process.env.DEN_PORTAL_WEB_CLIENT_ID ?? 'den-portal-web';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Keycloak({
       clientId: clientId(),
-      clientSecret: required('RID_PORTAL_WEB_CLIENT_SECRET'),
+      clientSecret: required('DEN_PORTAL_WEB_CLIENT_SECRET'),
       issuer: keycloakIssuer(),
       // Authorization Code + PKCE S256 (required by the realm), plus state and nonce.
       checks: ['pkce', 'state', 'nonce'],
@@ -46,7 +46,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ...(await refreshTokens(session, {
           tokenEndpoint: `${keycloakIssuer()}/protocol/openid-connect/token`,
           clientId: clientId(),
-          clientSecret: required('RID_PORTAL_WEB_CLIENT_SECRET'),
+          clientSecret: required('DEN_PORTAL_WEB_CLIENT_SECRET'),
         })),
       };
     },

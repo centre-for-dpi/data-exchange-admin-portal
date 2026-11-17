@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { createdApplicationSchema, subscriptionDetailSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { createdApplicationSchema, subscriptionDetailSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { untar } from '../../test/untar.js';
@@ -58,7 +58,7 @@ describe('OPA bundle and activation (M1-09)', () => {
       headers: { authorization: `Bearer ${token}` },
       payload: {
         labels: { id: 'opa-test', version: '1.21.4' },
-        bundles: { rid: { name: 'rid', active_revision: revision } },
+        bundles: { den: { name: 'den', active_revision: revision } },
       },
     });
 
@@ -91,7 +91,7 @@ describe('OPA bundle and activation (M1-09)', () => {
       name: `Validador ${randomUUID().slice(0, 6)}`,
       description: 'Valida requisitos al asignar subsidios.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     return createdApplicationSchema.parse(res.json()).application;
   }
@@ -115,7 +115,7 @@ describe('OPA bundle and activation (M1-09)', () => {
       sector: 'salud',
       tags: [],
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -169,7 +169,7 @@ describe('OPA bundle and activation (M1-09)', () => {
     it('carries routes, clients with granted subscriptions only, and the hash salt', async () => {
       const { data, etag, revision } = await bundleData();
       expect(etag).toBe(`"${revision}"`);
-      expect(data.routes[`rid-route-${versionId}`]).toEqual({
+      expect(data.routes[`den-route-${versionId}`]).toEqual({
         apiVersionId: versionId,
         classification: 'personal',
         operations: [
@@ -198,7 +198,7 @@ describe('OPA bundle and activation (M1-09)', () => {
       expect(client?.subscriptions).toEqual([
         expect.objectContaining({
           id: approvedId,
-          route: `rid-route-${versionId}`,
+          route: `den-route-${versionId}`,
           operations: ['getAfiliado'],
           purposes: ['eligibility_check'],
           endUserRequired: true,
@@ -209,8 +209,8 @@ describe('OPA bundle and activation (M1-09)', () => {
       const all = Object.values(data.clients).flatMap((c) => c.subscriptions.map((s) => s.id));
       expect(all).not.toContain(pendingId);
       expect(data.config).toEqual({
-        endUserHashSalt: process.env.RID_END_USER_HASH_SALT,
-        subjectRefKey: process.env.RID_SUBJECT_REF_KEY,
+        endUserHashSalt: process.env.DEN_END_USER_HASH_SALT,
+        subjectRefKey: process.env.DEN_SUBJECT_REF_KEY,
         country: 'CO',
         documentTypes: ['CC', 'CE', 'TI', 'PEP', 'PPT', 'PA'],
         mtlsRequired: true,
@@ -290,12 +290,12 @@ describe('OPA bundle and activation (M1-09)', () => {
         openapiFile,
         servicePath: '/salud',
       });
-      const synthetic = { application: { keycloakClientId: { startsWith: 'rid-app-carga-' } } };
+      const synthetic = { application: { keycloakClientId: { startsWith: 'den-app-carga-' } } };
       // Each synthetic application has its client secret: the Keycloak reconciler needs it.
       expect(
         await prisma.application.count({
           where: {
-            keycloakClientId: { startsWith: 'rid-app-carga-' },
+            keycloakClientId: { startsWith: 'den-app-carga-' },
             credentials: { none: { kind: 'client_secret', status: 'active' } },
           },
         }),

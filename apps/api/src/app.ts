@@ -15,7 +15,7 @@ import {
   SUBJECT_ACCESS_BODY_LIMIT_BYTES,
   SUBJECT_ACCESS_PATH,
 } from './transparency/subject-access.controller.js';
-import { RidLogger, logFormat } from './common/logger.js';
+import { DenLogger, logFormat } from './common/logger.js';
 
 export const API_PREFIX = 'api/v1';
 /** Maximum JSON body (CLAUDE.md, ARCHITECTURE.md §12). Document uploads get their own limit. */
@@ -36,7 +36,7 @@ const uploadTokenValid = async (token: string): Promise<boolean> =>
   !tokenVerifier || (await verifiedSubject(token)) !== null;
 
 /**
- * Who may set X-Forwarded-For (RID_TRUST_PROXY, M6-01): request.ip is then the caller's address,
+ * Who may set X-Forwarded-For (DEN_TRUST_PROXY, M6-01): request.ip is then the caller's address,
  * for rate limits and security events. The proxy's addresses or networks, comma-separated
  * (`172.30.0.0/16`), so that another container that reaches the API directly cannot pick the
  * address it is logged and limited under. A number trusts that many hops whoever sends them:
@@ -57,7 +57,7 @@ export function trustedProxies(
 export function createAdapter(): FastifyAdapter {
   const adapter = new FastifyAdapter({
     bodyLimit: BODY_LIMIT_BYTES,
-    trustProxy: trustedProxies(process.env.RID_TRUST_PROXY),
+    trustProxy: trustedProxies(process.env.DEN_TRUST_PROXY),
   });
   // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
   adapter.getInstance().removeContentTypeParser('text/plain');
@@ -141,15 +141,15 @@ export async function configureApp(app: NestFastifyApplication): Promise<NestFas
 /** Builds and initialises the application without listening. */
 export async function createApp(module: Type = AppModule): Promise<NestFastifyApplication> {
   const app = await NestFactory.create<NestFastifyApplication>(module, createAdapter(), {
-    // Masked lines, JSON with RID_LOG_FORMAT=json (common/logger.ts).
-    logger: new RidLogger(logFormat(), ['error', 'warn', 'log']),
+    // Masked lines, JSON with DEN_LOG_FORMAT=json (common/logger.ts).
+    logger: new DenLogger(logFormat(), ['error', 'warn', 'log']),
   });
   return configureApp(app);
 }
 
 /**
  * Prometheus metrics (M5-06): every request's latency by route template, and GET /metrics,
- * outside the public prefix and only with RID_METRICS_TOKEN (404 otherwise). Before init():
+ * outside the public prefix and only with DEN_METRICS_TOKEN (404 otherwise). Before init():
  * Fastify takes no hooks or routes once it is ready.
  */
 function registerMetrics(app: NestFastifyApplication): void {

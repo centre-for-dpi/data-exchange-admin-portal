@@ -1,20 +1,20 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 const keycloak = process.env.KEYCLOAK_URL ?? 'http://localhost:8080';
-const api = process.env.RID_API_URL ?? 'http://localhost:4000';
+const api = process.env.DEN_API_URL ?? 'http://localhost:4000';
 
 /**
- * Logs a citizen in to the reference Carpeta (realm rid-citizens, client carpeta-ciudadana) with
+ * Logs a citizen in to the reference Carpeta (realm den-citizens, client citizen-app) with
  * Authorization Code + PKCE, submitting Keycloak's login form as a browser would, and returns the
  * access token. The Carpeta itself (MT-07) does not need to run: the code is taken from the
  * redirect.
  */
 export async function citizenToken(username: string): Promise<string> {
-  const realm = `${keycloak}/realms/rid-citizens/protocol/openid-connect`;
-  const redirectUri = `${process.env.RID_CARPETA_URL ?? 'http://localhost:3100'}/auth/callback`;
+  const realm = `${keycloak}/realms/den-citizens/protocol/openid-connect`;
+  const redirectUri = `${process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100'}/auth/callback`;
   const verifier = randomBytes(32).toString('base64url');
   const params = new URLSearchParams({
-    client_id: 'carpeta-ciudadana',
+    client_id: 'citizen-app',
     response_type: 'code',
     scope: 'openid',
     redirect_uri: redirectUri,
@@ -43,18 +43,18 @@ export async function citizenToken(username: string): Promise<string> {
     },
     body: new URLSearchParams({
       username,
-      password: process.env.RID_DEMO_USER_PASSWORD ?? 'demo',
+      password: process.env.DEN_DEMO_USER_PASSWORD ?? 'demo',
       credentialId: '',
     }),
   });
   const code = new URL(submitted.headers.get('location') ?? 'about:blank').searchParams.get('code');
   if (!code) throw new Error('Citizen login failed');
-  const secret = process.env.RID_CARPETA_CLIENT_SECRET ?? '';
+  const secret = process.env.DEN_CITIZEN_APP_CLIENT_SECRET ?? '';
   const tokens = await fetch(`${realm}/token`, {
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
-      authorization: `Basic ${Buffer.from(`carpeta-ciudadana:${secret}`).toString('base64')}`,
+      authorization: `Basic ${Buffer.from(`citizen-app:${secret}`).toString('base64')}`,
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
@@ -95,7 +95,7 @@ export async function myAccesses(token: string): Promise<CitizenAccess[]> {
 }
 
 /** The reference citizen folder (infra/mock-citizen-app, MT-07). */
-export const carpeta = process.env.RID_CARPETA_URL ?? 'http://localhost:3100';
+export const carpeta = process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100';
 const mailpit = `http://localhost:${process.env.MAILPIT_UI_PORT ?? '8025'}/api/v1`;
 
 /** Messages Mailpit received for an address. */

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { exchangeMapSchema, networkIndicatorsSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { exchangeMapSchema, networkIndicatorsSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -26,7 +26,7 @@ describe("the network's indicators (M5-04)", () => {
   const realmUsers = readRealmUsers();
   const sub = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
   const run = randomUUID().slice(0, 8);
-  const index = `rid-access-test-indicators-${run}`;
+  const index = `den-access-test-indicators-${run}`;
   const queries: string[] = [];
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
@@ -128,7 +128,7 @@ describe("the network's indicators (M5-04)", () => {
       call('2025-06-06T15:00:00Z', 500),
       // Not production traffic: the sandbox and a validation check.
       call('2025-06-06T15:00:00Z', 200, { route_id: sandboxRouteId(versionId) }),
-      call('2025-06-06T15:00:00Z', 200, { route_id: `rid-check-${versionId}` }),
+      call('2025-06-06T15:00:00Z', 200, { route_id: `den-check-${versionId}` }),
     ];
     const body =
       docs
@@ -218,7 +218,7 @@ describe("the network's indicators (M5-04)", () => {
         name: `Indicadores ${run}`,
         description: 'Aplicación de prueba.',
         environment: 'production',
-        keycloakClientId: `rid-app-test-${randomUUID()}`,
+        keycloakClientId: `den-app-test-${randomUUID()}`,
         technicalContact: 'dev@example.org',
         createdBy: 'test',
       },
@@ -264,7 +264,7 @@ describe("the network's indicators (M5-04)", () => {
         name: `Mapa ${run}`,
         description: 'Aplicación de prueba.',
         environment: 'production',
-        keycloakClientId: `rid-app-test-${randomUUID()}`,
+        keycloakClientId: `den-app-test-${randomUUID()}`,
         technicalContact: 'dev@example.org',
         createdBy: 'test',
       },

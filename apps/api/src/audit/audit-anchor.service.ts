@@ -5,7 +5,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { z } from 'zod';
 import { localDay, nextDay, startOfLocalDay } from '../common/local-day.js';
 import { MAIL_TRANSPORT, type MailTransport } from '../mail/mail.service.js';
@@ -64,7 +64,7 @@ const TEXT = {
 
 /**
  * Daily anchoring of the audit chain (ARCHITECTURE.md §7, M2-09). Every
- * RID_AUDIT_ANCHOR_INTERVAL_SECONDS (default 3600), for each finished day (country time zone)
+ * DEN_AUDIT_ANCHOR_INTERVAL_SECONDS (default 3600), for each finished day (country time zone)
  * with events and no anchor yet: the hash of its last chained event is time-stamped (RFC 3161),
  * stored in the insert-only audit_anchor table, recorded as `audit.anchored` and e-mailed to the
  * regulators. The chain alone cannot show that its tail was cut; an anchor whose event is gone
@@ -86,7 +86,7 @@ export class AuditAnchorService implements OnApplicationBootstrap, OnApplication
   async onApplicationBootstrap(): Promise<void> {
     if (!QueueService.enabled()) return;
     await this.queue.work(ANCHOR_EMAIL_TOPIC, (data) => this.email(data));
-    const seconds = Number(process.env.RID_AUDIT_ANCHOR_INTERVAL_SECONDS ?? 3600);
+    const seconds = Number(process.env.DEN_AUDIT_ANCHOR_INTERVAL_SECONDS ?? 3600);
     const run = (): void => {
       this.anchorDue().catch((error: unknown) =>
         this.logger.error(error instanceof Error ? error.message : String(error)),

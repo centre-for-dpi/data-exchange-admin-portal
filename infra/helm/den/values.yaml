@@ -1,4 +1,4 @@
-# Values of the RID chart (M6-05). docs/DEPLOYMENT.md §9 explains each block; the defaults are the
+# Values of the DEN chart (M6-05). docs/DEPLOYMENT.md §9 explains each block; the defaults are the
 # production topology of docs/ARCHITECTURE.md §11. Nothing country-specific here: the country is
 # config/country/<code>.yaml, chosen with `country` (CLAUDE.md, rule 6).
 
@@ -8,11 +8,11 @@
 country: co
 
 # The portal's public URL (web, API under /api/v1, Keycloak under /auth): one host behind the ingress.
-publicUrl: https://rid.example.org
+publicUrl: https://den.example.org
 
 # The gateway's own public name. With mTLS (features.mtls.required) applications reach it on this
 # name, whose TLS the gateway terminates: it is not behind the portal's ingress.
-gatewayHost: gw.rid.example.org
+gatewayHost: gw.den.example.org
 # Only when applications reach it on another port than 443 (test clusters).
 gatewayPublicUrl: ''
 
@@ -20,16 +20,16 @@ imagePullSecrets: []
 
 images:
   api:
-    repository: ghcr.io/centre-for-dpi/rid-portal-api
+    repository: ghcr.io/centre-for-dpi/den-portal-api
     tag: '' # appVersion when empty
   web:
-    repository: ghcr.io/centre-for-dpi/rid-portal-web
+    repository: ghcr.io/centre-for-dpi/den-portal-web
     tag: ''
   wgHub:
-    repository: ghcr.io/centre-for-dpi/rid-wg-hub
+    repository: ghcr.io/centre-for-dpi/den-wg-hub
     tag: ''
   contractRunner:
-    repository: ghcr.io/centre-for-dpi/rid-contract-runner
+    repository: ghcr.io/centre-for-dpi/den-contract-runner
     tag: ''
   apisix: apache/apisix:3.19.0-debian
   opa: openpolicyagent/opa:1.21.4-static
@@ -41,7 +41,7 @@ images:
 
 # --- Secrets -------------------------------------------------------------------------------------
 #
-# Each component gets a Secret with only the keys it uses (rid-<component>; the keys are listed in
+# Each component gets a Secret with only the keys it uses (den-<component>; the keys are listed in
 # docs/DEPLOYMENT.md §9.2). Two ways to fill them:
 #   externalSecrets: External Secrets Operator reads them from a secret store (OpenBao, the open
 #     fork of Vault, or any ESO backend): one entry, `remoteKey`, with every key as a property.
@@ -55,7 +55,7 @@ secrets:
     secretStoreRef:
       name: openbao
       kind: ClusterSecretStore
-    remoteKey: rid/platform
+    remoteKey: den/platform
     refreshInterval: 1h
 
 # --- Portal --------------------------------------------------------------------------------------
@@ -63,23 +63,23 @@ secrets:
 api:
   replicas: 2
   port: 4000
-  # The first platform administrator (RID_BOOTSTRAP_ADMIN_EMAIL): whoever signs in first with this
+  # The first platform administrator (DEN_BOOTSTRAP_ADMIN_EMAIL): whoever signs in first with this
   # address, verified, while the network has none. Remove it once they are in.
   bootstrapAdminEmail: ''
-  # Proxies allowed to set X-Forwarded-For (RID_TRUST_PROXY, M6-01): the ingress controller's pods.
+  # Proxies allowed to set X-Forwarded-For (DEN_TRUST_PROXY, M6-01): the ingress controller's pods.
   trustProxy: '10.0.0.0/8'
   # Uploaded documents (designation, agreements): shared by every replica.
   documents:
     storageClass: ''
     size: 20Gi
     accessMode: ReadWriteMany
-  # Non-secret settings (see .env.example); the secrets come from rid-api.
+  # Non-secret settings (see .env.example); the secrets come from den-api.
   env:
-    RID_MAIL_FROM: no-reply@rid.example.org
-    RID_SMTP_URL: smtp://smtp.example.org:587
-    RID_TSA_URL: https://tsa.example.org
-    RID_TRANSPARENCY_LOG_ID: rid-transparency
-    RID_GATEWAY_NODES: '2'
+    DEN_MAIL_FROM: no-reply@den.example.org
+    DEN_SMTP_URL: smtp://smtp.example.org:587
+    DEN_TSA_URL: https://tsa.example.org
+    DEN_TRANSPARENCY_LOG_ID: den-transparency
+    DEN_GATEWAY_NODES: '2'
   resources:
     requests: { cpu: 250m, memory: 512Mi }
     limits: { memory: 1Gi }
@@ -89,7 +89,7 @@ web:
   port: 3000
   env:
     # The realm's ssoSessionIdleTimeout (WCAG 2.2.1, M6-02).
-    RID_SESSION_IDLE_SECONDS: '1800'
+    DEN_SESSION_IDLE_SECONDS: '1800'
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits: { memory: 512Mi }
@@ -102,7 +102,7 @@ ingress:
   className: traefik
   annotations: {}
   # The TLS certificate of publicUrl's host (cert-manager or the operator's own).
-  tlsSecretName: rid-portal-tls
+  tlsSecretName: den-portal-tls
 
 # --- Keycloak ------------------------------------------------------------------------------------
 
@@ -110,16 +110,16 @@ keycloak:
   image: quay.io/keycloak/keycloak:26.8.0
   replicas: 2
   # The temporary administrator of the first start (its password: KEYCLOAK_ADMIN_PASSWORD).
-  bootstrapAdmin: rid-bootstrap
-  # rid-citizens simulates the country's digital identity in development; in production the
-  # citizen folder uses the national one (RID_CITIZEN_ISSUER).
+  bootstrapAdmin: den-bootstrap
+  # den-citizens simulates the country's digital identity in development; in production the
+  # citizen folder uses the national one (DEN_CITIZEN_ISSUER).
   citizensRealm: false
-  carpetaUrl: ''
+  citizenAppUrl: ''
   # The realm's mail server (the user and password are KEYCLOAK_SMTP_USER and _PASSWORD).
   smtp:
     host: ''
     port: '587'
-    from: no-reply@rid.example.org
+    from: no-reply@den.example.org
     starttls: 'true'
     ssl: 'false'
   resources:
@@ -131,8 +131,8 @@ keycloak:
 stepCa:
   image: smallstep/step-ca:0.30.2
   # The operator's CA material (offline root, ARCHITECTURE §11): root_ca.crt, intermediate_ca.crt
-  # and intermediate_ca_key (encrypted with RID_STEP_CA_PROVISIONER_PASSWORD).
-  pkiSecret: rid-step-ca-pki
+  # and intermediate_ca_key (encrypted with DEN_STEP_CA_PROVISIONER_PASSWORD).
+  pkiSecret: den-step-ca-pki
   # SHA-256 of root_ca.crt (`step certificate fingerprint root_ca.crt`): the API pins it.
   rootFingerprint: ''
   storageClass: ''
@@ -140,7 +140,7 @@ stepCa:
     requests: { cpu: 100m, memory: 128Mi }
     limits: { memory: 256Mi }
 
-# --- Databases (CloudNativePG, installed by the rid-platform chart) --------------------------------
+# --- Databases (CloudNativePG, installed by the den-platform chart) --------------------------------
 
 postgres:
   # Empty: the operator's default PostgreSQL image.
@@ -159,11 +159,11 @@ postgres:
     resources:
       requests: { cpu: 250m, memory: 512Mi }
       limits: { memory: 1Gi }
-  # Backups (M6-06, ADR-0026): Barman Cloud, the CloudNativePG plugin of rid-platform, to the
+  # Backups (M6-06, ADR-0026): Barman Cloud, the CloudNativePG plugin of den-platform, to the
   # operator's S3-compatible object store, outside the cluster. Both databases, each under its own
   # name in the same store: the WAL continuously and a base backup a day, so either can be
   # recovered to any moment within the retention (OPERATIONS.md §6). The access key is
-  # DB_BACKUP_ACCESS_KEY_ID / DB_BACKUP_SECRET_ACCESS_KEY (rid-db-backup).
+  # DB_BACKUP_ACCESS_KEY_ID / DB_BACKUP_SECRET_ACCESS_KEY (den-db-backup).
   backup:
     enabled: true
     # s3://<bucket>/<path>. Required while enabled.
@@ -251,11 +251,11 @@ accessLogs:
   enabled: true
   replicas: 2
   opensearch:
-    host: rid-opensearch
+    host: den-opensearch
     port: 9200
     tls: true
     # The Secret with the CA of OpenSearch's certificate (key ca.crt): cert-manager's.
-    caSecret: rid-opensearch-tls
+    caSecret: den-opensearch-tls
     # OpenSearch's pods, the only place the pipeline may send to (NetworkPolicy).
     podLabels:
       app.kubernetes.io/name: opensearch
@@ -266,8 +266,8 @@ networkPolicy:
   enabled: true
   # The namespace of the ingress controller that reaches the web and the API.
   ingressControllerNamespace: traefik
-  # Where the rid-platform chart runs (the CloudNativePG operator reaches the database pods).
-  platformNamespace: rid-platform
+  # Where the den-platform chart runs (the CloudNativePG operator reaches the database pods).
+  platformNamespace: den-platform
   # Private ranges the gateway may call besides public addresses (an X-Road Security Server or
   # providers inside the operator's network). Empty: public addresses only.
   gatewayExtraEgressCidrs: []
@@ -281,11 +281,11 @@ networkPolicy:
 # Users and their password hashes: OPENSEARCH_INTERNAL_USERS_YML in the store (DEPLOYMENT.md §9).
 opensearch:
   enabled: true
-  fullnameOverride: rid-opensearch
-  clusterName: rid-opensearch
+  fullnameOverride: den-opensearch
+  clusterName: den-opensearch
   replicas: 3
   labels:
-    app.kubernetes.io/part-of: rid
+    app.kubernetes.io/part-of: den
   extraEnvs:
     - { name: DISABLE_INSTALL_DEMO_CONFIG, value: 'true' }
   opensearchJavaOpts: -Xms1g -Xmx1g
@@ -296,11 +296,11 @@ opensearch:
     size: 50Gi
   secretMounts:
     - name: tls
-      secretName: rid-opensearch-tls
+      secretName: den-opensearch-tls
       path: /usr/share/opensearch/config/certs
   config:
     opensearch.yml: |
-      cluster.name: rid-opensearch
+      cluster.name: den-opensearch
       network.host: 0.0.0.0
       plugins.security.ssl.transport.pemcert_filepath: certs/tls.crt
       plugins.security.ssl.transport.pemkey_filepath: certs/tls.key
@@ -310,48 +310,48 @@ opensearch:
       plugins.security.ssl.http.pemcert_filepath: certs/tls.crt
       plugins.security.ssl.http.pemkey_filepath: certs/tls.key
       plugins.security.ssl.http.pemtrustedcas_filepath: certs/ca.crt
-      plugins.security.nodes_dn: ['CN=rid-opensearch']
-      plugins.security.authcz.admin_dn: ['CN=rid-opensearch-admin']
+      plugins.security.nodes_dn: ['CN=den-opensearch']
+      plugins.security.authcz.admin_dn: ['CN=den-opensearch-admin']
       plugins.security.allow_default_init_securityindex: true
       plugins.security.restapi.roles_enabled: ['all_access']
   securityConfig:
     enabled: true
     config:
-      securityConfigSecret: rid-opensearch-security
+      securityConfigSecret: den-opensearch-security
       dataComplete: true
 
 # Metrics and alerts (M5-06). Prometheus scrapes the gateway's pods (APISIX and OPA's diagnostic
-# listener), the API (with RID_METRICS_TOKEN) and Keycloak; the rules are infra/prometheus's.
+# listener), the API (with DEN_METRICS_TOKEN) and Keycloak; the rules are infra/prometheus's.
 prometheus:
   enabled: true
   kube-state-metrics: { enabled: false }
   prometheus-node-exporter: { enabled: false }
   prometheus-pushgateway: { enabled: false }
   server:
-    fullnameOverride: rid-prometheus
+    fullnameOverride: den-prometheus
     # The chart's own labels already name it: this one is for the NetworkPolicies.
     podLabels:
-      rid-network: prometheus
+      den-network: prometheus
     retention: 30d
     persistentVolume: { size: 20Gi }
     extraConfigmapMounts:
       - {
-          name: rid-rules,
-          mountPath: /etc/rid-rules,
-          configMap: rid-prometheus-rules,
+          name: den-rules,
+          mountPath: /etc/den-rules,
+          configMap: den-prometheus-rules,
           readOnly: true,
         }
     extraSecretMounts:
       - {
           name: metrics-token,
-          mountPath: /etc/rid-metrics,
-          secretName: rid-prometheus,
+          mountPath: /etc/den-metrics,
+          secretName: den-prometheus,
           readOnly: true,
         }
   serverFiles:
     prometheus.yml:
       rule_files:
-        - /etc/rid-rules/rid.rules.yml
+        - /etc/den-rules/den.rules.yml
   scrapeConfigs:
     gateway:
       job_name: apisix
@@ -363,7 +363,7 @@ prometheus:
               __meta_kubernetes_pod_label_app_kubernetes_io_name,
               __meta_kubernetes_pod_container_port_name,
             ]
-          regex: rid-gateway;metrics
+          regex: den-gateway;metrics
           action: keep
     opa:
       job_name: opa
@@ -374,12 +374,12 @@ prometheus:
               __meta_kubernetes_pod_label_app_kubernetes_io_name,
               __meta_kubernetes_pod_container_port_name,
             ]
-          regex: rid-gateway;opa-diag
+          regex: den-gateway;opa-diag
           action: keep
     api:
       job_name: api
       metrics_path: /metrics
-      authorization: { type: Bearer, credentials_file: /etc/rid-metrics/RID_METRICS_TOKEN }
+      authorization: { type: Bearer, credentials_file: /etc/den-metrics/DEN_METRICS_TOKEN }
       kubernetes_sd_configs: [{ role: pod, namespaces: { own_namespace: true } }]
       relabel_configs:
         - source_labels:
@@ -387,7 +387,7 @@ prometheus:
               __meta_kubernetes_pod_label_app_kubernetes_io_name,
               __meta_kubernetes_pod_container_port_name,
             ]
-          regex: rid-api;http
+          regex: den-api;http
           action: keep
     keycloak:
       job_name: keycloak
@@ -398,22 +398,22 @@ prometheus:
               __meta_kubernetes_pod_label_app_kubernetes_io_name,
               __meta_kubernetes_pod_container_port_name,
             ]
-          regex: rid-keycloak;management
+          regex: den-keycloak;management
           action: keep
-  # The operator's mail: the server's password is ALERTMANAGER_SMTP_PASSWORD (rid-alertmanager).
+  # The operator's mail: the server's password is ALERTMANAGER_SMTP_PASSWORD (den-alertmanager).
   alertmanager:
     enabled: true
-    fullnameOverride: rid-alertmanager
+    fullnameOverride: den-alertmanager
     podLabels:
-      app.kubernetes.io/part-of: rid
+      app.kubernetes.io/part-of: den
     extraSecretMounts:
-      - { name: smtp, mountPath: /etc/rid-smtp, secretName: rid-alertmanager, readOnly: true }
+      - { name: smtp, mountPath: /etc/den-smtp, secretName: den-alertmanager, readOnly: true }
     config:
       global:
         smtp_smarthost: smtp.example.org:587
-        smtp_from: alertas@rid.example.org
-        smtp_auth_username: alertas@rid.example.org
-        smtp_auth_password_file: /etc/rid-smtp/ALERTMANAGER_SMTP_PASSWORD
+        smtp_from: alertas@den.example.org
+        smtp_auth_username: alertas@den.example.org
+        smtp_auth_password_file: /etc/den-smtp/ALERTMANAGER_SMTP_PASSWORD
         smtp_require_tls: true
       route:
         receiver: operator
@@ -426,17 +426,17 @@ prometheus:
       receivers:
         - name: operator
           email_configs:
-            - { to: operaciones@rid.example.org, send_resolved: true }
+            - { to: operaciones@den.example.org, send_resolved: true }
 
 # The operator's dashboard (AGPL-3.0, its own service). Behind the ingress at /grafana, with its
-# own login (admin password GRAFANA_ADMIN_PASSWORD, rid-grafana).
+# own login (admin password GRAFANA_ADMIN_PASSWORD, den-grafana).
 grafana:
   enabled: true
-  fullnameOverride: rid-grafana
+  fullnameOverride: den-grafana
   podLabels:
-    app.kubernetes.io/part-of: rid
+    app.kubernetes.io/part-of: den
   admin:
-    existingSecret: rid-grafana
+    existingSecret: den-grafana
     userKey: GRAFANA_ADMIN_USER
     passwordKey: GRAFANA_ADMIN_PASSWORD
   grafana.ini:
@@ -453,7 +453,7 @@ grafana:
             uid: prometheus,
             type: prometheus,
             access: proxy,
-            url: 'http://rid-prometheus',
+            url: 'http://den-prometheus',
             isDefault: true,
             editable: false,
           }
@@ -461,6 +461,6 @@ grafana:
     dashboardproviders.yaml:
       apiVersion: 1
       providers:
-        - { name: rid, folder: RID, type: file, options: { path: /var/lib/grafana/dashboards/rid } }
+        - { name: den, folder: DEN, type: file, options: { path: /var/lib/grafana/dashboards/den } }
   dashboardsConfigMaps:
-    rid: rid-grafana-dashboards
+    den: den-grafana-dashboards

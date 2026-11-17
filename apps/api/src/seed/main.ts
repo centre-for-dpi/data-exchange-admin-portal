@@ -1,5 +1,5 @@
 // `pnpm db:seed`: loads development data (M1-01). Idempotent: safe to run repeatedly.
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { AuditService } from '../audit/audit.service.js';
 import { loadDevEnv } from '../dev-env.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -8,8 +8,8 @@ import { runSeed } from './seed.js';
 
 async function main(): Promise<void> {
   loadDevEnv();
-  if (process.env.NODE_ENV === 'production' && process.env.RID_ALLOW_SEED !== 'true') {
-    throw new Error('Refusing to seed in production (set RID_ALLOW_SEED=true to override)');
+  if (process.env.NODE_ENV === 'production' && process.env.DEN_ALLOW_SEED !== 'true') {
+    throw new Error('Refusing to seed in production (set DEN_ALLOW_SEED=true to override)');
   }
   const prisma = new PrismaService();
   try {

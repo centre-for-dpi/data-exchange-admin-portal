@@ -34,7 +34,7 @@ jobs:
       # Known vulnerabilities of the dependencies (M6-01, ASVS 15.2.1): high and critical fail.
       - run: pnpm audit --audit-level high
       # The alerts of ARCHITECTURE.md §9 (M5-06): each fires on its series, none on healthy ones.
-      - run: docker run --rm -v "$PWD/infra/prometheus:/p:ro" -w /p/tests --entrypoint promtool prom/prometheus:v3.15.1 test rules rid.rules.test.yml
+      - run: docker run --rm -v "$PWD/infra/prometheus:/p:ro" -w /p/tests --entrypoint promtool prom/prometheus:v3.15.1 test rules den.rules.test.yml
 
   api-integration:
     name: API integration tests (PostgreSQL)
@@ -48,7 +48,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Same PostgreSQL image and init scripts (roles rid/rid_app, database rid_test) as local dev,
+      # Same PostgreSQL image and init scripts (roles den/den_app, database den_test) as local dev,
       # plus APISIX and etcd: the APISIX reconciler is tested against the real Admin API (M1-08),
       # the development TSA: the transparency evidence is stamped for real (MT-04), and step-ca:
       # application certificates are signed by the real CA (M3-01), and OpenSearch with Fluent Bit:
@@ -68,17 +68,17 @@ jobs:
           done
           echo "TSA answered $code"; cat /tmp/q.tsr; docker compose -f infra/compose/docker-compose.yml --env-file .env logs --tail 50 tsa
           exit 1
-      - run: pnpm exec turbo run build --filter=@rid/api^...
-      - run: pnpm --filter @rid/api test:integration
+      - run: pnpm exec turbo run build --filter=@den/api^...
+      - run: pnpm --filter @den/api test:integration
         env:
           # The contract runner (Schemathesis) is not started here: its checks run with the full
           # local stack (M4-06).
-          RID_CONTRACT_RUNNER_URL: ''
+          DEN_CONTRACT_RUNNER_URL: ''
       - name: Logs of the stack when the tests fail
         if: failure()
         run: docker compose -f infra/compose/docker-compose.yml --env-file .env logs --tail 80 tsa keycloak opensearch
       # Compiled code under plain Node: catches CommonJS interop issues Vitest hides.
-      - run: pnpm exec turbo run build --filter=@rid/api && pnpm --filter @rid/api test:dist
+      - run: pnpm exec turbo run build --filter=@den/api && pnpm --filter @den/api test:dist
 
   policy:
     name: OPA policy tests

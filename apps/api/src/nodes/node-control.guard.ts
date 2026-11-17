@@ -19,8 +19,8 @@ import {
 } from './node-control.service.js';
 
 /** Set by the gateway's control route; a client never chooses either value (M4-02). */
-export const NODE_CONTROL_TOKEN_HEADER = 'x-rid-node-control';
-export const CLIENT_CERT_HEADER = 'x-rid-client-cert-s256';
+export const NODE_CONTROL_TOKEN_HEADER = 'x-den-node-control';
+export const CLIENT_CERT_HEADER = 'x-den-client-cert-s256';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -31,7 +31,7 @@ interface NodeRequest {
 /**
  * Authenticates kit nodes on the control channel (ARCHITECTURE.md §10). The TLS with the node's
  * certificate ends at the gateway, whose control route replaces whatever the client sent with
- * the thumbprint of the certificate verified in the handshake (rid-client-cert) and adds the
+ * the thumbprint of the certificate verified in the handshake (den-client-cert) and adds the
  * shared control token. Without that token the request did not come through the gateway, so the
  * thumbprint header means nothing: 401. With it, the thumbprint must be the node's.
  */
@@ -51,7 +51,7 @@ export class NodeControlGuard implements CanActivate {
     };
     const settings = nodeControlSettings();
     if (!settings.controlToken) {
-      this.logger.error('RID_NODE_CONTROL_TOKEN is not set: the control channel is closed');
+      this.logger.error('DEN_NODE_CONTROL_TOKEN is not set: the control channel is closed');
       throw new UnauthenticatedError();
     }
     if (!sameSecret(header(NODE_CONTROL_TOKEN_HEADER), settings.controlToken)) {

@@ -1,11 +1,11 @@
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   type GatewayJwks,
   type RotateGatewaySigningKeyInput,
   rotateGatewaySigningKeySchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { open, seal } from '../common/secrets.js';
@@ -22,8 +22,8 @@ const context = (kid: string) => `gateway-signing-key:${kid}`;
 
 /**
  * The keys the gateway signs its assertions to providers with (ADR-0024, M6-10). The portal
- * generates them (EC P-256), keeps the private key sealed with RID_SECRETS_KEY, and the APISIX
- * reconciler pushes the current one into the rid-assertion plugin's metadata (encrypted in etcd
+ * generates them (EC P-256), keeps the private key sealed with DEN_SECRETS_KEY, and the APISIX
+ * reconciler pushes the current one into the den-assertion plugin's metadata (encrypted in etcd
  * with the deployment's keyring). A key signs for lifecycle.assertionKeyRotationDays; then a new
  * one takes over. The JWKS lists every key ever used (newest first), except a compromised one, so
  * the assertions providers archived keep verifying.
@@ -111,7 +111,7 @@ export class GatewaySigningKeysService {
     now: Date,
   ): Promise<GatewaySigningKey> {
     const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-    const kid = `rid-gw-${now.toISOString().slice(0, 10)}-${randomBytes(4).toString('hex')}`;
+    const kid = `den-gw-${now.toISOString().slice(0, 10)}-${randomBytes(4).toString('hex')}`;
     const jwk = publicKey.export({ format: 'jwk' });
     const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
     if (previous) {

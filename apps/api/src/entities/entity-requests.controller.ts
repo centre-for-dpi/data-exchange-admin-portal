@@ -5,7 +5,7 @@ import {
   entityRequestInputSchema,
   entityRequestListSchema,
   entityRequestSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { type AuthenticatedRequest, CurrentPrincipal, SignedIn } from '../auth/decorators.js';
@@ -99,7 +99,7 @@ export class EntityRequestsController {
     operationId: 'putEntityDesignationDocument',
     summary: 'Attach the designation document (PDF)',
     description:
-      'The body is the PDF itself (`Content-Type: application/pdf`), up to RID_DOCUMENT_MAX_BYTES ' +
+      'The body is the PDF itself (`Content-Type: application/pdf`), up to DEN_DOCUMENT_MAX_BYTES ' +
       '(10 MiB by default). The portal keeps its SHA-256 and checks it on every download. ' +
       'Replaces any previous document.',
     tags: ['entity-requests'],

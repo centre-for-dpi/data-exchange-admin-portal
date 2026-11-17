@@ -1,4 +1,4 @@
-import { purposeAdminListSchema } from '@rid/contracts';
+import { purposeAdminListSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

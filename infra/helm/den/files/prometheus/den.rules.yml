@@ -1,9 +1,9 @@
-# Alerts of the RID portal + gateway (ARCHITECTURE.md §9, M5-06). Tested with promtool
-# (infra/prometheus/tests/rid.rules.test.yml, run by tests/infra). Texts for the operator.
+# Alerts of the DEN portal + gateway (ARCHITECTURE.md §9, M5-06). Tested with promtool
+# (infra/prometheus/tests/den.rules.test.yml, run by tests/infra). Texts for the operator.
 groups:
-  - name: rid-gateway
+  - name: den-gateway
     rules:
-      - alert: RidGateway5xxRate
+      - alert: DenGateway5xxRate
         # More than 2 % of the gateway's answers were 5xx over 5 minutes.
         expr: |
           sum(rate(apisix_http_status{code=~"5.."}[5m]))
@@ -15,7 +15,7 @@ groups:
           summary: 'Más del 2 % de las respuestas del gateway son 5xx'
           description: '{{ $value | humanizePercentage }} de respuestas 5xx en los últimos 5 minutos.'
 
-      - alert: RidGatewayLatencyHigh
+      - alert: DenGatewayLatencyHigh
         # p95 of the whole request at the gateway, upstream included, in milliseconds.
         expr: |
           histogram_quantile(0.95, sum by (le) (rate(apisix_http_latency_bucket{type="request"}[5m]))) > 200
@@ -26,7 +26,7 @@ groups:
           summary: 'La latencia p95 del gateway pasa de 200 ms'
           description: 'p95 de {{ $value | humanize }} ms en los últimos 5 minutos.'
 
-      - alert: RidTargetDown
+      - alert: DenTargetDown
         expr: up{job=~"apisix|api|opa"} == 0
         for: 2m
         labels:
@@ -35,11 +35,11 @@ groups:
           summary: '{{ $labels.job }} no responde a Prometheus'
           description: 'El objetivo {{ $labels.instance }} lleva 2 minutos sin responder.'
 
-  - name: rid-policy
+  - name: den-policy
     rules:
-      - alert: RidOpaBundleBehind
+      - alert: DenOpaBundleBehind
         # OPA still runs an older bundle more than 2 minutes after the current one was built.
-        expr: rid_opa_bundle_lag_seconds > 120
+        expr: den_opa_bundle_lag_seconds > 120
         for: 1m
         labels:
           severity: critical
@@ -47,9 +47,9 @@ groups:
           summary: 'OPA aplica un bundle con más de 2 minutos de atraso'
           description: 'Las suscripciones aprobadas o revocadas no llegan al gateway ({{ $value | humanizeDuration }}).'
 
-      - alert: RidOpaBundleFetchFailing
+      - alert: DenOpaBundleFetchFailing
         # OPA has not fetched the bundle from the portal for more than 2 minutes.
-        expr: time() - last_success_bundle_request{name="rid"} / 1e9 > 120
+        expr: time() - last_success_bundle_request{name="den"} / 1e9 > 120
         for: 1m
         labels:
           severity: critical
@@ -57,10 +57,10 @@ groups:
           summary: 'OPA no descarga el bundle del portal hace más de 2 minutos'
           description: 'Última descarga exitosa hace {{ $value | humanizeDuration }}.'
 
-  - name: rid-portal
+  - name: den-portal
     rules:
-      - alert: RidReconcileFailing
-        expr: sum by (system) (rid_sync_targets{status="error"}) > 0
+      - alert: DenReconcileFailing
+        expr: sum by (system) (den_sync_targets{status="error"}) > 0
         for: 10m
         labels:
           severity: warning
@@ -68,8 +68,8 @@ groups:
           summary: 'La reconciliación con {{ $labels.system }} está fallando'
           description: '{{ $value }} objetos en error: ver la consola de sincronización del operador.'
 
-      - alert: RidNodeOffline
-        expr: rid_nodes{status="offline"} > 0
+      - alert: DenNodeOffline
+        expr: den_nodes{status="offline"} > 0
         for: 5m
         labels:
           severity: warning
@@ -77,10 +77,10 @@ groups:
           summary: 'Hay nodos del kit fuera de línea'
           description: '{{ $value }} nodos sin heartbeat: ver la consola de nodos.'
 
-      - alert: RidCertificateExpiring
+      - alert: DenCertificateExpiring
         # The gateway's certificate and the nodes' renew themselves: one this close to expiry means
         # the renewal is failing.
-        expr: rid_certificate_soonest_expiry_seconds{kind=~"gateway|node"} < 14 * 86400
+        expr: den_certificate_soonest_expiry_seconds{kind=~"gateway|node"} < 14 * 86400
         for: 1h
         labels:
           severity: warning
@@ -88,8 +88,8 @@ groups:
           summary: 'Un certificado de tipo {{ $labels.kind }} vence en menos de 14 días'
           description: 'Vence en {{ $value | humanizeDuration }}.'
 
-      - alert: RidQueueBacklog
-        expr: sum(rid_queue_jobs{state=~"created|retry"}) > 100
+      - alert: DenQueueBacklog
+        expr: sum(den_queue_jobs{state=~"created|retry"}) > 100
         for: 15m
         labels:
           severity: warning

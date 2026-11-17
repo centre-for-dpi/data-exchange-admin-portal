@@ -7,7 +7,7 @@ import {
   nodeEnrollmentSchema,
   nodeHeartbeatResponseSchema,
   renewedNodeCertificateSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeCsr } from '../../test/csr.js';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
@@ -41,11 +41,11 @@ describe('node enrollment and heartbeat (M4-02)', () => {
 
   beforeAll(async () => {
     for (const [k, v] of Object.entries({
-      RID_WG_HUB_PUBLIC_KEY: wireguardKey(),
-      RID_WG_HUB_ENDPOINT: 'hub.rid.example:51820',
-      RID_WG_SUBNET: '10.77.0.0/16',
-      RID_NODE_CONTROL_TOKEN: CONTROL_TOKEN,
-      RID_NODE_CONTROL_URL: 'https://gateway.rid.example',
+      DEN_WG_HUB_PUBLIC_KEY: wireguardKey(),
+      DEN_WG_HUB_ENDPOINT: 'hub.den.example:51820',
+      DEN_WG_SUBNET: '10.77.0.0/16',
+      DEN_NODE_CONTROL_TOKEN: CONTROL_TOKEN,
+      DEN_NODE_CONTROL_URL: 'https://gateway.den.example',
     })) {
       saved[k] = process.env[k];
       process.env[k] = v;
@@ -121,7 +121,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
 
   const enrollment = async (token: string) => ({
     token,
-    csr: await makeCsr('rid-node'),
+    csr: await makeCsr('den-node'),
     wireguardPublicKey: wireguardKey(),
     kitVersion: '1.0.0',
     servicePort: 8443,
@@ -157,8 +157,8 @@ describe('node enrollment and heartbeat (M4-02)', () => {
     health: { status: 'ok' },
   };
   const asNode = (fingerprint: string) => ({
-    'x-rid-node-control': CONTROL_TOKEN,
-    'x-rid-client-cert-s256': fingerprint,
+    'x-den-node-control': CONTROL_TOKEN,
+    'x-den-client-cert-s256': fingerprint,
   });
 
   it('enrolls with the token: certificate for its own name, tunnel address, token used', async () => {
@@ -167,11 +167,11 @@ describe('node enrollment and heartbeat (M4-02)', () => {
     expect(body).toMatchObject({
       contractVersion: '1',
       nodeId,
-      nodeName: `rid-node-${nodeId}`,
-      controlUrl: 'https://gateway.rid.example',
+      nodeName: `den-node-${nodeId}`,
+      controlUrl: 'https://gateway.den.example',
       heartbeatIntervalSeconds: 60,
       wireguard: {
-        hubEndpoint: 'hub.rid.example:51820',
+        hubEndpoint: 'hub.den.example:51820',
         hubAddress: '10.77.0.1',
         allowedIps: ['10.77.0.1/32'],
       },
@@ -181,8 +181,8 @@ describe('node enrollment and heartbeat (M4-02)', () => {
     // The CA named the node, for server and client authentication, from the network root.
     const [leafPem, ...chain] = body.certificate.split(/(?<=-----END CERTIFICATE-----\n)/);
     const leaf = new X509Certificate(leafPem ?? '');
-    expect(leaf.subject).toBe('CN=rid-node');
-    expect(leaf.subjectAltName).toBe(`DNS:rid-node-${nodeId}`);
+    expect(leaf.subject).toBe('CN=den-node');
+    expect(leaf.subjectAltName).toBe(`DNS:den-node-${nodeId}`);
     expect(leaf.toLegacyObject().ext_key_usage).toEqual(
       expect.arrayContaining(['1.3.6.1.5.5.7.3.1', '1.3.6.1.5.5.7.3.2']),
     );
@@ -215,7 +215,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
   });
 
   it('refuses unknown, expired and revoked tokens alike, with 401', async () => {
-    expect((await enroll(await enrollment(`rid-enroll-${'x'.repeat(43)}`))).statusCode).toBe(401);
+    expect((await enroll(await enrollment(`den-enroll-${'x'.repeat(43)}`))).statusCode).toBe(401);
 
     const { as } = await admin();
     const expired = await issued(as);
@@ -233,13 +233,13 @@ describe('node enrollment and heartbeat (M4-02)', () => {
     expect((await enroll(await enrollment(revoked.token))).statusCode).toBe(401);
   });
 
-  it('a refused CSR leaves the token usable; the CSR names nothing but CN=rid-node', async () => {
+  it('a refused CSR leaves the token usable; the CSR names nothing but CN=den-node', async () => {
     const { as } = await admin();
     const created = await issued(as);
     for (const csr of [
       await makeCsr('otro-nombre'),
-      await makeCsr('rid-node', { dnsNames: ['rid-node-intruso'] }),
-      await makeCsr('rid-node', { key: 'RSA-1024' }),
+      await makeCsr('den-node', { dnsNames: ['den-node-intruso'] }),
+      await makeCsr('den-node', { key: 'RSA-1024' }),
     ]) {
       const res = await enroll({ ...(await enrollment(created.token)), csr });
       expect(res.statusCode, res.body).toBe(400);
@@ -250,12 +250,12 @@ describe('node enrollment and heartbeat (M4-02)', () => {
   it('without the hub configured it answers 503 and keeps the token', async () => {
     const { as } = await admin();
     const created = await issued(as);
-    const key = process.env.RID_WG_HUB_PUBLIC_KEY;
-    delete process.env.RID_WG_HUB_PUBLIC_KEY;
+    const key = process.env.DEN_WG_HUB_PUBLIC_KEY;
+    delete process.env.DEN_WG_HUB_PUBLIC_KEY;
     try {
       expect((await enroll(await enrollment(created.token))).statusCode).toBe(503);
     } finally {
-      process.env.RID_WG_HUB_PUBLIC_KEY = key;
+      process.env.DEN_WG_HUB_PUBLIC_KEY = key;
     }
     expect((await enroll(await enrollment(created.token))).statusCode).toBe(201);
   });
@@ -285,7 +285,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
           'POST',
           nodeId,
           'heartbeat',
-          { 'x-rid-client-cert-s256': a.fingerprint },
+          { 'x-den-client-cert-s256': a.fingerprint },
           heartbeatBody,
         )
       ).statusCode,
@@ -296,7 +296,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
           'POST',
           nodeId,
           'heartbeat',
-          { ...asNode(a.fingerprint), 'x-rid-node-control': 'otro-token-de-control-0123456789ab' },
+          { ...asNode(a.fingerprint), 'x-den-node-control': 'otro-token-de-control-0123456789ab' },
           heartbeatBody,
         )
       ).statusCode,
@@ -377,7 +377,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
   it('renews its certificate; the replaced one can only repeat that renewal', async () => {
     const { created, fingerprint } = await enrolled();
     const nodeId = created.node.id;
-    const csr = await makeCsr('rid-node');
+    const csr = await makeCsr('den-node');
     const res = await control('POST', nodeId, 'renew', asNode(fingerprint), { csr });
     expect(res.statusCode, res.body).toBe(200);
     const renewed = renewedNodeCertificateSchema.parse(res.json());
@@ -387,7 +387,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
       new X509Certificate(
         `${renewed.certificate.split('-----END CERTIFICATE-----')[0]}-----END CERTIFICATE-----`,
       ).subjectAltName,
-    ).toBe(`DNS:rid-node-${nodeId}`);
+    ).toBe(`DNS:den-node-${nodeId}`);
     expect(
       (await control('POST', nodeId, 'heartbeat', asNode(fresh), heartbeatBody)).statusCode,
     ).toBe(200);
@@ -402,7 +402,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
     expect(renewedNodeCertificateSchema.parse(retry.json()).certificate).toBe(renewed.certificate);
     // A new key with the replaced certificate is refused: nobody takes the node over with it.
     const takeover = await control('POST', nodeId, 'renew', asNode(fingerprint), {
-      csr: await makeCsr('rid-node'),
+      csr: await makeCsr('den-node'),
     });
     expect(takeover.statusCode).toBe(401);
     expect((await prisma.node.findUniqueOrThrow({ where: { id: nodeId } })).certificatePem).toBe(
@@ -433,7 +433,7 @@ describe('node enrollment and heartbeat (M4-02)', () => {
     expect(
       (
         await control('POST', nodeId, 'renew', asNode(fingerprint), {
-          csr: await makeCsr('rid-node'),
+          csr: await makeCsr('den-node'),
         })
       ).statusCode,
     ).toBe(409);

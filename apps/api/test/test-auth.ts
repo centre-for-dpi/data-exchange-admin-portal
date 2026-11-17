@@ -1,6 +1,6 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
-import { MFA_ACR } from '@rid/contracts';
+import { MFA_ACR } from '@den/contracts';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { configureApp, createAdapter } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
@@ -15,7 +15,7 @@ import {
   createCitizenTokenVerifier,
 } from '../src/transparency/citizen/citizen-token-verifier.js';
 
-const TEST_ISSUER = 'https://keycloak.test/realms/rid-portal';
+const TEST_ISSUER = 'https://keycloak.test/realms/den-portal';
 
 export interface TestIssuer {
   /** Signs an access token like Keycloak would (RS256, issuer, audience, expiry). */
@@ -101,7 +101,7 @@ export async function createTestApp(
   return app;
 }
 
-export const TEST_CITIZEN_ISSUER = 'https://identity.test/realms/rid-citizens';
+export const TEST_CITIZEN_ISSUER = 'https://identity.test/realms/den-citizens';
 
 export interface TestCitizenIssuer {
   /** Signs a citizen access token like the national identity provider would. */
@@ -119,7 +119,7 @@ export interface TestCitizenIssuer {
   verifier: CitizenTokenVerifier;
 }
 
-/** Citizen tokens (MT-05) against a local key instead of the rid-citizens realm. */
+/** Citizen tokens (MT-05) against a local key instead of the den-citizens realm. */
 export async function createTestCitizenIssuer(): Promise<TestCitizenIssuer> {
   const trusted = await generateKeyPair('RS256');
   const foreign = await generateKeyPair('RS256');
@@ -127,20 +127,20 @@ export async function createTestCitizenIssuer(): Promise<TestCitizenIssuer> {
   const verifier = createCitizenTokenVerifier({
     ...citizenTokenOptions(),
     issuer: TEST_CITIZEN_ISSUER,
-    clients: ['carpeta-ciudadana'],
+    clients: ['citizen-app'],
     keys: createLocalJWKSet({ keys: [jwk] }),
   });
   return {
     verifier,
     token: (sub, options = {}) => {
-      const claims: Record<string, unknown> = { azp: options.azp ?? 'carpeta-ciudadana' };
+      const claims: Record<string, unknown> = { azp: options.azp ?? 'citizen-app' };
       if (options.documentType !== null) claims.document_type = options.documentType ?? 'CC';
       if (options.documentNumber !== null) claims.document_number = options.documentNumber;
       return new SignJWT(claims)
         .setProtectedHeader({ alg: 'RS256', kid: 'citizen-key' })
         .setSubject(sub)
         .setIssuer(TEST_CITIZEN_ISSUER)
-        .setAudience(options.audience ?? 'rid-transparency-api')
+        .setAudience(options.audience ?? 'den-transparency-api')
         .setIssuedAt()
         .setExpirationTime(options.expiresIn ?? '5m')
         .sign(options.foreign ? foreign.privateKey : trusted.privateKey);

@@ -2,8 +2,8 @@
 // Simulated kit node (M4-03). TEST FIXTURE ONLY (ADR-0011): it exercises the portal side of the
 // contract (ARCHITECTURE.md §10) end to end in Compose. The real kit is another product.
 //
-//   1. Waits for an enrollment token (RID_ENROLLMENT_TOKEN, or the file /var/lib/mock-node/token).
-//   2. Enrolls: key and CSR with openssl (CN=rid-node), WireGuard keys with wg.
+//   1. Waits for an enrollment token (DEN_ENROLLMENT_TOKEN, or the file /var/lib/mock-node/token).
+//   2. Enrolls: key and CSR with openssl (CN=den-node), WireGuard keys with wg.
 //   3. Brings up wg0 with the configuration it received.
 //   4. Serves HTTPS on its tunnel address (servicePort): only the gateway's client certificate
 //      for its entity (gatewayClientName, from the network CA) gets in; requests are forwarded
@@ -17,7 +17,7 @@ import { createServer, request as httpsRequest } from 'node:https';
 
 const DIR = '/var/lib/mock-node';
 const STATE = `${DIR}/state.json`;
-const PORTAL = (process.env.RID_PORTAL_URL ?? 'http://host.docker.internal:4000').replace(
+const PORTAL = (process.env.DEN_PORTAL_URL ?? 'http://host.docker.internal:4000').replace(
   /\/+$/,
   '',
 );
@@ -43,7 +43,7 @@ const sh = (cmd, args, input) => execFileSync(cmd, args, { input }).toString().t
 async function token() {
   for (;;) {
     const value =
-      process.env.RID_ENROLLMENT_TOKEN ||
+      process.env.DEN_ENROLLMENT_TOKEN ||
       (existsSync(`${DIR}/token`) ? readFileSync(`${DIR}/token`, 'utf8').trim() : '');
     if (value) return value;
     await sleep(2000);
@@ -53,7 +53,7 @@ async function token() {
 async function enroll() {
   const enrollmentToken = await token();
   sh('openssl', ['ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', `${DIR}/node.key`]);
-  const csr = sh('openssl', ['req', '-new', '-key', `${DIR}/node.key`, '-subj', '/CN=rid-node']);
+  const csr = sh('openssl', ['req', '-new', '-key', `${DIR}/node.key`, '-subj', '/CN=den-node']);
   const wgPrivate = sh('wg', ['genkey']);
   const wgPublic = sh('wg', ['pubkey'], wgPrivate);
   const res = await fetch(`${PORTAL}/api/v1/nodes/enroll`, {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { syncPageSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { syncPageSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -15,7 +15,7 @@ describe("the operator's sync console (M5-07)", () => {
   const realmUsers = readRealmUsers();
   const sub = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
   const versionId = randomUUID();
-  const target = `apisix:route:rid-route-${versionId}`;
+  const target = `apisix:route:den-route-${versionId}`;
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
 
@@ -96,7 +96,7 @@ describe("the operator's sync console (M5-07)", () => {
   it('the gateway, OPA, the hub and OpenSearch have their own jobs; an unknown target is 404', async () => {
     for (const [t, topic] of [
       ['opa:bundle', 'policy.sync'],
-      ['opensearch:index-template:rid-access', 'opensearch.sync'],
+      ['opensearch:index-template:den-access', 'opensearch.sync'],
     ] as const) {
       const exists = await prisma.syncState.findUnique({ where: { target: t } });
       if (!exists) continue;
@@ -105,7 +105,7 @@ describe("the operator's sync console (M5-07)", () => {
       expect(await prisma.outboxMessage.findFirst({ where: { topic } })).not.toBeNull();
     }
     const unknown = await call('POST', '/admin/sync/retry', 'pablo.plataforma', {
-      target: `apisix:route:rid-route-${randomUUID()}`,
+      target: `apisix:route:den-route-${randomUUID()}`,
     });
     expect(unknown.statusCode).toBe(404);
   });

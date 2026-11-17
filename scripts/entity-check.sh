@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks and helpers for the server of a participating entity (docs/guides/entities.md): network
-# reachability of the RID platform, the key and CSR of an application, and a first call through
+# reachability of the DEN platform, the key and CSR of an application, and a first call through
 # the gateway with mTLS and a certificate-bound token. Needs bash, curl and openssl; nothing else.
 # It is not the instant-APIs kit (ADR-0011): it only exercises the platform's public contract.
 #
@@ -29,9 +29,9 @@ curl_quote() {
   printf '%s = "%s"\n' "$key" "$value"
 }
 
-network_ca() { # portal → ./rid-network-ca.pem
-  [[ -s rid-network-ca.pem ]] && return 0
-  curl -fsS --max-time 15 -o rid-network-ca.pem "https://$1/api/v1/pki/ca" ||
+network_ca() { # portal → ./den-network-ca.pem
+  [[ -s den-network-ca.pem ]] && return 0
+  curl -fsS --max-time 15 -o den-network-ca.pem "https://$1/api/v1/pki/ca" ||
     fail "No pude descargar la raíz de la red desde https://$1/api/v1/pki/ca"
 }
 
@@ -49,11 +49,11 @@ cmd_check() {
   fi
 
   network_ca "$portal"
-  ok "Raíz de la red guardada en ./rid-network-ca.pem ($(openssl x509 -in rid-network-ca.pem -noout -subject))"
+  ok "Raíz de la red guardada en ./den-network-ca.pem ($(openssl x509 -in den-network-ca.pem -noout -subject))"
 
   # The gateway asks for a client certificate: without one the handshake ends, but its server
   # certificate must verify against the network root.
-  out=$(openssl s_client -connect "$gateway:443" -servername "$gateway" -CAfile rid-network-ca.pem \
+  out=$(openssl s_client -connect "$gateway:443" -servername "$gateway" -CAfile den-network-ca.pem \
     -verify_return_error </dev/null 2>&1 || true)
   if grep -q 'Verify return code: 0 (ok)' <<<"$out" || grep -q 'Verification: OK' <<<"$out"; then
     ok "Salida al gateway ($gateway:443) y certificado del gateway válido para la red"
@@ -86,7 +86,7 @@ cmd_call() {
   [[ -r $id.crt && -r $id.key ]] || fail "Faltan $id.crt y $id.key en este directorio."
   network_ca "$portal"
   if [[ -z $secret ]]; then read -r -s -p "Secreto de la aplicación $id: " secret; echo; fi
-  local tls=(--cert "$id.crt" --key "$id.key" --cacert rid-network-ca.pem)
+  local tls=(--cert "$id.crt" --key "$id.key" --cacert den-network-ca.pem)
 
   # Secret and token go to curl in a config on stdin (-K -): never in argv, where ps shows them.
   body=$(curl_quote "user = $id:$secret" | curl -sS -K - --max-time 20 "${tls[@]}" -d grant_type=client_credentials \
@@ -95,8 +95,8 @@ cmd_call() {
   [[ -n $token ]] || fail "El gateway no dio token: $body"
   ok "Token obtenido (5 min, ligado al certificado de $id)"
 
-  local headers=(-H "X-RID-Purpose: $purpose")
-  [[ -n $end_user ]] && headers+=(-H "X-RID-End-User: $end_user")
+  local headers=(-H "X-DEN-Purpose: $purpose")
+  [[ -n $end_user ]] && headers+=(-H "X-DEN-End-User: $end_user")
   body=$(curl_quote "header = Authorization: Bearer $token" |
     curl -sS -K - --max-time 30 "${tls[@]}" "${headers[@]}" -w '\n%{http_code}' "https://$gateway/${path#/}")
   code=${body##*$'\n'}

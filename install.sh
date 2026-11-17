@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Interactive installer of the RID portal + gateway on one Linux server (pilot topology,
+# Interactive installer of the DEN portal + gateway on one Linux server (pilot topology,
 # docs/INSTALL.md). Production is the Helm charts of M6-05, not this script.
 #
 #   sudo ./install.sh              # asks step by step, writes .env, builds and starts everything
@@ -23,7 +23,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 ENV_FILE="$ROOT/.env"
 NODE_IMAGE="node:24.22.1-alpine3.24"
-EDGE_NETWORK="rid-edge"
+EDGE_NETWORK="den-edge"
 MIN_COMPOSE="2.26.0"
 
 # --- output -------------------------------------------------------------------------------------
@@ -90,10 +90,10 @@ ensure_env_additions() {
 # --- compose ------------------------------------------------------------------------------------
 compose_args() {
   COMPOSE=(docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml)
-  [[ $(env_get RID_INSTALL_PROXY) == bundled ]] && COMPOSE+=(-f infra/compose/docker-compose.edge.yml)
+  [[ $(env_get DEN_INSTALL_PROXY) == bundled ]] && COMPOSE+=(-f infra/compose/docker-compose.edge.yml)
   COMPOSE+=(--env-file "$ENV_FILE")
-  [[ $(env_get RID_INSTALL_OBSERVABILITY) == true ]] && COMPOSE+=(--profile observability)
-  [[ $(env_get RID_INSTALL_ANTIVIRUS) == true ]] && COMPOSE+=(--profile antivirus)
+  [[ $(env_get DEN_INSTALL_OBSERVABILITY) == true ]] && COMPOSE+=(--profile observability)
+  [[ $(env_get DEN_INSTALL_ANTIVIRUS) == true ]] && COMPOSE+=(--profile antivirus)
   return 0
 }
 dc() { compose_args; "${COMPOSE[@]}" "$@"; }
@@ -175,7 +175,7 @@ check_ports() {
   port_busy 51820 udp && busy+=("51820/udp")
   if ((${#busy[@]})); then
     # Our own containers already hold them on a re-run.
-    if docker ps --format '{{.Names}}' | grep -qE '^rid-(edge|wg-hub)-1$'; then
+    if docker ps --format '{{.Names}}' | grep -qE '^den-(edge|wg-hub)-1$'; then
       ok "Puertos ${busy[*]} ya en uso por esta instalación"
     else
       fail "Puertos ocupados por otro servicio: ${busy[*]}. Libéralos o usa la opción de proxy existente."
@@ -217,7 +217,7 @@ questions() {
   info "  • el del portal (personas: portal web, API, inicio de sesión)"
   info "  • el del gateway (sistemas: tráfico con mTLS de aplicaciones y nodos del kit)"
   while :; do
-    ask PORTAL_HOST "Nombre del portal (p. ej. rid.entidad.gov.xx)"
+    ask PORTAL_HOST "Nombre del portal (p. ej. den.entidad.gov.xx)"
     PORTAL_HOST=${PORTAL_HOST,,}
     [[ $PORTAL_HOST =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]] && break
     warn "Escribe solo el nombre, sin https:// ni rutas."
@@ -240,6 +240,11 @@ questions() {
     ask EDGE_NET "Nombre de la red de Docker de tu Traefik" "traefik"
     docker network inspect "$EDGE_NET" >/dev/null 2>&1 || fail "No existe la red de Docker '$EDGE_NET'."
     TLS=external
+    info "El instalador escribe las rutas del portal y del gateway para tu Traefik (proveedor de archivos)."
+    ask EDGE_ENTRYPOINT "EntryPoint HTTPS de tu Traefik" "websecure"
+    ask EDGE_RESOLVER "certResolver de tu Traefik para el certificado del portal (\"-\": tu Traefik ya lo tiene)" "-"
+    ask EDGE_DIR "Carpeta de configuración dinámica de tu Traefik en este servidor (\"-\": solo generar el archivo)" "-"
+    [[ $EDGE_DIR == - || -d $EDGE_DIR ]] || fail "No existe la carpeta $EDGE_DIR."
   else
     PROXY=bundled
     EDGE_NET=$EDGE_NETWORK
@@ -299,39 +304,48 @@ write_env() {
   step "Paso 7 · Secretos y configuración (.env)"
   local args=("https://$PORTAL_HOST" --gateway-host "$GATEWAY_HOST" --traefik-network "$EDGE_NET" --country "$COUNTRY")
   # The password goes through the environment, never on a command line (ps would show it).
-  RID_DEPLOY_DEMO_PASSWORD="$DEMO_PASSWORD" docker run --rm -e RID_DEPLOY_DEMO_PASSWORD     -v "$ROOT:/w" -w /w "$NODE_IMAGE" node scripts/make-deploy-env.mjs "${args[@]}"
+  DEN_DEPLOY_DEMO_PASSWORD="$DEMO_PASSWORD" docker run --rm -e DEN_DEPLOY_DEMO_PASSWORD     -v "$ROOT:/w" -w /w "$NODE_IMAGE" node scripts/make-deploy-env.mjs "${args[@]}"
   cat >>"$ENV_FILE" <<EOF
 
 # Installer (install.sh, docs/INSTALL.md)
-RID_PORTAL_HOST=$PORTAL_HOST
-RID_GATEWAY_HOST=$GATEWAY_HOST
-RID_INSTALL_PROXY=$PROXY
-RID_INSTALL_TLS=$TLS
-RID_ACME_EMAIL=${ACME_EMAIL-}
-RID_INSTALL_OBSERVABILITY=$OBSERVABILITY
-RID_INSTALL_ANTIVIRUS=$ANTIVIRUS
+DEN_PORTAL_HOST=$PORTAL_HOST
+DEN_GATEWAY_HOST=$GATEWAY_HOST
+DEN_INSTALL_PROXY=$PROXY
+DEN_INSTALL_TLS=$TLS
+DEN_ACME_EMAIL=${ACME_EMAIL-}
+DEN_EDGE_ENTRYPOINT=${EDGE_ENTRYPOINT-websecure}
+DEN_EDGE_CERT_RESOLVER=${EDGE_RESOLVER--}
+DEN_EDGE_DYNAMIC_DIR=${EDGE_DIR--}
+DEN_INSTALL_OBSERVABILITY=$OBSERVABILITY
+DEN_INSTALL_ANTIVIRUS=$ANTIVIRUS
 EOF
-  [[ $ANTIVIRUS == true ]] && env_set RID_CLAMAV_URL tcp://clamav:3310
+  [[ $ANTIVIRUS == true ]] && env_set DEN_CLAMAV_URL tcp://clamav:3310
   chmod 600 "$ENV_FILE"
   ok ".env escrito (permisos 600). Contiene todas las llaves de la instalación."
   warn "Guarda una copia cifrada de .env FUERA de este servidor: sin ella no se pueden recuperar los datos."
 }
 
 load_env_settings() {
-  PORTAL_HOST=$(env_get RID_PORTAL_HOST)
-  GATEWAY_HOST=$(env_get RID_GATEWAY_HOST)
-  PROXY=$(env_get RID_INSTALL_PROXY)
-  TLS=$(env_get RID_INSTALL_TLS)
-  OBSERVABILITY=$(env_get RID_INSTALL_OBSERVABILITY)
-  ANTIVIRUS=$(env_get RID_INSTALL_ANTIVIRUS)
+  PORTAL_HOST=$(env_get DEN_PORTAL_HOST)
+  GATEWAY_HOST=$(env_get DEN_GATEWAY_HOST)
+  PROXY=$(env_get DEN_INSTALL_PROXY)
+  TLS=$(env_get DEN_INSTALL_TLS)
+  OBSERVABILITY=$(env_get DEN_INSTALL_OBSERVABILITY)
+  ANTIVIRUS=$(env_get DEN_INSTALL_ANTIVIRUS)
   EDGE_NET=$(env_get TRAEFIK_NETWORK)
+  EDGE_ENTRYPOINT=$(env_get DEN_EDGE_ENTRYPOINT)
+  EDGE_RESOLVER=$(env_get DEN_EDGE_CERT_RESOLVER)
+  EDGE_DIR=$(env_get DEN_EDGE_DYNAMIC_DIR)
   [[ -n $PORTAL_HOST && -n $PROXY ]] ||
-    fail ".env existe pero no lo escribió este instalador (faltan RID_PORTAL_HOST / RID_INSTALL_PROXY). Ver docs/INSTALL.md §7."
+    fail ".env existe pero no lo escribió este instalador (faltan DEN_PORTAL_HOST / DEN_INSTALL_PROXY). Ver docs/INSTALL.md §7."
 }
 
 write_edge() {
-  [[ $PROXY == bundled ]] || return 0
   mkdir -p infra/edge/dynamic infra/edge/certs
+  if [[ $PROXY != bundled ]]; then
+    write_edge_external
+    return
+  fi
   local tls='{ certResolver: le }'
   if [[ $TLS == files ]]; then
     tls='{}'
@@ -341,7 +355,7 @@ write_edge() {
     fi
     [[ -f infra/edge/certs/portal.crt ]] || fail "Falta infra/edge/certs/portal.crt (certificado propio)."
     cat >infra/edge/dynamic/certs.yml <<'EOF'
-# Written by install.sh: the portal's own certificate (RID_INSTALL_TLS=files).
+# Written by install.sh: the portal's own certificate (DEN_INSTALL_TLS=files).
 tls:
   stores:
     default:
@@ -352,9 +366,30 @@ EOF
   else
     rm -f infra/edge/dynamic/certs.yml
   fi
-  sed -e "s/@PORTAL_HOST@/$PORTAL_HOST/g" -e "s/@GATEWAY_HOST@/$GATEWAY_HOST/g" -e "s/@TLS@/$tls/g" \
-    infra/edge/rid.yml.template >infra/edge/dynamic/rid.yml
-  ok "Rutas del proxy en infra/edge/dynamic/rid.yml"
+  render_edge websecure "$tls" infra/edge/dynamic/den.yml
+  ok "Rutas del proxy en infra/edge/dynamic/den.yml"
+}
+
+# render_edge ENTRYPOINT TLS FILE: the routes of the portal and the gateway (den.yml.template).
+render_edge() {
+  sed -e "s/@PORTAL_HOST@/$PORTAL_HOST/g" -e "s/@GATEWAY_HOST@/$GATEWAY_HOST/g" -e "s/@TLS@/$2/g" \
+    -e "s/@ENTRYPOINT@/$1/g" infra/edge/den.yml.template >"$3"
+}
+
+# write_edge_external: the same routes for a Traefik that is already on this server (file
+# provider). They go to its dynamic folder when the operator gave it; otherwise the file is left
+# in infra/edge/den-external.yml to be copied by hand.
+write_edge_external() {
+  local tls='{}' file=infra/edge/den-external.yml
+  [[ -n ${EDGE_RESOLVER-} && $EDGE_RESOLVER != - ]] && tls="{ certResolver: $EDGE_RESOLVER }"
+  render_edge "${EDGE_ENTRYPOINT:-websecure}" "$tls" "$file"
+  if [[ -n ${EDGE_DIR-} && $EDGE_DIR != - ]]; then
+    [[ -d $EDGE_DIR ]] || fail "No existe la carpeta dinámica de tu Traefik: $EDGE_DIR"
+    install -m 644 "$file" "$EDGE_DIR/den.yml"
+    ok "Rutas del portal y del gateway en $EDGE_DIR/den.yml (tu Traefik las carga solo si vigila esa carpeta)"
+  else
+    warn "Copia $ROOT/$file a la carpeta de configuración dinámica de tu Traefik: sin esas rutas el portal no responde."
+  fi
 }
 
 prepare_host() {
@@ -364,9 +399,9 @@ prepare_host() {
   }
   if [[ $OBSERVABILITY == true ]]; then
     if (($(sysctl -n vm.max_map_count) < 262144)); then
-      echo 'vm.max_map_count=262144' >/etc/sysctl.d/99-rid-opensearch.conf
+      echo 'vm.max_map_count=262144' >/etc/sysctl.d/99-den-opensearch.conf
       sysctl --system >/dev/null
-      ok "vm.max_map_count=262144 (OpenSearch), persistente en /etc/sysctl.d/99-rid-opensearch.conf"
+      ok "vm.max_map_count=262144 (OpenSearch), persistente en /etc/sysctl.d/99-den-opensearch.conf"
     else
       ok "vm.max_map_count ya es suficiente"
     fi
@@ -415,7 +450,7 @@ verify() {
   code=$(curl_portal /api/v1/opa/bundle.tar.gz)
   [[ $code != 200 ]] && ok "El bundle de OPA no está expuesto al público ($code)" ||
     warn "¡/api/v1/opa responde 200 desde afuera! Revisa las rutas del proxy."
-  code=$(curl_portal /auth/realms/rid-portal/.well-known/openid-configuration)
+  code=$(curl_portal /auth/realms/den-portal/.well-known/openid-configuration)
   [[ $code == 200 ]] && ok "Keycloak responde en /auth" || warn "Keycloak respondió $code (puede tardar unos minutos más)"
   if dc exec -T api wget -qO- 'http://opa:8181/health?bundles' >/dev/null 2>&1; then
     ok "OPA tiene el bundle de política activo"
@@ -449,7 +484,7 @@ summary() {
     "Gateway (sistemas, mTLS):" "https://$GATEWAY_HOST" \
     "Consola de Keycloak:" "https://$PORTAL_HOST/auth/admin/" \
     "Correo de pruebas:" "https://$PORTAL_HOST/mail" \
-    "Carpeta ciudadana demo:" "https://$PORTAL_HOST/carpeta"
+    "Carpeta ciudadana demo:" "https://$PORTAL_HOST/citizen-app"
   [[ $OBSERVABILITY == true ]] && printf '  %-26s %s\n' "Tablero del operador:" "https://$PORTAL_HOST/grafana/"
   echo
   info "Usuarios y contraseñas:   sudo ./install.sh credentials"
@@ -459,7 +494,7 @@ summary() {
 }
 
 cmd_install() {
-  printf '%s\n' "${B}Instalador del Portal RID — portal + gateway en un servidor (piloto)${N}"
+  printf '%s\n' "${B}Instalador del Portal DEN — portal + gateway en un servidor (piloto)${N}"
   check_system
   if [[ -f $ENV_FILE ]]; then
     step "Instalación existente"
@@ -492,7 +527,7 @@ cmd_credentials() {
   require_install
   warn "Datos sensibles: no los compartas por canales abiertos."
   printf '  %-34s %s\n' \
-    "Usuarios de demo (contraseña):" "$(env_get RID_DEMO_USER_PASSWORD)" \
+    "Usuarios de demo (contraseña):" "$(env_get DEN_DEMO_USER_PASSWORD)" \
     "  operador / revisor:" "ana.operadora (segundo factor)" \
     "  administrador de plataforma:" "pablo.plataforma (segundo factor)" \
     "  regulador:" "marta.regulador (segundo factor)" \
@@ -504,7 +539,7 @@ cmd_credentials() {
     "  ciudadana (carpeta):" "ciudadana.demo" \
     "Keycloak (realm master):" "$(env_get KEYCLOAK_ADMIN_USER) / $(env_get KEYCLOAK_ADMIN_PASSWORD)" \
     "Correo de pruebas (/mail):" "$(env_get MAILPIT_UI_AUTH | sed 's/:/ \/ /')"
-  [[ $(env_get RID_INSTALL_OBSERVABILITY) == true ]] &&
+  [[ $(env_get DEN_INSTALL_OBSERVABILITY) == true ]] &&
     printf '  %-34s %s\n' "Grafana (/grafana):" "admin / $(env_get GRAFANA_ADMIN_PASSWORD)"
   info "Código de segundo factor de los usuarios de demo: sudo ./install.sh otp"
 }
@@ -518,20 +553,20 @@ cmd_backup() {
   require_install
   local dir="$ROOT/backups/$(date +%Y%m%d-%H%M%S)" user db
   mkdir -p "$dir"; chmod 700 "$ROOT/backups" "$dir"
-  user=$(env_get POSTGRES_USER); user=${user:-rid}
-  db=$(env_get POSTGRES_DB); db=${db:-rid}
+  user=$(env_get POSTGRES_USER); user=${user:-den}
+  db=$(env_get POSTGRES_DB); db=${db:-den}
   info "Respaldando en $dir"
   # A full pgBackRest backup first (OPERATIONS.md §6), when the service runs (M6-06 onwards).
   if dc ps --status running --services 2>/dev/null | grep -qx pgbackrest; then
-    dc exec -T pgbackrest pgbackrest --stanza=rid --type=full backup
+    dc exec -T pgbackrest pgbackrest --stanza=den --type=full backup
   fi
   # Logical dumps too: they restore into another PostgreSQL version or another platform.
-  dc exec -T postgres pg_dump -U "$user" -Fc "$db" >"$dir/rid.dump"
+  dc exec -T postgres pg_dump -U "$user" -Fc "$db" >"$dir/den.dump"
   dc exec -T postgres pg_dump -U "$user" -Fc keycloak >"$dir/keycloak.dump"
   # The pgBackRest repository is encrypted: it can leave the server as is.
-  for v in step-ca-data tsa-data api-documents carpeta-data pgbackrest-repo; do
-    docker volume inspect "rid_$v" >/dev/null 2>&1 &&
-      docker run --rm -v "rid_$v:/v:ro" -v "$dir:/b" "$NODE_IMAGE" tar czf "/b/$v.tgz" -C /v .
+  for v in step-ca-data tsa-data api-documents citizen-app-data pgbackrest-repo; do
+    docker volume inspect "den_$v" >/dev/null 2>&1 &&
+      docker run --rm -v "den_$v:/v:ro" -v "$dir:/b" "$NODE_IMAGE" tar czf "/b/$v.tgz" -C /v .
   done
   cp "$ENV_FILE" "$dir/env"
   chmod 600 "$dir"/*
@@ -540,11 +575,11 @@ cmd_backup() {
 
 cmd_restore() {
   require_install; load_env_settings
-  local target=${1:-} args=(--stanza=rid --delta)
+  local target=${1:-} args=(--stanza=den --delta)
   [[ -n $target ]] && args+=(--type=time "--target=$target" --target-action=promote)
   dc ps --status running --services 2>/dev/null | grep -qx pgbackrest ||
     fail "El servicio pgbackrest no está corriendo: no hay respaldos que restaurar (sudo ./install.sh start)."
-  dc exec -T pgbackrest pgbackrest --stanza=rid info
+  dc exec -T pgbackrest pgbackrest --stanza=den info
   warn "Se detiene todo, se restaura la base ${target:+al instante $target}${target:-al último estado archivado} y se arranca de nuevo. Lo escrito después de ese instante se pierde."
   yes_no "¿Continuar?" n || exit 0
   dc stop
@@ -552,7 +587,7 @@ cmd_restore() {
   dc run --rm --no-deps pgbackrest sh -c     "mkdir -p /var/lib/postgresql/18 && pgbackrest $(printf '%q ' "${args[@]}")restore"
   dc up -d --wait --wait-timeout 1800
   # A full backup on the new timeline, the base of the next point-in-time recoveries.
-  dc exec -T pgbackrest pgbackrest --stanza=rid --type=full backup
+  dc exec -T pgbackrest pgbackrest --stanza=den --type=full backup
   ok "Base restaurada${target:+ al instante $target}. Revisa el portal; los volúmenes (CA, documentos) se restauran aparte (OPERATIONS.md §6)."
 }
 

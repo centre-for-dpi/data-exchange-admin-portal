@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Agent of the WireGuard hub (M4-03, ADR-0023). Brings up wg0 on the first address of
-// RID_WG_SUBNET, closes the tunnel to anything new coming from the nodes, routes TLS connections
+// DEN_WG_SUBNET, closes the tunnel to anything new coming from the nodes, routes TLS connections
 // to the nodes by SNI with nginx stream, and serves the desired-state API the portal's reconciler
-// uses (internal network only, bearer RID_WG_HUB_AGENT_TOKEN):
+// uses (internal network only, bearer DEN_WG_HUB_AGENT_TOKEN):
 //   GET  /health           liveness, no token
 //   GET  /v1/state         { publicKey, listenPort, peers: [...], routes: [...] }
 //   PUT  /v1/state         { peers: [{ publicKey, address }], routes: [{ name, address, port }] }
@@ -18,15 +18,15 @@ const STATE_DIR = '/var/lib/wg-hub';
 const STATE_FILE = `${STATE_DIR}/state.json`;
 const WG_CONF = '/etc/wireguard/wg0.conf';
 const NGINX_CONF = '/etc/nginx/nginx.conf';
-const ROUTES_MAP = '/etc/nginx/rid-nodes.map';
-const LISTEN_PORT = Number(process.env.RID_WG_LISTEN_PORT ?? 51820);
-const AGENT_PORT = Number(process.env.RID_WG_HUB_AGENT_PORT ?? 8090);
-const SNI_PORT = Number(process.env.RID_WG_HUB_SNI_PORT ?? 8443);
-const TOKEN = process.env.RID_WG_HUB_AGENT_TOKEN ?? '';
-const PRIVATE_KEY = process.env.RID_WG_HUB_PRIVATE_KEY ?? '';
+const ROUTES_MAP = '/etc/nginx/den-nodes.map';
+const LISTEN_PORT = Number(process.env.DEN_WG_LISTEN_PORT ?? 51820);
+const AGENT_PORT = Number(process.env.DEN_WG_HUB_AGENT_PORT ?? 8090);
+const SNI_PORT = Number(process.env.DEN_WG_HUB_SNI_PORT ?? 8443);
+const TOKEN = process.env.DEN_WG_HUB_AGENT_TOKEN ?? '';
+const PRIVATE_KEY = process.env.DEN_WG_HUB_PRIVATE_KEY ?? '';
 
 const KEY = /^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$/;
-const NODE_NAME = /^rid-node-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const NODE_NAME = /^den-node-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // The container log (stderr): no content, only what the hub did.
 const log = (...args) => console.error(new Date().toISOString(), ...args);
@@ -39,7 +39,7 @@ const nginx = (args) => execFileSync('nginx', args, { stdio: ['ignore', 'inherit
 
 const toInt = (ip) => ip.split('.').reduce((acc, o) => acc * 256 + Number(o), 0);
 const toIp = (n) => [24, 16, 8, 0].map((s) => Math.floor(n / 2 ** s) % 256).join('.');
-const [subnetIp, subnetBits] = (process.env.RID_WG_SUBNET ?? '10.77.0.0/16').split('/');
+const [subnetIp, subnetBits] = (process.env.DEN_WG_SUBNET ?? '10.77.0.0/16').split('/');
 const prefix = Number(subnetBits);
 const size = 2 ** (32 - prefix);
 const network = toInt(subnetIp) - (toInt(subnetIp) % size);
@@ -89,10 +89,10 @@ function interfaceConf(peers) {
 
 function bringUp() {
   if (!KEY.test(PRIVATE_KEY)) {
-    throw new Error('RID_WG_HUB_PRIVATE_KEY must be a WireGuard private key (base64, 32 bytes)');
+    throw new Error('DEN_WG_HUB_PRIVATE_KEY must be a WireGuard private key (base64, 32 bytes)');
   }
   if (!TOKEN || TOKEN.length < 16)
-    throw new Error('RID_WG_HUB_AGENT_TOKEN must be set (16+ chars)');
+    throw new Error('DEN_WG_HUB_AGENT_TOKEN must be set (16+ chars)');
   mkdirSync('/etc/wireguard', { recursive: true });
   writeFileSync(
     WG_CONF,
@@ -142,14 +142,14 @@ pid /run/nginx.pid;
 error_log stderr warn;
 events { worker_connections 4096; }
 stream {
-  map $ssl_preread_server_name $rid_node {
+  map $ssl_preread_server_name $den_node {
     include ${ROUTES_MAP};
     default 127.0.0.1:9;
   }
   server {
     listen ${SNI_PORT};
     ssl_preread on;
-    proxy_pass $rid_node;
+    proxy_pass $den_node;
     proxy_connect_timeout 5s;
   }
 }

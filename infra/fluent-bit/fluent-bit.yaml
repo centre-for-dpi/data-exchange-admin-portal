@@ -18,7 +18,7 @@ pipeline:
   filters:
     - name: lua
       match: apisix.*
-      script: /fluent-bit/etc/rid/allowlist.lua
+      script: /fluent-bit/etc/den/allowlist.lua
       call: allowlist
 
   outputs:
@@ -27,7 +27,7 @@ pipeline:
       host: opensearch
       port: 9200
       logstash_format: on
-      logstash_prefix: rid-access
+      logstash_prefix: den-access
       logstash_dateformat: '%Y.%m'
       suppress_type_name: on
       trace_error: on

@@ -95,6 +95,6 @@ test.describe('closing of M5: a simulated month', () => {
     await signIn(developer, 'carlos.dev', `/my-apps/usage?from=${MONTH.from}&to=${MONTH.to}`);
     await expect(
       developer.getByRole('region', { name: 'Llamadas negadas por el gateway, con su razón' }),
-    ).toContainText(/Finalidad no aprobada|Límite de peticiones|Falta X-RID-End-User/);
+    ).toContainText(/Finalidad no aprobada|Límite de peticiones|Falta X-DEN-End-User/);
   });
 });

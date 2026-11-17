@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 /**
  * UUIDv7 (RFC 9562) generated in the application, for rows whose id must be known before the
- * INSERT (e.g. deterministic external ids such as rid-app-<id>). Same format as PostgreSQL's
+ * INSERT (e.g. deterministic external ids such as den-app-<id>). Same format as PostgreSQL's
  * uuidv7(): 48-bit Unix milliseconds, version 7, variant 10, random bits.
  */
 export function uuidv7(now: number = Date.now()): string {

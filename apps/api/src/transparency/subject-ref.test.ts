@@ -3,7 +3,7 @@ import { normalizeDocumentNumber, subjectRef } from './subject-ref.js';
 
 describe('subject reference', () => {
   it('matches the vector shared with the OPA policy tests', () => {
-    // packages/policy/rid/authz_test.rego, test_the_reference_matches_the_portal_vector
+    // packages/policy/den/authz_test.rego, test_the_reference_matches_the_portal_vector
     expect(
       subjectRef({
         key: 'subject-key-for-tests-0000000000000001',

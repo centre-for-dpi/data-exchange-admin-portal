@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page } from '@playwright/test';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 
 /** Country configuration the running app uses (no country text is hard-coded in tests). */
 export const country = () => loadCountryConfig();
@@ -24,7 +24,7 @@ const MFA_USERS = new Set(
   (
     JSON.parse(
       readFileSync(
-        resolve(import.meta.dirname, '../../../infra/keycloak/rid-portal-realm.json'),
+        resolve(import.meta.dirname, '../../../infra/keycloak/den-portal-realm.json'),
         'utf8',
       ),
     ) as { users: Array<{ username: string; credentials?: Array<{ type: string }> }> }
@@ -36,7 +36,7 @@ const MFA_USERS = new Set(
 /** RFC 6238 TOTP like the realm's OTP policy (6 digits, 30 s, HMAC-SHA1, UTF-8 key). */
 export function totp(
   at = Date.now(),
-  secret = process.env.RID_DEMO_TOTP_SECRET ?? 'rid-demo-totp-secret',
+  secret = process.env.DEN_DEMO_TOTP_SECRET ?? 'den-demo-totp-secret',
 ): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
@@ -121,11 +121,11 @@ export async function enrollOneTimeCode(page: Page, password: string): Promise<v
   await page.waitForURL((url) => !url.pathname.includes('/realms/'));
 }
 
-/** Fills Keycloak's login form (realm rid-portal), and the one-time code for critical roles. */
+/** Fills Keycloak's login form (realm den-portal), and the one-time code for critical roles. */
 export async function keycloakLogin(page: Page, username: string): Promise<void> {
-  await page.waitForURL(/\/realms\/rid-portal\//);
+  await page.waitForURL(/\/realms\/den-portal\//);
   await page.locator('#username').fill(username);
-  await page.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'rid-demo-password');
+  await page.locator('#password').fill(process.env.DEN_DEMO_USER_PASSWORD ?? 'den-demo-password');
   await page.locator('#kc-login').click();
   if (MFA_USERS.has(username)) await enterOneTimeCode(page, username);
 }

@@ -4,7 +4,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { AuditService } from '../audit/audit.service.js';
 import { canTransition, type CredentialStatus } from '../domain/credential/state-machine.js';
 import { OutboxService } from '../outbox/outbox.service.js';
@@ -20,7 +20,7 @@ const BATCH = 500;
 
 /**
  * Time-driven steps of credentials (SPEC.md §4.3, M3-01, M3-04), every
- * RID_LIFECYCLE_INTERVAL_SECONDS (default 300):
+ * DEN_LIFECYCLE_INTERVAL_SECONDS (default 300):
  * - expiry notice: lifecycle.certificateExpiryWarningDays before notAfter, once per certificate.
  *   The audited `credential.expiry_notice_queued` reaches the entity's app developers as a
  *   notification (in the portal and by e-mail, M2-08);
@@ -40,7 +40,7 @@ export class CertificateLifecycleService implements OnApplicationBootstrap, OnAp
 
   onApplicationBootstrap(): void {
     if (!QueueService.enabled()) return;
-    const seconds = Number(process.env.RID_LIFECYCLE_INTERVAL_SECONDS ?? 300);
+    const seconds = Number(process.env.DEN_LIFECYCLE_INTERVAL_SECONDS ?? 300);
     this.timer = setInterval(
       () => {
         this.tick().catch((error: unknown) =>

@@ -3,10 +3,10 @@
 apisix:
   node_listen: 9080
   enable_ipv6: false
-  # Our own plugins (infra/apisix/plugins, mounted read-only): rid-data-subject (ADR-0017),
-  # rid-client-cert (S-3, M3-02), rid-rate-limited (S-2, M3-05), rid-header-guard (M3-07) and
-  # rid-assertion (SPIKE S-6, prototype).
-  extra_lua_path: /usr/local/apisix/rid/?.lua
+  # Our own plugins (infra/apisix/plugins, mounted read-only): den-data-subject (ADR-0017),
+  # den-client-cert (S-3, M3-02), den-rate-limited (S-2, M3-05), den-header-guard (M3-07) and
+  # den-assertion (SPIKE S-6, prototype).
+  extra_lua_path: /usr/local/apisix/den/?.lua
   ssl:
     enable: true
     listen:
@@ -15,15 +15,15 @@ apisix:
   status:
     ip: 0.0.0.0
     port: 7085
-  # Private keys in etcd (the gateway's TLS keys, the assertion key of rid-assertion) are encrypted
+  # Private keys in etcd (the gateway's TLS keys, the assertion key of den-assertion) are encrypted
   # with this keyring (M6-01, S-6). The first key encrypts and is the deployment's own secret
-  # (16 characters, RID_APISIX_KEYRING); APISIX's factory key, which is public, only stays to read
+  # (16 characters, DEN_APISIX_KEYRING); APISIX's factory key, which is public, only stays to read
   # what was written before it, until the reconciler rewrites those objects (certificate renewal,
   # at most 90 days): then it is removed from here.
   data_encryption:
     enable_encrypt_fields: true
     keyring:
-      - '${{RID_APISIX_KEYRING}}'
+      - '${{DEN_APISIX_KEYRING}}'
       - qeddd145sfvddff3
 
 deployment:
@@ -78,18 +78,18 @@ plugin_attr:
 # (desired-state.ts) and ours. Without them in the list, a route that asked for anything else -
 # serverless functions above all, which run arbitrary Lua - is refused by APISIX. fault-injection
 # stays for the tests that simulate a provider's errors. (The S-3 spike prototype used
-# serverless-pre-function; that plugin is now rid-client-cert.)
+# serverless-pre-function; that plugin is now den-client-cert.)
 plugins:
   - request-id
-  - rid-header-guard
+  - den-header-guard
   - openid-connect
-  - rid-client-cert
-  - rid-data-subject
+  - den-client-cert
+  - den-data-subject
   - proxy-rewrite
   - opa
-  - rid-assertion
+  - den-assertion
   - limit-count
-  - rid-rate-limited
+  - den-rate-limited
   - response-rewrite
   - fault-injection
   - prometheus

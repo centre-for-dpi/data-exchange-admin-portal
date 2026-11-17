@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   applicationDetailSchema,
   createdApplicationSchema,
   credentialSchema,
   issuedCertificateSchema,
   rotatedSecretSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeCsr } from '../../test/csr.js';
 import { FakeKeycloak } from '../../test/fake-keycloak.js';
@@ -79,7 +79,7 @@ describe('credential rotation and revocation (M3-04)', () => {
       name: `Rotación ${randomUUID().slice(0, 6)}`,
       description: 'Prueba la rotación de credenciales.',
       environment: 'sandbox',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     expect(res.statusCode, res.body).toBe(201);
     const created = createdApplicationSchema.parse(res.json());

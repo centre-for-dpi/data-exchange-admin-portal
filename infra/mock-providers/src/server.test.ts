@@ -204,17 +204,17 @@ describe('request logging', () => {
       method: 'GET',
       url: `/afiliados/${SAMPLE_ID}?extra=1`,
       headers: {
-        'x-rid-consumer-entity': 'programas-sociales',
-        'x-rid-purpose': 'eligibility_check',
-        'x-rid-operation': 'getAfiliado',
-        'x-rid-end-user': '52123456',
+        'x-den-consumer-entity': 'programas-sociales',
+        'x-den-purpose': 'eligibility_check',
+        'x-den-operation': 'getAfiliado',
+        'x-den-end-user': '52123456',
         'x-request-id': 'req-123',
         authorization: 'Bearer secret-token',
       },
     });
     const output = lines.join('');
-    expect(output).toContain('"x-rid-consumer-entity":"programas-sociales"');
-    expect(output).toContain('"x-rid-purpose":"eligibility_check"');
+    expect(output).toContain('"x-den-consumer-entity":"programas-sociales"');
+    expect(output).toContain('"x-den-purpose":"eligibility_check"');
     expect(output).toContain('"x-request-id":"req-123"');
     expect(output).toContain('"route":"/afiliados/:numeroIdentificacion"');
     expect(output).not.toContain(SAMPLE_ID);
@@ -227,16 +227,16 @@ describe('request logging', () => {
   it('masks the end-user header and ignores unrelated headers', () => {
     expect(
       traceHeaders({
-        'x-rid-end-user': '123',
-        'x-rid-data-subject': 'CC:1000000001',
-        'x-rid-purpose': 'p',
+        'x-den-end-user': '123',
+        'x-den-data-subject': 'CC:1000000001',
+        'x-den-purpose': 'p',
         cookie: 'c',
         host: 'h',
       }),
     ).toEqual({
-      'x-rid-end-user': '[masked]',
-      'x-rid-data-subject': '[masked]',
-      'x-rid-purpose': 'p',
+      'x-den-end-user': '[masked]',
+      'x-den-data-subject': '[masked]',
+      'x-den-purpose': 'p',
     });
   });
 });

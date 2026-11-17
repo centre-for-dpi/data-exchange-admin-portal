@@ -12,7 +12,7 @@ import {
   type TimelineKind,
   timelineParamsSchema,
   timelineSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import {
   type AuthenticatedRequest,
@@ -45,8 +45,8 @@ export class AuditController {
     operationId: 'exportAuditTrail',
     summary: 'Signed export of the audit trail (CSV or JSON), with the same filters as the list',
     description:
-      'Every field of each event, hashes included. Headers: `X-RID-Export-SHA256` (hex), ' +
-      '`Digest` and `X-RID-Export-Signature`, a compact JWS (EdDSA) over the manifest ' +
+      'Every field of each event, hashes included. Headers: `X-DEN-Export-SHA256` (hex), ' +
+      '`Digest` and `X-DEN-Export-Signature`, a compact JWS (EdDSA) over the manifest ' +
       '{sha256, format, count, filters, exportedAt, firstSeq, lastSeq}, verifiable with ' +
       '/transparency/jwks. At most 50 000 events per export; each export is audited.',
     tags: ['audit'],
@@ -67,10 +67,10 @@ export class AuditController {
       .header('content-disposition', `attachment; filename="${file.fileName}"`)
       .header('x-content-type-options', 'nosniff')
       .header('cache-control', 'no-store')
-      .header('x-rid-export-sha256', file.sha256)
-      .header('x-rid-export-count', String(file.count))
+      .header('x-den-export-sha256', file.sha256)
+      .header('x-den-export-count', String(file.count))
       .header('digest', `sha-256=${Buffer.from(file.sha256, 'hex').toString('base64')}`);
-    if (file.signature) void reply.header('x-rid-export-signature', file.signature);
+    if (file.signature) void reply.header('x-den-export-signature', file.signature);
     await reply.send(file.body);
   }
 

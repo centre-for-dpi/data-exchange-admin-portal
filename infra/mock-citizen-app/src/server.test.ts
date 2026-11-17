@@ -8,14 +8,14 @@ import { AlertStore } from './store.js';
 
 const secret = `whsec_${randomBytes(32).toString('base64')}`;
 const config: CitizenAppConfig = {
-  publicUrl: 'https://folder.test/carpeta',
-  basePath: '/carpeta',
+  publicUrl: 'https://folder.test/citizen-app',
+  basePath: '/citizen-app',
   port: 0,
   name: { es: 'Carpeta de prueba', en: 'Test folder' },
   oidc: {
-    issuer: 'https://identity.test/realms/rid-citizens',
-    internalUrl: 'https://identity.test/realms/rid-citizens',
-    clientId: 'carpeta-ciudadana',
+    issuer: 'https://identity.test/realms/den-citizens',
+    internalUrl: 'https://identity.test/realms/den-citizens',
+    clientId: 'citizen-app',
     clientSecret: 'secret',
   },
   portal: {
@@ -41,7 +41,7 @@ describe('reference citizen folder (MT-07)', () => {
   const app = buildServer(config, { store, mailer });
 
   beforeAll(async () => {
-    process.env.RID_COUNTRY ??= 'co';
+    process.env.DEN_COUNTRY ??= 'co';
     store.set(alertId, { sub: 'citizen-1', email: 'valentina@example.test' });
     await app.ready();
   });
@@ -62,7 +62,7 @@ describe('reference citizen folder (MT-07)', () => {
     const signature = new Webhook(overrides.secret ?? secret).sign(id, now, body);
     return app.inject({
       method: 'POST',
-      url: '/carpeta/api/rid/alerts',
+      url: '/citizen-app/api/den/alerts',
       headers: {
         'content-type': 'application/json',
         'webhook-id': id,
@@ -80,7 +80,7 @@ describe('reference citizen folder (MT-07)', () => {
     expect((await notice({ id })).statusCode).toBe(204); // retry of the same message
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ to: 'valentina@example.test' });
-    expect(sent[0]?.text).toContain('https://folder.test/carpeta/consultas');
+    expect(sent[0]?.text).toContain('https://folder.test/citizen-app/consultas');
     expect(sent[0]?.text).toContain('datos sensibles');
     expect(sent[0]?.text).not.toContain(alertId);
   });
@@ -95,34 +95,34 @@ describe('reference citizen folder (MT-07)', () => {
   });
 
   it('serves its pages under the base path, and asks to sign in for the private ones', async () => {
-    const home = await app.inject({ url: '/carpeta/' });
+    const home = await app.inject({ url: '/citizen-app/' });
     expect(home.statusCode).toBe(200);
     expect(home.body).toContain('<html lang="es">');
     expect(home.headers['content-security-policy']).toContain("default-src 'self'");
-    expect((await app.inject({ url: '/carpeta/?lang=en' })).body).toContain('<html lang="en">');
-    const consultations = await app.inject({ url: '/carpeta/consultas' });
+    expect((await app.inject({ url: '/citizen-app/?lang=en' })).body).toContain('<html lang="en">');
+    const consultations = await app.inject({ url: '/citizen-app/consultas' });
     expect(consultations.statusCode).toBe(302);
-    expect(consultations.headers.location).toBe('/carpeta/login');
-    const login = await app.inject({ url: '/carpeta/login' });
+    expect(consultations.headers.location).toBe('/citizen-app/login');
+    const login = await app.inject({ url: '/citizen-app/login' });
     const target = new URL(login.headers.location ?? '');
     expect(target.origin + target.pathname).toBe(
-      'https://identity.test/realms/rid-citizens/protocol/openid-connect/auth',
+      'https://identity.test/realms/den-citizens/protocol/openid-connect/auth',
     );
     expect(target.searchParams.get('code_challenge_method')).toBe('S256');
     expect(target.searchParams.get('redirect_uri')).toBe(
-      'https://folder.test/carpeta/auth/callback',
+      'https://folder.test/citizen-app/auth/callback',
     );
   });
 
   it('accepts a sign-in callback only in the browser that started it (login CSRF)', async () => {
-    const login = await app.inject({ url: '/carpeta/login' });
+    const login = await app.inject({ url: '/citizen-app/login' });
     const state = new URL(login.headers.location ?? '').searchParams.get('state') ?? '';
     const cookie = login.cookies.find((c) => c.name === 'citizen_login');
     expect(cookie).toMatchObject({ value: state, httpOnly: true, sameSite: 'Lax' });
     // Another browser (no cookie) arriving with this state and a code is sent home, signed out.
-    const forged = await app.inject({ url: `/carpeta/auth/callback?state=${state}&code=x` });
+    const forged = await app.inject({ url: `/citizen-app/auth/callback?state=${state}&code=x` });
     expect(forged.statusCode).toBe(302);
-    expect(forged.headers.location).toBe('/carpeta/');
+    expect(forged.headers.location).toBe('/citizen-app/');
     expect(forged.cookies.find((c) => c.name === 'citizen_session')).toBeUndefined();
   });
 

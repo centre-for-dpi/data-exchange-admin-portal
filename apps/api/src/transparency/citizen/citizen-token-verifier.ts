@@ -1,4 +1,4 @@
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 import {
   DOCUMENT_NUMBER,
@@ -35,20 +35,20 @@ export interface CitizenTokenOptions {
 
 export const citizenTokenOptions = (): CitizenTokenOptions => ({
   issuer:
-    process.env.RID_CITIZEN_ISSUER ??
-    `${process.env.KEYCLOAK_URL ?? 'http://localhost:8080'}/realms/rid-citizens`,
-  audience: process.env.RID_CITIZEN_AUDIENCE ?? 'rid-transparency-api',
-  clients: (process.env.RID_CITIZEN_CLIENTS ?? 'carpeta-ciudadana')
+    process.env.DEN_CITIZEN_ISSUER ??
+    `${process.env.KEYCLOAK_URL ?? 'http://localhost:8080'}/realms/den-citizens`,
+  audience: process.env.DEN_CITIZEN_AUDIENCE ?? 'den-transparency-api',
+  clients: (process.env.DEN_CITIZEN_CLIENTS ?? 'citizen-app')
     .split(',')
     .map((c) => c.trim())
     .filter(Boolean),
-  documentTypeClaim: process.env.RID_CITIZEN_DOCUMENT_TYPE_CLAIM ?? 'document_type',
-  documentNumberClaim: process.env.RID_CITIZEN_DOCUMENT_NUMBER_CLAIM ?? 'document_number',
+  documentTypeClaim: process.env.DEN_CITIZEN_DOCUMENT_TYPE_CLAIM ?? 'document_type',
+  documentNumberClaim: process.env.DEN_CITIZEN_DOCUMENT_NUMBER_CLAIM ?? 'document_number',
 });
 
 /**
  * Verifies access tokens of the national digital identity (in development, the Keycloak realm
- * rid-citizens): RS256 signature against the issuer's JWKS, issuer, audience, expiry, and an
+ * den-citizens): RS256 signature against the issuer's JWKS, issuer, audience, expiry, and an
  * authorized citizen app as azp. The document claims become the citizen's pseudonym with the
  * same key and normalization as the gateway; the number itself is not kept or returned.
  */

@@ -5,7 +5,7 @@ import {
   DESIGNEE_ROLES,
   entityRequestSchema,
   membershipSummarySchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';

@@ -3,7 +3,7 @@
 // (M6-06, ADR-0026), with the same image, pgBackRest configuration, scheduler and restore commands
 // as the pilot (infra/postgres, install.sh restore, OPERATIONS.md §6). In throwaway containers and
 // volumes of its own: the development stack is not touched.
-//   1. PostgreSQL archiving its WAL to an encrypted repository; a full backup (rid-backup-scheduler
+//   1. PostgreSQL archiving its WAL to an encrypted repository; a full backup (den-backup-scheduler
 //      --once); a row written before a point in time and another one after it.
 //   2. Disaster: the data volume is lost. Restore the latest state into an empty volume: both rows
 //      are there (the backup plus the archived WAL after it).
@@ -17,14 +17,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const IMAGE = 'rid/postgres:restore-test';
-const RUN = `rid-restore-test-${randomBytes(3).toString('hex')}`;
+const IMAGE = 'den/postgres:restore-test';
+const RUN = `den-restore-test-${randomBytes(3).toString('hex')}`;
 const VOLUMES = { data: `${RUN}-data`, repo: `${RUN}-repo`, socket: `${RUN}-socket` };
 const ENV = {
-  POSTGRES_USER: 'rid',
+  POSTGRES_USER: 'den',
   POSTGRES_PASSWORD: randomBytes(12).toString('hex'),
-  POSTGRES_DB: 'rid',
-  PGBACKREST_PG1_USER: 'rid',
+  POSTGRES_DB: 'den',
+  PGBACKREST_PG1_USER: 'den',
   PGBACKREST_REPO1_CIPHER_PASS: randomBytes(24).toString('base64url'),
 };
 // The pilot's settings (docker-compose.deploy.yml).
@@ -32,7 +32,7 @@ const ARCHIVING = [
   '-c',
   'archive_mode=on',
   '-c',
-  'archive_command=pgbackrest --stanza=rid archive-push %p',
+  'archive_command=pgbackrest --stanza=den archive-push %p',
   '-c',
   'archive_timeout=60',
 ];
@@ -63,7 +63,7 @@ function startDatabase() {
   docker(['run', '-d', '--name', DB, ...envArgs(), ...mounts(), IMAGE, 'postgres', ...ARCHIVING]);
   for (let i = 0; i < 90; i += 1) {
     // pg_isready alone answers during the entrypoint's temporary init server: wait for TCP too.
-    const r = docker(['exec', DB, 'pg_isready', '-h', '127.0.0.1', '-U', 'rid', '-d', 'rid'], {
+    const r = docker(['exec', DB, 'pg_isready', '-h', '127.0.0.1', '-U', 'den', '-d', 'den'], {
       allowFail: true,
     });
     if (r.status === 0) return;
@@ -89,7 +89,7 @@ function restore(target) {
   pgbackrest(
     'sh',
     '-c',
-    `mkdir -p /var/lib/postgresql/18 && pgbackrest --stanza=rid --delta${time} restore`,
+    `mkdir -p /var/lib/postgresql/18 && pgbackrest --stanza=den --delta${time} restore`,
   );
 }
 
@@ -99,9 +99,9 @@ const sql = (query) =>
     DB,
     'psql',
     '-U',
-    'rid',
+    'den',
     '-d',
-    'rid',
+    'den',
     '-At',
     '-v',
     'ON_ERROR_STOP=1',
@@ -127,7 +127,7 @@ try {
 
   log('1. Archiving, a full backup and two rows around a point in time');
   startDatabase();
-  pgbackrest('rid-backup-scheduler', '--once');
+  pgbackrest('den-backup-scheduler', '--once');
   ok('stanza created, archiving checked, full backup taken');
   sql('CREATE TABLE restore_probe (v text)');
   sql("INSERT INTO restore_probe VALUES ('before')");
@@ -139,7 +139,7 @@ try {
   sql('SELECT pg_sleep(1.5)');
   sql("INSERT INTO restore_probe VALUES ('after')");
   // `check` switches the WAL segment and waits until it reaches the repository.
-  pgbackrest('pgbackrest', '--stanza=rid', 'check');
+  pgbackrest('pgbackrest', '--stanza=den', 'check');
   ok(`target ${target}; the WAL with both rows is archived`);
 
   log('2. Disaster: the data volume is lost; restore the latest state into an empty one');
@@ -157,8 +157,8 @@ try {
   expectRows('before', 'point-in-time restore');
 
   log('4. After the restore');
-  pgbackrest('pgbackrest', '--stanza=rid', '--type=full', 'backup');
-  const info = JSON.parse(pgbackrest('pgbackrest', '--stanza=rid', '--output=json', 'info').stdout);
+  pgbackrest('pgbackrest', '--stanza=den', '--type=full', 'backup');
+  const info = JSON.parse(pgbackrest('pgbackrest', '--stanza=den', '--output=json', 'info').stdout);
   const backups = info[0]?.backup?.length ?? 0;
   if (backups < 2) throw new Failure(`expected two backups in the repository, found ${backups}`);
   ok(`a full backup on the new timeline (${backups} in the repository)`);
@@ -169,11 +169,11 @@ try {
       '--user',
       'postgres',
       '-e',
-      'PGBACKREST_PG1_USER=rid',
+      'PGBACKREST_PG1_USER=den',
       ...mounts(),
       IMAGE,
       'pgbackrest',
-      '--stanza=rid',
+      '--stanza=den',
       'info',
     ],
     { allowFail: true },

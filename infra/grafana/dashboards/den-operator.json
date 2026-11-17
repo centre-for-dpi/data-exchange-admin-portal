@@ -1,7 +1,7 @@
 {
-  "uid": "rid-operator",
-  "title": "RID · Operador",
-  "tags": ["rid"],
+  "uid": "den-operator",
+  "title": "DEN · Operador",
+  "tags": ["den"],
   "timezone": "browser",
   "schemaVersion": 41,
   "version": 1,
@@ -327,7 +327,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max(rid_opa_bundle_lag_seconds)",
+          "expr": "max(den_opa_bundle_lag_seconds)",
           "legendFormat": ""
         }
       ],
@@ -377,7 +377,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rid_sync_targets{status=\"error\"}) or vector(0)",
+          "expr": "sum(den_sync_targets{status=\"error\"}) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -426,7 +426,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rid_queue_jobs{state=~\"created|retry\"}) or vector(0)",
+          "expr": "sum(den_queue_jobs{state=~\"created|retry\"}) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -474,7 +474,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rid_nodes{status=\"offline\"}) or vector(0)",
+          "expr": "sum(den_nodes{status=\"offline\"}) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -522,7 +522,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(10, histogram_quantile(0.95, sum by (le, route) (rate(rid_api_http_request_duration_seconds_bucket[5m]))))",
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, route) (rate(den_api_http_request_duration_seconds_bucket[5m]))))",
           "legendFormat": "{{route}}"
         }
       ],
@@ -555,7 +555,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (system, status) (rid_sync_targets)",
+          "expr": "sum by (system, status) (den_sync_targets)",
           "legendFormat": "{{system}} · {{status}}"
         }
       ],
@@ -593,7 +593,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rid_certificate_soonest_expiry_seconds / 86400",
+          "expr": "den_certificate_soonest_expiry_seconds / 86400",
           "legendFormat": "{{kind}}"
         }
       ],

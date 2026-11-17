@@ -1,5 +1,5 @@
-import { getCountryConfig } from '@rid/config';
-import { entityRequestSchema } from '@rid/contracts';
+import { getCountryConfig } from '@den/config';
+import { entityRequestSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

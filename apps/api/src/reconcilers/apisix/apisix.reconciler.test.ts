@@ -44,14 +44,14 @@ class LaggingApisix implements ApisixAdmin {
 }
 
 const settings: GatewaySettings = {
-  keycloakDiscoveryUrl: 'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-  audience: 'rid-gateway',
+  keycloakDiscoveryUrl: 'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+  audience: 'den-gateway',
   opaUrl: 'http://opa:8181',
   accessLogUrl: 'http://fluent-bit:9880/',
   transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes(''),
   resolveHost: () => Promise.resolve([]),
-  tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
+  tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
 };
 
 /** Only what reconcileVersion touches for a retired version. */
@@ -87,7 +87,7 @@ describe('APISIX reconciler: removing a version', () => {
 
 describe("APISIX reconciler: the assertion's signing key (M6-10)", () => {
   const PEM = '-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n';
-  let kid = 'rid-gw-1';
+  let kid = 'den-gw-1';
   const keys = {
     current: () => Promise.resolve({ kid, privateKeyPem: PEM }),
   } as unknown as GatewaySigningKeysService;
@@ -104,28 +104,28 @@ describe("APISIX reconciler: the assertion's signing key (M6-10)", () => {
   it('puts the current key in the metadata, then leaves it while the kid is the same', async () => {
     const admin = new LaggingApisix(0);
     expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('created');
-    expect(admin.objects.get('plugin_metadata/rid-assertion')).toEqual({
+    expect(admin.objects.get('plugin_metadata/den-assertion')).toEqual({
       issuer: 'https://gw.example',
-      kid: 'rid-gw-1',
+      kid: 'den-gw-1',
       private_key: PEM,
     });
     // APISIX returns the key encrypted: only issuer and kid are compared.
-    admin.objects.set('plugin_metadata/rid-assertion', {
+    admin.objects.set('plugin_metadata/den-assertion', {
       issuer: 'https://gw.example',
-      kid: 'rid-gw-1',
+      kid: 'den-gw-1',
       private_key: 'encrypted',
     });
     expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('unchanged');
-    kid = 'rid-gw-2';
+    kid = 'den-gw-2';
     expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('updated');
-    expect(admin.objects.get('plugin_metadata/rid-assertion')).toMatchObject({ kid: 'rid-gw-2' });
+    expect(admin.objects.get('plugin_metadata/den-assertion')).toMatchObject({ kid: 'den-gw-2' });
   });
 
   it('removes the key from APISIX when the country turns the assertion off', async () => {
     const admin = new LaggingApisix(0);
     await withAssertion(admin, true).reconcileAssertionKey();
     expect(await withAssertion(admin, false).reconcileAssertionKey()).toBe('deleted');
-    expect(admin.objects.has('plugin_metadata/rid-assertion')).toBe(false);
+    expect(admin.objects.has('plugin_metadata/den-assertion')).toBe(false);
     expect(await withAssertion(admin, false).reconcileAssertionKey()).toBe('absent');
   });
 });

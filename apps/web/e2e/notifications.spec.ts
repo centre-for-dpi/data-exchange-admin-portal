@@ -32,7 +32,7 @@ test.describe('notifications (M2-08)', () => {
     await expect
       .poll(
         async () =>
-          (await mailsTo('lucia.datos@demo.rid.example')).some((m) => m.Subject.includes(appName)),
+          (await mailsTo('lucia.datos@demo.den.example')).some((m) => m.Subject.includes(appName)),
         {
           timeout: 60_000,
         },

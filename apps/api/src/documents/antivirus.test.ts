@@ -90,12 +90,12 @@ describe('ClamdScanner (M6-08)', () => {
     ).rejects.toThrow(/timed out/);
   });
 
-  it('is configured by RID_CLAMAV_URL', () => {
+  it('is configured by DEN_CLAMAV_URL', () => {
     expect(ClamdScanner.fromEnv({})).toBeUndefined();
-    expect(ClamdScanner.fromEnv({ RID_CLAMAV_URL: 'tcp://clamav:3310' })).toBeInstanceOf(
+    expect(ClamdScanner.fromEnv({ DEN_CLAMAV_URL: 'tcp://clamav:3310' })).toBeInstanceOf(
       ClamdScanner,
     );
-    expect(() => ClamdScanner.fromEnv({ RID_CLAMAV_URL: 'http://clamav:3310' })).toThrow(
+    expect(() => ClamdScanner.fromEnv({ DEN_CLAMAV_URL: 'http://clamav:3310' })).toThrow(
       /tcp:\/\//,
     );
   });

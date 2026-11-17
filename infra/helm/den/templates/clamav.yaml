@@ -2,7 +2,7 @@
 {{- $c := dict "root" . "component" "clamav" }}
 {{- /*
 Antivirus of uploaded documents (M6-08, ASVS 5.4.3): clamd, GPL-2.0 in its own pod (CLAUDE.md
-rule 1). The portal API sends every document to it before storing it (RID_CLAMAV_URL) and refuses
+rule 1). The portal API sends every document to it before storing it (DEN_CLAMAV_URL) and refuses
 the upload while it does not answer. freshclam, in the same container, keeps the signatures up to
 date from the internet (NetworkPolicy: public HTTPS only). Runs as the image's clamav user with a
 read-only root filesystem.
@@ -10,18 +10,18 @@ read-only root filesystem.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "rid.name" "clamav" }}
+  name: {{ include "den.name" "clamav" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   replicas: {{ .Values.antivirus.replicas }}
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -68,12 +68,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "clamav" }}
+  name: {{ include "den.name" "clamav" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: clamd, port: 3310, targetPort: clamd }
 {{- end }}

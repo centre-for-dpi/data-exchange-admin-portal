@@ -4,7 +4,7 @@ import {
   type IndicatorsQuery,
   indicatorsQuerySchema,
   networkIndicatorsSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { PlatformAccess } from '../auth/decorators.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { EntityInvitation, EntityMember, EntityRole } from '@rid/contracts';
+import type { EntityInvitation, EntityMember, EntityRole } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { EntityContext } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Public keys of the gateway's assertions to providers (X-RID-Assertion, ADR-0024, M6-10): ES256,
+ * Public keys of the gateway's assertions to providers (X-DEN-Assertion, ADR-0024, M6-10): ES256,
  * by kid. Every key ever used is listed (newest first) unless it was compromised, so assertions a
  * provider archived keep verifying.
  */

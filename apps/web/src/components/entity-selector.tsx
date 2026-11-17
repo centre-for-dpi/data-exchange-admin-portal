@@ -1,6 +1,6 @@
 'use client';
 
-import type { MembershipSummary } from '@rid/contracts';
+import type { MembershipSummary } from '@den/contracts';
 import { useTranslations } from 'next-intl';
 import { useId } from 'react';
 import { usePathname } from 'next/navigation';

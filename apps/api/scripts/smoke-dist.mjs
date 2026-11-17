@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Runs compiled code under plain Node ESM. Vitest transforms modules and hides CommonJS interop
 // problems (e.g. namespace imports of CJS packages being undefined); this catches them.
-// Usage: pnpm --filter @rid/api build && node scripts/smoke-dist.mjs
+// Usage: pnpm --filter @den/api build && node scripts/smoke-dist.mjs
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,7 +26,7 @@ const external = await lintOpenApi(
     noIdInQuery: true,
   },
 );
-const externalFlagged = external.report.issues.some((i) => i.code === 'rid-no-external-ref');
+const externalFlagged = external.report.issues.some((i) => i.code === 'den-no-external-ref');
 if (!ok.report.valid || ok.operations.length !== 2 || broken.report.valid || !externalFlagged) {
   console.error(
     'Smoke test failed',

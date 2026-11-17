@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { enterOneTimeCode, expectNoAccessibilityViolations, keycloakLogin, totp } from './helpers';
 
-/** The web's own address, wherever the suite runs (RID_WEB_URL). */
-const webOrigin = (process.env.RID_WEB_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+/** The web's own address, wherever the suite runs (DEN_WEB_URL). */
+const webOrigin = (process.env.DEN_WEB_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
 const at = (path: string) => `${webOrigin}${path}`;
 
 // M0 closing criterion: the web shows login working against Keycloak.
@@ -42,7 +42,7 @@ test.describe('login with Keycloak', () => {
 
     // Keycloak's SSO session is closed too: signing in again asks for credentials.
     await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
-    await expect(page).toHaveURL(/\/realms\/rid-portal\//);
+    await expect(page).toHaveURL(/\/realms\/den-portal\//);
     await expect(page.locator('#username')).toBeVisible();
   });
 
@@ -60,7 +60,7 @@ test.describe('login with Keycloak', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
     await page.locator('#username').fill('lucia.datos');
-    await page.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'rid-demo-password');
+    await page.locator('#password').fill(process.env.DEN_DEMO_USER_PASSWORD ?? 'den-demo-password');
     await page.locator('#kc-login').click();
 
     // The portal sees the session lacks the second factor and asks Keycloak for it.

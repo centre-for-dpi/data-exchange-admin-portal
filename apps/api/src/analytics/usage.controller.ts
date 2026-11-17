@@ -7,7 +7,7 @@ import {
   providerUsageSchema,
   type UsageQuery,
   usageQuerySchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { CurrentEntity, EntityAccess, type EntityContext } from '../auth/decorators.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';

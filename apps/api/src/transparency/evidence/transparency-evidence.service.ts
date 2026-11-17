@@ -4,13 +4,13 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import type {
   TransparencyCheckpoint,
   TransparencyCheckpointsQuery,
   TransparencyReceipt,
   TransparencyVerification,
-} from '@rid/contracts';
+} from '@den/contracts';
 import {
   type AccessRecord,
   type CheckpointPayload,
@@ -26,7 +26,7 @@ import {
   treeRoot,
   verifyCheckpoint,
   verifyTimestampToken,
-} from '@rid/transparency-verifier';
+} from '@den/transparency-verifier';
 import { AuditService } from '../../audit/audit.service.js';
 import { ConflictError, NotFoundError } from '../../common/errors.js';
 import type { SubjectAccessRecord } from '../../generated/prisma/client.js';
@@ -36,7 +36,7 @@ import { TransparencySigningKey } from './signing-key.js';
 import { TsaClient } from './tsa.client.js';
 
 /** Serializes sealing across API instances. */
-const SEAL_LOCK = 0x7269645f7365616cn; // "rid_seal"
+const SEAL_LOCK = 0x7269645f7365616cn; // "den_seal"
 /** Batches sealed per round at most, so a large backlog does not hold the lock for long. */
 const MAX_BATCHES_PER_ROUND = 20;
 const STAMPS_PER_ROUND = 20;
@@ -68,14 +68,14 @@ export function toAccessRecord(row: SubjectAccessRecord): AccessRecord {
 }
 
 const batchMax = () => {
-  const n = Number(process.env.RID_TRANSPARENCY_BATCH_MAX ?? 1000);
+  const n = Number(process.env.DEN_TRANSPARENCY_BATCH_MAX ?? 1000);
   return Number.isInteger(n) && n >= 1 && n <= 100_000 ? n : 1000;
 };
 const intervalMs = () => {
-  const s = Number(process.env.RID_TRANSPARENCY_SEAL_INTERVAL_SECONDS ?? 10);
+  const s = Number(process.env.DEN_TRANSPARENCY_SEAL_INTERVAL_SECONDS ?? 10);
   return (Number.isFinite(s) && s >= 1 ? s : 10) * 1000;
 };
-const logId = () => process.env.RID_TRANSPARENCY_LOG_ID ?? 'rid-transparency';
+const logId = () => process.env.DEN_TRANSPARENCY_LOG_ID ?? 'den-transparency';
 
 /**
  * Verifiable evidence of the transparency register (ADR-0016, MT-04).
@@ -102,7 +102,7 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
   onApplicationBootstrap(): void {
     if (!QueueService.enabled()) return;
     if (!this.key.configured()) {
-      this.logger.error('RID_TRANSPARENCY_SIGNING_JWK is not set: the register is not sealed');
+      this.logger.error('DEN_TRANSPARENCY_SIGNING_JWK is not set: the register is not sealed');
       return;
     }
     this.timer = setInterval(() => void this.round(), intervalMs());
@@ -138,7 +138,7 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
     return sealed;
   }
 
-  /** Seals one batch of up to RID_TRANSPARENCY_BATCH_MAX records; null if none is waiting. */
+  /** Seals one batch of up to DEN_TRANSPARENCY_BATCH_MAX records; null if none is waiting. */
   async sealOnce(): Promise<{ seq: number; size: number } | null> {
     const signingKey = await this.key.signingKey();
     const kid = this.key.kid();

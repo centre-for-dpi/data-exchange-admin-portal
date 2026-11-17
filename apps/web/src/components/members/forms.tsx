@@ -1,6 +1,6 @@
 'use client';
 
-import { ENTITY_ROLES, type EntityRole } from '@rid/contracts';
+import { ENTITY_ROLES, type EntityRole } from '@den/contracts';
 import { useTranslations } from 'next-intl';
 import { useActionState, useEffect, useRef } from 'react';
 import { type FormState, initialFormState } from '../../lib/forms';

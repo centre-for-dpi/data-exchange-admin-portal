@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Applies the second-factor setup of infra/keycloak/rid-portal-realm.json (M3-08, ADR-0021) and
+// Applies the second-factor setup of infra/keycloak/den-portal-realm.json (M3-08, ADR-0021) and
 // the hardening of M6-01 (password policy, events, exact redirect URIs of the portal and the
 // citizens' folder) to a Keycloak that imported the realms before: --import-realm skips them.
 //
@@ -7,9 +7,9 @@
 //   node scripts/keycloak-portal-mfa.mjs --demo-otp   # also the demo users' TOTP (dev and demo only)
 //
 // Idempotent. It sets the ACR to level-of-authentication map and the OTP policy, rebuilds the
-// browser flow `rid-browser` from the file and binds it. With --demo-otp, each seed user that has
+// browser flow `den-browser` from the file and binds it. With --demo-otp, each seed user that has
 // an OTP credential in the file and none in Keycloak is re-imported from the file (same id, the
-// password of RID_DEMO_USER_PASSWORD and the code of RID_DEMO_TOTP_SECRET): Keycloak's admin API
+// password of DEN_DEMO_USER_PASSWORD and the code of DEN_DEMO_TOTP_SECRET): Keycloak's admin API
 // cannot add an OTP credential to an existing user.
 //
 // Uses KEYCLOAK_URL, KEYCLOAK_ADMIN_USER and KEYCLOAK_ADMIN_PASSWORD from the environment or the
@@ -24,7 +24,7 @@ if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env')
 const url = (process.env.KEYCLOAK_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
 const demoOtp = process.argv.includes('--demo-otp');
 // Keycloak's own placeholder syntax, ${NAME} or ${NAME:default}, resolved like --import-realm does.
-const raw = readFileSync(resolve(root, 'infra/keycloak/rid-portal-realm.json'), 'utf8');
+const raw = readFileSync(resolve(root, 'infra/keycloak/den-portal-realm.json'), 'utf8');
 const realmFile = JSON.parse(
   raw.replace(/\$\{([A-Z0-9_]+)(?::([^}]*))?\}/g, (_, name, fallback) => {
     const value = process.env[name] ?? fallback;
@@ -102,8 +102,8 @@ const resolveFile = (file) =>
     ),
   );
 for (const [realmName, file, clientId] of [
-  [realm, 'rid-portal-realm.json', 'rid-portal-web'],
-  ['rid-citizens', 'rid-citizens-realm.json', 'carpeta-ciudadana'],
+  [realm, 'den-portal-realm.json', 'den-portal-web'],
+  ['den-citizens', 'den-citizens-realm.json', 'citizen-app'],
 ]) {
   const wanted = resolveFile(file).clients.find((c) => c.clientId === clientId);
   if (!wanted) continue;

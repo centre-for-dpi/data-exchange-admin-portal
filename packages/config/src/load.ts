@@ -9,8 +9,8 @@ import {
   type UiLocale,
 } from './schema.js';
 
-export const COUNTRY_ENV_VAR = 'RID_COUNTRY';
-export const CONFIG_DIR_ENV_VAR = 'RID_CONFIG_DIR';
+export const COUNTRY_ENV_VAR = 'DEN_COUNTRY';
+export const CONFIG_DIR_ENV_VAR = 'DEN_CONFIG_DIR';
 
 /** Thrown when the country configuration is missing or invalid. Startup must stop on it. */
 export class CountryConfigError extends Error {
@@ -39,7 +39,7 @@ export function resolveCountryCode(env: NodeJS.ProcessEnv = process.env): string
 }
 
 /**
- * Directory holding `<code>.yaml`: RID_CONFIG_DIR if set, otherwise the nearest `config/country`
+ * Directory holding `<code>.yaml`: DEN_CONFIG_DIR if set, otherwise the nearest `config/country`
  * walking up from `startDir` (apps run from their own folder inside the monorepo).
  */
 export function resolveConfigDir(
@@ -138,13 +138,13 @@ export function parseCountryConfigFile(file: string): CountryConfig {
 
 export interface LoadOptions {
   env?: NodeJS.ProcessEnv;
-  /** Overrides RID_CONFIG_DIR / directory discovery. */
+  /** Overrides DEN_CONFIG_DIR / directory discovery. */
   configDir?: string;
-  /** Overrides RID_COUNTRY. */
+  /** Overrides DEN_COUNTRY. */
   code?: string;
 }
 
-/** Loads `config/country/<RID_COUNTRY>.yaml`. Throws CountryConfigError when invalid. */
+/** Loads `config/country/<DEN_COUNTRY>.yaml`. Throws CountryConfigError when invalid. */
 export function loadCountryConfig(options: LoadOptions = {}): CountryConfig {
   const env = options.env ?? process.env;
   const code = options.code ?? resolveCountryCode(env);

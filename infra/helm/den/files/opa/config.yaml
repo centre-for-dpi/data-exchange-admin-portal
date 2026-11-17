@@ -13,7 +13,7 @@ services:
 persistence_directory: /var/lib/opa
 
 bundles:
-  rid:
+  den:
     service: portal
     # GET {url}/bundle.tar.gz (apps/api, ETag = revision). Without a bundle OPA has no policy and
     # the gateway denies every call (fail closed).
@@ -33,4 +33,4 @@ status:
   prometheus: true
 
 # Decision logs are intentionally NOT configured: each decision input carries request headers
-# (Authorization, X-RID-End-User in clear). Access metadata goes through APISIX -> Fluent Bit.
+# (Authorization, X-DEN-End-User in clear). Access metadata goes through APISIX -> Fluent Bit.

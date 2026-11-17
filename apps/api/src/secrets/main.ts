@@ -1,5 +1,5 @@
-// `pnpm --filter @rid/api secrets:reseal` (in the image: `node dist/secrets/main.js`): seals
-// again with RID_SECRETS_KEY what a previous key sealed (OPERATIONS.md §5.6).
+// `pnpm --filter @den/api secrets:reseal` (in the image: `node dist/secrets/main.js`): seals
+// again with DEN_SECRETS_KEY what a previous key sealed (OPERATIONS.md §5.6).
 import { AuditService } from '../audit/audit.service.js';
 import { loadDevEnv } from '../dev-env.js';
 import { PrismaService } from '../prisma/prisma.service.js';

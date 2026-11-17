@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { type VersionValidation, versionValidationSchema } from '@rid/contracts';
+import { type VersionValidation, versionValidationSchema } from '@den/contracts';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import { ConflictError } from '../common/errors.js';
@@ -19,23 +19,23 @@ export const VERSION_VALIDATION_TOPIC = 'version.validate';
 
 const SYSTEM = { type: 'system' as const, id: 'system:version-validation' };
 
-/** Validations run unless RID_VERSION_VALIDATION=off (the API's integration tests). */
-export const validationEnabled = (): boolean => process.env.RID_VERSION_VALIDATION !== 'off';
+/** Validations run unless DEN_VERSION_VALIDATION=off (the API's integration tests). */
+export const validationEnabled = (): boolean => process.env.DEN_VERSION_VALIDATION !== 'off';
 
 export function validationSettings(env: NodeJS.ProcessEnv = process.env) {
   return {
-    token: env.RID_VALIDATION_TOKEN || undefined,
+    token: env.DEN_VALIDATION_TOKEN || undefined,
     /** APISIX as the API reaches it (plain HTTP inside the platform). */
-    gatewayUrl: (env.RID_GATEWAY_INTERNAL_URL ?? 'http://localhost:9080').replace(/\/+$/, ''),
-    runnerUrl: env.RID_CONTRACT_RUNNER_URL?.replace(/\/+$/, '') || undefined,
-    runnerToken: env.RID_CONTRACT_RUNNER_TOKEN || undefined,
+    gatewayUrl: (env.DEN_GATEWAY_INTERNAL_URL ?? 'http://localhost:9080').replace(/\/+$/, ''),
+    runnerUrl: env.DEN_CONTRACT_RUNNER_URL?.replace(/\/+$/, '') || undefined,
+    runnerToken: env.DEN_CONTRACT_RUNNER_TOKEN || undefined,
     /** APISIX as the runner reaches it. */
-    runnerGatewayUrl: (env.RID_CONTRACT_RUNNER_GATEWAY_URL ?? 'http://apisix:9080').replace(
+    runnerGatewayUrl: (env.DEN_CONTRACT_RUNNER_GATEWAY_URL ?? 'http://apisix:9080').replace(
       /\/+$/,
       '',
     ),
-    maxExamples: Number(env.RID_CONTRACT_MAX_EXAMPLES ?? 20),
-    timeoutSeconds: Number(env.RID_CONTRACT_TIMEOUT_SECONDS ?? 120),
+    maxExamples: Number(env.DEN_CONTRACT_MAX_EXAMPLES ?? 20),
+    timeoutSeconds: Number(env.DEN_CONTRACT_TIMEOUT_SECONDS ?? 120),
   };
 }
 

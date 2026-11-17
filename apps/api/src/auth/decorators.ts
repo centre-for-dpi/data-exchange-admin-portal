@@ -1,15 +1,15 @@
 import { createParamDecorator, type ExecutionContext, SetMetadata } from '@nestjs/common';
-import type { EntityRole } from '@rid/contracts';
+import type { EntityRole } from '@den/contracts';
 import type { EntityAction, PlatformAction } from './authz.policy.js';
 import type { Principal } from './principal.service.js';
 
-export const IS_PUBLIC = 'rid:public';
-export const ENTITY_ACTION = 'rid:entity-action';
-export const PLATFORM_ACTION = 'rid:platform-action';
-export const OPTIONAL_AUTH = 'rid:optional-auth';
-export const SIGNED_IN = 'rid:signed-in';
-export const CITIZEN = 'rid:citizen';
-export const NODE = 'rid:node';
+export const IS_PUBLIC = 'den:public';
+export const ENTITY_ACTION = 'den:entity-action';
+export const PLATFORM_ACTION = 'den:platform-action';
+export const OPTIONAL_AUTH = 'den:optional-auth';
+export const SIGNED_IN = 'den:signed-in';
+export const CITIZEN = 'den:citizen';
+export const NODE = 'den:node';
 
 /** Endpoint that does not require authentication (health checks). Everything else does. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);

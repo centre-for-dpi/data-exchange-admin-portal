@@ -1,6 +1,6 @@
 {{- if .Values.wgHub.enabled }}
 {{- $c := dict "root" . "component" "wg-hub" }}
-{{- $secret := include "rid.name" "wg-hub" }}
+{{- $secret := include "den.name" "wg-hub" }}
 {{- /*
 The kit nodes' WireGuard hub (M4-03, ADR-0023): the tunnel (UDP from the internet), the SNI router
 APISIX calls (8443) and the agent the portal's reconciler drives (8090). One replica: the nodes'
@@ -11,17 +11,17 @@ kind: StatefulSet
 metadata:
   name: {{ $secret }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   serviceName: {{ $secret }}
   replicas: 1
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{- toYaml . | nindent 8 }}
@@ -33,14 +33,14 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: wg-hub
-          image: {{ include "rid.image" (dict "root" . "name" "wgHub") }}
+          image: {{ include "den.image" (dict "root" . "name" "wgHub") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
           env:
-            - { name: RID_WG_SUBNET, value: {{ .Values.wgHub.subnet | quote }} }
-            - name: RID_WG_HUB_PRIVATE_KEY
-              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: RID_WG_HUB_PRIVATE_KEY } }
-            - name: RID_WG_HUB_AGENT_TOKEN
-              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: RID_WG_HUB_AGENT_TOKEN } }
+            - { name: DEN_WG_SUBNET, value: {{ .Values.wgHub.subnet | quote }} }
+            - name: DEN_WG_HUB_PRIVATE_KEY
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: DEN_WG_HUB_PRIVATE_KEY } }
+            - name: DEN_WG_HUB_AGENT_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: DEN_WG_HUB_AGENT_TOKEN } }
           ports:
             - { name: wireguard, containerPort: 51820, protocol: UDP }
             - { name: sni, containerPort: 8443 }
@@ -76,28 +76,28 @@ kind: Service
 metadata:
   name: {{ $secret }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: sni, port: 8443, targetPort: sni }
     - { name: agent, port: 8090, targetPort: agent }
 ---
-# The nodes reach the hub over UDP from the internet (RID_WG_HUB_ENDPOINT).
+# The nodes reach the hub over UDP from the internet (DEN_WG_HUB_ENDPOINT).
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "wg-hub-public" }}
+  name: {{ include "den.name" "wg-hub-public" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
   {{- with .Values.wgHub.service.annotations }}
   annotations: {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   type: {{ .Values.wgHub.service.type }}
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: wireguard, port: 51820, targetPort: wireguard, protocol: UDP }
 {{- end }}

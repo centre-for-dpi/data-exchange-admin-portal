@@ -1,10 +1,10 @@
-# CLAUDE.md — Portal RID (Red de Intercambio de Datos)
+# CLAUDE.md — Portal DEN (Data Exchange Network, red de intercambio de datos)
 
 Este archivo es el contexto permanente para Claude Code. Léelo completo al inicio de cada sesión.
 
 ## Qué estamos construyendo
 
-El **Portal RID** es el portal de desarrolladores y la consola de gobierno de una red nacional de intercambio de datos entre entidades públicas. El primer despliegue es Colombia (gateway operado por la AND y gobernado por MinTIC), pero el producto debe ser **reutilizable en cualquier país**: nada específico de Colombia va en el código, todo va en `config/country/*.yaml`.
+El **Portal DEN** es el portal de desarrolladores y la consola de gobierno de una red nacional de intercambio de datos entre entidades públicas. El primer despliegue es Colombia (gateway operado por la AND y gobernado por MinTIC), pero el producto debe ser **reutilizable en cualquier país**: nada específico de Colombia va en el código, todo va en `config/country/*.yaml`.
 
 El portal NO es el gateway. El gateway es **Apache APISIX**. El portal es la capa de gobierno encima:
 
@@ -65,7 +65,7 @@ Documentos que mandan (léelos antes de tocar un área):
 ## Estructura del repo
 
 ```
-rid-portal/
+den-portal/
 ├── CLAUDE.md
 ├── README.md
 ├── apps/
@@ -82,8 +82,8 @@ rid-portal/
 │       └── example.yaml     # plantilla para otros países
 ├── infra/
 │   ├── compose/             # docker-compose.yml + overrides
-│   ├── keycloak/            # *-realm.json de dev (rid-portal, rid-gateway, rid-citizens)
-│   ├── postgres/            # init: roles rid_app y keycloak
+│   ├── keycloak/            # *-realm.json de dev (den-portal, den-gateway, den-citizens)
+│   ├── postgres/            # init: roles den_app y keycloak
 │   ├── tsa/                 # TSA RFC 3161 de desarrollo (ADR-0016)
 │   ├── apisix/              # config.yaml de APISIX
 │   ├── opa/                 # config de OPA (apunta al bundle del portal)
@@ -108,7 +108,7 @@ Dentro de `apps/api/src`, un módulo NestJS por contexto de dominio: `entities`,
 ```bash
 pnpm install
 pnpm infra:up            # levanta Postgres, Keycloak, APISIX, etcd, OPA, step-ca, OpenSearch, Fluent Bit, Mailpit, mock-providers
-pnpm db:migrate          # prisma migrate dev (como dueño del esquema; el API corre como rid_app)
+pnpm db:migrate          # prisma migrate dev (como dueño del esquema; el API corre como den_app)
 pnpm db:deploy           # prisma migrate deploy (CI, producción)
 pnpm db:seed             # entidades, usuarios (del realm de Keycloak), roles y finalidades de ejemplo; idempotente
 pnpm dev                 # web (3000) + api (4000)
@@ -147,10 +147,10 @@ Las historias marcadas **SPIKE** son investigaciones con tiempo acotado: el entr
 
 ## Convenciones
 
-- **API del portal:** REST bajo `/api/v1`, recursos en plural, IDs como UUIDv7, paginación por cursor (`?cursor=&limit=`), errores RFC 9457 con `type` = `https://rid.example/errors/<codigo>` y códigos definidos en `packages/contracts/src/errors.ts`.
+- **API del portal:** REST bajo `/api/v1`, recursos en plural, IDs como UUIDv7, paginación por cursor (`?cursor=&limit=`), errores RFC 9457 con `type` = `https://den.example/errors/<codigo>` y códigos definidos en `packages/contracts/src/errors.ts`.
 - **Estados de dominio:** enums en Prisma + máquinas de estado explícitas en `domain/<contexto>/state-machine.ts`. Una transición inválida lanza `InvalidTransitionError` (409).
 - **Fechas:** almacenar en UTC, mostrar en la zona del país (`config.country.timezone`).
-- **IDs externos deterministas** para recursos en APISIX/Keycloak: `rid-<tipo>-<uuid>` para poder reconciliar sin estado extra.
+- **IDs externos deterministas** para recursos en APISIX/Keycloak: `den-<tipo>-<uuid>` para poder reconciliar sin estado extra.
 - **Multi-entidad:** todo query de dominio filtra por `entityId` a través de un helper (`scopedRepo`), nunca a mano.
 - **Feature flags:** en `config/country/*.yaml` bajo `features:` (por ejemplo `mtls.required`, `approval.regulatorForSensitive`).
 

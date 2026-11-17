@@ -6,7 +6,7 @@ import {
   certificateRevocationResultSchema,
   type ExecuteCertificateRevocationInput,
   executeCertificateRevocationSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { type AuthenticatedRequest, CurrentPrincipal, PlatformAccess } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';

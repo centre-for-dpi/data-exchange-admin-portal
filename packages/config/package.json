@@ -1,5 +1,5 @@
 {
-  "name": "@rid/config",
+  "name": "@den/config",
   "version": "0.0.0",
   "private": true,
   "description": "Loads and validates config/country/<code>.yaml",

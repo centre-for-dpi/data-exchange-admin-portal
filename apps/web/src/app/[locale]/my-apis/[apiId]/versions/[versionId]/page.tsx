@@ -1,5 +1,5 @@
-import { apiDetailSchema, apiVersionDetailSchema, purposeListSchema } from '@rid/contracts';
-import { getCountryConfig } from '@rid/config';
+import { apiDetailSchema, apiVersionDetailSchema, purposeListSchema } from '@den/contracts';
+import { getCountryConfig } from '@den/config';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

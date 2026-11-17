@@ -20,7 +20,7 @@ This guide explains **what each piece of the platform is, why it is there and wh
 
 ## 1. The network on one page
 
-The Data Exchange Network (RID) lets a public entity **query another entity's data** without copying it, with **explicit permission**, for a **declared purpose** and leaving **a trace of every request**.
+The Data Exchange Network (DEN) lets a public entity **query another entity's data** without copying it, with **explicit permission**, for a **declared purpose** and leaving **a trace of every request**.
 
 - **The data stays at each entity.** The central gateway only passes the request and the response through; it does not store content (neither in a database nor in logs).
 - **Nobody gets in without permission.** Each access is a *subscription*: a specific application, to a specific API, for a specific purpose, approved by the data steward of the entity that owns the data. If anything is missing, the gateway rejects the call.
@@ -125,7 +125,7 @@ For each one: **what it does**, **what happens if it goes down** and **what it s
 | **Portal API** (NestJS) | The brain. It runs the workflows (registration, publication, request, approval), checks role and entity on **every** request, and records every change in the audit log. In the background it reconciles APISIX, Keycloak, OPA and the hub; signs certificates; seals the transparency log and the audit log; sends emails and notifications; expires subscriptions and certificates; rotates every 90 days the key the gateway uses to sign its assertions, and publishes the public keys (JWKS) | No portal and no changes; traffic keeps flowing with the latest state | Nothing of its own: everything is in PostgreSQL |
 | **PostgreSQL** | **Single source of truth**: entities, people and roles, APIs, applications, subscriptions, audit log, transparency log, job queues. The audit log is insert-only, even for the database owner | The governance plane stops; traffic keeps flowing | Everything. **Backed up** |
 | **pgBackRest** | Archives every PostgreSQL change within a few minutes (at most 5 minutes of loss), takes a full backup each week and a differential one each day, and keeps four weeks, in an **encrypted** repository. It can return to the latest state or to an exact point in time; restore is tested in CI | New changes wait to be archived; traffic keeps flowing | The encrypted repository. **Copied off the server** |
-| **Keycloak** | Identity: it **authenticates, it does not authorize** (roles live in PostgreSQL). Three realms: `rid-portal` (people, with a second factor), `rid-gateway` (the entities' applications; the portal creates their clients) and `rid-citizens` (simulated citizen identity; in production, the country's own is used) | Nobody can sign in; applications cannot get new tokens | Users and clients (in PostgreSQL) |
+| **Keycloak** | Identity: it **authenticates, it does not authorize** (roles live in PostgreSQL). Three realms: `den-portal` (people, with a second factor), `den-gateway` (the entities' applications; the portal creates their clients) and `den-citizens` (simulated citizen identity; in production, the country's own is used) | Nobody can sign in; applications cannot get new tokens | Users and clients (in PostgreSQL) |
 | **step-ca** | **The network's certificate authority.** It signs the applications' certificates (from the CSR the entity uploads: the private key never leaves the entity), the gateway's and the nodes'. Only the API talks to it | No certificates are issued; current ones keep working | The CA keys. **Losing them invalidates every certificate: they are backed up** |
 | **TSA** (RFC 3161 timestamping) | Seals the audit log's daily anchor and the transparency log's batches: it proves they existed at that moment and that nobody rewrote them | Seals are queued and applied when it comes back | Its key (the development one; in production, the country's accredited TSA) |
 | **Email** (Mailpit in the pilot) | Captures all email (invitations, notifications, account verification, anchors to the regulator) and shows it at `/mail`, behind a password. In production, the operator's SMTP | No emails go out | Pilot emails |
@@ -147,7 +147,7 @@ For each one: **what it does**, **what happens if it goes down** and **what it s
 ### 4.4 Pilot tooling (does not go to production)
 
 - **Test providers** (`mock-salud`, `mock-socioeconomico`): they simulate two entities with synthetic data.
-- **Reference citizen folder** (`/carpeta`): shows what the country's real citizen folder must implement (requests, notifications, receipts).
+- **Reference citizen folder** (`/citizen-app`): shows what the country's real citizen folder must implement (requests, notifications, receipts).
 - **Seed data:** three fictitious entities and the demo users.
 
 ## 5. How everything flows
@@ -186,10 +186,10 @@ sequenceDiagram
   C->>GW: POST /oauth/token (mTLS + secret)
   GW->>KC: with the verified certificate
   KC-->>C: 5-minute token bound to the certificate
-  C->>GW: GET /salud/afiliacion/v1/... (mTLS + token + X-RID-Purpose + X-RID-End-User)
+  C->>GW: GET /salud/afiliacion/v1/... (mTLS + token + X-DEN-Purpose + X-DEN-End-User)
   GW->>OPA: allowed?
   OPA-->>GW: yes + traceability headers
-  GW->>P: request + who, what for, under which subscription + signed assertion (X-RID-Assertion)
+  GW->>P: request + who, what for, under which subscription + signed assertion (X-DEN-Assertion)
   P-->>GW: response
   GW-->>C: response (not stored)
 ```
@@ -198,7 +198,7 @@ With each request, the provider receives the consumer entity and application, th
 
 ### 5.4 Accountability to citizens
 
-Every authorized request for a person's data is recorded in the transparency log with the data subject's pseudonym. Every 10 seconds the records are grouped into batches signed by the operator and sealed by the TSA. From their folder, citizens see who queried them and what for, receive notifications, and download a receipt that **anyone can verify without trusting the portal** (the open verifier `rid-verify-receipt`).
+Every authorized request for a person's data is recorded in the transparency log with the data subject's pseudonym. Every 10 seconds the records are grouped into batches signed by the operator and sealed by the TSA. From their folder, citizens see who queried them and what for, receive notifications, and download a receipt that **anyone can verify without trusting the portal** (the open verifier `den-verify-receipt`).
 
 ## 6. Security and privacy: what the platform guarantees
 
@@ -222,7 +222,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 1. **Requirements:** a Linux VPS with 4–8 vCPUs, 16 GB of RAM and a 100 GB SSD; a public IP; **two DNS names** (portal and gateway); ports 443/tcp, 80/tcp and 51820/udp open.
 2. **Install:**
    ```bash
-   git clone <repository-url> rid && cd rid
+   git clone <repository-url> den && cd den
    sudo ./install.sh
    ```
    The script asks for the country, the two names, the proxy and the certificate, whether to enable observability and the document antivirus, and the demo password (12 characters or more). It then generates all the secrets, builds, starts and checks everything.
@@ -237,10 +237,10 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 | Secret | Why it matters | Suggested custodian |
 | :-- | :-- | :-- |
 | The full `.env` | Without it, the data cannot be recovered and receipts cannot be verified | AND, encrypted copy off the server |
-| `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | They define the pseudonyms; **they are not rotated** | AND |
+| `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | They define the pseudonyms; **they are not rotated** | AND |
 | The step-ca volume | The network CA's keys | AND (encrypted backup) |
 | `PGBACKREST_REPO1_CIPHER_PASS` | Encrypts the database backups: without it, none of them can be restored | AND, copy off the server, next to the `.env` |
-| `RID_SECRETS_KEY` | Seals the clients' secrets and the key the gateway signs with | AND, inside the `.env` |
+| `DEN_SECRETS_KEY` | Seals the clients' secrets and the key the gateway signs with | AND, inside the `.env` |
 | Keycloak administrator | Control over identities | AND, two people |
 | Users with the `regulator` role | Oversight | MinTIC |
 
@@ -268,8 +268,8 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 | Timestamping | Development TSA | The country's accredited TSA |
 | Email | Mailpit | The operator's SMTP |
 | Secrets | `.env` on disk | Secrets manager (OpenBao) |
-| Citizen identity | Simulated (`rid-citizens`) | The country's own |
-| Initial data | Fictitious entities and demo users | No demo data; the first `platform_admin` is whoever signs in first with the address in `RID_BOOTSTRAP_ADMIN_EMAIL`, verified by Keycloak (`DEPLOYMENT.md §9`) |
+| Citizen identity | Simulated (`den-citizens`) | The country's own |
+| Initial data | Fictitious entities and demo users | No demo data; the first `platform_admin` is whoever signs in first with the address in `DEN_BOOTSTRAP_ADMIN_EMAIL`, verified by Keycloak (`DEPLOYMENT.md §9`) |
 | Antivirus | Optional (installer step 5) | Enabled, with two replicas |
 | Backups | Automatic with pgBackRest on the same server; the off-server copy with `install.sh backup` | Automatic, to the operator's object storage (Barman Cloud) |
 | Metrics and alerts | Prometheus, Alertmanager and Grafana on the same server; notifications to Mailpit | The same, with the operator's SMTP and long-term metrics storage |
@@ -295,7 +295,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 
 - **Can the operator see the data being exchanged?** No. The gateway passes it through without storing it, and the logs only hold masked metadata.
 - **What happens if the portal goes down?** Traffic between entities keeps flowing with the latest configuration and the latest policy. Only changes stop (new approvals, publications). It is tested: with the portal down, calls keep going; OPA and APISIX restart without it, and when the portal comes back it recovers the transparency records from the outage.
-- **How does the provider know a request really comes from the gateway?** Through the signed assertion (`X-RID-Assertion`): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.
+- **How does the provider know a request really comes from the gateway?** Through the signed assertion (`X-DEN-Assertion`): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.
 - **How much traffic can it handle?** On the development machine, 200 requests per second with a p95 of 13 ms added by the gateway. The target, 500 per second, will be validated in a production-like environment. Capacity grows with more gateway nodes: each one counts limits on its own, and the policy gives it its share.
 - **Is the portal available in English?** Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen folder are bilingual too.
 - **Does an entity have to open inbound ports?** Not if it uses the kit: the node opens the tunnel outbound (UDP 51820). With an existing API, the entity must allow the gateway to reach it.

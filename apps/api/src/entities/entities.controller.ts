@@ -6,7 +6,7 @@ import {
   entitySummarySchema,
   type PaginationQuery,
   paginationQuerySchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { z } from 'zod';
 import { CurrentEntity, EntityAccess, type EntityContext } from '../auth/decorators.js';
 import { NotFoundError } from '../common/errors.js';

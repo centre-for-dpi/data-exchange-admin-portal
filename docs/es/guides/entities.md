@@ -4,7 +4,7 @@
 
 Versión 1.2 · noviembre 2026 · para la jornada de incorporación (bootcamp) con las entidades
 
-Esta guía explica qué tiene que **designar, disponer y hacer** cada entidad para conectarse a la Red de Intercambio de Datos (RID), como **proveedora** de datos, como **consumidora** o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso.
+Esta guía explica qué tiene que **designar, disponer y hacer** cada entidad para conectarse a la red de intercambio de datos DEN (Data Exchange Network), como **proveedora** de datos, como **consumidora** o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso.
 
 **Las proveedoras tienen su propia guía,** en el repositorio del kit (`docs/es/guides/providers.md`, con su versión para proyectar `providers.html`): cómo se conecta el servicio por el nodo, qué servidor y qué red necesita, cómo se instala el nodo, cómo se publica una API y qué recibe el servicio en cada consulta. Aquí queda lo común a todas las entidades y lo de las consumidoras.
 
@@ -37,7 +37,7 @@ Cada persona necesita un **correo institucional propio**: la cuenta se verifica 
 | Salida a internet | `443/tcp` hacia el **nombre del gateway** y el **nombre del portal** |
 | Lugar seguro para secretos | La llave privada del certificado y el secreto de la aplicación: nunca en el código ni en un repositorio |
 | `openssl` | Para generar la llave y la solicitud de certificado (CSR). La llave **nunca sale** del servidor de la entidad |
-| Identificador del funcionario | Las APIs con datos personales exigen `X-RID-End-User`: el usuario o el correo institucional de quien hace la consulta. Solo se registra como hash |
+| Identificador del funcionario | Las APIs con datos personales exigen `X-DEN-End-User`: el usuario o el correo institucional de quien hace la consulta. Solo se registra como hash |
 
 ### 3.2 Como proveedora
 
@@ -47,7 +47,7 @@ Los requisitos del servidor y de la red, la instalación y la publicación está
 
 #### Verificar la aserción del gateway
 
-Si el país la tiene activada (`features.gatewayAssertion`), cada consulta llega con la cabecera `X-RID-Assertion` (ADR-0024). Es un JWS ES256 firmado por el gateway con lo que autorizó:
+Si el país la tiene activada (`features.gatewayAssertion`), cada consulta llega con la cabecera `X-DEN-Assertion` (ADR-0024). Es un JWS ES256 firmado por el gateway con lo que autorizó:
 - quién consulta: entidad, aplicación y suscripción;
 - para qué: la finalidad;
 - qué operación;
@@ -142,7 +142,7 @@ chmod +x entity-check.sh
 ./entity-check.sh check <portal> <gateway>
 ```
 
-Comprueba el DNS, la salida HTTPS al portal y al gateway, y que el certificado del gateway verifica contra la raíz de la red. Deja la raíz en `./rid-network-ca.pem`. Solo necesita `bash`, `curl` y `openssl`.
+Comprueba el DNS, la salida HTTPS al portal y al gateway, y que el certificado del gateway verifica contra la raíz de la red. Deja la raíz en `./den-network-ca.pem`. Solo necesita `bash`, `curl` y `openssl`.
 
 ### 4.2 Alta de la entidad y de su gente
 
@@ -170,7 +170,7 @@ Está en la **guía de proveedoras** del repositorio del kit: el token de enrola
    CLIENT_SECRET=... ./entity-check.sh call <portal> <gateway> <client_id> \
      /sandbox/<entidad>/<api>/v1/<recurso> <finalidad> <funcionario>
    ```
-   El script pide el token al gateway (`/oauth/token`, ligado al certificado), hace la consulta con `X-RID-Purpose` y `X-RID-End-User`, y explica la respuesta. Las URL exactas están en la ficha de la API y en la ficha de la suscripción.
+   El script pide el token al gateway (`/oauth/token`, ligado al certificado), hace la consulta con `X-DEN-Purpose` y `X-DEN-End-User`, y explica la respuesta. Las URL exactas están en la ficha de la API y en la ficha de la suscripción.
 6. Con la aplicación de **producción** se repiten los pasos 2 a 5 con la ruta real (sin `/sandbox`), una vez aprobada la solicitud.
 
 ## 5. Por qué el gateway niega una llamada
@@ -180,9 +180,9 @@ El gateway responde `403` con `application/problem+json` y un `code` estable:
 | `code` | Qué significa | Qué hacer |
 | :-- | :-- | :-- |
 | `no_subscription` | La aplicación no tiene acceso activo a esa versión | Pedir acceso o esperar la aprobación ("Aprobada, activándose" tarda segundos) |
-| `purpose_not_allowed` | Falta `X-RID-Purpose` o no es la finalidad aprobada | Enviar el código de finalidad de la suscripción |
+| `purpose_not_allowed` | Falta `X-DEN-Purpose` o no es la finalidad aprobada | Enviar el código de finalidad de la suscripción |
 | `operation_not_allowed` | La suscripción no cubre esa operación | Pedir acceso a esa operación |
-| `end_user_required` / `end_user_invalid` | Falta `X-RID-End-User` o es inválido (1 a 128 caracteres visibles, sin espacios) | Enviar el usuario institucional del funcionario |
+| `end_user_required` / `end_user_invalid` | Falta `X-DEN-End-User` o es inválido (1 a 128 caracteres visibles, sin espacios) | Enviar el usuario institucional del funcionario |
 | `client_certificate_required` / `certificate_mismatch` / `certificate_revoked` | Sin certificado, el de otra aplicación o uno revocado | Usar el certificado vigente de **esa** aplicación |
 | `token_not_bound` | El token no está ligado al certificado | Pedir el token en `https://<gateway>/oauth/token` con el certificado |
 | `environment_mismatch` | Aplicación sandbox en una ruta real, o al revés | Usar la ruta que corresponde al tipo de aplicación |
@@ -193,7 +193,7 @@ Otros códigos: `401` (token vencido o inválido; dura 5 minutos), `404` (no hay
 ## 6. Compromisos de la entidad
 
 - **Finalidad real.** Solo consultar para la finalidad declarada y aprobada. Cada consulta queda en la bitácora y el ciudadano la ve.
-- **Funcionario identificado.** Enviar en `X-RID-End-User` a la persona que realmente consulta.
+- **Funcionario identificado.** Enviar en `X-DEN-End-User` a la persona que realmente consulta.
 - **Credenciales protegidas.** La llave privada y el secreto no se comparten ni se suben a repositorios. Ante una sospecha, se **revocan** desde la ficha de la aplicación. Antes de que venza un certificado (90 días, con aviso a los 15), se emite otro: el anterior sigue sirviendo durante la ventana de rotación.
 - **No guardar de más.** Conservar solo lo que la finalidad exige.
 - **Avisar los cambios.** Un cambio incompatible en una API publicada exige una versión mayor nueva. La anterior se deprecia con fecha de retiro.

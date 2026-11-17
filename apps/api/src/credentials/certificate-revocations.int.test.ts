@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   certificateRevocationPreviewSchema,
   certificateRevocationResultSchema,
   createdApplicationSchema,
   issuedCertificateSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeCsr } from '../../test/csr.js';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
@@ -95,7 +95,7 @@ describe('mass revocation of client certificates (M6-07)', () => {
           name: `Revocación ${randomUUID().slice(0, 6)}`,
           description: 'Consulta con certificado de cliente.',
           environment: 'sandbox',
-          technicalContact: 'dev@programas.demo.rid.example',
+          technicalContact: 'dev@programas.demo.den.example',
         },
       });
       expect(created.statusCode, created.body).toBe(201);

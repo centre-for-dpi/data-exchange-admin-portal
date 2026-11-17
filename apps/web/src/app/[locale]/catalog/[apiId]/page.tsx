@@ -1,5 +1,5 @@
-import { getCountryConfig } from '@rid/config';
-import { catalogDetailSchema } from '@rid/contracts';
+import { getCountryConfig } from '@den/config';
+import { catalogDetailSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -112,7 +112,7 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
         </aside>
 
         <div className="min-w-0 space-y-10">
-          <div className="prose-rid">
+          <div className="prose-den">
             {/* react-markdown renders no raw HTML and sanitizes link protocols. */}
             <Markdown skipHtml>{detail.api.description}</Markdown>
           </div>

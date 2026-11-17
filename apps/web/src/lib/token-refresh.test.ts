@@ -3,7 +3,7 @@ import { needsRefresh, refreshTokens } from './token-refresh';
 
 const options = (fetchFn: typeof fetch) => ({
   tokenEndpoint: 'https://kc/token',
-  clientId: 'rid-portal-web',
+  clientId: 'den-portal-web',
   clientSecret: 's',
   fetchFn,
 });

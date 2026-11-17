@@ -1,6 +1,6 @@
 'use server';
 
-import { purgedDocumentSchema } from '@rid/contracts';
+import { purgedDocumentSchema } from '@den/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';

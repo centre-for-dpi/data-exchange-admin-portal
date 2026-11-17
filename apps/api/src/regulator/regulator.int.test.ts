@@ -2,13 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   createdApplicationSchema,
   regulatorQueueSchema,
   reviewDetailSchema,
   subscriptionDetailSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -71,7 +71,7 @@ describe('regulator approval (M2-04)', () => {
       description: 'Datos sintéticos.',
       sector: 'salud',
       classification: 'sensitive',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     expect(api.statusCode, api.body).toBe(201);
     const apiId = api.json<{ id: string }>().id;
@@ -114,7 +114,7 @@ describe('regulator approval (M2-04)', () => {
       name: `Validador ${randomUUID().slice(0, 6)}`,
       description: 'Valida requisitos con datos de salud.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     const applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const requested = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {

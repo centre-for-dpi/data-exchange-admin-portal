@@ -4,7 +4,7 @@ import {
   gatewaySigningKeyRotatedSchema,
   type RotateGatewaySigningKeyInput,
   rotateGatewaySigningKeySchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import {
   type AuthenticatedRequest,
   CurrentPrincipal,
@@ -31,7 +31,7 @@ export class GatewayController {
     summary: 'Public keys of the assertions the gateway signs for providers',
     description:
       'ES256 keys (RFC 7517) by kid, newest first: every key ever used, so archived assertions ' +
-      'keep verifying, except a compromised one. Providers verify X-RID-Assertion with them.',
+      'keep verifying, except a compromised one. Providers verify X-DEN-Assertion with them.',
     tags: ['gateway'],
     authenticated: false,
     responses: { 200: { description: 'JSON Web Key Set', schema: gatewayJwksSchema } },

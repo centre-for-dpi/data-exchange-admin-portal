@@ -14,7 +14,7 @@ export function repoRoot(start: string = process.cwd()): string {
 
 /** Seed users of the Keycloak realm export: single source for their ids (keycloakSub). */
 export function readRealmUsers(root: string = repoRoot()): RealmUser[] {
-  const file = join(root, 'infra', 'keycloak', 'rid-portal-realm.json');
+  const file = join(root, 'infra', 'keycloak', 'den-portal-realm.json');
   const realm = JSON.parse(readFileSync(file, 'utf8')) as { users?: RealmUser[] };
   return realm.users ?? [];
 }

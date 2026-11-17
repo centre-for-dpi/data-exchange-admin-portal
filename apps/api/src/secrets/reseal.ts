@@ -17,7 +17,7 @@ export interface ResealSummary {
 const SYSTEM = { type: 'system' as const, id: 'system:secrets-reseal' };
 
 /**
- * Seals again with RID_SECRETS_KEY every value sealed with a previous key (ASVS 11.1, rotation
+ * Seals again with DEN_SECRETS_KEY every value sealed with a previous key (ASVS 11.1, rotation
  * of OPERATIONS.md §5.6). Idempotent: a value already sealed with the current key is left alone,
  * and one that changed meanwhile is skipped (a later run takes it). A value no configured key
  * opens stops the run: nothing is lost, the operator adds the missing previous key and runs it

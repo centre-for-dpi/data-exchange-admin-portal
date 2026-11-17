@@ -6,8 +6,8 @@ export interface Prometheus {
   instant(query: string, at: Date): Promise<number | null>;
 }
 
-/** RID_PROMETHEUS_URL (observability profile); without it the indicators that need it are null. */
-export const prometheusUrl = (): string | undefined => process.env.RID_PROMETHEUS_URL || undefined;
+/** DEN_PROMETHEUS_URL (observability profile); without it the indicators that need it are null. */
+export const prometheusUrl = (): string | undefined => process.env.DEN_PROMETHEUS_URL || undefined;
 
 interface QueryResponse {
   status?: string;

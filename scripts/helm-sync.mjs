@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// `pnpm helm:sync [--check]`: copies into the Helm chart (infra/helm/rid/files) the configuration
+// `pnpm helm:sync [--check]`: copies into the Helm chart (infra/helm/den/files) the configuration
 // files it shares with Compose: Helm only reads files inside the chart's directory. The repository's
 // files stay the source; `--check` (CI, tests/infra) fails when a copy differs from its source.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -7,29 +7,29 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const chartFiles = resolve(root, 'infra/helm/rid/files');
+const chartFiles = resolve(root, 'infra/helm/den/files');
 
 /** Source in the repository -> path under the chart's files/. */
 export const SHARED = {
-  'infra/apisix/plugins/apisix/plugins/rid-assertion.lua': 'apisix/plugins/rid-assertion.lua',
-  'infra/apisix/plugins/apisix/plugins/rid-client-cert.lua': 'apisix/plugins/rid-client-cert.lua',
-  'infra/apisix/plugins/apisix/plugins/rid-data-subject.lua': 'apisix/plugins/rid-data-subject.lua',
-  'infra/apisix/plugins/apisix/plugins/rid-header-guard.lua': 'apisix/plugins/rid-header-guard.lua',
-  'infra/apisix/plugins/apisix/plugins/rid-rate-limited.lua': 'apisix/plugins/rid-rate-limited.lua',
+  'infra/apisix/plugins/apisix/plugins/den-assertion.lua': 'apisix/plugins/den-assertion.lua',
+  'infra/apisix/plugins/apisix/plugins/den-client-cert.lua': 'apisix/plugins/den-client-cert.lua',
+  'infra/apisix/plugins/apisix/plugins/den-data-subject.lua': 'apisix/plugins/den-data-subject.lua',
+  'infra/apisix/plugins/apisix/plugins/den-header-guard.lua': 'apisix/plugins/den-header-guard.lua',
+  'infra/apisix/plugins/apisix/plugins/den-rate-limited.lua': 'apisix/plugins/den-rate-limited.lua',
   'infra/fluent-bit/allowlist.lua': 'fluent-bit/allowlist.lua',
   'infra/fluent-bit/transparency.lua': 'fluent-bit/transparency.lua',
   'infra/fluent-bit/transparency.yaml': 'fluent-bit/transparency.yaml',
   'infra/fluent-bit/gateway-errors.lua': 'fluent-bit/gateway-errors.lua',
   'infra/fluent-bit/gateway-errors.yaml': 'fluent-bit/gateway-errors.yaml',
-  'infra/prometheus/rules/rid.rules.yml': 'prometheus/rid.rules.yml',
-  'infra/grafana/dashboards/rid-operator.json': 'grafana/rid-operator.json',
+  'infra/prometheus/rules/den.rules.yml': 'prometheus/den.rules.yml',
+  'infra/grafana/dashboards/den-operator.json': 'grafana/den-operator.json',
   'infra/opa/config.yaml': 'opa/config.yaml',
   'infra/step-ca/app.tpl': 'step-ca/app.tpl',
   'infra/step-ca/gateway.tpl': 'step-ca/gateway.tpl',
   'infra/step-ca/node.tpl': 'step-ca/node.tpl',
-  'infra/keycloak/rid-portal-realm.json': 'keycloak/rid-portal-realm.json',
-  'infra/keycloak/rid-gateway-realm.json': 'keycloak/rid-gateway-realm.json',
-  'infra/keycloak/rid-citizens-realm.json': 'keycloak/rid-citizens-realm.json',
+  'infra/keycloak/den-portal-realm.json': 'keycloak/den-portal-realm.json',
+  'infra/keycloak/den-gateway-realm.json': 'keycloak/den-gateway-realm.json',
+  'infra/keycloak/den-citizens-realm.json': 'keycloak/den-citizens-realm.json',
 };
 
 /**
@@ -87,4 +87,4 @@ if (drift.length > 0) {
   console.error(`Helm chart files out of date (run \`pnpm helm:sync\`):\n  ${drift.join('\n  ')}`);
   process.exit(1);
 }
-if (!check) console.log(`Copied ${Object.keys(SHARED).length} files into infra/helm/rid/files`);
+if (!check) console.log(`Copied ${Object.keys(SHARED).length} files into infra/helm/den/files`);

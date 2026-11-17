@@ -42,7 +42,7 @@ paths:
     const result = await lintOpenApi(withRef(url), { noIdInQuery: true });
     expect(hits).toBe(0);
     expect(result.report.valid).toBe(false);
-    expect(result.report.issues.map((i) => i.code)).toContain('rid-no-external-ref');
+    expect(result.report.issues.map((i) => i.code)).toContain('den-no-external-ref');
     expect(JSON.stringify(result)).not.toContain('internal secret');
   });
 
@@ -51,7 +51,7 @@ paths:
     async (ref) => {
       const result = await lintOpenApi(withRef(ref), { noIdInQuery: true });
       expect(result.report.valid).toBe(false);
-      expect(result.report.issues.map((i) => i.code)).toContain('rid-no-external-ref');
+      expect(result.report.issues.map((i) => i.code)).toContain('den-no-external-ref');
       expect(JSON.stringify(result)).not.toMatch(/AUTH_SECRET|localhost|\[extensions\]/);
     },
   );
@@ -68,12 +68,12 @@ paths:
     for (const path of ['/../otra', '/a/./b', '/a/%2e%2e/b', '/a%2Fb', '/a\\\\b', '/a//b']) {
       const result = await lintOpenApi(withPath(path), { noIdInQuery: true });
       expect(
-        result.report.issues.some((i) => i.code === 'rid-path-traversal'),
+        result.report.issues.some((i) => i.code === 'den-path-traversal'),
         path,
       ).toBe(true);
     }
     const fine = await lintOpenApi(withPath('/afiliados/{id}'), { noIdInQuery: true });
-    expect(fine.report.issues.some((i) => i.code === 'rid-path-traversal')).toBe(false);
+    expect(fine.report.issues.some((i) => i.code === 'den-path-traversal')).toBe(false);
   });
 
   it('still resolves local #/components refs', async () => {
@@ -129,7 +129,7 @@ ${aliasBomb()}
     const result = await lintOpenApi(bomb, { noIdInQuery: true });
     expect(Date.now() - started).toBeLessThan(5_000);
     expect(result.report.valid).toBe(false);
-    expect(result.report.issues.map((i) => i.code)).toContain('rid-yaml-too-complex');
+    expect(result.report.issues.map((i) => i.code)).toContain('den-yaml-too-complex');
     expect(JSON.stringify(result.spec).length).toBeLessThan(10_000);
   });
 });

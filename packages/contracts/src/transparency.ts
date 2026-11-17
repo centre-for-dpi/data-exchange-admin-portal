@@ -77,7 +77,7 @@ export const accessRecordSchema = z.object({
   gatewayRequestId: z.string(),
 });
 
-/** Receipt of one call: verifiable offline with rid-verify-receipt (ADR-0016 §4). */
+/** Receipt of one call: verifiable offline with den-verify-receipt (ADR-0016 §4). */
 export const transparencyReceiptSchema = z.object({
   v: z.literal(1),
   record: accessRecordSchema,

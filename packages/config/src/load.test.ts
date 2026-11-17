@@ -21,7 +21,7 @@ const coRaw = (): Json => parse(readFileSync(coFile, 'utf8')) as Json;
 
 /** Writes a config object as <code>.yaml in a fresh temp dir (with the files it references). */
 function writeConfig(config: Json | string, code = 'co'): string {
-  const dir = mkdtempSync(join(tmpdir(), 'rid-config-'));
+  const dir = mkdtempSync(join(tmpdir(), 'den-config-'));
   mkdirSync(join(dir, 'branding', 'co'), { recursive: true });
   copyFileSync(join(repoConfigDir, 'branding/co/logo.svg'), join(dir, 'branding/co/logo.svg'));
   mkdirSync(join(dir, 'templates', 'co'), { recursive: true });
@@ -200,8 +200,8 @@ describe('validation', () => {
 });
 
 describe('loading', () => {
-  it('loads the file named by RID_COUNTRY', () => {
-    const config = loadCountryConfig({ env: { RID_COUNTRY: 'CO', RID_CONFIG_DIR: repoConfigDir } });
+  it('loads the file named by DEN_COUNTRY', () => {
+    const config = loadCountryConfig({ env: { DEN_COUNTRY: 'CO', DEN_CONFIG_DIR: repoConfigDir } });
     expect(config.country.code).toBe('CO');
   });
 
@@ -216,8 +216,8 @@ describe('loading', () => {
     expect(resolveConfigDir({}, nested)).toBe(repoConfigDir);
   });
 
-  it('prefers RID_CONFIG_DIR over discovery', () => {
-    expect(resolveConfigDir({ RID_CONFIG_DIR: '/somewhere/else' }, repoConfigDir)).toBe(
+  it('prefers DEN_CONFIG_DIR over discovery', () => {
+    expect(resolveConfigDir({ DEN_CONFIG_DIR: '/somewhere/else' }, repoConfigDir)).toBe(
       resolve('/somewhere/else'),
     );
   });
@@ -225,15 +225,15 @@ describe('loading', () => {
 
 describe('resolveCountryCode', () => {
   it('normalises the code to lower case', () => {
-    expect(resolveCountryCode({ RID_COUNTRY: 'CO' })).toBe('co');
+    expect(resolveCountryCode({ DEN_COUNTRY: 'CO' })).toBe('co');
   });
 
   it('fails when the variable is missing', () => {
-    expect(() => resolveCountryCode({})).toThrow(/RID_COUNTRY is not set/);
+    expect(() => resolveCountryCode({})).toThrow(/DEN_COUNTRY is not set/);
   });
 
   it('rejects values that could escape the config directory', () => {
-    expect(() => resolveCountryCode({ RID_COUNTRY: '../co' })).toThrow(/country code/);
+    expect(() => resolveCountryCode({ DEN_COUNTRY: '../co' })).toThrow(/country code/);
   });
 });
 

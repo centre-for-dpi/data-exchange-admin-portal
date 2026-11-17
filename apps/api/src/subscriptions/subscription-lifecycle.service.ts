@@ -4,8 +4,8 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
-import type { SubscriptionStatus } from '@rid/contracts';
+import { getCountryConfig } from '@den/config';
+import type { SubscriptionStatus } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import { LIVE_STATUSES } from '../domain/subscription/state-machine.js';
 import { OutboxService } from '../outbox/outbox.service.js';
@@ -19,7 +19,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 /**
  * Time-driven steps of a subscription (SPEC.md §4.4, M2-06), every
- * RID_LIFECYCLE_INTERVAL_SECONDS (default 300):
+ * DEN_LIFECYCLE_INTERVAL_SECONDS (default 300):
  * - expiry: granted subscriptions past validUntil become `expired` (OPA also denies them by
  *   date; this makes the state and the audit trail say so) and the policy is resynced;
  * - renewal notice: lifecycle.subscriptionRenewalNoticeDays before validUntil, once, unless a
@@ -39,7 +39,7 @@ export class SubscriptionLifecycleService implements OnApplicationBootstrap, OnA
 
   onApplicationBootstrap(): void {
     if (!QueueService.enabled()) return;
-    const seconds = Number(process.env.RID_LIFECYCLE_INTERVAL_SECONDS ?? 300);
+    const seconds = Number(process.env.DEN_LIFECYCLE_INTERVAL_SECONDS ?? 300);
     this.timer = setInterval(
       () => {
         this.tick().catch((error: unknown) =>

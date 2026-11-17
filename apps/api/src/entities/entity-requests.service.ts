@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   type createEntitySchema,
   DESIGNEE_ENTITY_ROLES,
@@ -12,7 +12,7 @@ import {
   entityRequestInputSchema,
   type PlatformRole,
   FieldErrorKey,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import { PLATFORM_PERMISSIONS } from '../auth/authz.policy.js';

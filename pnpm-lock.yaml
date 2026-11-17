@@ -65,13 +65,13 @@ importers:
       '@prisma/client':
         specifier: 7.10.1
         version: 7.10.1(prisma@7.10.1(@types/node@24.19.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.7(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3)
-      '@rid/config':
+      '@den/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@rid/contracts':
+      '@den/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@rid/transparency-verifier':
+      '@den/transparency-verifier':
         specifier: workspace:*
         version: link:../../packages/transparency-verifier
       '@scalar/nestjs-api-reference':
@@ -165,10 +165,10 @@ importers:
 
   apps/web:
     dependencies:
-      '@rid/config':
+      '@den/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@rid/contracts':
+      '@den/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@scalar/api-reference-react':
@@ -259,10 +259,10 @@ importers:
       '@fastify/formbody':
         specifier: 9.0.1
         version: 9.0.1
-      '@rid/config':
+      '@den/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@rid/transparency-verifier':
+      '@den/transparency-verifier':
         specifier: workspace:*
         version: link:../../packages/transparency-verifier
       fastify:

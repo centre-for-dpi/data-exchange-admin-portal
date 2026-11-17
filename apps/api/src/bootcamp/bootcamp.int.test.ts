@@ -5,7 +5,7 @@ import {
   type EntityRole,
   networkBootcampSchema,
   type PlatformRole,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { MAIL_TRANSPORT } from '../mail/mail.service.js';

@@ -6,9 +6,9 @@ const PASSED_HEADERS = [
   'content-type',
   'content-disposition',
   'digest',
-  'x-rid-export-sha256',
-  'x-rid-export-count',
-  'x-rid-export-signature',
+  'x-den-export-sha256',
+  'x-den-export-count',
+  'x-den-export-signature',
 ];
 
 /**

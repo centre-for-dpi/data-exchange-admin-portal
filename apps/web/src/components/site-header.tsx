@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Bell } from 'lucide-react';
-import { notificationPageSchema } from '@rid/contracts';
+import { notificationPageSchema } from '@den/contracts';
 import { Link } from '../i18n/navigation';
 import { apiGet } from '../lib/api';
 import { stepUpAction } from '../lib/auth-actions';

@@ -22,13 +22,13 @@ import {
 } from './desired-state.js';
 
 const HTTP_PORT = Number(process.env.APISIX_HTTP_PORT ?? 9080);
-// Outside the reconciler's rid- prefix: its orphan cleanup leaves them alone.
+// Outside the reconciler's den- prefix: its orphan cleanup leaves them alone.
 const ROUTE = 'test-m3-03-upstream';
 const UPSTREAM = 'test-m3-03-upstream';
-const PATH = '/__rid_m3_03__';
+const PATH = '/__den_m3_03__';
 // How APISIX, in its container, reaches a server on the host.
 const HOST = 'host.docker.internal';
-// The provider entity whose upstream it is: the gateway presents CN=rid-gateway.<slug>.
+// The provider entity whose upstream it is: the gateway presents CN=den-gateway.<slug>.
 const PROVIDER = { id: '0190d0c4-0000-7000-8000-00000000e003', slug: 'salud' };
 
 interface Seen {
@@ -59,7 +59,7 @@ const portOf = (server: Server) => (server.address() as AddressInfo).port;
 
 /**
  * The gateway towards upstreams with mTLS (M3-03), against the real APISIX and step-ca: the
- * gateway presents its client certificate (CN=rid-gateway) and verifies the node's certificate
+ * gateway presents its client certificate (CN=den-gateway) and verifies the node's certificate
  * against the network CA, for the node's name.
  */
 describe('mTLS towards upstreams (M3-03)', () => {
@@ -136,14 +136,14 @@ describe('mTLS towards upstreams (M3-03)', () => {
   beforeAll(async () => {
     settings = {
       keycloakDiscoveryUrl:
-        'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-      audience: 'rid-gateway',
+        'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+      audience: 'den-gateway',
       opaUrl: 'http://opa:8181',
       accessLogUrl: 'http://fluent-bit:9880/',
       transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
       devNodes: parseDevNodes(''),
       resolveHost: () => Promise.resolve(['93.184.215.14']),
-      tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
+      tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
     };
     app = await createTestApp(await createTestIssuer(), [
       { token: APISIX_SETTINGS, value: settings },
@@ -169,10 +169,10 @@ describe('mTLS towards upstreams (M3-03)', () => {
     const ssl = await admin.get('ssls', gatewayClientSslId(PROVIDER.id));
     expect(ssl).toMatchObject({ type: 'client' });
     const row = await prisma.gatewayCertificate.findFirstOrThrow({
-      where: { purpose: 'upstream_client', hosts: { equals: ['rid-gateway.salud'] } },
+      where: { purpose: 'upstream_client', hosts: { equals: ['den-gateway.salud'] } },
       orderBy: { createdAt: 'desc' },
     });
-    expect(row.hosts).toEqual(['rid-gateway.salud']);
+    expect(row.hosts).toEqual(['den-gateway.salud']);
     expect(
       await prisma.auditEvent.count({
         where: { targetId: row.id, action: 'gateway_certificate.issued' },
@@ -180,14 +180,14 @@ describe('mTLS towards upstreams (M3-03)', () => {
     ).toBe(1);
   });
 
-  it('presents CN=rid-gateway.<provider> to a node that requires mTLS, with its name as Host', async () => {
+  it('presents CN=den-gateway.<provider> to a node that requires mTLS, with its name as Host', async () => {
     const server = await mtlsServer({ ...(await serverCertificate()), ca: chain });
     servers.push(server);
     await route(portOf(server));
     const outcome = await call();
     expect(outcome.status).toBe(200);
     expect(outcome.seen).toEqual({
-      cn: 'rid-gateway.salud',
+      cn: 'den-gateway.salud',
       host: HOST,
       path: '/servicio/consulta',
     });
@@ -204,7 +204,7 @@ describe('mTLS towards upstreams (M3-03)', () => {
   });
 
   it('refuses a node whose certificate the network CA did not issue (502)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'rid-m3-03-'));
+    const dir = mkdtempSync(join(tmpdir(), 'den-m3-03-'));
     try {
       const { keyPem } = await makeKeyAndCsr(HOST);
       writeFileSync(join(dir, 'key.pem'), keyPem);

@@ -65,7 +65,7 @@ interface PendingMessage {
  *   are idempotent, and the `stately` policy keyed by aggregate coalesces repeated changes.
  * - Queue handlers (reconcilers) are registered from M1-08; until then queues have no workers.
  * The pg-boss schema is created by a Prisma migration, so pg-boss never runs DDL here.
- * Set RID_WORKER=off to run the API without background work (tests, read-only replicas).
+ * Set DEN_WORKER=off to run the API without background work (tests, read-only replicas).
  */
 @Injectable()
 export class QueueService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -78,7 +78,7 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
   constructor(private readonly prisma: PrismaService) {}
 
   static enabled(): boolean {
-    return process.env.RID_WORKER !== 'off';
+    return process.env.DEN_WORKER !== 'off';
   }
 
   async onApplicationBootstrap(): Promise<void> {

@@ -1,6 +1,6 @@
 'use server';
 
-import { apiDetailSchema, apiVersionDetailSchema } from '@rid/contracts';
+import { apiDetailSchema, apiVersionDetailSchema } from '@den/contracts';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from '../i18n/navigation';

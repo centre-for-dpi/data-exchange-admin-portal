@@ -1,5 +1,5 @@
 import type { PipeTransform } from '@nestjs/common';
-import { validationMessageKey, ZOD_ISSUE_KEY } from '@rid/contracts';
+import { validationMessageKey, ZOD_ISSUE_KEY } from '@den/contracts';
 import type { z } from 'zod';
 import { type FieldError, ValidationError } from './errors.js';
 

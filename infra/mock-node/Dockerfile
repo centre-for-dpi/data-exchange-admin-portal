@@ -3,6 +3,6 @@
 # address and sends heartbeats. No installer, no database connectors, no API generation.
 FROM node:24.22.1-alpine3.24
 RUN apk add --no-cache wireguard-tools wireguard-go openssl iproute2
-COPY mock-node.mjs /rid/mock-node.mjs
+COPY mock-node.mjs /den/mock-node.mjs
 VOLUME /var/lib/mock-node
-CMD ["node", "/rid/mock-node.mjs"]
+CMD ["node", "/den/mock-node.mjs"]

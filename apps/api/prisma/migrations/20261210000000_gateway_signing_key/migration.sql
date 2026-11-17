@@ -1,4 +1,4 @@
--- Signing keys of the gateway's assertions to providers (ADR-0024, M6-10). rid_app reads and
+-- Signing keys of the gateway's assertions to providers (ADR-0024, M6-10). den_app reads and
 -- writes them through the owner's default privileges.
 CREATE TABLE "gateway_signing_key" (
     "id" UUID NOT NULL DEFAULT uuidv7(),

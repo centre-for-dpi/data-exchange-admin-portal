@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { ExchangeMap, IndicatorsQuery, NetworkIndicators } from '@rid/contracts';
+import type { ExchangeMap, IndicatorsQuery, NetworkIndicators } from '@den/contracts';
 import { localDay, nextDay, startOfLocalDay } from '../common/local-day.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ROUTE_PREFIX } from '../reconcilers/apisix/desired-state.js';

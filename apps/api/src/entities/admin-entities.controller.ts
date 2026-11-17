@@ -10,7 +10,7 @@ import {
   reactivateEntitySchema,
   setXroadMemberSchema,
   suspendEntitySchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { type AuthenticatedRequest, CurrentPrincipal, PlatformAccess } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';

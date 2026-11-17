@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { env } from './env.js';
 import {
   audiences,
-  carpetaClient,
+  citizenAppClient,
   clientCredentialsToken,
   CookieJar,
   decodeJwt,
@@ -17,23 +17,23 @@ import {
 import { fromRoot } from './paths.js';
 
 const seedUsers = (
-  JSON.parse(readFileSync(fromRoot('infra/keycloak/rid-portal-realm.json'), 'utf8')) as {
+  JSON.parse(readFileSync(fromRoot('infra/keycloak/den-portal-realm.json'), 'utf8')) as {
     users: Array<{ id: string; username: string }>;
   }
 ).users;
 
-describe('realm rid-portal (M0-03)', () => {
-  const password = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
+describe('realm den-portal (M0-03)', () => {
+  const password = env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
 
   it.each(seedUsers)('$username logs in through apps/web (code + PKCE)', async (user) => {
     const result = await loginWithAuthorizationCode(user.username, password);
     expect(result.tokens, result.page?.slice(0, 200)).toBeDefined();
 
     const claims = decodeJwt(result.tokens?.access_token ?? '');
-    expect(claims.iss).toBe(`${keycloakUrl()}/realms/rid-portal`);
+    expect(claims.iss).toBe(`${keycloakUrl()}/realms/den-portal`);
     expect(claims.sub).toBe(user.id);
-    expect(claims.azp).toBe('rid-portal-web');
-    expect(audiences(claims)).toContain('rid-portal-api');
+    expect(claims.azp).toBe('den-portal-web');
+    expect(audiences(claims)).toContain('den-portal-api');
     expect(claims.exp - claims.iat).toBe(300);
   });
 
@@ -57,14 +57,14 @@ describe('realm rid-portal (M0-03)', () => {
     expect(result.redirect).toBeUndefined();
   });
 
-  it('does not allow the password grant on rid-portal-web', async () => {
-    const res = await fetch(`${keycloakUrl()}/realms/rid-portal/protocol/openid-connect/token`, {
+  it('does not allow the password grant on den-portal-web', async () => {
+    const res = await fetch(`${keycloakUrl()}/realms/den-portal/protocol/openid-connect/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'password',
-        client_id: 'rid-portal-web',
-        client_secret: env('RID_PORTAL_WEB_CLIENT_SECRET'),
+        client_id: 'den-portal-web',
+        client_secret: env('DEN_PORTAL_WEB_CLIENT_SECRET'),
         username: 'carlos.dev',
         password,
       }),
@@ -74,16 +74,16 @@ describe('realm rid-portal (M0-03)', () => {
   });
 
   it('serves its discovery document with the browser-facing issuer', async () => {
-    const res = await fetch(`${keycloakUrl()}/realms/rid-portal/.well-known/openid-configuration`);
+    const res = await fetch(`${keycloakUrl()}/realms/den-portal/.well-known/openid-configuration`);
     const discovery = (await res.json()) as { issuer: string };
-    expect(discovery.issuer).toBe(`${keycloakUrl()}/realms/rid-portal`);
+    expect(discovery.issuer).toBe(`${keycloakUrl()}/realms/den-portal`);
     expect(webUrl()).toMatch(/^https?:\/\//);
   });
 });
 
-describe('realm rid-portal: second factor (M3-08)', () => {
-  const password = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
-  const tokenUrl = `${keycloakUrl()}/realms/rid-portal/protocol/openid-connect/token`;
+describe('realm den-portal: second factor (M3-08)', () => {
+  const password = env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
+  const tokenUrl = `${keycloakUrl()}/realms/den-portal/protocol/openid-connect/token`;
   /** Keycloak accepts each code once, and the codes of the periods next to this one. */
   const used = new Set<string>();
   const nextCode = (username: string) => {
@@ -118,8 +118,8 @@ describe('realm rid-portal: second factor (M3-08)', () => {
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: stepUp.tokens?.refresh_token ?? '',
-        client_id: 'rid-portal-web',
-        client_secret: env('RID_PORTAL_WEB_CLIENT_SECRET'),
+        client_id: 'den-portal-web',
+        client_secret: env('DEN_PORTAL_WEB_CLIENT_SECRET'),
       }),
     });
     expect(refreshed.status).toBe(200);
@@ -177,13 +177,13 @@ describe('realm rid-portal: second factor (M3-08)', () => {
     });
     const { access_token: adminToken } = (await login.json()) as { access_token: string };
     const admin = (method: string, path: string, body?: unknown) =>
-      fetch(`${keycloakUrl()}/admin/realms/rid-portal${path}`, {
+      fetch(`${keycloakUrl()}/admin/realms/den-portal${path}`, {
         method,
         headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     const username = `mfa-probe-${randomUUID().slice(0, 8)}`;
-    const email = `${username}@demo.rid.example`;
+    const email = `${username}@demo.den.example`;
     const created = await admin('POST', '/users', {
       username,
       email,
@@ -234,10 +234,10 @@ describe('realm rid-portal: second factor (M3-08)', () => {
   });
 });
 
-describe('realm rid-gateway (M0-03)', () => {
+describe('realm den-gateway (M0-03)', () => {
   const admin = `${keycloakUrl()}/admin/realms`;
   let provisionerToken: string;
-  const appClientId = `rid-app-${randomUUID()}`;
+  const appClientId = `den-app-${randomUUID()}`;
   let appInternalId: string | undefined;
 
   const asProvisioner = (path: string, init: RequestInit = {}): Promise<Response> =>
@@ -252,9 +252,9 @@ describe('realm rid-gateway (M0-03)', () => {
 
   beforeAll(async () => {
     const res = await clientCredentialsToken(
-      'rid-gateway',
-      env('RID_GATEWAY_PROVISIONER_CLIENT_ID', 'rid-portal-provisioner'),
-      env('RID_GATEWAY_PROVISIONER_SECRET'),
+      'den-gateway',
+      env('DEN_GATEWAY_PROVISIONER_CLIENT_ID', 'den-portal-provisioner'),
+      env('DEN_GATEWAY_PROVISIONER_SECRET'),
     );
     expect(res.status).toBe(200);
     provisionerToken = ((await res.json()) as { access_token: string }).access_token;
@@ -262,11 +262,11 @@ describe('realm rid-gateway (M0-03)', () => {
 
   afterAll(async () => {
     if (appInternalId)
-      await asProvisioner(`/rid-gateway/clients/${appInternalId}`, { method: 'DELETE' });
+      await asProvisioner(`/den-gateway/clients/${appInternalId}`, { method: 'DELETE' });
   });
 
   it('lets the portal provisioner create an application client', async () => {
-    const res = await asProvisioner('/rid-gateway/clients', {
+    const res = await asProvisioner('/den-gateway/clients', {
       method: 'POST',
       body: JSON.stringify({
         clientId: appClientId,
@@ -283,16 +283,16 @@ describe('realm rid-gateway (M0-03)', () => {
     expect(appInternalId).toBeTruthy();
   });
 
-  it('issues minimal 5-minute application tokens with the rid-gateway audience', async () => {
-    const secretRes = await asProvisioner(`/rid-gateway/clients/${appInternalId}/client-secret`);
+  it('issues minimal 5-minute application tokens with the den-gateway audience', async () => {
+    const secretRes = await asProvisioner(`/den-gateway/clients/${appInternalId}/client-secret`);
     const { value: secret } = (await secretRes.json()) as { value: string };
 
-    const tokenRes = await clientCredentialsToken('rid-gateway', appClientId, secret);
+    const tokenRes = await clientCredentialsToken('den-gateway', appClientId, secret);
     expect(tokenRes.status).toBe(200);
     const claims = decodeJwt(((await tokenRes.json()) as { access_token: string }).access_token);
 
-    expect(claims.iss).toBe(`${keycloakUrl()}/realms/rid-gateway`);
-    expect(audiences(claims)).toEqual(['rid-gateway']);
+    expect(claims.iss).toBe(`${keycloakUrl()}/realms/den-gateway`);
+    expect(audiences(claims)).toEqual(['den-gateway']);
     expect(claims.azp).toBe(appClientId);
     expect(claims.client_id).toBe(appClientId);
     expect(claims.sub).toBeTruthy();
@@ -311,7 +311,7 @@ describe('realm rid-gateway (M0-03)', () => {
   });
 
   it('rotates a portal-managed secret: the previous one works until removed (M3-04)', async () => {
-    const clientId = `rid-app-rotation-${Date.now()}`;
+    const clientId = `den-app-rotation-${Date.now()}`;
     const base = {
       clientId,
       enabled: true,
@@ -321,23 +321,23 @@ describe('realm rid-gateway (M0-03)', () => {
       standardFlowEnabled: false,
       directAccessGrantsEnabled: false,
       clientAuthenticatorType: 'client-secret',
-      attributes: { 'rid.managed': 'true' },
+      attributes: { 'den.managed': 'true' },
     };
-    const created = await asProvisioner('/rid-gateway/clients', {
+    const created = await asProvisioner('/den-gateway/clients', {
       method: 'POST',
       body: JSON.stringify({ ...base, secret: 'previous-secret-0123456789abcdef' }),
     });
     expect(created.status).toBe(201);
     const id = created.headers.get('location')?.split('/').pop() ?? '';
     const works = async (secret: string) =>
-      (await clientCredentialsToken('rid-gateway', clientId, secret)).status === 200;
+      (await clientCredentialsToken('den-gateway', clientId, secret)).status === 200;
     try {
       // What the portal reconciler does: regenerate (previous -> rotated), then set the new one.
       expect(
-        (await asProvisioner(`/rid-gateway/clients/${id}/client-secret`, { method: 'POST' }))
+        (await asProvisioner(`/den-gateway/clients/${id}/client-secret`, { method: 'POST' }))
           .status,
       ).toBe(200);
-      const put = await asProvisioner(`/rid-gateway/clients/${id}`, {
+      const put = await asProvisioner(`/den-gateway/clients/${id}`, {
         method: 'PUT',
         body: JSON.stringify({ ...base, secret: 'new-secret-0123456789abcdef0123' }),
       });
@@ -345,14 +345,14 @@ describe('realm rid-gateway (M0-03)', () => {
       expect(await works('new-secret-0123456789abcdef0123')).toBe(true);
       expect(await works('previous-secret-0123456789abcdef')).toBe(true);
 
-      const rotated = await asProvisioner(`/rid-gateway/clients/${id}/client-secret/rotated`);
+      const rotated = await asProvisioner(`/den-gateway/clients/${id}/client-secret/rotated`);
       expect(((await rotated.json()) as { value: string }).value).toBe(
         'previous-secret-0123456789abcdef',
       );
       // Revocation, or the end of the window.
       expect(
         (
-          await asProvisioner(`/rid-gateway/clients/${id}/client-secret/rotated`, {
+          await asProvisioner(`/den-gateway/clients/${id}/client-secret/rotated`, {
             method: 'DELETE',
           })
         ).status,
@@ -360,39 +360,39 @@ describe('realm rid-gateway (M0-03)', () => {
       expect(await works('previous-secret-0123456789abcdef')).toBe(false);
       expect(await works('new-secret-0123456789abcdef0123')).toBe(true);
     } finally {
-      await asProvisioner(`/rid-gateway/clients/${id}`, { method: 'DELETE' });
+      await asProvisioner(`/den-gateway/clients/${id}`, { method: 'DELETE' });
     }
   });
 
-  it('confines the provisioner to clients of rid-gateway', async () => {
-    expect((await asProvisioner('/rid-gateway/users')).status).toBe(403);
-    expect((await asProvisioner('/rid-gateway/roles')).status).toBe(403);
-    expect((await asProvisioner('/rid-portal/clients')).status).toBe(403);
+  it('confines the provisioner to clients of den-gateway', async () => {
+    expect((await asProvisioner('/den-gateway/users')).status).toBe(403);
+    expect((await asProvisioner('/den-gateway/roles')).status).toBe(403);
+    expect((await asProvisioner('/den-portal/clients')).status).toBe(403);
     expect((await asProvisioner('/master/clients')).status).toBe(403);
   });
 });
 
 const citizens = (
-  JSON.parse(readFileSync(fromRoot('infra/keycloak/rid-citizens-realm.json'), 'utf8')) as {
+  JSON.parse(readFileSync(fromRoot('infra/keycloak/den-citizens-realm.json'), 'utf8')) as {
     users: Array<{ id: string; username: string; attributes: Record<string, string[]> }>;
   }
 ).users;
 
-describe('realm rid-citizens (MT-05)', () => {
-  const password = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
+describe('realm den-citizens (MT-05)', () => {
+  const password = env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
 
   it.each(citizens)(
     '$username logs in to the Carpeta and its token carries the verified document only',
     async (citizen) => {
       const result = await loginWithAuthorizationCode(citizen.username, password, {
-        client: carpetaClient(),
+        client: citizenAppClient(),
       });
       expect(result.tokens, result.page?.slice(0, 200)).toBeDefined();
       const claims = decodeJwt(result.tokens?.access_token ?? '');
-      expect(claims.iss).toBe(`${keycloakUrl()}/realms/rid-citizens`);
+      expect(claims.iss).toBe(`${keycloakUrl()}/realms/den-citizens`);
       expect(claims.sub).toBe(citizen.id);
-      expect(claims.azp).toBe('carpeta-ciudadana');
-      expect(audiences(claims)).toEqual(['rid-transparency-api']);
+      expect(claims.azp).toBe('citizen-app');
+      expect(audiences(claims)).toEqual(['den-transparency-api']);
       expect(claims.document_type).toBe(citizen.attributes.document_type?.[0]);
       expect(claims.document_number).toBe(citizen.attributes.document_number?.[0]);
       // Nothing else about the person travels to the portal.
@@ -403,8 +403,8 @@ describe('realm rid-citizens (MT-05)', () => {
   );
 
   it('does not allow the password grant on the Carpeta client', async () => {
-    const client = carpetaClient();
-    const res = await fetch(`${keycloakUrl()}/realms/rid-citizens/protocol/openid-connect/token`, {
+    const client = citizenAppClient();
+    const res = await fetch(`${keycloakUrl()}/realms/den-citizens/protocol/openid-connect/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -420,7 +420,7 @@ describe('realm rid-citizens (MT-05)', () => {
 
   it('refuses redirect URIs outside the Carpeta', async () => {
     const result = await loginWithAuthorizationCode('ciudadana.demo', password, {
-      client: carpetaClient(),
+      client: citizenAppClient(),
       redirectUri: 'https://attacker.example/callback',
     });
     expect(result.tokens).toBeUndefined();

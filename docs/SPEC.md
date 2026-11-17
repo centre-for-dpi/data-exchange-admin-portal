@@ -1,4 +1,4 @@
-# Functional specification — RID Portal
+# Functional specification — DEN Portal
 
 > Versión en español: [docs/es/SPEC.md](es/SPEC.md)
 
@@ -6,7 +6,7 @@ Version 0.1 · November 2026 · Status: draft for construction
 
 ## 1. Purpose and scope
 
-The RID Portal governs a data exchange network between public entities. It lets one entity publish an API, lets another consume it for an authorized purpose, and lets the operator and the regulator see and control the whole lifecycle. Traffic goes through a central gateway (APISIX); the data stays in each entity and the gateway stores no content.
+The DEN Portal governs a data exchange network between public entities. It lets one entity publish an API, lets another consume it for an authorized purpose, and lets the operator and the regulator see and control the whole lifecycle. Traffic goes through a central gateway (APISIX); the data stays in each entity and the gateway stores no content.
 
 **In scope for the MVP**
 
@@ -126,7 +126,7 @@ active → offboarded
 - **Detail (M2-01).** Anyone with an account (self-registration with a verified email, ADR-0018) can request a registration. They can have up to 3 open requests at a time. In `requested` it is the requester's turn: they correct the data, attach the designation document and submit it (it moves to `under_review`). Asking for corrections or rejecting requires a comment that the requester reads. The identifier and the tax ID are reserved only from the moment the request is submitted. A draft reserves nothing, and between drafts the first one submitted wins. Rejection is final, but it frees both values for a new request. This way a fake request cannot block the real entity forever.
 - **Separation of duties:** nobody decides on a request they submitted or in which they appear as a designated officer.
 - **Direct registration.** `platform_admin` registers the entity without a request when an act or a decision has already brought it into the network. They state that basis, which is recorded in the audit log, and the entity's administrator. The entity is active immediately; the administrator and the officers receive an invitation by email. The operator cannot be the administrator or one of the officers.
-- **Designated officers.** The data steward receives `data_steward`. The technical lead receives `api_publisher` and `app_developer`. If the requester designates themselves, the roles are added to their membership without an invitation. Each invitation expires after `RID_INVITATION_TTL_DAYS` days (14 by default).
+- **Designated officers.** The data steward receives `data_steward`. The technical lead receives `api_publisher` and `app_developer`. If the requester designates themselves, the roles are added to their membership without an invitation. Each invitation expires after `DEN_INVITATION_TTL_DAYS` days (14 by default).
 4. `suspended` blocks any new publication and suspends in the gateway all of the entity's subscriptions as a consumer (not as a provider, unless explicitly decided). The `platform_admin` decides it, with a reason; reactivating returns each subscription to its previous state. `offboarded` is final: it closes the entity's subscriptions on both sides, retires its versions and revokes its memberships (M2-11).
 
 ### 4.2 Publishing an API version
@@ -139,7 +139,7 @@ published → deprecated → retired
 
 1. `api_publisher` creates the API and the version: uploads OpenAPI 3.x, chooses the upstream, fills in the exposed fields, legal basis, allowed purposes and SLA.
 2. Automatic validations when submitting for review (blocking):
-   - OpenAPI lint with the RID ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), descriptions in Spanish.
+   - OpenAPI lint with the DEN ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), descriptions in Spanish.
    - Connectivity: the portal asks the node/URL for a `healthcheck` through the gateway in test mode (GET to the service root; it passes with any response that is not a 5xx).
    - Contract test (Schemathesis) against the sandbox, with a time limit. The sandbox is the test service with synthetic data that the version declares; without a sandbox, the test is skipped and does not block.
 
@@ -186,8 +186,8 @@ pending_provider → info_requested → pending_provider (question from the stew
 
 The consumer system obtains a token from Keycloak with its credentials and calls the gateway with:
 - `Authorization: Bearer <token>`
-- `X-RID-Purpose: <purpose code>` (required)
-- `X-RID-End-User: <official's identifier>`: required for APIs with personal or sensitive data. It is an identifier of 1 to 128 visible characters, with no spaces, such as the username or the institutional email. It is only recorded as a hash with the deployment's salt.
+- `X-DEN-Purpose: <purpose code>` (required)
+- `X-DEN-End-User: <official's identifier>`: required for APIs with personal or sensitive data. It is an identifier of 1 to 128 visible characters, with no spaces, such as the username or the institutional email. It is only recorded as a hash with the deployment's salt.
 - `X-Request-Id` (optional; if it is missing, the gateway generates it)
 
 The gateway allows the call only if there is an `active` subscription for that client, that version, that operation and that purpose. The provider receives traceability headers (see `ARCHITECTURE.md §6`).
@@ -209,7 +209,7 @@ enrollment_issued → enrolled → online ⇄ offline
 
 ### 4.7 Transparency for the data subject (ADR-0015, ADR-0016)
 
-1. When a version of a `personal` or `sensitive` API is published, each operation declares where the data subject is (`x-rid-data-subject`) or that it has no data subject (`none`).
+1. When a version of a `personal` or `sensitive` API is published, each operation declares where the data subject is (`x-den-data-subject`) or that it has no data subject (`none`).
 2. On each authorized call, the gateway computes a pseudonym for the data subject and records the query: the entity and application that queried, the provider entity, the API and the exposed data, the operation, the purpose, the official (hash), the date and the result. It never records the content or the document number.
 3. Queries are grouped into sealed batches (operator signature and a timestamp from an independent TSA). Each query has a receipt that anyone can verify.
 4. Citizens see their queries in the Carpeta Ciudadana Digital. The portal only answers the Carpeta with the citizen's token, and alerts the citizen about new queries if the citizen asked for it.
@@ -217,7 +217,7 @@ enrollment_issued → enrolled → online ⇄ offline
 ## 5. Cross-cutting business rules
 
 - **Minimization:** the reviewer sees the `exposedFields` and must confirm that they match the allowed purposes. The catalog shows which personal data each API exposes.
-- **Classification:** `public` (open data), `internal` (non-personal, internal use), `personal` (personal data), `sensitive` (special categories: health, etc.). The classification determines additional approvals, maximum validity and whether `X-RID-End-User` is required.
+- **Classification:** `public` (open data), `internal` (non-personal, internal use), `personal` (personal data), `sensitive` (special categories: health, etc.). The classification determines additional approvals, maximum validity and whether `X-DEN-End-User` is required.
 - **Maximum subscription validity** per classification, configurable (by default: public 24 months, internal 24 months, personal 12 months, sensitive 6 months).
 - **Nothing is deleted** in the domain: entities, APIs and subscriptions change state. The only physical deletion is of attached documents by legal order, and it is recorded in the audit log.
 
@@ -259,7 +259,7 @@ In the portal and by email. Minimum events: invitation to an entity, registratio
 
 ## 9. Planned extension points
 
-- **Consent:** the subscription model supports `consentRequired: bool`. When it is enabled, OPA will query a consent service before allowing. It is not implemented in the MVP; the policy interface already receives the `X-RID-Consent-Ref` header if present.
+- **Consent:** the subscription model supports `consentRequired: bool`. When it is enabled, OPA will query a consent service before allowing. It is not implemented in the MVP; the policy interface already receives the `X-DEN-Consent-Ref` header if present.
 - **Territorial instances** (e.g. Bogotá): a gateway instance with its own subset of routes, governed from the same portal (`Gateway` as a first-class entity in a future version).
 - **Verifiable credentials:** a provider entity will be able to mark an API as an "issuance source" for a credential issuer; out of the MVP.
 
@@ -302,7 +302,7 @@ branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/log
 - **Propagation:** approval or revocation reflected in the gateway in < 60 s.
 - **Initial scale:** 200 entities, 1,000 APIs, 5,000 subscriptions, 500 sustained requests/s at the gateway.
 - **Security:** OWASP ASVS L2; mandatory MFA for platform roles and `data_steward` (Keycloak asks for the code; the API requires it on every request, ADR-0021).
-- **Privacy:** no bodies in logs; identifiers in paths masked; `X-RID-End-User` stored as a hash with a per-deployment salt.
+- **Privacy:** no bodies in logs; identifiers in paths masked; `X-DEN-End-User` stored as a hash with a per-deployment salt.
 - **Retention:** audit log 5 years (configurable); access logs 1 year (configurable).
 - **Accessibility:** WCAG 2.1 AA.
 - **Languages:** Spanish (default) and English.

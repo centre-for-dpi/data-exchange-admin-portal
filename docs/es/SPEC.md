@@ -1,4 +1,4 @@
-# Especificación funcional — Portal RID
+# Especificación funcional — Portal DEN
 
 > English version (official): [docs/SPEC.md](../SPEC.md)
 
@@ -6,7 +6,7 @@ Versión 0.1 · noviembre 2026 · Estado: borrador para construcción
 
 ## 1. Propósito y alcance
 
-El Portal RID gobierna una red de intercambio de datos entre entidades públicas. Permite que una entidad publique una API, que otra la consuma con una finalidad autorizada, y que el operador y el regulador vean y controlen todo el ciclo. El tráfico pasa por un gateway central (APISIX); los datos se quedan en cada entidad y el gateway no guarda contenido.
+El Portal DEN gobierna una red de intercambio de datos entre entidades públicas. Permite que una entidad publique una API, que otra la consuma con una finalidad autorizada, y que el operador y el regulador vean y controlen todo el ciclo. El tráfico pasa por un gateway central (APISIX); los datos se quedan en cada entidad y el gateway no guarda contenido.
 
 **Dentro del alcance del MVP**
 
@@ -126,7 +126,7 @@ active → offboarded
 - **Detalle (M2-01).** Cualquier persona con cuenta (autorregistro con correo verificado, ADR-0018) puede pedir un alta. Tiene hasta 3 solicitudes abiertas a la vez. En `requested` le toca al solicitante: corrige los datos, adjunta el documento de designación y la envía (pasa a `under_review`). Pedir correcciones o rechazar exige un comentario que el solicitante lee. El identificador y la identificación tributaria quedan reservados solo desde que la solicitud se envía. Un borrador no reserva nada, y entre borradores gana el primero que se envía. El rechazo es definitivo, pero libera ambos datos para una nueva solicitud. Así una solicitud falsa no bloquea para siempre a la entidad real.
 - **Separación de funciones:** nadie decide sobre una solicitud que presentó o en la que figura como responsable designado.
 - **Alta directa.** `platform_admin` registra la entidad sin solicitud cuando un acto o una decisión ya la incorporó a la red. Indica ese fundamento, que queda en la bitácora, y el administrador de la entidad. La entidad queda activa de inmediato; el administrador y los responsables reciben una invitación por correo. El operador no puede ser el administrador ni uno de los responsables.
-- **Responsables designados.** El responsable de datos recibe `data_steward`. El responsable técnico recibe `api_publisher` y `app_developer`. Si el solicitante se designa a sí mismo, los roles se suman a su membresía sin invitación. Cada invitación vence a los `RID_INVITATION_TTL_DAYS` días (14 por omisión).
+- **Responsables designados.** El responsable de datos recibe `data_steward`. El responsable técnico recibe `api_publisher` y `app_developer`. Si el solicitante se designa a sí mismo, los roles se suman a su membresía sin invitación. Cada invitación vence a los `DEN_INVITATION_TTL_DAYS` días (14 por omisión).
 4. `suspended` bloquea toda publicación nueva y suspende en el gateway todas sus suscripciones como consumidora (no como proveedora, salvo decisión explícita). Lo decide el `platform_admin` con un motivo; reactivar devuelve cada suscripción a su estado. `offboarded` es definitivo: cierra sus suscripciones de ambos lados, retira sus versiones y revoca sus membresías (M2-11).
 
 ### 4.2 Publicación de una versión de API
@@ -139,7 +139,7 @@ published → deprecated → retired
 
 1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige upstream, completa campos expuestos, base legal, finalidades permitidas, SLA.
 2. Validaciones automáticas al enviar a revisión (bloqueantes):
-   - Lint del OpenAPI con el conjunto de reglas RID (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), descripciones en español.
+   - Lint del OpenAPI con el conjunto de reglas DEN (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), descripciones en español.
    - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba (GET a la raíz del servicio; pasa con cualquier respuesta que no sea 5xx).
    - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo. El sandbox es el servicio de pruebas con datos sintéticos que la versión declara; sin sandbox, la prueba se omite y no bloquea.
 
@@ -186,8 +186,8 @@ pending_provider → info_requested → pending_provider (pregunta del responsab
 
 El sistema consumidor obtiene un token de Keycloak con sus credenciales y llama al gateway con:
 - `Authorization: Bearer <token>`
-- `X-RID-Purpose: <código de finalidad>` (obligatorio)
-- `X-RID-End-User: <identificador del funcionario>`: obligatorio en APIs con datos personales o sensibles. Es un identificador de 1 a 128 caracteres visibles, sin espacios, como el usuario o el correo institucional. Solo se registra como hash con la sal del despliegue.
+- `X-DEN-Purpose: <código de finalidad>` (obligatorio)
+- `X-DEN-End-User: <identificador del funcionario>`: obligatorio en APIs con datos personales o sensibles. Es un identificador de 1 a 128 caracteres visibles, sin espacios, como el usuario o el correo institucional. Solo se registra como hash con la sal del despliegue.
 - `X-Request-Id` (opcional; si no viene el gateway lo genera)
 
 El gateway permite la llamada solo si existe una suscripción `active` para ese cliente, esa versión, esa operación y esa finalidad. El proveedor recibe cabeceras de trazabilidad (ver `ARCHITECTURE.md §6`).
@@ -209,7 +209,7 @@ enrollment_issued → enrolled → online ⇄ offline
 
 ### 4.7 Transparencia para el titular (ADR-0015, ADR-0016)
 
-1. Al publicar una versión de una API `personal` o `sensitive`, cada operación declara dónde está el titular (`x-rid-data-subject`) o que no tiene titular (`none`).
+1. Al publicar una versión de una API `personal` o `sensitive`, cada operación declara dónde está el titular (`x-den-data-subject`) o que no tiene titular (`none`).
 2. En cada llamada autorizada, el gateway calcula un seudónimo del titular y registra la consulta: entidad y aplicación que consultaron, entidad proveedora, API y datos expuestos, operación, finalidad, funcionario (hash), fecha y resultado. Nunca registra el contenido ni el número de documento.
 3. Las consultas se agrupan en lotes sellados (firma del operador y sello de tiempo de una TSA independiente). Cada consulta tiene un comprobante que cualquiera puede verificar.
 4. El ciudadano ve sus consultas en la Carpeta Ciudadana Digital. El portal solo responde a la Carpeta con el token del ciudadano, y le avisa de consultas nuevas si el ciudadano lo pidió.
@@ -217,7 +217,7 @@ enrollment_issued → enrolled → online ⇄ offline
 ## 5. Reglas de negocio transversales
 
 - **Minimización:** el revisor ve los `exposedFields` y debe confirmar que corresponden a las finalidades permitidas. El catálogo muestra qué datos personales expone cada API.
-- **Clasificación:** `public` (datos abiertos), `internal` (no personal, uso interno), `personal` (datos personales), `sensitive` (categorías especiales: salud, etc.). La clasificación decide aprobaciones adicionales, vigencia máxima y si se exige `X-RID-End-User`.
+- **Clasificación:** `public` (datos abiertos), `internal` (no personal, uso interno), `personal` (datos personales), `sensitive` (categorías especiales: salud, etc.). La clasificación decide aprobaciones adicionales, vigencia máxima y si se exige `X-DEN-End-User`.
 - **Vigencia máxima de suscripción** por clasificación, configurable (por defecto: public 24 m, internal 24 m, personal 12 m, sensitive 6 m).
 - **Nada se borra** en el dominio: las entidades, APIs y suscripciones cambian de estado. La única eliminación física es de documentos adjuntos por orden legal, y se registra en auditoría.
 
@@ -259,7 +259,7 @@ En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobad
 
 ## 9. Puntos de extensión previstos
 
-- **Consentimiento:** el modelo de suscripción admite `consentRequired: bool`. Cuando se active, OPA consultará un servicio de consentimiento antes de permitir. No se implementa en el MVP; la interfaz de política ya recibe la cabecera `X-RID-Consent-Ref` si viene.
+- **Consentimiento:** el modelo de suscripción admite `consentRequired: bool`. Cuando se active, OPA consultará un servicio de consentimiento antes de permitir. No se implementa en el MVP; la interfaz de política ya recibe la cabecera `X-DEN-Consent-Ref` si viene.
 - **Instancias territoriales** (p. ej. Bogotá): una instancia del gateway con su propio subconjunto de rutas, gobernada desde el mismo portal (`Gateway` como entidad de primer nivel en una versión futura).
 - **Credenciales verificables:** una entidad proveedora podrá marcar una API como "fuente de emisión" para un emisor de credenciales; fuera del MVP.
 
@@ -302,7 +302,7 @@ branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/log
 - **Propagación:** aprobación o revocación reflejada en el gateway en < 60 s.
 - **Escala inicial:** 200 entidades, 1.000 APIs, 5.000 suscripciones, 500 peticiones/s sostenidas en el gateway.
 - **Seguridad:** OWASP ASVS L2; MFA obligatorio para roles de plataforma y `data_steward` (Keycloak pide el código; el API lo exige en cada petición, ADR-0021).
-- **Privacidad:** sin cuerpos en logs; identificadores en rutas enmascarados; `X-RID-End-User` guardado como hash con sal por despliegue.
+- **Privacidad:** sin cuerpos en logs; identificadores en rutas enmascarados; `X-DEN-End-User` guardado como hash con sal por despliegue.
 - **Retención:** bitácora de auditoría 5 años (configurable); logs de acceso 1 año (configurable).
 - **Accesibilidad:** WCAG 2.1 AA.
 - **Idiomas:** español (por defecto) e inglés.

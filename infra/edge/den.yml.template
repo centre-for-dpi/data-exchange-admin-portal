@@ -1,95 +1,96 @@
-# Routes of the bundled proxy (infra/compose/docker-compose.edge.yml). install.sh writes
-# infra/edge/dynamic/rid.yml from this file, replacing the PORTAL_HOST, GATEWAY_HOST and TLS
-# markers (each between two @).
+# Routes of the portal and the gateway, for the bundled proxy (infra/compose/docker-compose.edge.yml)
+# or a Traefik already on the server (file provider). install.sh writes
+# infra/edge/dynamic/den.yml (or infra/edge/den-external.yml) from this file, replacing the
+# PORTAL_HOST, GATEWAY_HOST, TLS and ENTRYPOINT markers (each between two @).
 # Same routes as DEPLOYMENT.md §5.2; keep both in step.
 #
 # Never published: /api/v1/internal (transparency collector) and /api/v1/opa (OPA bundle).
 
 http:
   middlewares:
-    rid-strip-gw:
+    den-strip-gw:
       stripPrefix: { prefixes: ['/gw'] }
-    rid-strip-tsa:
+    den-strip-tsa:
       stripPrefix: { prefixes: ['/tsa'] }
     # Keycloak trusts these headers on the gateway's token route only (ADR-0022): every other way
     # to Keycloak drops them.
-    rid-no-client-cert-headers:
+    den-no-client-cert-headers:
       headers:
         customRequestHeaders: { SSL_CLIENT_CERT: '', ssl-client-verify: '' }
     # Per source address, in front of the API's own limits (M6-01, ASVS 2.4.1). Generous: a
     # government office often reaches the portal from one address.
-    rid-rate-api:
+    den-rate-api:
       rateLimit: { average: 50, burst: 100, period: 1s }
-    rid-rate-auth:
+    den-rate-auth:
       rateLimit: { average: 20, burst: 60, period: 1s }
 
   routers:
-    rid-web:
+    den-web:
       rule: 'Host(`@PORTAL_HOST@`)'
-      entryPoints: [websecure]
-      service: rid-web
+      entryPoints: [@ENTRYPOINT@]
+      service: den-web
       tls: @TLS@
-    rid-api:
+    den-api:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/api/v1`) && !PathPrefix(`/api/v1/internal`) && !PathPrefix(`/api/v1/opa`)'
-      entryPoints: [websecure]
-      service: rid-api
-      middlewares: [rid-rate-api]
+      entryPoints: [@ENTRYPOINT@]
+      service: den-api
+      middlewares: [den-rate-api]
       tls: @TLS@
-    rid-auth:
+    den-auth:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/auth`)'
-      entryPoints: [websecure]
-      service: rid-keycloak
-      middlewares: [rid-no-client-cert-headers, rid-rate-auth]
+      entryPoints: [@ENTRYPOINT@]
+      service: den-keycloak
+      middlewares: [den-no-client-cert-headers, den-rate-auth]
       tls: @TLS@
-    rid-gw:
+    den-gw:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/gw`)'
-      entryPoints: [websecure]
-      service: rid-apisix
-      middlewares: [rid-strip-gw]
+      entryPoints: [@ENTRYPOINT@]
+      service: den-apisix
+      middlewares: [den-strip-gw]
       tls: @TLS@
-    rid-mail:
+    den-mail:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/mail`)'
-      entryPoints: [websecure]
-      service: rid-mailpit
+      entryPoints: [@ENTRYPOINT@]
+      service: den-mailpit
       tls: @TLS@
-    rid-carpeta:
-      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/carpeta`)'
-      entryPoints: [websecure]
-      service: rid-carpeta
+    den-citizen-app:
+      rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/citizen-app`)'
+      entryPoints: [@ENTRYPOINT@]
+      service: den-citizen-app
       tls: @TLS@
-    rid-grafana:
+    den-grafana:
       # The operator's dashboard (M5-06), with Grafana's own login.
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/grafana`)'
-      entryPoints: [websecure]
-      service: rid-grafana
-      middlewares: [rid-rate-auth]
+      entryPoints: [@ENTRYPOINT@]
+      service: den-grafana
+      middlewares: [den-rate-auth]
       tls: @TLS@
-    rid-tsa:
+    den-tsa:
       rule: 'Host(`@PORTAL_HOST@`) && Path(`/tsa/api/v1/timestamp/certchain`)'
-      entryPoints: [websecure]
-      service: rid-tsa
-      middlewares: [rid-strip-tsa]
+      entryPoints: [@ENTRYPOINT@]
+      service: den-tsa
+      middlewares: [den-strip-tsa]
       tls: @TLS@
 
   services:
-    rid-web: { loadBalancer: { servers: [{ url: 'http://rid-portal-web:3000' }] } }
-    rid-api: { loadBalancer: { servers: [{ url: 'http://rid-portal-api:4000' }] } }
-    rid-keycloak: { loadBalancer: { servers: [{ url: 'http://rid-keycloak:8080' }] } }
-    rid-apisix: { loadBalancer: { servers: [{ url: 'http://rid-apisix:9080' }] } }
-    rid-mailpit: { loadBalancer: { servers: [{ url: 'http://rid-mailpit:8025' }] } }
-    rid-carpeta: { loadBalancer: { servers: [{ url: 'http://rid-carpeta:3100' }] } }
-    rid-tsa: { loadBalancer: { servers: [{ url: 'http://rid-tsa:3004' }] } }
-    rid-grafana: { loadBalancer: { servers: [{ url: 'http://rid-grafana:3000' }] } }
+    den-web: { loadBalancer: { servers: [{ url: 'http://den-portal-web:3000' }] } }
+    den-api: { loadBalancer: { servers: [{ url: 'http://den-portal-api:4000' }] } }
+    den-keycloak: { loadBalancer: { servers: [{ url: 'http://den-keycloak:8080' }] } }
+    den-apisix: { loadBalancer: { servers: [{ url: 'http://den-apisix:9080' }] } }
+    den-mailpit: { loadBalancer: { servers: [{ url: 'http://den-mailpit:8025' }] } }
+    den-citizen-app: { loadBalancer: { servers: [{ url: 'http://den-citizen-app:3100' }] } }
+    den-tsa: { loadBalancer: { servers: [{ url: 'http://den-tsa:3004' }] } }
+    den-grafana: { loadBalancer: { servers: [{ url: 'http://den-grafana:3000' }] } }
 
 # The gateway's name: TLS goes through untouched to APISIX, which presents its step-ca certificate
 # and asks for the client certificate (applications and kit nodes).
 tcp:
   routers:
-    rid-gateway-mtls:
+    den-gateway-mtls:
       rule: 'HostSNI(`@GATEWAY_HOST@`)'
-      entryPoints: [websecure]
-      service: rid-apisix-tls
+      entryPoints: [@ENTRYPOINT@]
+      service: den-apisix-tls
       tls: { passthrough: true }
   services:
-    rid-apisix-tls:
-      loadBalancer: { servers: [{ address: 'rid-apisix:9443' }] }
+    den-apisix-tls:
+      loadBalancer: { servers: [{ address: 'den-apisix:9443' }] }

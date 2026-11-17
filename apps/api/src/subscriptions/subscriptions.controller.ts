@@ -20,7 +20,7 @@ import {
   subscriptionListQuerySchema,
   subscriptionPageSchema,
   subscriptionParamsSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
@@ -152,7 +152,7 @@ export class SubscriptionsController {
     operationId: 'putSubscriptionAgreement',
     summary: 'Attach the exchange agreement (PDF) to a pending request',
     description:
-      'The body is the PDF itself (`Content-Type: application/pdf`), up to RID_DOCUMENT_MAX_BYTES. ' +
+      'The body is the PDF itself (`Content-Type: application/pdf`), up to DEN_DOCUMENT_MAX_BYTES. ' +
       'Only while the provider has not decided; replaces any previous agreement.',
     tags: ['subscriptions'],
     params: subscriptionParamsSchema,

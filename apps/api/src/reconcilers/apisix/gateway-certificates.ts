@@ -93,8 +93,8 @@ export function renewalDue(c: { notBefore: Date; notAfter: Date }, now: Date): b
 
 /**
  * Certificates of the gateway itself, issued by the network CA (ARCHITECTURE.md §4.4, M3-02).
- * The portal generates the key, has step-ca sign the CSR through the rid-gateway-tls provisioner
- * and keeps both (the key sealed with RID_SECRETS_KEY); the APISIX reconciler puts them in the
+ * The portal generates the key, has step-ca sign the CSR through the den-gateway-tls provisioner
+ * and keeps both (the key sealed with DEN_SECRETS_KEY); the APISIX reconciler puts them in the
  * SSL object. Called only by the reconciler.
  */
 @Injectable()
@@ -129,8 +129,8 @@ export class GatewayCertificates {
 
   /**
    * A client certificate the gateway presents to upstreams that require mTLS (M3-03): subject
-   * CN=<name>, one per provider entity (rid-gateway.<slug>), issued like the applications' (TLS
-   * client authentication only, provisioner rid-portal). Each provider trusts the network CA and
+   * CN=<name>, one per provider entity (den-gateway.<slug>), issued like the applications' (TLS
+   * client authentication only, provisioner den-portal). Each provider trusts the network CA and
    * its own name only.
    */
   upstreamClient(name: string, now = new Date()): Promise<IssuedGatewayCertificate> {

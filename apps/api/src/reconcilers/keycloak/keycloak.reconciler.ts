@@ -11,7 +11,7 @@ import { hashSecret, open } from '../../common/secrets.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
 import { isDrift, recordSyncSuccess } from '../sync-state.js';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   BOUND_TOKENS_ATTRIBUTE,
   type GatewayClient,
@@ -19,7 +19,7 @@ import {
   type KeycloakGatewayAdmin,
 } from './keycloak-admin.js';
 
-/** Outbox topic for changes that affect Keycloak clients of the rid-gateway realm. */
+/** Outbox topic for changes that affect Keycloak clients of the den-gateway realm. */
 export const KEYCLOAK_SYNC_TOPIC = 'keycloak.sync';
 const FULL_RECONCILE_MS = 5 * 60 * 1000;
 
@@ -40,7 +40,7 @@ const COMPARED: Array<keyof GatewayClient> = [
 ];
 
 /**
- * Makes each consumer application exist as a confidential client in rid-gateway
+ * Makes each consumer application exist as a confidential client in den-gateway
  * (ARCHITECTURE.md §3.2, §4.3). Desired state comes from PostgreSQL only; the reconciler reads
  * Keycloak, applies the difference with idempotent calls and records the outcome in sync_state.
  * Runs from the outbox (keycloak.sync) and as a full pass every 5 minutes to repair drift.
@@ -115,11 +115,11 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
       directAccessGrantsEnabled: false,
       implicitFlowEnabled: false,
       attributes: {
-        'rid.application': app.id,
-        'rid.entity': app.entityId,
-        'rid.environment': app.environment,
+        'den.application': app.id,
+        'den.entity': app.entityId,
+        'den.environment': app.environment,
         // Puts the client under the realm's secret rotation policy (M3-04).
-        'rid.managed': 'true',
+        'den.managed': 'true',
         // With features.mtls.required, tokens are bound to the certificate APISIX verified on the
         // token route (S-4, M3-10). The application still authenticates with its secret: a forged
         // certificate header cannot authenticate anyone, and a bound token only works with the
@@ -155,7 +155,7 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
         const id = actual.id ?? '';
         let changed = COMPARED.some((f) => !isDeepStrictEqual(desired[f], actual[f]));
         if (changed) {
-          // Attributes first: the rotation policy applies to clients with rid.managed.
+          // Attributes first: the rotation policy applies to clients with den.managed.
           await this.admin.updateClient(id, desired);
         }
         if (secret) {

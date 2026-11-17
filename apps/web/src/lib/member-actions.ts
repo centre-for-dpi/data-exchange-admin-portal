@@ -1,6 +1,6 @@
 'use server';
 
-import { ENTITY_ROLES, entityInvitationSchema, entityMemberSchema } from '@rid/contracts';
+import { ENTITY_ROLES, entityInvitationSchema, entityMemberSchema } from '@den/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend, type Problem } from './api';

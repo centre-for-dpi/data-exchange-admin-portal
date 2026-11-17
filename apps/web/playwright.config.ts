@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
 const rootEnv = resolve(import.meta.dirname, '../../.env');
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
-const baseURL = process.env.RID_WEB_URL ?? 'http://localhost:3000';
+const baseURL = process.env.DEN_WEB_URL ?? 'http://localhost:3000';
 
 /**
  * End-to-end tests against the full local stack: `pnpm infra:up` first.
@@ -31,21 +31,21 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   webServer: [
     {
-      command: 'pnpm -w exec turbo run build --filter=@rid/api && pnpm --filter @rid/api start',
-      url: `${process.env.RID_API_URL ?? 'http://localhost:4000'}/api/v1/health`,
+      command: 'pnpm -w exec turbo run build --filter=@den/api && pnpm --filter @den/api start',
+      url: `${process.env.DEN_API_URL ?? 'http://localhost:4000'}/api/v1/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 240_000,
     },
     {
       // The reference citizen folder (MT-07).
       command:
-        'pnpm -w exec turbo run build --filter=@rid/mock-citizen-app... && pnpm --filter @rid/mock-citizen-app start',
-      url: `${process.env.RID_CARPETA_URL ?? 'http://localhost:3100'}/health`,
+        'pnpm -w exec turbo run build --filter=@den/mock-citizen-app... && pnpm --filter @den/mock-citizen-app start',
+      url: `${process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100'}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 240_000,
     },
     {
-      command: 'pnpm -w exec turbo run build --filter=@rid/web... && pnpm start',
+      command: 'pnpm -w exec turbo run build --filter=@den/web... && pnpm start',
       url: baseURL,
       reuseExistingServer: !process.env.CI,
       timeout: 240_000,

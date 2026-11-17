@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ApiVersionStatus, PlatformRole, ReviewDetail } from '@rid/contracts';
+import type { ApiVersionStatus, PlatformRole, ReviewDetail } from '@den/contracts';
 import { ApisService, VERSION_INCLUDE, versionSnapshot } from '../apis/apis.service.js';
 import { VersionValidationService } from '../apis/version-validation.service.js';
 import { AuditService } from '../audit/audit.service.js';

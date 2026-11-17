@@ -1,7 +1,7 @@
-import { FieldErrorKey } from '@rid/contracts';
+import { FieldErrorKey } from '@den/contracts';
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import type { AuditExportQuery } from '@rid/contracts';
+import type { AuditExportQuery } from '@den/contracts';
 import { CompactSign } from 'jose';
 import type { Principal } from '../auth/principal.service.js';
 import { ValidationError } from '../common/errors.js';
@@ -123,7 +123,7 @@ export class AuditExportService {
     };
     const signature = this.key.configured()
       ? await new CompactSign(new TextEncoder().encode(JSON.stringify(manifest)))
-          .setProtectedHeader({ alg: 'EdDSA', kid: this.key.kid(), typ: 'rid-audit-export+jws' })
+          .setProtectedHeader({ alg: 'EdDSA', kid: this.key.kid(), typ: 'den-audit-export+jws' })
           .sign(await this.key.signingKey())
       : null;
     await this.prisma.$transaction((tx) =>

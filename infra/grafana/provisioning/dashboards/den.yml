@@ -1,9 +1,9 @@
-# The RID dashboards, from files (infra/grafana/dashboards), not editable in the UI: changes go
+# The DEN dashboards, from files (infra/grafana/dashboards), not editable in the UI: changes go
 # through the repository.
 apiVersion: 1
 providers:
-  - name: rid
-    folder: RID
+  - name: den
+    folder: DEN
     type: file
     disableDeletion: true
     allowUiUpdates: false

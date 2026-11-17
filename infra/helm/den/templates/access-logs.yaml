@@ -9,9 +9,9 @@ over TLS with its own user, as production requires (ASVS 12.3, M6-05).
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "rid.name" "access-logs" }}
+  name: {{ include "den.name" "access-logs" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 data:
   fluent-bit.yaml: |
     service:
@@ -31,7 +31,7 @@ data:
         # Second privacy barrier after APISIX: only metadata fields stay.
         - name: lua
           match: apisix.*
-          script: /fluent-bit/etc/rid/allowlist.lua
+          script: /fluent-bit/etc/den/allowlist.lua
           call: allowlist
       outputs:
         - name: opensearch
@@ -46,7 +46,7 @@ data:
           http_passwd: ${OPENSEARCH_PASSWORD}
           {{- end }}
           logstash_format: on
-          logstash_prefix: rid-access
+          logstash_prefix: den-access
           logstash_dateformat: '%Y.%m'
           suppress_type_name: on
           trace_error: on
@@ -56,18 +56,18 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "rid.name" "access-logs" }}
+  name: {{ include "den.name" "access-logs" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   replicas: {{ .Values.accessLogs.replicas }}
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
       annotations:
         checksum/config: {{ .Files.Get "files/fluent-bit/allowlist.lua" | sha256sum }}
     spec:
@@ -80,9 +80,9 @@ spec:
         - name: fluent-bit
           image: {{ .Values.images.fluentBit }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/fluent-bit.yaml']
+          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/fluent-bit.yaml']
           envFrom:
-            - secretRef: { name: {{ include "rid.name" "access-logs" }} }
+            - secretRef: { name: {{ include "den.name" "access-logs" }} }
           ports:
             - { name: logs, containerPort: 9880 }
             - { name: health, containerPort: 2020 }
@@ -95,13 +95,13 @@ spec:
           resources:
             {{- toYaml .Values.gateway.resources.fluentBit | nindent 12 }}
           volumeMounts:
-            - { name: config, mountPath: /fluent-bit/etc/rid }
+            - { name: config, mountPath: /fluent-bit/etc/den }
             {{- if $os.tls }}
             - { name: opensearch-ca, mountPath: /fluent-bit/etc/opensearch }
             {{- end }}
       volumes:
         - name: config
-          configMap: { name: {{ include "rid.name" "access-logs" }} }
+          configMap: { name: {{ include "den.name" "access-logs" }} }
         {{- if $os.tls }}
         - name: opensearch-ca
           secret: { secretName: {{ $os.caSecret }}, items: [{ key: ca.crt, path: ca.crt }] }
@@ -110,12 +110,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "access-logs" }}
+  name: {{ include "den.name" "access-logs" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: logs, port: 9880, targetPort: logs }
 {{- end }}

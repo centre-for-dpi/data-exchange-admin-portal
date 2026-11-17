@@ -1,4 +1,4 @@
-import { problemDetailsSchema } from '@rid/contracts';
+import { problemDetailsSchema } from '@den/contracts';
 import { z } from 'zod';
 import type { OperationSpec } from './api-operation.decorator.js';
 
@@ -110,7 +110,7 @@ export function buildOpenApiDocument(routes: RouteDoc[], info: { title: string; 
     info: {
       ...info,
       description:
-        'API of the RID portal. Errors use RFC 9457 problem details (application/problem+json).',
+        'API of the DEN portal. Errors use RFC 9457 problem details (application/problem+json).',
     },
     servers: [{ url: '/' }],
     security: [{ bearerAuth: [] }],
@@ -124,13 +124,13 @@ export function buildOpenApiDocument(routes: RouteDoc[], info: { title: string; 
           bearerFormat: 'JWT',
           description:
             'Access token of the national digital identity, issued to an authorized citizen app ' +
-            '(the Carpeta Ciudadana). Development: realm rid-citizens.',
+            '(the Carpeta Ciudadana). Development: realm den-citizens.',
         },
         nodeMutualTls: {
           type: 'mutualTLS',
           description:
             'Control channel of kit nodes (ARCHITECTURE.md §10): TLS with the node certificate ' +
-            'issued at enrollment, at the gateway (RID_NODE_CONTROL_URL), which passes the ' +
+            'issued at enrollment, at the gateway (DEN_NODE_CONTROL_URL), which passes the ' +
             'verified thumbprint to the portal.',
         },
       },

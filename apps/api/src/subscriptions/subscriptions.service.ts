@@ -1,6 +1,6 @@
-import { FieldErrorKey } from '@rid/contracts';
+import { FieldErrorKey } from '@den/contracts';
 import { Injectable } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import type {
   ApproveSubscriptionInput,
   Classification,
@@ -11,7 +11,7 @@ import type {
   SubscriptionListQuery,
   SubscriptionStatus,
   SubscriptionSummary,
-} from '@rid/contracts';
+} from '@den/contracts';
 import {
   approveSubscriptionSchema,
   createSubscriptionSchema,
@@ -22,7 +22,7 @@ import {
   revokeSubscriptionSchema,
   suspendSubscriptionSchema,
   withdrawSubscriptionSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';

@@ -3,12 +3,12 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   createdApplicationSchema,
   documentPageSchema,
   subscriptionDetailSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -27,7 +27,7 @@ describe('exchange agreements and deletion by legal order (M2-07)', () => {
   const prisma = new PrismaService();
   const realmUsers = readRealmUsers();
   const subOf = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
-  const documentsDir = mkdtempSync(join(tmpdir(), 'rid-agreements-'));
+  const documentsDir = mkdtempSync(join(tmpdir(), 'den-agreements-'));
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
   let salud = '';
@@ -51,7 +51,7 @@ describe('exchange agreements and deletion by legal order (M2-07)', () => {
     });
 
   beforeAll(async () => {
-    process.env.RID_DOCUMENTS_DIR = documentsDir;
+    process.env.DEN_DOCUMENTS_DIR = documentsDir;
     await runSeed(prisma, new AuditService(), {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers,
@@ -69,7 +69,7 @@ describe('exchange agreements and deletion by legal order (M2-07)', () => {
       description: 'Datos sintéticos.',
       sector: 'salud',
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -103,7 +103,7 @@ describe('exchange agreements and deletion by legal order (M2-07)', () => {
       name: `Acuerdo ${randomUUID().slice(0, 6)}`,
       description: 'Aplicación de prueba de acuerdos.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     const applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const res = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {

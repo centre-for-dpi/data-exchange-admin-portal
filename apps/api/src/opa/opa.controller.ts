@@ -24,7 +24,7 @@ const statusReportSchema = z.looseObject({
 });
 type StatusReport = z.infer<typeof statusReportSchema>;
 
-export const BUNDLE_NAME = 'rid';
+export const BUNDLE_NAME = 'den';
 
 /**
  * Endpoints for the gateways' OPA (ARCHITECTURE.md §4.2), authenticated with the service token
@@ -50,7 +50,7 @@ export class OpaController {
   @Get('bundle.tar.gz')
   @ApiOperation({
     operationId: 'getOpaBundle',
-    summary: 'OPA bundle: rid.authz policies and the data they decide on',
+    summary: 'OPA bundle: den.authz policies and the data they decide on',
     description:
       'For the gateways’ OPA only (Bearer OPA_BUNDLE_TOKEN, internal network). Supports ' +
       'If-None-Match: the ETag is the bundle revision.',

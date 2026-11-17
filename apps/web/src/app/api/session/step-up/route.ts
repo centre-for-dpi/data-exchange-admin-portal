@@ -1,4 +1,4 @@
-import { MFA_ACR } from '@rid/contracts';
+import { MFA_ACR } from '@den/contracts';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { signIn } from '../../../../auth';

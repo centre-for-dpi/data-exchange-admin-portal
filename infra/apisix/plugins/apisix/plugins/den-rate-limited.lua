@@ -1,5 +1,5 @@
 --
--- rid-rate-limited: the gateway's own 429 in RFC 9457 problem+json (SPIKE S-2, M3-05).
+-- den-rate-limited: the gateway's own 429 in RFC 9457 problem+json (SPIKE S-2, M3-05).
 --
 -- limit-count rejects a call over its subscription's limit with 429 before any upstream is
 -- contacted, so $upstream_status is empty. Only that 429 gets the problem+json body (code
@@ -12,7 +12,7 @@
 local core = require("apisix.core")
 
 local PROBLEM = core.json.encode({
-    type = "https://rid.example/errors/rate_limited",
+    type = "https://den.example/errors/rate_limited",
     title = "Too many requests",
     status = 429,
     code = "rate_limited",
@@ -29,7 +29,7 @@ local schema = {
 local _M = {
     version = 0.1,
     priority = 898,
-    name = "rid-rate-limited",
+    name = "den-rate-limited",
     schema = schema,
 }
 
@@ -45,15 +45,15 @@ function _M.header_filter(_conf, ctx)
     if upstream_status ~= nil and upstream_status ~= "" then
         return
     end
-    ctx.rid_rate_limited = true
+    ctx.den_rate_limited = true
     core.response.set_header("Content-Type", "application/problem+json")
     -- A refusal of the gateway, like OPA's: the access log counts it with its reason (M5-03).
-    core.response.set_header("X-RID-Deny-Reason", "rate_limited")
+    core.response.set_header("X-DEN-Deny-Reason", "rate_limited")
     core.response.clear_header_as_body_modified()
 end
 
 function _M.body_filter(_conf, ctx)
-    if not ctx.rid_rate_limited then
+    if not ctx.den_rate_limited then
         return
     end
     if ngx.arg[2] then

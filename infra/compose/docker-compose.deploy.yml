@@ -8,17 +8,17 @@
 # internal service names. Differences from development:
 #   - nothing is published on the host; an existing reverse proxy (Traefik) on the external
 #     network TRAEFIK_NETWORK reaches five services by alias, all under one public host:
-#       /            -> rid-portal-web:3000   (portal)
-#       /api/v1      -> rid-portal-api:4000   (portal API; /api/v1/internal and /api/v1/opa stay
+#       /            -> den-portal-web:3000   (portal)
+#       /api/v1      -> den-portal-api:4000   (portal API; /api/v1/internal and /api/v1/opa stay
 #                                              off the public host)
-#       /auth        -> rid-keycloak:8080     (Keycloak, relative path /auth)
-#       /gw          -> rid-apisix:9080       (gateway, prefix stripped by the proxy)
-#       /mail        -> rid-mailpit:8025      (Mailpit, demo mail, behind MAILPIT_UI_AUTH)
-#       /carpeta     -> rid-carpeta:3100      (reference citizen folder, MT-07)
-#       /tsa/api/v1/timestamp/certchain -> rid-tsa:3004 (the TSA certificates, for verifiers)
-#       /grafana     -> rid-grafana:3000      (operator dashboard, M5-06; Grafana's own login)
+#       /auth        -> den-keycloak:8080     (Keycloak, relative path /auth)
+#       /gw          -> den-apisix:9080       (gateway, prefix stripped by the proxy)
+#       /mail        -> den-mailpit:8025      (Mailpit, demo mail, behind MAILPIT_UI_AUTH)
+#       /citizen-app     -> den-citizen-app:3100      (reference citizen folder, MT-07)
+#       /tsa/api/v1/timestamp/certchain -> den-tsa:3004 (the TSA certificates, for verifiers)
+#       /grafana     -> den-grafana:3000      (operator dashboard, M5-06; Grafana's own login)
 #   - the API and the web app run in containers (apps/*/Dockerfile); the API applies migrations
-#     and the idempotent seed on start (RID_ALLOW_SEED=true).
+#     and the idempotent seed on start (DEN_ALLOW_SEED=true).
 
 x-no-ports: &no-ports
   ports: !reset []
@@ -35,7 +35,7 @@ services:
       - -c
       - archive_mode=on
       - -c
-      - archive_command=pgbackrest --stanza=rid archive-push %p
+      - archive_command=pgbackrest --stanza=den archive-push %p
       - -c
       - archive_timeout=300
     environment: &pgbackrest-env
@@ -46,23 +46,23 @@ services:
       - pg-socket:/var/run/postgresql
 
   # Scheduled backups (infra/postgres/backup-scheduler.sh): a full one a week and a differential
-  # one every other day, at RID_BACKUP_HOUR (UTC). It reaches the database through its socket and
+  # one every other day, at DEN_BACKUP_HOUR (UTC). It reaches the database through its socket and
   # data volume only: no network.
   pgbackrest:
     # The database's own image (built once, cached for the second service).
     build: ../postgres
-    image: rid/postgres:local
+    image: den/postgres:local
     restart: unless-stopped
     user: postgres
     network_mode: none
-    command: [rid-backup-scheduler]
+    command: [den-backup-scheduler]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       <<: *pgbackrest-env
-      RID_BACKUP_HOUR: ${RID_BACKUP_HOUR:-2}
-      RID_BACKUP_FULL_DAY: ${RID_BACKUP_FULL_DAY:-0}
+      DEN_BACKUP_HOUR: ${DEN_BACKUP_HOUR:-2}
+      DEN_BACKUP_FULL_DAY: ${DEN_BACKUP_FULL_DAY:-0}
     volumes:
       - pg-data:/var/lib/postgresql
       - pgbackrest-repo:/var/lib/pgbackrest
@@ -72,7 +72,7 @@ services:
     <<: *no-ports
     restart: unless-stopped
     environment:
-      KC_HOSTNAME: ${RID_PUBLIC_URL:?set RID_PUBLIC_URL in .env}/auth
+      KC_HOSTNAME: ${DEN_PUBLIC_URL:?set DEN_PUBLIC_URL in .env}/auth
       KC_HTTP_RELATIVE_PATH: /auth
       # Health stays at /health/ready on the management port (the health check above).
       KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
@@ -83,7 +83,7 @@ services:
     networks:
       default: {}
       edge:
-        aliases: [rid-keycloak]
+        aliases: [den-keycloak]
 
   etcd:
     restart: unless-stopped
@@ -98,7 +98,7 @@ services:
       gateway: {}
       providers: {}
       edge:
-        aliases: [rid-apisix]
+        aliases: [den-apisix]
 
   opa:
     <<: *no-ports
@@ -138,7 +138,7 @@ services:
     networks:
       default: {}
       edge:
-        aliases: [rid-grafana]
+        aliases: [den-grafana]
 
   tsa:
     <<: *no-ports
@@ -146,7 +146,7 @@ services:
     networks:
       default: {}
       edge:
-        aliases: [rid-tsa]
+        aliases: [den-tsa]
 
   clamav:
     <<: *no-ports
@@ -163,20 +163,20 @@ services:
     networks:
       default: {}
       edge:
-        aliases: [rid-mailpit]
+        aliases: [den-mailpit]
 
   mock-salud:
     <<: *no-ports
     restart: unless-stopped
     environment:
       # Like a real provider: the gateway's public keys from the portal's public address (M6-10).
-      RID_GATEWAY_JWKS_URL: ${RID_PUBLIC_URL:?set RID_PUBLIC_URL in .env}/api/v1/gateway/jwks
+      DEN_GATEWAY_JWKS_URL: ${DEN_PUBLIC_URL:?set DEN_PUBLIC_URL in .env}/api/v1/gateway/jwks
 
   mock-socioeconomico:
     <<: *no-ports
     restart: unless-stopped
     environment:
-      RID_GATEWAY_JWKS_URL: ${RID_PUBLIC_URL:?set RID_PUBLIC_URL in .env}/api/v1/gateway/jwks
+      DEN_GATEWAY_JWKS_URL: ${DEN_PUBLIC_URL:?set DEN_PUBLIC_URL in .env}/api/v1/gateway/jwks
 
   contract-runner:
     <<: *no-ports
@@ -185,7 +185,7 @@ services:
 
   wg-hub:
     restart: unless-stopped
-    # Nodes reach the hub from the internet (UDP 51820, RID_WG_HUB_ENDPOINT); the agent and the
+    # Nodes reach the hub from the internet (UDP 51820, DEN_WG_HUB_ENDPOINT); the agent and the
     # SNI router stay on the Compose network.
     ports: !override
       - ${WG_HUB_UDP_PORT:-51820}:51820/udp
@@ -194,19 +194,19 @@ services:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
-    image: rid/portal-api:deploy
+    image: den/portal-api:deploy
     restart: unless-stopped
     env_file: ../../.env
     environment:
-      RID_ALLOW_SEED: 'true'
-      RID_SMTP_URL: smtp://mailpit:1025
+      DEN_ALLOW_SEED: 'true'
+      DEN_SMTP_URL: smtp://mailpit:1025
     volumes:
-      - api-documents:/var/lib/rid/documents
-      # Only the certificates of the CA (RID_STEP_CA_ROOT_FILE): the API verifies step-ca's TLS
+      - api-documents:/var/lib/den/documents
+      # Only the certificates of the CA (DEN_STEP_CA_ROOT_FILE): the API verifies step-ca's TLS
       # with its root. The keys (secrets/) stay out of this container. Needs Compose >= 2.26.
       - type: volume
         source: step-ca-data
-        target: /var/lib/rid/step-ca
+        target: /var/lib/den/step-ca
         read_only: true
         volume:
           subpath: certs
@@ -228,13 +228,13 @@ services:
       gateway: {}
       runner: {}
       edge:
-        aliases: [rid-portal-api]
+        aliases: [den-portal-api]
 
   web:
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
-    image: rid/portal-web:deploy
+    image: den/portal-web:deploy
     restart: unless-stopped
     env_file: ../../.env
     environment:
@@ -245,35 +245,35 @@ services:
     networks:
       default: {}
       edge:
-        aliases: [rid-portal-web]
+        aliases: [den-portal-web]
 
   carpeta:
     build:
       context: ../..
       dockerfile: infra/mock-citizen-app/Dockerfile
-    image: rid/mock-citizen-app:deploy
+    image: den/mock-citizen-app:deploy
     restart: unless-stopped
     env_file: ../../.env
     environment:
       CITIZEN_APP_PORTAL_API_URL: http://api:4000
       # Public material, fetched where anyone would: the operator JWKS and the TSA chain.
-      CITIZEN_APP_JWKS_URL: ${RID_PUBLIC_URL}/api/v1/transparency/jwks
-      CITIZEN_APP_TSA_ROOT_URL: ${RID_PUBLIC_URL}/tsa/api/v1/timestamp/certchain
+      CITIZEN_APP_JWKS_URL: ${DEN_PUBLIC_URL}/api/v1/transparency/jwks
+      CITIZEN_APP_TSA_ROOT_URL: ${DEN_PUBLIC_URL}/tsa/api/v1/timestamp/certchain
       CITIZEN_APP_SMTP_HOST: mailpit
       CITIZEN_APP_SMTP_PORT: '1025'
       CITIZEN_APP_DATA_FILE: /repo/infra/mock-citizen-app/data/alerts.json
     volumes:
-      - carpeta-data:/repo/infra/mock-citizen-app/data
+      - citizen-app-data:/repo/infra/mock-citizen-app/data
     depends_on:
       api:
         condition: service_healthy
     networks:
       default: {}
       edge:
-        aliases: [rid-carpeta]
+        aliases: [den-citizen-app]
 
 volumes:
-  carpeta-data:
+  citizen-app-data:
   api-documents:
   pgbackrest-repo:
   pg-socket:

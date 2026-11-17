@@ -7,8 +7,8 @@ import type {
 type StoredClient = GatewayClient & { id: string; secret?: string; rotated?: string };
 
 /**
- * In-memory stand-in for the Keycloak Admin API (realm rid-gateway). Secret rotation behaves like
- * Keycloak with the rid-secret-rotation client policy (checked against Keycloak 26.8, M3-04):
+ * In-memory stand-in for the Keycloak Admin API (realm den-gateway). Secret rotation behaves like
+ * Keycloak with the den-secret-rotation client policy (checked against Keycloak 26.8, M3-04):
  * regenerating moves the current secret to the rotated one; an update with `secret` replaces
  * only the current one.
  */

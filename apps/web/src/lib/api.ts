@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-const apiUrl = (): string => process.env.RID_API_URL ?? 'http://localhost:4000';
+const apiUrl = (): string => process.env.DEN_API_URL ?? 'http://localhost:4000';
 
 /**
  * Calls apps/api from the server with the user's access token, read from the encrypted session

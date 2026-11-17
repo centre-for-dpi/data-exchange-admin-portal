@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { catalogDetailSchema, catalogPageSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { catalogDetailSchema, catalogPageSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -16,8 +16,8 @@ const openapi = readFileSync(
   'utf8',
 );
 
-// The gateway the catalogue advertises: RID_GATEWAY_PUBLIC_URL (https://localhost:9443 with mTLS).
-const gatewayBase = (process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(
+// The gateway the catalogue advertises: DEN_GATEWAY_PUBLIC_URL (https://localhost:9443 with mTLS).
+const gatewayBase = (process.env.DEN_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(
   /\/$/,
   '',
 );
@@ -73,7 +73,7 @@ describe('catalogue (M1-05)', () => {
       sector: 'salud',
       tags: ['afiliacion'],
       classification,
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -175,7 +175,7 @@ describe('catalogue (M1-05)', () => {
     expect(res.statusCode).toBe(200);
     const spec = res.json<{ servers: Array<{ url: string }>; paths: Record<string, unknown> }>();
     expect(spec.servers).toEqual([
-      { url: `${gatewayBase}/salud/catalogo-${run}/v1`, description: 'RID gateway' },
+      { url: `${gatewayBase}/salud/catalogo-${run}/v1`, description: 'DEN gateway' },
     ]);
     expect(Object.keys(spec.paths)).toEqual([
       '/afiliados/{numeroIdentificacion}',

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { SyncPage, SyncQuery } from '@rid/contracts';
+import type { SyncPage, SyncQuery } from '@den/contracts';
 import { OPENSEARCH_SYNC_TOPIC } from '../analytics/access-log-index.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
@@ -13,7 +13,7 @@ import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconci
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const VERSION_ROUTE = /^apisix:route:rid-route-([0-9a-f-]{36})$/;
+const VERSION_ROUTE = /^apisix:route:den-route-([0-9a-f-]{36})$/;
 const KEYCLOAK_CLIENT = /^keycloak:client:(.+)$/;
 
 /**

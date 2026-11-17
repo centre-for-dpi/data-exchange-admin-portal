@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { AdminEntityQuery, EntityStatus, SubscriptionStatus } from '@rid/contracts';
+import type { AdminEntityQuery, EntityStatus, SubscriptionStatus } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError } from '../common/errors.js';

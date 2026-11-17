@@ -30,7 +30,7 @@ export async function registerApi(
   await page.getByLabel('Descripción (Markdown)').fill('API de prueba con datos sintéticos.');
   await page.getByLabel('Sector').selectOption({ label: 'Salud' });
   await page.getByLabel('Clasificación').selectOption({ label: classification });
-  await page.getByLabel('Correo del responsable').fill('apis@salud.demo.rid.example');
+  await page.getByLabel('Correo del responsable').fill('apis@salud.demo.den.example');
   await page.getByRole('button', { name: 'Registrar API' }).click();
   // The redirect renders the new API's page; next dev can take several seconds on first compile.
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible({ timeout: 30_000 });
@@ -119,7 +119,7 @@ export async function createApplication(page: Page, name: string): Promise<strin
   await page.getByLabel(/^Nombre de la aplicación/).fill(name);
   await page.getByLabel(/^Para qué la usará/).fill('Verifica requisitos de subsidios.');
   await page.getByLabel(/^Entorno/).selectOption('production');
-  await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.rid.example');
+  await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.den.example');
   await page.getByRole('button', { name: 'Crear aplicación' }).click();
   return (await page.getByTestId('client-id').textContent()) ?? '';
 }

@@ -1,4 +1,4 @@
-import { ZOD_ISSUE_KEY } from '@rid/contracts';
+import { ZOD_ISSUE_KEY } from '@den/contracts';
 import { getLocale, getTranslations } from 'next-intl/server';
 import type { Problem } from './api';
 import {

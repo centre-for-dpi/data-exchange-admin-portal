@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query, Req, UnauthorizedException } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   catalogApiParamsSchema,
   catalogDetailSchema,
@@ -8,7 +8,7 @@ import {
   type CatalogQuery,
   catalogQuerySchema,
   catalogVersionParamsSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { type AuthenticatedRequest, OptionalAuth } from '../auth/decorators.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';

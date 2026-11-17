@@ -371,11 +371,11 @@
       "created": "Creada",
       "pendingNote": "Estamos creando las credenciales en el servidor de identidad. Esto toma unos segundos.",
       "guide": "Guía de integración",
-      "guideNote": "Define RID_CLIENT_SECRET con el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada.",
+      "guideNote": "Define DEN_CLIENT_SECRET con el secreto que guardaste al crear la aplicación. Necesitas una solicitud de acceso aprobada para que el gateway acepte la llamada.",
       "guideLimit": "Cada suscripción tiene un límite de peticiones por minuto. Al superarlo, el gateway responde 429 en application/problem+json (código rate_limited); las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset dicen el límite, lo que queda y en cuántos segundos se reinicia.",
-      "guideEndUser": "X-RID-End-User identifica al funcionario que hace la consulta. Es obligatorio en las APIs con datos personales o sensibles: de 1 a 128 caracteres visibles, sin espacios (por ejemplo, su usuario o su correo institucional). El gateway lo convierte en un hash con la sal de la red: ni el proveedor ni los registros ven el valor.",
+      "guideEndUser": "X-DEN-End-User identifica al funcionario que hace la consulta. Es obligatorio en las APIs con datos personales o sensibles: de 1 a 128 caracteres visibles, sin espacios (por ejemplo, su usuario o su correo institucional). El gateway lo convierte en un hash con la sal de la red: ni el proveedor ni los registros ven el valor.",
       "guideMtls": "La red exige mTLS: las dos llamadas presentan el certificado de la aplicación (sección Certificado de cliente) y su clave privada. El token queda ligado a ese certificado y solo sirve con él. El certificado del gateway lo emite la autoridad de certificación de la red:",
-      "guideCa": "descargar la raíz de la red (rid-network-ca.pem)"
+      "guideCa": "descargar la raíz de la red (den-network-ca.pem)"
     },
     "certificates": {
       "title": "Certificado de cliente (mTLS)",
@@ -423,7 +423,7 @@
       "conflict": "La credencial cambió mientras tanto o no se puede hacer esta operación. Recarga la página."
     },
     "guide": {
-      "lead": "Un programa completo en cada lenguaje: pide el token y llama a una API con las cabeceras RID. El secreto se lee de la variable de entorno RID_CLIENT_SECRET, nunca del código. Reemplaza la ruta, la finalidad y el funcionario por los de tu solicitud aprobada.",
+      "lead": "Un programa completo en cada lenguaje: pide el token y llama a una API con las cabeceras DEN. El secreto se lee de la variable de entorno DEN_CLIENT_SECRET, nunca del código. Reemplaza la ruta, la finalidad y el funcionario por los de tu solicitud aprobada.",
       "languages": "Lenguajes",
       "language": {
         "curl": "curl",
@@ -480,7 +480,7 @@
     "perMinute": "{limit} por minuto",
     "defaultRateLimit": "El de la API ({limit} por minuto)",
     "endUser": "Identificación del funcionario",
-    "endUserRequired": "Obligatoria: cada llamada debe enviar X-RID-End-User.",
+    "endUserRequired": "Obligatoria: cada llamada debe enviar X-DEN-End-User.",
     "endUserNotRequired": "No se exige.",
     "regulatorNote": "Esta API maneja datos sensibles: después de tu aprobación, la solicitud pasa al regulador.",
     "activatingNote": "Aprobada. El gateway la aplicará en unos segundos.",
@@ -1360,8 +1360,8 @@
       "operation_not_allowed": "Operación no permitida por la suscripción",
       "purpose_not_allowed": "Finalidad no aprobada para la suscripción",
       "subscription_expired": "Suscripción vencida",
-      "end_user_required": "Falta X-RID-End-User (el funcionario)",
-      "end_user_invalid": "X-RID-End-User no válido",
+      "end_user_required": "Falta X-DEN-End-User (el funcionario)",
+      "end_user_invalid": "X-DEN-End-User no válido",
       "data_subject_required": "Falta el titular de los datos",
       "rate_limited": "Límite de peticiones por minuto superado"
     },

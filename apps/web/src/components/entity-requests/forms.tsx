@@ -1,6 +1,6 @@
 'use client';
 
-import { DESIGNEE_ROLES, ENTITY_KINDS, type EntityRequest } from '@rid/contracts';
+import { DESIGNEE_ROLES, ENTITY_KINDS, type EntityRequest } from '@den/contracts';
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import {

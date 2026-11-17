@@ -9,7 +9,7 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: { path: 'prisma/migrations' },
-  // Migrations run as the schema owner, never as the runtime role (rid_app).
+  // Migrations run as the schema owner, never as the runtime role (den_app).
   // Empty when unset so `prisma generate` works in CI without a database.
   datasource: { url: process.env.DATABASE_MIGRATION_URL ?? '' },
 });

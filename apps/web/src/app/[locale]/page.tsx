@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Notice } from '../../components/ui/notice';
 import { Link } from '../../i18n/navigation';
 import { signInAction } from '../../lib/auth-actions';
-import { invitationListSchema } from '@rid/contracts';
+import { invitationListSchema } from '@den/contracts';
 import { apiGet } from '../../lib/api';
 import { homeQuickLinks } from '../../lib/navigation';
 import { getSite } from '../../lib/site';

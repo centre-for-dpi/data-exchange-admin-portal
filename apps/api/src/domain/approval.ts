@@ -1,4 +1,4 @@
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 
 /**
  * The regulator must also approve (M2-04) when the country requires it for sensitive data and the

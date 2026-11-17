@@ -1,13 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import formbody from '@fastify/formbody';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   certificatesInPem,
   type Receipt,
   type ReceiptVerification,
   verifyReceipt,
-} from '@rid/transparency-verifier';
+} from '@den/transparency-verifier';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { createRemoteJWKSet, type JSONWebKeySet, jwtVerify } from 'jose';
 import { Webhook } from 'standardwebhooks';
@@ -376,7 +376,7 @@ export function buildServer(
       });
 
       // Notices from the portal (MT-06): Standard Webhooks, verified with the reference library.
-      routes.post('/api/rid/alerts', async (request, reply) => {
+      routes.post('/api/den/alerts', async (request, reply) => {
         const body = typeof request.body === 'string' ? request.body : '';
         let message: {
           type?: string;
@@ -536,7 +536,7 @@ export function buildServer(
       <p><a href="${base}/consultas/${id}/comprobante.json">${t.download}</a></p>
       <p>
         ${t.cli}<br /><code
-          >rid-verify-receipt comprobante-${id}.json --jwks ${config.portal.jwksUrl} --tsa-root
+          >den-verify-receipt comprobante-${id}.json --jwks ${config.portal.jwksUrl} --tsa-root
           ${config.portal.tsaRootUrl}</code
         >
       </p>

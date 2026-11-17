@@ -1,6 +1,6 @@
 {{- if .Values.networkPolicy.enabled }}
 {{- /*
-The segmentation of M6-01 in Kubernetes (ARCHITECTURE §12): every RID pod refuses what is not
+The segmentation of M6-01 in Kubernetes (ARCHITECTURE §12): every DEN pod refuses what is not
 listed here. etcd and OPA, without authentication of their own, are reached only from the gateway's
 pods; the gateway leaves only to its own services and to public addresses (the providers), never to
 the platform's internals; the Admin API only from the portal API.
@@ -10,20 +10,20 @@ the platform's internals; the Admin API only from the portal API.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "default-deny" }}
+  name: {{ include "den.name" "default-deny" }}
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/part-of: rid
+      app.kubernetes.io/part-of: den
   policyTypes: [Ingress]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "web" }}
+  name: {{ include "den.name" "web" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "web" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "web" }} }
   policyTypes: [Ingress]
   ingress:
     - from:
@@ -34,54 +34,54 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "api" }}
+  name: {{ include "den.name" "api" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "api" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "api" }} }
   policyTypes: [Ingress]
   ingress:
     - from:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
         # Server-side pages, OPA's bundle, the transparency collector, the nodes' control route.
-        {{- include "rid.np.from" "web" | nindent 8 }}
-        {{- include "rid.np.from" "gateway" | nindent 8 }}
-        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+        {{- include "den.np.from" "web" | nindent 8 }}
+        {{- include "den.np.from" "gateway" | nindent 8 }}
+        {{- include "den.np.from" "prometheus" | nindent 8 }}
       ports: [{ port: {{ .Values.api.port }} }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "gateway" }}
+  name: {{ include "den.name" "gateway" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "gateway" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "gateway" }} }
   policyTypes: [Ingress, Egress]
   ingress:
     # The applications, from anywhere: their certificate is what lets them in.
     - ports: [{ port: 9443 }]
     # Plain HTTP inside the namespace: the validations and the contract runner.
     - from:
-        {{- include "rid.np.from" "api" | nindent 8 }}
-        {{- include "rid.np.from" "contract-runner" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "contract-runner" | nindent 8 }}
       ports: [{ port: 9080 }]
     # The Admin API: only the portal's reconcilers.
     - from:
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: 9180 }]
     # Metrics: APISIX, and OPA's diagnostic listener (never its API on 8181, which is loopback).
     - from:
-        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+        {{- include "den.np.from" "prometheus" | nindent 8 }}
       ports: [{ port: 9091 }, { port: 8282 }]
   egress:
     # Its own services: etcd, the portal (OPA's bundle, transparency, node control), Keycloak
     # (token route, JWKS), the access logs, the nodes' hub.
     - to:
-        {{- include "rid.np.from" "etcd" | nindent 8 }}
-        {{- include "rid.np.from" "api" | nindent 8 }}
-        {{- include "rid.np.from" "keycloak" | nindent 8 }}
-        {{- include "rid.np.from" "access-logs" | nindent 8 }}
-        {{- include "rid.np.from" "wg-hub" | nindent 8 }}
+        {{- include "den.np.from" "etcd" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "keycloak" | nindent 8 }}
+        {{- include "den.np.from" "access-logs" | nindent 8 }}
+        {{- include "den.np.from" "wg-hub" | nindent 8 }}
     - to:
         - namespaceSelector: {}
           podSelector:
@@ -102,35 +102,35 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "keycloak" }}
+  name: {{ include "den.name" "keycloak" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "keycloak" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "keycloak" }} }
   policyTypes: [Ingress]
   ingress:
     - from:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
-        {{- include "rid.np.from" "gateway" | nindent 8 }}
-        {{- include "rid.np.from" "api" | nindent 8 }}
-        {{- include "rid.np.from" "web" | nindent 8 }}
+        {{- include "den.np.from" "gateway" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "web" | nindent 8 }}
       ports: [{ port: 8080 }]
     - from:
-        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+        {{- include "den.np.from" "prometheus" | nindent 8 }}
       ports: [{ port: 9000 }]
 ---
 # The CA: only the portal API asks it for certificates.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "step-ca" }}
+  name: {{ include "den.name" "step-ca" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "step-ca" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "step-ca" }} }
   policyTypes: [Ingress]
   ingress:
     - from:
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: 9000 }]
 {{- range $db := list (dict "component" "db" "client" "api") (dict "component" "keycloak-db" "client" "keycloak") }}
 ---
@@ -139,18 +139,18 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" $db.component }}
+  name: {{ include "den.name" $db.component }}
 spec:
   podSelector:
-    matchLabels: { cnpg.io/cluster: {{ include "rid.name" $db.component }} }
+    matchLabels: { cnpg.io/cluster: {{ include "den.name" $db.component }} }
   policyTypes: [Ingress]
   ingress:
     - from:
-        {{- include "rid.np.from" $db.client | nindent 8 }}
+        {{- include "den.np.from" $db.client | nindent 8 }}
       ports: [{ port: 5432 }]
     - from:
         - podSelector:
-            matchLabels: { cnpg.io/cluster: {{ include "rid.name" $db.component }} }
+            matchLabels: { cnpg.io/cluster: {{ include "den.name" $db.component }} }
       ports: [{ port: 5432 }, { port: 8000 }]
     - from:
         - namespaceSelector:
@@ -161,31 +161,31 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "etcd" }}
+  name: {{ include "den.name" "etcd" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "etcd" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "etcd" }} }
   policyTypes: [Ingress]
   ingress:
     - from:
-        {{- include "rid.np.from" "gateway" | nindent 8 }}
+        {{- include "den.np.from" "gateway" | nindent 8 }}
       ports: [{ port: 2379 }]
     - from:
-        {{- include "rid.np.from" "etcd" | nindent 8 }}
+        {{- include "den.np.from" "etcd" | nindent 8 }}
       ports: [{ port: 2379 }, { port: 2380 }]
 {{- if .Values.accessLogs.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "access-logs" }}
+  name: {{ include "den.name" "access-logs" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "access-logs" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "access-logs" }} }
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
-        {{- include "rid.np.from" "gateway" | nindent 8 }}
+        {{- include "den.np.from" "gateway" | nindent 8 }}
       ports: [{ port: 9880 }]
   egress:
     - ports: [{ port: {{ .Values.accessLogs.opensearch.port }} }]
@@ -203,10 +203,10 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "wg-hub" }}
+  name: {{ include "den.name" "wg-hub" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "wg-hub" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "wg-hub" }} }
   policyTypes: [Ingress, Egress]
   # Out only WireGuard's UDP to the nodes (anywhere: their addresses change); the connections to
   # the nodes' services travel inside the tunnel.
@@ -228,10 +228,10 @@ spec:
     # The kit nodes, from the internet.
     - ports: [{ port: 51820, protocol: UDP }]
     - from:
-        {{- include "rid.np.from" "gateway" | nindent 8 }}
+        {{- include "den.np.from" "gateway" | nindent 8 }}
       ports: [{ port: 8443 }]
     - from:
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: 8090 }]
 {{- end }}
 {{- if .Values.contractRunner.enabled }}
@@ -239,20 +239,20 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "contract-runner" }}
+  name: {{ include "den.name" "contract-runner" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "contract-runner" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "contract-runner" }} }
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: 8096 }]
   # It calls what OpenAPI documents of the entities describe: only through the gateway's check
   # routes, never anything else of the platform (SSRF, as on Compose's providers network).
   egress:
     - to:
-        {{- include "rid.np.from" "gateway" | nindent 8 }}
+        {{- include "den.np.from" "gateway" | nindent 8 }}
       ports: [{ port: 9080 }]
     - to:
         - namespaceSelector: {}
@@ -266,15 +266,15 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "opensearch" }}
+  name: {{ include "den.name" "opensearch" }}
 spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: opensearch }
   policyTypes: [Ingress]
   ingress:
     - from:
-        {{- include "rid.np.from" "access-logs" | nindent 8 }}
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "access-logs" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: 9200 }]
     - from:
         - podSelector:
@@ -287,29 +287,29 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "prometheus" }}
+  name: {{ include "den.name" "prometheus" }}
 spec:
   podSelector:
-    matchLabels: { rid-network: prometheus }
+    matchLabels: { den-network: prometheus }
   policyTypes: [Ingress]
   ingress:
     - from:
         - podSelector:
             matchLabels: { app.kubernetes.io/name: grafana }
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: 9090 }]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "alertmanager" }}
+  name: {{ include "den.name" "alertmanager" }}
 spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: alertmanager }
   policyTypes: [Ingress]
   ingress:
     - from:
-        {{- include "rid.np.from" "prometheus" | nindent 8 }}
+        {{- include "den.np.from" "prometheus" | nindent 8 }}
       ports: [{ port: 9093 }]
 {{- end }}
 {{- if .Values.grafana.enabled }}
@@ -318,7 +318,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "grafana" }}
+  name: {{ include "den.name" "grafana" }}
 spec:
   podSelector:
     matchLabels: { app.kubernetes.io/name: grafana }
@@ -335,14 +335,14 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "etcd-egress" }}
+  name: {{ include "den.name" "etcd-egress" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "etcd" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "etcd" }} }
   policyTypes: [Egress]
   egress:
     - to:
-        {{- include "rid.np.from" "etcd" | nindent 8 }}
+        {{- include "den.np.from" "etcd" | nindent 8 }}
       ports: [{ port: 2380 }, { port: 2379 }]
     - to:
         - namespaceSelector: {}
@@ -353,10 +353,10 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "step-ca-egress" }}
+  name: {{ include "den.name" "step-ca-egress" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "step-ca" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "step-ca" }} }
   policyTypes: [Egress]
   egress:
     - to:
@@ -369,19 +369,19 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "keycloak-egress" }}
+  name: {{ include "den.name" "keycloak-egress" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "keycloak" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "keycloak" }} }
   policyTypes: [Egress]
   egress:
     - to:
         - podSelector:
-            matchLabels: { cnpg.io/cluster: {{ include "rid.name" "keycloak-db" }} }
+            matchLabels: { cnpg.io/cluster: {{ include "den.name" "keycloak-db" }} }
       ports: [{ port: 5432 }]
     # Its replicas form a cluster (JDBC_PING, Infinispan).
     - to:
-        {{- include "rid.np.from" "keycloak" | nindent 8 }}
+        {{- include "den.np.from" "keycloak" | nindent 8 }}
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -400,19 +400,19 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "web-egress" }}
+  name: {{ include "den.name" "web-egress" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "web" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "web" }} }
   policyTypes: [Egress]
   egress:
     - to:
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: {{ .Values.api.port }} }]
     - to:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
-        {{- include "rid.np.from" "keycloak" | nindent 8 }}
+        {{- include "den.np.from" "keycloak" | nindent 8 }}
     # The ingress may be reached at its public address (a load balancer outside the cluster).
     - to:
         - ipBlock:
@@ -430,27 +430,27 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "api-egress" }}
+  name: {{ include "den.name" "api-egress" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "api" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "api" }} }
   policyTypes: [Egress]
   egress:
     - to:
         - podSelector:
-            matchLabels: { cnpg.io/cluster: {{ include "rid.name" "db" }} }
+            matchLabels: { cnpg.io/cluster: {{ include "den.name" "db" }} }
       ports: [{ port: 5432 }]
     # Keycloak by its public name (KEYCLOAK_URL, the issuer the tokens carry): through the ingress.
     - to:
         - namespaceSelector:
             matchLabels: { kubernetes.io/metadata.name: {{ $ingressController }} }
-        {{- include "rid.np.from" "gateway" | nindent 8 }}
-        {{- include "rid.np.from" "keycloak" | nindent 8 }}
-        {{- include "rid.np.from" "step-ca" | nindent 8 }}
-        {{- include "rid.np.from" "wg-hub" | nindent 8 }}
-        {{- include "rid.np.from" "contract-runner" | nindent 8 }}
-        {{- include "rid.np.from" "prometheus" | nindent 8 }}
-        {{- include "rid.np.from" "clamav" | nindent 8 }}
+        {{- include "den.np.from" "gateway" | nindent 8 }}
+        {{- include "den.np.from" "keycloak" | nindent 8 }}
+        {{- include "den.np.from" "step-ca" | nindent 8 }}
+        {{- include "den.np.from" "wg-hub" | nindent 8 }}
+        {{- include "den.np.from" "contract-runner" | nindent 8 }}
+        {{- include "den.np.from" "prometheus" | nindent 8 }}
+        {{- include "den.np.from" "clamav" | nindent 8 }}
         - podSelector:
             matchLabels: { app.kubernetes.io/name: opensearch }
     - to:
@@ -472,14 +472,14 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "rid.name" "clamav" }}
+  name: {{ include "den.name" "clamav" }}
 spec:
   podSelector:
-    matchLabels: { app.kubernetes.io/name: {{ include "rid.name" "clamav" }} }
+    matchLabels: { app.kubernetes.io/name: {{ include "den.name" "clamav" }} }
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
-        {{- include "rid.np.from" "api" | nindent 8 }}
+        {{- include "den.np.from" "api" | nindent 8 }}
       ports: [{ port: 3310 }]
   egress:
     - to:

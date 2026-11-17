@@ -1,6 +1,6 @@
 'use server';
 
-import { meResponseSchema } from '@rid/contracts';
+import { meResponseSchema } from '@den/contracts';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { apiGet } from './api';

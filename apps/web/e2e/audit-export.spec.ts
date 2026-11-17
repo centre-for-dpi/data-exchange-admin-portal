@@ -23,10 +23,10 @@ test.describe('complete audit (M2-09)', () => {
     const res = await page.request.get(href);
     expect(res.status()).toBe(200);
     const body = await res.body();
-    expect(res.headers()['x-rid-export-sha256']).toBe(
+    expect(res.headers()['x-den-export-sha256']).toBe(
       createHash('sha256').update(body).digest('hex'),
     );
-    expect(res.headers()['x-rid-export-signature']).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/);
+    expect(res.headers()['x-den-export-signature']).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/);
     const rows = body.toString('utf8').trim().split('\r\n').slice(1);
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => r.includes('"subscription.'))).toBe(true);

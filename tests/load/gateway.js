@@ -25,7 +25,7 @@ const gateway = { hostname: host, origin: `${scheme}://${host}${port ? `:${port}
 const RATE = Number(env('RATE', '500'));
 const DURATION = env('DURATION', '5m');
 const WARMUP = env('WARMUP', '30s');
-const denied = new Counter('rid_denied');
+const denied = new Counter('den_denied');
 
 export const options = {
   hosts: env('GATEWAY_IP', '') ? { [gateway.hostname]: env('GATEWAY_IP') } : {},
@@ -115,13 +115,13 @@ export default function () {
   const res = http.get(`${gateway.origin}${env('PATH_TEMPLATE').replace('{n}', n)}`, {
     headers: {
       authorization: `Bearer ${currentToken()}`,
-      'x-rid-purpose': env('PURPOSE', 'eligibility_check'),
-      'x-rid-end-user': `funcionario-carga-${__VU}`,
+      'x-den-purpose': env('PURPOSE', 'eligibility_check'),
+      'x-den-end-user': `funcionario-carga-${__VU}`,
     },
     tags: { name: 'call' },
   });
-  // A denial of the gateway carries X-RID-Deny-Reason.
-  const reason = res.headers['X-Rid-Deny-Reason'];
+  // A denial of the gateway carries X-DEN-Deny-Reason.
+  const reason = res.headers['X-Den-Deny-Reason'];
   if (reason) denied.add(1, { reason });
   if (res.status !== 200) showFailure('call', res);
   check(res, { 'allowed and answered': (r) => !reason && r.status === 200 });

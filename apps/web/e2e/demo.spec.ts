@@ -61,8 +61,8 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     const token = await gatewayToken(clientId, clientSecret);
     const headers = (extra: Record<string, string> = {}) => ({
       authorization: `Bearer ${token}`,
-      'x-rid-purpose': 'eligibility_check',
-      'x-rid-end-user': 'funcionario-42',
+      'x-den-purpose': 'eligibility_check',
+      'x-den-end-user': 'funcionario-42',
       ...extra,
     });
 
@@ -72,10 +72,10 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     const ok = await gatewayFetch(`${base}/1000000001`, {
       headers: headers({
         'x-request-id': requestId,
-        'x-rid-subscription': 'sub-SPOOFED',
-        'x-rid-operation': 'deleteEverything',
-        'x-rid-consumer-entity': 'entidad-falsa',
-        'x-rid-end-user-hash': 'hash-falso',
+        'x-den-subscription': 'sub-SPOOFED',
+        'x-den-operation': 'deleteEverything',
+        'x-den-consumer-entity': 'entidad-falsa',
+        'x-den-end-user-hash': 'hash-falso',
       }),
     });
     expect(ok.status).toBe(200);
@@ -84,15 +84,15 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     await expect.poll(() => providerSaw(requestId, since), { timeout: 10_000 }).toBeDefined();
     const seen = providerSaw(requestId, since) ?? {};
     expect(seen).toMatchObject({
-      'x-rid-subscription': subscriptionId,
-      'x-rid-operation': 'getAfiliado',
-      'x-rid-consumer-entity': 'programas-sociales',
-      'x-rid-consumer-app': clientId,
-      'x-rid-purpose': 'eligibility_check',
+      'x-den-subscription': subscriptionId,
+      'x-den-operation': 'getAfiliado',
+      'x-den-consumer-entity': 'programas-sociales',
+      'x-den-consumer-app': clientId,
+      'x-den-purpose': 'eligibility_check',
     });
-    expect(seen['x-rid-end-user-hash']).toMatch(/^[0-9a-f]{64}$/);
+    expect(seen['x-den-end-user-hash']).toMatch(/^[0-9a-f]{64}$/);
     // The official's identifier never reaches the provider in clear (the mock would log it).
-    expect(seen).not.toHaveProperty('x-rid-end-user');
+    expect(seen).not.toHaveProperty('x-den-end-user');
 
     // Denials with stable reasons (DEMO.md step 8).
     const deny = async (
@@ -102,22 +102,22 @@ test.describe('DEMO.md end to end (M1-12)', () => {
     ) => {
       const res = await gatewayFetch(url, init);
       expect(res.status, reason).toBe(403);
-      expect(res.headers.get('x-rid-deny-reason')).toBe(reason);
+      expect(res.headers.get('x-den-deny-reason')).toBe(reason);
       expect(res.headers.get('content-type')).toMatch(/problem\+json/);
       expect(await res.json()).toMatchObject({ code: reason, status: 403 });
     };
     await deny(
       `${base}/1000000001`,
-      { headers: headers({ 'x-rid-purpose': 'benefit_targeting' }) },
+      { headers: headers({ 'x-den-purpose': 'benefit_targeting' }) },
       'purpose_not_allowed',
     );
     const withoutOfficial: Record<string, string> = headers();
-    delete withoutOfficial['x-rid-end-user'];
+    delete withoutOfficial['x-den-end-user'];
     await deny(`${base}/1000000001`, { headers: withoutOfficial }, 'end_user_required');
     // The official is an identifier, not free text (M3-06).
     await deny(
       `${base}/1000000001`,
-      { headers: headers({ 'x-rid-end-user': 'Juan Pérez' }) },
+      { headers: headers({ 'x-den-end-user': 'Juan Pérez' }) },
       'end_user_invalid',
     );
     // The POST operation exists in the API but was not requested (read-only by default).
@@ -145,7 +145,7 @@ test.describe('DEMO.md end to end (M1-12)', () => {
       .poll(
         async () => {
           const res = await gatewayFetch(`${base}/1000000001`, { headers: headers() });
-          return res.status === 403 ? res.headers.get('x-rid-deny-reason') : String(res.status);
+          return res.status === 403 ? res.headers.get('x-den-deny-reason') : String(res.status);
         },
         { timeout: 60_000, intervals: [1_000] },
       )

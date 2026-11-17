@@ -6,7 +6,7 @@ import { readPolicies } from './policy-files.js';
 
 const data = (salt = 'salt-for-tests-0001'): BundleData => ({
   routes: {
-    'rid-route-v1': {
+    'den-route-v1': {
       apiVersionId: 'v1',
       classification: 'personal',
       operations: [
@@ -95,13 +95,13 @@ describe('buildBundle', () => {
   it('packs the manifest, data.json and the policies without their tests', () => {
     const { archive, revision } = buildBundle(policies, data());
     const entries = untar(archive);
-    expect([...entries.keys()]).toEqual(['.manifest', 'data.json', 'rid/authz.rego']);
+    expect([...entries.keys()]).toEqual(['.manifest', 'data.json', 'den/authz.rego']);
     expect(JSON.parse(entries.get('.manifest') ?? '{}')).toEqual({
       revision,
-      roots: ['rid', 'routes', 'clients', 'config'],
+      roots: ['den', 'routes', 'clients', 'config'],
     });
     expect(JSON.parse(entries.get('data.json') ?? '{}')).toEqual(data());
-    expect(entries.get('rid/authz.rego')).toContain('package rid.authz');
+    expect(entries.get('den/authz.rego')).toContain('package den.authz');
   });
 
   it('is reproducible: same content, same archive and revision; any change, a new one', () => {

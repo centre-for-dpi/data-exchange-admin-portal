@@ -5,7 +5,7 @@ import { dropIndex, indexAccessLogs, publishedIds } from './access-logs';
 
 // M5-04: the network's indicators for the regulator and the operator.
 test.describe("the network's indicators (M5-04)", () => {
-  const index = `rid-access-e2e-indicators-${Date.now().toString(36)}`;
+  const index = `den-access-e2e-indicators-${Date.now().toString(36)}`;
   test.afterAll(async () => {
     await dropIndex(index);
   });
@@ -22,7 +22,7 @@ test.describe("the network's indicators (M5-04)", () => {
     const { versionId } = await publishedIds(page, name);
     // July 2025: no other traffic in the store for that month.
     const call = (ts: string, status: number, extra: Record<string, unknown> = {}) => ({
-      route_id: `rid-route-${versionId}`,
+      route_id: `den-route-${versionId}`,
       ts,
       status,
       latency_ms: 10,
@@ -78,7 +78,7 @@ test.describe("the network's indicators (M5-04)", () => {
     await indexAccessLogs(
       index,
       ['2025-08-04', '2025-08-05', '2025-08-06'].map((day) => ({
-        route_id: `rid-route-${versionId}`,
+        route_id: `den-route-${versionId}`,
         ts: `${day}T15:00:00Z`,
         status: 200,
         consumer_entity: 'programas-sociales',

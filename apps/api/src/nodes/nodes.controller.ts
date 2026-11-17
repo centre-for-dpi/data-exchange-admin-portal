@@ -10,7 +10,7 @@ import {
   nodeDetailSchema,
   nodeIdParamsSchema,
   nodeListSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import {
   type AuthenticatedRequest,
@@ -55,7 +55,7 @@ export class NodesController {
     summary: 'Register a node and issue its single-use enrollment token',
     description:
       'Returns the enrollment token once; it cannot be retrieved again. It is valid for ' +
-      'RID_NODE_ENROLLMENT_TTL_HOURS hours (72 by default) and enrolls a single kit installation.',
+      'DEN_NODE_ENROLLMENT_TTL_HOURS hours (72 by default) and enrolls a single kit installation.',
     tags: ['nodes'],
     params: entityIdParamsSchema,
     body: createNodeSchema,

@@ -1,5 +1,5 @@
 {
-  "realm": "rid-citizens",
+  "realm": "den-citizens",
   "enabled": true,
   "displayName": "Identidad digital (simulada)",
   "sslRequired": "external",
@@ -89,7 +89,7 @@
       ]
     },
     {
-      "name": "rid-transparency-audience",
+      "name": "den-transparency-audience",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -97,12 +97,12 @@
       },
       "protocolMappers": [
         {
-          "name": "audience-rid-transparency-api",
+          "name": "audience-den-transparency-api",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.custom.audience": "rid-transparency-api",
+            "included.custom.audience": "den-transparency-api",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
@@ -115,27 +115,27 @@
   "defaultOptionalClientScopes": [],
   "clients": [
     {
-      "clientId": "carpeta-ciudadana",
+      "clientId": "citizen-app",
       "name": "Carpeta Ciudadana (referencia)",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${RID_CARPETA_CLIENT_SECRET}",
+      "secret": "${DEN_CITIZEN_APP_CLIENT_SECRET}",
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": true,
       "fullScopeAllowed": false,
-      "rootUrl": "${RID_CARPETA_URL:http://localhost:3100}",
-      "redirectUris": ["${RID_CARPETA_URL:http://localhost:3100}/auth/callback"],
-      "webOrigins": ["${RID_CARPETA_URL:http://localhost:3100}"],
+      "rootUrl": "${DEN_CITIZEN_APP_URL:http://localhost:3100}",
+      "redirectUris": ["${DEN_CITIZEN_APP_URL:http://localhost:3100}/auth/callback"],
+      "webOrigins": ["${DEN_CITIZEN_APP_URL:http://localhost:3100}"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${RID_CARPETA_URL:http://localhost:3100}/"
+        "post.logout.redirect.uris": "${DEN_CITIZEN_APP_URL:http://localhost:3100}/"
       },
-      "defaultClientScopes": ["basic", "citizen-document", "rid-transparency-audience"],
+      "defaultClientScopes": ["basic", "citizen-document", "den-transparency-audience"],
       "optionalClientScopes": []
     }
   ],
@@ -153,7 +153,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         }
       ]
@@ -171,7 +171,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         }
       ]

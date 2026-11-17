@@ -27,7 +27,7 @@ ${extra}      responses:
           description: ok
 `;
 
-describe('OpenAPI lint (RID ruleset)', () => {
+describe('OpenAPI lint (DEN ruleset)', () => {
   it.each(['salud', 'socioeconomico'])(
     'accepts the %s mock provider document',
     async (provider) => {
@@ -57,7 +57,7 @@ describe('OpenAPI lint (RID ruleset)', () => {
     ]);
   });
 
-  describe('data subject (x-rid-data-subject, ADR-0015)', () => {
+  describe('data subject (x-den-data-subject, ADR-0015)', () => {
     const personal = {
       noIdInQuery: true,
       dataSubject: { required: true, documentTypes: ['CC', 'CE', 'TI'] },
@@ -75,7 +75,7 @@ describe('OpenAPI lint (RID ruleset)', () => {
 
     it('requires a declaration on every operation of a personal-data API', async () => {
       const { report } = await lintOpenApi(minimal(), personal);
-      const issue = report.issues.find((i) => i.code === 'rid-data-subject-required');
+      const issue = report.issues.find((i) => i.code === 'den-data-subject-required');
       expect(issue).toMatchObject({ severity: 'error', line: 7 }); // the operation's line
       expect(issue?.message).toContain('getThing');
       // APIs without personal data may omit it.
@@ -89,13 +89,13 @@ describe('OpenAPI lint (RID ruleset)', () => {
 
     it('accepts a path parameter or none', async () => {
       for (const yaml of [
-        'x-rid-data-subject:\n  in: path\n  name: thingId',
-        'x-rid-data-subject:\n  in: path\n  name: thingId\n  documentType: CE',
-        'x-rid-data-subject: none',
+        'x-den-data-subject:\n  in: path\n  name: thingId',
+        'x-den-data-subject:\n  in: path\n  name: thingId\n  documentType: CE',
+        'x-den-data-subject: none',
       ]) {
         expect(await codes(withSubject(yaml)), yaml).toEqual([]);
       }
-      const { operations } = await lintOpenApi(withSubject('x-rid-data-subject: none'), personal);
+      const { operations } = await lintOpenApi(withSubject('x-den-data-subject: none'), personal);
       expect(operations[0]?.dataSubject).toEqual({ in: 'none' });
     });
 
@@ -124,14 +124,14 @@ ${subject
 
       it('accepts a JSON pointer, with a fixed or a body document type', async () => {
         for (const yaml of [
-          'x-rid-data-subject:\n  in: body\n  pointer: /numeroIdentificacion',
-          'x-rid-data-subject:\n  in: body\n  pointer: /persona/numero\n  documentType: CE',
-          'x-rid-data-subject:\n  in: body\n  pointer: /persona/numero\n  documentTypePointer: /persona/tipo',
+          'x-den-data-subject:\n  in: body\n  pointer: /numeroIdentificacion',
+          'x-den-data-subject:\n  in: body\n  pointer: /persona/numero\n  documentType: CE',
+          'x-den-data-subject:\n  in: body\n  pointer: /persona/numero\n  documentTypePointer: /persona/tipo',
         ]) {
           expect(await codes(post(yaml)), yaml).toEqual([]);
         }
         const { operations } = await lintOpenApi(
-          post('x-rid-data-subject:\n  in: body\n  pointer: /persona/numero'),
+          post('x-den-data-subject:\n  in: body\n  pointer: /persona/numero'),
           personal,
         );
         expect(operations[0]?.dataSubject).toEqual({ in: 'body', pointer: '/persona/numero' });
@@ -139,54 +139,54 @@ ${subject
 
       it('rejects bad pointers, both type sources, and operations without a JSON body', async () => {
         expect(
-          await codes(post('x-rid-data-subject:\n  in: body\n  pointer: numeroIdentificacion')),
-        ).toEqual(['rid-data-subject-pointer']);
+          await codes(post('x-den-data-subject:\n  in: body\n  pointer: numeroIdentificacion')),
+        ).toEqual(['den-data-subject-pointer']);
         expect(
           await codes(
             post(
-              'x-rid-data-subject:\n  in: body\n  pointer: /n\n  documentType: CC\n  documentTypePointer: /t',
+              'x-den-data-subject:\n  in: body\n  pointer: /n\n  documentType: CC\n  documentTypePointer: /t',
             ),
           ),
-        ).toEqual(['rid-data-subject-invalid']);
+        ).toEqual(['den-data-subject-invalid']);
         expect(
-          await codes(withSubject('x-rid-data-subject:\n  in: body\n  pointer: /numero')),
-        ).toEqual(['rid-data-subject-body']);
+          await codes(withSubject('x-den-data-subject:\n  in: body\n  pointer: /numero')),
+        ).toEqual(['den-data-subject-body']);
       });
     });
 
     it('rejects parameters that are not in the path and unknown document types', async () => {
-      expect(await codes(withSubject('x-rid-data-subject:\n  in: path\n  name: cedula'))).toEqual([
-        'rid-data-subject-parameter',
+      expect(await codes(withSubject('x-den-data-subject:\n  in: path\n  name: cedula'))).toEqual([
+        'den-data-subject-parameter',
       ]);
       expect(
         await codes(
           withSubject(
-            'x-rid-data-subject:\n  in: path\n  name: thingId\n  documentTypeParam: tipo',
+            'x-den-data-subject:\n  in: path\n  name: thingId\n  documentTypeParam: tipo',
           ),
         ),
-      ).toEqual(['rid-data-subject-parameter']);
+      ).toEqual(['den-data-subject-parameter']);
       expect(
         await codes(
           withSubject(
-            'x-rid-data-subject:\n  in: path\n  name: thingId\n  documentType: PASAPORTE',
+            'x-den-data-subject:\n  in: path\n  name: thingId\n  documentType: PASAPORTE',
           ),
         ),
-      ).toEqual(['rid-data-subject-document-type']);
+      ).toEqual(['den-data-subject-document-type']);
     });
 
     it('rejects malformed declarations, which then count as undeclared', async () => {
       for (const yaml of [
-        'x-rid-data-subject: thingId',
-        'x-rid-data-subject:\n  in: query\n  name: thingId',
-        'x-rid-data-subject:\n  in: path',
+        'x-den-data-subject: thingId',
+        'x-den-data-subject:\n  in: query\n  name: thingId',
+        'x-den-data-subject:\n  in: path',
         // The consumer-declared header (before ADR-0017) is no longer accepted.
-        'x-rid-data-subject:\n  in: header',
+        'x-den-data-subject:\n  in: header',
       ]) {
         const result = await lintOpenApi(withSubject(yaml), personal);
         expect(
           result.report.issues.map((i) => i.code),
           yaml,
-        ).toEqual(['rid-data-subject-invalid']);
+        ).toEqual(['den-data-subject-invalid']);
         expect(result.operations[0]?.dataSubject).toBeNull();
       }
     });
@@ -215,11 +215,11 @@ ${subject
           schema: { type: string }
 `);
     const strict = await lintOpenApi(withQuery, { noIdInQuery: true });
-    const issue = strict.report.issues.find((i) => i.code === 'rid-no-id-in-query');
+    const issue = strict.report.issues.find((i) => i.code === 'den-no-id-in-query');
     expect(issue?.severity).toBe('error');
     expect(issue?.line).toBe(14);
     const lenient = await lintOpenApi(withQuery, { noIdInQuery: false });
-    expect(lenient.report.issues.map((i) => i.code)).not.toContain('rid-no-id-in-query');
+    expect(lenient.report.issues.map((i) => i.code)).not.toContain('den-no-id-in-query');
   });
 
   it('allows harmless query parameters', async () => {
@@ -240,7 +240,7 @@ ${subject
         noIdInQuery: true,
       },
     );
-    expect(swagger.report.issues.map((i) => i.code)).toContain('rid-openapi-3');
+    expect(swagger.report.issues.map((i) => i.code)).toContain('den-openapi-3');
   });
 
   it('accepts JSON as well as YAML', async () => {

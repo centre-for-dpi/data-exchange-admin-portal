@@ -1,4 +1,4 @@
-import { ErrorCode, FieldErrorKey, ValidationMessage } from '@rid/contracts';
+import { ErrorCode, FieldErrorKey, ValidationMessage } from '@den/contracts';
 import { describe, expect, it } from 'vitest';
 import en from '../../messages/en.json';
 import es from '../../messages/es.json';

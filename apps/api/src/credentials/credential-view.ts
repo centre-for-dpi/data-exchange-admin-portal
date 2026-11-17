@@ -1,6 +1,6 @@
 import { createHash, X509Certificate } from 'node:crypto';
-import { getCountryConfig } from '@rid/config';
-import type { CredentialView } from '@rid/contracts';
+import { getCountryConfig } from '@den/config';
+import type { CredentialView } from '@den/contracts';
 import type { Credential } from '../generated/prisma/client.js';
 
 const DAY = 24 * 60 * 60 * 1000;

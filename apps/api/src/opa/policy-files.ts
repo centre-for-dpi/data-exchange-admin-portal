@@ -3,17 +3,17 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Directory of the Rego policies (packages/policy). RID_POLICY_DIR wins (container images);
+ * Directory of the Rego policies (packages/policy). DEN_POLICY_DIR wins (container images);
  * otherwise it is searched upwards from this file, which works from src/ and dist/.
  */
 export function findPolicyDir(): string {
-  if (process.env.RID_POLICY_DIR) return resolve(process.env.RID_POLICY_DIR);
+  if (process.env.DEN_POLICY_DIR) return resolve(process.env.DEN_POLICY_DIR);
   let dir = dirname(fileURLToPath(import.meta.url));
   for (;;) {
     const candidate = join(dir, 'packages', 'policy');
-    if (existsSync(join(candidate, 'rid'))) return candidate;
+    if (existsSync(join(candidate, 'den'))) return candidate;
     const parent = dirname(dir);
-    if (parent === dir) throw new Error('packages/policy not found (set RID_POLICY_DIR)');
+    if (parent === dir) throw new Error('packages/policy not found (set DEN_POLICY_DIR)');
     dir = parent;
   }
 }

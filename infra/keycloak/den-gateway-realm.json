@@ -1,7 +1,7 @@
 {
-  "realm": "rid-gateway",
+  "realm": "den-gateway",
   "enabled": true,
-  "displayName": "RID Gateway",
+  "displayName": "DEN Gateway",
   "sslRequired": "external",
   "registrationAllowed": false,
   "bruteForceProtected": true,
@@ -52,7 +52,7 @@
       ]
     },
     {
-      "name": "rid-gateway-audience",
+      "name": "den-gateway-audience",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -60,12 +60,12 @@
       },
       "protocolMappers": [
         {
-          "name": "audience-rid-gateway",
+          "name": "audience-den-gateway",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.custom.audience": "rid-gateway",
+            "included.custom.audience": "den-gateway",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
@@ -74,18 +74,18 @@
       ]
     }
   ],
-  "defaultDefaultClientScopes": ["basic", "rid-gateway-audience"],
+  "defaultDefaultClientScopes": ["basic", "den-gateway-audience"],
   "defaultOptionalClientScopes": [],
   "clients": [
     {
-      "clientId": "rid-portal-provisioner",
-      "name": "Portal RID: aprovisionamiento de aplicaciones",
+      "clientId": "den-portal-provisioner",
+      "name": "Portal DEN: aprovisionamiento de aplicaciones",
       "description": "Service account used by the portal reconciler to manage application clients in this realm only.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${RID_GATEWAY_PROVISIONER_SECRET}",
+      "secret": "${DEN_GATEWAY_PROVISIONER_SECRET}",
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -96,9 +96,9 @@
   ],
   "users": [
     {
-      "username": "service-account-rid-portal-provisioner",
+      "username": "service-account-den-portal-provisioner",
       "enabled": true,
-      "serviceAccountClientId": "rid-portal-provisioner",
+      "serviceAccountClientId": "den-portal-provisioner",
       "clientRoles": {
         "realm-management": ["manage-clients"]
       }
@@ -107,7 +107,7 @@
   "clientProfiles": {
     "profiles": [
       {
-        "name": "rid-secret-rotation",
+        "name": "den-secret-rotation",
         "description": "Rotation window of application secrets (M3-04): regenerating keeps the previous secret as rotated, for at most 30 days; the portal ends the window earlier.",
         "executors": [
           {
@@ -125,19 +125,19 @@
   "clientPolicies": {
     "policies": [
       {
-        "name": "rid-secret-rotation",
-        "description": "Applications managed by the portal (client attribute rid.managed = true)",
+        "name": "den-secret-rotation",
+        "description": "Applications managed by the portal (client attribute den.managed = true)",
         "enabled": true,
         "conditions": [
           {
             "condition": "client-attributes",
             "configuration": {
-              "attributes": "[{\"key\":\"rid.managed\",\"value\":\"true\"}]",
+              "attributes": "[{\"key\":\"den.managed\",\"value\":\"true\"}]",
               "is-negative-logic": false
             }
           }
         ],
-        "profiles": ["rid-secret-rotation"]
+        "profiles": ["den-secret-rotation"]
       }
     ]
   }

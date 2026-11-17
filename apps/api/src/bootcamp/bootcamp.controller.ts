@@ -5,7 +5,7 @@ import {
   entityIdParamsSchema,
   networkBootcampSchema,
   updateBootcampItemSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import {
   type AuthenticatedRequest,
   CurrentEntity,

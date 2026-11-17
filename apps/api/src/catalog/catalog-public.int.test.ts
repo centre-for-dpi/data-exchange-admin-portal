@@ -3,8 +3,8 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { catalogDetailSchema, catalogPageSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { catalogDetailSchema, catalogPageSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -26,7 +26,7 @@ describe('public catalogue (M6-08)', () => {
   const realmUsers = readRealmUsers();
   const subOf = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
   const run = randomUUID().slice(0, 6);
-  const configDir = mkdtempSync(join(tmpdir(), 'rid-config-'));
+  const configDir = mkdtempSync(join(tmpdir(), 'den-config-'));
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
   let salud = '';
@@ -39,7 +39,7 @@ describe('public catalogue (M6-08)', () => {
     const yaml = readFileSync(co, 'utf8');
     expect(yaml).toMatch(/^ {2}publicCatalog: false$/m);
     writeFileSync(co, yaml.replace(/^ {2}publicCatalog: false$/m, '  publicCatalog: true'));
-    process.env.RID_CONFIG_DIR = configDir;
+    process.env.DEN_CONFIG_DIR = configDir;
 
     await runSeed(prisma, new AuditService(), {
       config: loadCountryConfig({ code: 'co' }),
@@ -52,7 +52,7 @@ describe('public catalogue (M6-08)', () => {
     personal = await publish(`personal-${run}`, 'personal');
   });
   afterAll(async () => {
-    delete process.env.RID_CONFIG_DIR;
+    delete process.env.DEN_CONFIG_DIR;
     await app.close();
     await prisma.$disconnect();
     rmSync(configDir, { recursive: true, force: true });
@@ -75,7 +75,7 @@ describe('public catalogue (M6-08)', () => {
       sector: 'salud',
       tags: ['catalogo'],
       classification,
-      ownerContact: 'responsable.apis@salud.demo.rid.example',
+      ownerContact: 'responsable.apis@salud.demo.den.example',
     });
     expect(api.statusCode, api.body).toBe(201);
     const apiId = api.json<{ id: string }>().id;
@@ -136,7 +136,7 @@ describe('public catalogue (M6-08)', () => {
     const signedIn = catalogDetailSchema.parse(
       (await call(`/api/v1/catalog/apis/${open.apiId}`, 'carlos.dev')).json(),
     );
-    expect(signedIn.api.ownerContact).toBe('responsable.apis@salud.demo.rid.example');
+    expect(signedIn.api.ownerContact).toBe('responsable.apis@salud.demo.den.example');
   });
 
   it('never treats an invalid token as an anonymous visit', async () => {

@@ -6,22 +6,22 @@ operator's dashboard of infra/grafana (copied by `pnpm helm:sync`).
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "rid.name" "prometheus-rules" }}
+  name: {{ include "den.name" "prometheus-rules" }}
   labels:
-    {{- include "rid.labels" (dict "root" . "component" "prometheus") | nindent 4 }}
+    {{- include "den.labels" (dict "root" . "component" "prometheus") | nindent 4 }}
 data:
-  rid.rules.yml: |
-    {{- .Files.Get "files/prometheus/rid.rules.yml" | nindent 4 }}
+  den.rules.yml: |
+    {{- .Files.Get "files/prometheus/den.rules.yml" | nindent 4 }}
 {{- end }}
 {{- if .Values.grafana.enabled }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "rid.name" "grafana-dashboards" }}
+  name: {{ include "den.name" "grafana-dashboards" }}
   labels:
-    {{- include "rid.labels" (dict "root" . "component" "grafana") | nindent 4 }}
+    {{- include "den.labels" (dict "root" . "component" "grafana") | nindent 4 }}
 data:
-  rid-operator.json: |
-    {{- .Files.Get "files/grafana/rid-operator.json" | nindent 4 }}
+  den-operator.json: |
+    {{- .Files.Get "files/grafana/den-operator.json" | nindent 4 }}
 {{- end }}

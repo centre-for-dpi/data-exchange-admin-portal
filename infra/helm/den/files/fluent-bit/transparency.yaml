@@ -22,24 +22,24 @@ pipeline:
       listen: 0.0.0.0
       port: 5170
       format: json
-      tag: rid.transparency
+      tag: den.transparency
       storage.type: filesystem
 
   filters:
     - name: lua
-      match: rid.transparency
-      script: /fluent-bit/etc/rid/transparency.lua
+      match: den.transparency
+      script: /fluent-bit/etc/den/transparency.lua
       call: transparency
 
   outputs:
     - name: http
-      match: rid.transparency
-      host: ${RID_TRANSPARENCY_COLLECTOR_HOST}
-      port: ${RID_TRANSPARENCY_COLLECTOR_PORT}
+      match: den.transparency
+      host: ${DEN_TRANSPARENCY_COLLECTOR_HOST}
+      port: ${DEN_TRANSPARENCY_COLLECTOR_PORT}
       uri: /api/v1/internal/subject-access
       format: json
       json_date_key: false
-      header: Authorization Bearer ${RID_TRANSPARENCY_INGEST_TOKEN}
+      header: Authorization Bearer ${DEN_TRANSPARENCY_INGEST_TOKEN}
       # Keep retrying: a record lost here is a consultation the citizen never sees.
       retry_limit: no_limits
       storage.total_limit_size: 1G

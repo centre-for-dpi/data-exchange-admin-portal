@@ -8,14 +8,14 @@ import { desiredGateway, type GatewaySettings, parseDevNodes } from './desired-s
 
 const GATEWAY = `http://127.0.0.1:${process.env.APISIX_HTTP_PORT ?? 9080}`;
 const OPA = `http://localhost:${process.env.OPA_PORT ?? 8181}`;
-// Outside the reconciler's rid- prefix and the bundle's roots: nothing else manages them.
+// Outside the reconciler's den- prefix and the bundle's roots: nothing else manages them.
 const ROUTE = 'test-m4-05-xroad';
-const PACKAGE = 'ridtestm405';
-const BASE = '/__rid_m4_05__/hogares/v1';
+const PACKAGE = 'dentestm405';
+const BASE = '/__den_m4_05__/hogares/v1';
 const SALT = 'm4-05-end-user-salt-0123456789';
-const CLIENT = 'rid-app-m4-05';
+const CLIENT = 'den-app-m4-05';
 const SUBSCRIPTION = '0190d0c4-0000-7000-8000-0000000a4005';
-const OPERATOR = 'CO/GOV/9000000001/RID-GATEWAY';
+const OPERATOR = 'CO/GOV/9000000001/DEN-GATEWAY';
 const SERVICE = {
   instance: 'CO',
   memberClass: 'GOV',
@@ -64,7 +64,7 @@ describe('X-Road upstream through the operator Security Server (M4-05)', () => {
     for (const { path, source } of readPolicies()) {
       if (path.endsWith('_test.rego')) continue;
       const renamed = source
-        .replace(/^package rid\.authz/m, `package ${PACKAGE}.authz`)
+        .replace(/^package den\.authz/m, `package ${PACKAGE}.authz`)
         .replace(/data\.(routes|clients|config)\b/g, `data.${PACKAGE}.$1`);
       const res = await fetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
         method: 'PUT',
@@ -126,14 +126,14 @@ describe('X-Road upstream through the operator Security Server (M4-05)', () => {
 
     const settings: GatewaySettings = {
       keycloakDiscoveryUrl:
-        'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-      audience: 'rid-gateway',
+        'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+      audience: 'den-gateway',
       opaUrl: 'http://opa:8181',
       accessLogUrl: 'http://fluent-bit:9880/',
       transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
       devNodes: parseDevNodes(''),
       resolveHost: () => Promise.resolve([]),
-      tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
+      tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
       xroad: { securityServerUrl: `http://host.docker.internal:${port}`, client: OPERATOR },
     };
     const { route, upstream } = desiredGateway(
@@ -183,8 +183,8 @@ describe('X-Road upstream through the operator Security Server (M4-05)', () => {
     const res = await fetch(`${GATEWAY}${BASE}${path}?campos=basico`, {
       headers: {
         authorization: `Bearer ${token(CLIENT)}`,
-        'x-rid-purpose': 'benefit_targeting',
-        'x-rid-end-user': 'funcionario-42',
+        'x-den-purpose': 'benefit_targeting',
+        'x-den-end-user': 'funcionario-42',
         ...headers,
       },
     });
@@ -208,8 +208,8 @@ describe('X-Road upstream through the operator Security Server (M4-05)', () => {
     expect(seen?.headers['x-road-userid']).toBe(
       createHmac('sha256', SALT).update('funcionario-42').digest('hex'),
     );
-    expect(seen?.headers['x-road-issue']).toBe(`rid:subscription:${SUBSCRIPTION}`);
-    expect(seen?.headers['x-rid-subscription']).toBe(SUBSCRIPTION);
+    expect(seen?.headers['x-road-issue']).toBe(`den:subscription:${SUBSCRIPTION}`);
+    expect(seen?.headers['x-den-subscription']).toBe(SUBSCRIPTION);
   });
 
   it('a consumer cannot steer the Security Server nor forge the X-Road headers', async () => {
@@ -233,7 +233,7 @@ describe('X-Road upstream through the operator Security Server (M4-05)', () => {
       expect(seen?.headers, name).not.toHaveProperty(name);
     }
     expect(seen?.headers['x-road-userid']).not.toBe('usuario-falso');
-    expect(seen?.headers['x-road-issue']).toBe(`rid:subscription:${SUBSCRIPTION}`);
+    expect(seen?.headers['x-road-issue']).toBe(`den:subscription:${SUBSCRIPTION}`);
   });
 
   it('a path trick cannot change the serviceId', async () => {
@@ -244,7 +244,7 @@ describe('X-Road upstream through the operator Security Server (M4-05)', () => {
   it('a denied call never reaches the Security Server', async () => {
     seen = [];
     const res = await fetch(`${GATEWAY}${BASE}/hogares/1`, {
-      headers: { authorization: `Bearer ${token('rid-app-otra')}`, 'x-rid-purpose': 'x' },
+      headers: { authorization: `Bearer ${token('den-app-otra')}`, 'x-den-purpose': 'x' },
     });
     expect(res.status).toBe(403);
     expect(seen).toHaveLength(0);

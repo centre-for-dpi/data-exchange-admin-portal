@@ -4,7 +4,7 @@
 
 Version 1.2 · November 2026 · for the onboarding day (bootcamp) with the entities
 
-This guide explains what each entity has to **appoint, provide and do** to connect to the Data Exchange Network (RID), as a data **provider**, as a **consumer**, or as both. The national operator runs the central platform (portal and gateway): the entity installs none of it.
+This guide explains what each entity has to **appoint, provide and do** to connect to the Data Exchange Network (DEN), as a data **provider**, as a **consumer**, or as both. The national operator runs the central platform (portal and gateway): the entity installs none of it.
 
 **Providers have their own guide,** in the kit repository (`docs/guides/providers.md`, with its presentation version `providers.html`): how the service connects through the node, which server and network it needs, how to install the node, how to publish an API, and what the service receives with each request. This guide covers what is common to all entities, plus what applies to consumers.
 
@@ -37,7 +37,7 @@ Each person needs their **own institutional email address**: the account is veri
 | Outbound internet access | `443/tcp` to the **gateway name** and the **portal name** |
 | A safe place for secrets | The certificate's private key and the application secret: never in code or in a repository |
 | `openssl` | To generate the private key and the certificate signing request (CSR). The private key **never leaves** the entity's server |
-| Official's identifier | APIs with personal data require `X-RID-End-User`: the username or institutional email of the person making the request. It is only recorded as a hash |
+| Official's identifier | APIs with personal data require `X-DEN-End-User`: the username or institutional email of the person making the request. It is only recorded as a hash |
 
 ### 3.2 As a provider
 
@@ -47,7 +47,7 @@ The server and network requirements, the installation and the publication steps 
 
 #### Verifying the gateway assertion
 
-If the country has it enabled (`features.gatewayAssertion`), every request arrives with the `X-RID-Assertion` header (ADR-0024). It is an ES256 JWS signed by the gateway with what it authorized:
+If the country has it enabled (`features.gatewayAssertion`), every request arrives with the `X-DEN-Assertion` header (ADR-0024). It is an ES256 JWS signed by the gateway with what it authorized:
 - who is making the request: entity, application and subscription;
 - what for: the purpose;
 - which operation;
@@ -142,7 +142,7 @@ chmod +x entity-check.sh
 ./entity-check.sh check <portal> <gateway>
 ```
 
-It checks DNS, outbound HTTPS to the portal and to the gateway, and that the gateway's certificate verifies against the network's root. It saves the root to `./rid-network-ca.pem`. It only needs `bash`, `curl` and `openssl`.
+It checks DNS, outbound HTTPS to the portal and to the gateway, and that the gateway's certificate verifies against the network's root. It saves the root to `./den-network-ca.pem`. It only needs `bash`, `curl` and `openssl`.
 
 ### 4.2 Registering the entity and its people
 
@@ -170,7 +170,7 @@ This is covered in the **provider guide** in the kit repository: the enrollment 
    CLIENT_SECRET=... ./entity-check.sh call <portal> <gateway> <client_id> \
      /sandbox/<entity>/<api>/v1/<resource> <purpose> <official>
    ```
-   The script requests the token from the gateway (`/oauth/token`, bound to the certificate), sends the request with `X-RID-Purpose` and `X-RID-End-User`, and explains the response. The exact URLs are on the API's page and on the subscription's page.
+   The script requests the token from the gateway (`/oauth/token`, bound to the certificate), sends the request with `X-DEN-Purpose` and `X-DEN-End-User`, and explains the response. The exact URLs are on the API's page and on the subscription's page.
 6. With the **production** application, repeat steps 2 to 5 with the real path (without `/sandbox`), once the request is approved.
 
 ## 5. Why the gateway rejects a call
@@ -180,9 +180,9 @@ The gateway responds with `403`, `application/problem+json` and a stable `code`:
 | `code` | What it means | What to do |
 | :-- | :-- | :-- |
 | `no_subscription` | The application has no active access to that version | Request access, or wait for approval ("Approved (activating)" takes a few seconds) |
-| `purpose_not_allowed` | `X-RID-Purpose` is missing or is not the approved purpose | Send the subscription's purpose code |
+| `purpose_not_allowed` | `X-DEN-Purpose` is missing or is not the approved purpose | Send the subscription's purpose code |
 | `operation_not_allowed` | The subscription does not cover that operation | Request access to that operation |
-| `end_user_required` / `end_user_invalid` | `X-RID-End-User` is missing or invalid (1 to 128 visible characters, no spaces) | Send the official's institutional username |
+| `end_user_required` / `end_user_invalid` | `X-DEN-End-User` is missing or invalid (1 to 128 visible characters, no spaces) | Send the official's institutional username |
 | `client_certificate_required` / `certificate_mismatch` / `certificate_revoked` | No certificate, another application's certificate, or a revoked one | Use the current certificate of **that** application |
 | `token_not_bound` | The token is not bound to the certificate | Request the token from `https://<gateway>/oauth/token` with the certificate |
 | `environment_mismatch` | A sandbox application on a real path, or the other way round | Use the path that matches the application type |
@@ -193,7 +193,7 @@ Other codes: `401` (token expired or invalid; it lasts 5 minutes), `404` (no API
 ## 6. The entity's commitments
 
 - **A real purpose.** Only send requests for the declared and approved purpose. Every request is recorded in the log, and the citizen sees it.
-- **An identified official.** Send in `X-RID-End-User` the person who is actually making the request.
+- **An identified official.** Send in `X-DEN-End-User` the person who is actually making the request.
 - **Protected credentials.** The private key and the secret are not shared or pushed to repositories. If you suspect a leak, **revoke** them from the application's page. Before a certificate expires (90 days, with a warning at 15), issue a new one: the previous one keeps working during the rotation window.
 - **Don't keep more than needed.** Keep only what the purpose requires.
 - **Announce changes.** An incompatible change to a published API requires a new major version. The previous one is deprecated with a retirement date.

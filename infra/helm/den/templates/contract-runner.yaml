@@ -7,18 +7,18 @@ gateway's check routes. Called by the portal API only (NetworkPolicy); only resu
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "rid.name" "contract-runner" }}
+  name: {{ include "den.name" "contract-runner" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{- toYaml . | nindent 8 }}
@@ -29,12 +29,12 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: contract-runner
-          image: {{ include "rid.image" (dict "root" . "name" "contractRunner") }}
+          image: {{ include "den.image" (dict "root" . "name" "contractRunner") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
           env:
-            - name: RID_CONTRACT_RUNNER_TOKEN
+            - name: DEN_CONTRACT_RUNNER_TOKEN
               valueFrom:
-                secretKeyRef: { name: {{ include "rid.name" "contract-runner" }}, key: RID_CONTRACT_RUNNER_TOKEN }
+                secretKeyRef: { name: {{ include "den.name" "contract-runner" }}, key: DEN_CONTRACT_RUNNER_TOKEN }
           ports:
             - { name: http, containerPort: 8096 }
           securityContext:
@@ -51,12 +51,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "contract-runner" }}
+  name: {{ include "den.name" "contract-runner" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: http, port: 8096, targetPort: http }
 {{- end }}

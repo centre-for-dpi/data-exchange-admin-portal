@@ -6,7 +6,7 @@ import type {
   ChainCheckResult,
   Timeline,
   TimelineKind,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { NotFoundError } from '../common/errors.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';

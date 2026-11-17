@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { CatalogDetail, CatalogItem, CatalogQuery, ExposedField } from '@rid/contracts';
-import { catalogQuerySchema } from '@rid/contracts';
+import type { CatalogDetail, CatalogItem, CatalogQuery, ExposedField } from '@den/contracts';
+import { catalogQuerySchema } from '@den/contracts';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { NotFoundError } from '../common/errors.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -12,7 +12,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 const LISTED = ['published', 'deprecated'] as const;
 
 export const gatewayPublicUrl = (): string =>
-  (process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(/\/$/, '');
+  (process.env.DEN_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(/\/$/, '');
 
 const fieldsOf = (value: unknown): ExposedField[] =>
   Array.isArray(value) ? (value as ExposedField[]) : [];
@@ -196,7 +196,7 @@ export class CatalogService {
     if (!version) throw new NotFoundError('API version');
     const spec = { ...(version.openapiSpec as Record<string, unknown>) };
     spec.servers = [
-      { url: `${gatewayPublicUrl()}${version.basePath}`, description: 'RID gateway' },
+      { url: `${gatewayPublicUrl()}${version.basePath}`, description: 'DEN gateway' },
     ];
     return spec;
   }

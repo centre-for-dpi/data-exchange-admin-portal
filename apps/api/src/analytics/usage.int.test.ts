@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { consumedUsageSchema, providerUsageSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { consumedUsageSchema, providerUsageSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -23,7 +23,7 @@ describe("usage of an entity's APIs (M5-02)", () => {
   const realmUsers = readRealmUsers();
   const sub = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
   const run = randomUUID().slice(0, 8);
-  const index = `rid-access-test-usage-${run}`;
+  const index = `den-access-test-usage-${run}`;
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
   let salud = '';
@@ -308,7 +308,7 @@ describe("usage of an entity's applications (M5-03)", () => {
   const realmUsers = readRealmUsers();
   const sub = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
   const run = randomUUID().slice(0, 8);
-  const index = `rid-access-test-consumed-${run}`;
+  const index = `den-access-test-consumed-${run}`;
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
   let programas = '';
@@ -321,7 +321,7 @@ describe("usage of an entity's applications (M5-03)", () => {
   };
 
   async function application(entityId: string, environment: 'production' | 'sandbox') {
-    const clientId = `rid-app-test-${randomUUID()}`;
+    const clientId = `den-app-test-${randomUUID()}`;
     const row = await prisma.application.create({
       data: {
         entityId,

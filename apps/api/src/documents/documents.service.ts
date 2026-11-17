@@ -1,4 +1,4 @@
-import { FieldErrorKey } from '@rid/contracts';
+import { FieldErrorKey } from '@den/contracts';
 import { createHash } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -20,9 +20,9 @@ import { StorageService } from './storage.service.js';
 export const PDF_MIME = 'application/pdf';
 const PDF_MAGIC = Buffer.from('%PDF-');
 
-/** Largest document accepted (RID_DOCUMENT_MAX_BYTES, default 10 MiB). */
+/** Largest document accepted (DEN_DOCUMENT_MAX_BYTES, default 10 MiB). */
 export const documentMaxBytes = (): number => {
-  const value = Number(process.env.RID_DOCUMENT_MAX_BYTES ?? 10 * 1024 * 1024);
+  const value = Number(process.env.DEN_DOCUMENT_MAX_BYTES ?? 10 * 1024 * 1024);
   return Number.isInteger(value) && value > 0 ? value : 10 * 1024 * 1024;
 };
 
@@ -42,7 +42,7 @@ export interface StoredDocument {
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger('Documents');
-  /** ClamAV, when RID_CLAMAV_URL is set (M6-08): every document is scanned before it is stored. */
+  /** ClamAV, when DEN_CLAMAV_URL is set (M6-08): every document is scanned before it is stored. */
   private readonly antivirus = ClamdScanner.fromEnv();
 
   constructor(

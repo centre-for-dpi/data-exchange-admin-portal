@@ -1,6 +1,6 @@
 # Portal web image. Built from the repo root:
 #   docker build -f apps/web/Dockerfile .
-# Configuration comes from the environment at run time (AUTH_URL, KEYCLOAK_URL, RID_API_URL…).
+# Configuration comes from the environment at run time (AUTH_URL, KEYCLOAK_URL, DEN_API_URL…).
 
 # --- Build: the whole workspace, then the web with its production dependencies only. ---
 FROM node:24.22.1-alpine3.24 AS build
@@ -10,11 +10,11 @@ COPY . .
 # The Auth.js config reads the client secret when a module loads, also while Next collects page
 # data: a placeholder for the build only. The real one comes from the environment at run time.
 RUN pnpm install --frozen-lockfile \
- && pnpm exec turbo run build --filter=@rid/web^... \
+ && pnpm exec turbo run build --filter=@den/web^... \
  && cd apps/web \
- && RID_PORTAL_WEB_CLIENT_SECRET=build-time-placeholder AUTH_SECRET=build-time-placeholder pnpm build \
+ && DEN_PORTAL_WEB_CLIENT_SECRET=build-time-placeholder AUTH_SECRET=build-time-placeholder pnpm build \
  && cd /repo \
- && pnpm --filter @rid/web deploy --prod --legacy /out \
+ && pnpm --filter @den/web deploy --prod --legacy /out \
  && rm -rf /out/.next && cp -r apps/web/.next /out/.next && rm -rf /out/.next/cache
 
 # --- Runtime: no compilers, no dev dependencies and no package manager (M6-05). ---

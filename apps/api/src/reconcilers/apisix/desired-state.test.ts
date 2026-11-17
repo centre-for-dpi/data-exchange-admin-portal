@@ -23,14 +23,14 @@ import {
 } from './desired-state.js';
 
 const settings: GatewaySettings = {
-  keycloakDiscoveryUrl: 'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-  audience: 'rid-gateway',
+  keycloakDiscoveryUrl: 'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+  audience: 'den-gateway',
   opaUrl: 'http://opa:8181',
   accessLogUrl: 'http://fluent-bit:9880/',
   transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
   devNodes: parseDevNodes('salud=mock-salud:8000'),
   resolveHost: () => Promise.resolve(['93.184.215.14']),
-  tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
+  tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
 };
 
 const PROVIDER = '0190d0c4-0000-7000-8000-00000000e001';
@@ -50,9 +50,9 @@ const version = (overrides: Partial<VersionForGateway> = {}): VersionForGateway 
 });
 
 describe('data subject read from the body (ADR-0017)', () => {
-  it('adds rid-data-subject only to routes with body subjects', () => {
+  it('adds den-data-subject only to routes with body subjects', () => {
     const without = desiredGateway(version(), settings).route.plugins as Plugins;
-    expect(without).not.toHaveProperty('rid-data-subject');
+    expect(without).not.toHaveProperty('den-data-subject');
 
     const plugins = desiredGateway(
       version({
@@ -67,7 +67,7 @@ describe('data subject read from the body (ADR-0017)', () => {
       }),
       settings,
     ).route.plugins as Plugins;
-    expect(plugins['rid-data-subject']).toEqual({
+    expect(plugins['den-data-subject']).toEqual({
       operations: [
         {
           method: 'POST',
@@ -78,10 +78,10 @@ describe('data subject read from the body (ADR-0017)', () => {
       ],
     });
     // OPA reads what the plugin extracted and never returns it: it does not reach the provider.
-    expect(plugins.opa?.send_headers_upstream).toContain('X-RID-Body-Subject');
+    expect(plugins.opa?.send_headers_upstream).toContain('X-DEN-Body-Subject');
     // proxy-rewrite runs after the plugin and must not remove its value.
     const removed = (plugins['proxy-rewrite']?.headers as { remove: string[] }).remove;
-    expect(removed).not.toContain('X-RID-Body-Subject');
+    expect(removed).not.toContain('X-DEN-Body-Subject');
   });
 });
 
@@ -93,7 +93,7 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     expect(route).toMatchObject({
       uri: '/salud/afiliacion/v1/*',
       methods: ['GET', 'POST'],
-      upstream_id: 'rid-upstream-0190d0c4-0000-7000-8000-000000000001',
+      upstream_id: 'den-upstream-0190d0c4-0000-7000-8000-000000000001',
       status: 1,
     });
     expect(upstream).toMatchObject({ scheme: 'http', nodes: { 'mock-salud:8000': 1 } });
@@ -106,17 +106,20 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
 
   it('signs for the provider entity when the country turns the assertion on (M6-10)', () => {
     const off = desiredGateway(version(), settings).route.plugins as Plugins;
-    expect(off['rid-assertion']).toBeUndefined();
+    expect(off['den-assertion']).toBeUndefined();
     const on = desiredGateway(version(), {
       ...settings,
       assertion: { issuer: 'https://gw.example' },
     }).route.plugins as Plugins;
-    expect(on['rid-assertion']).toEqual({ audience: 'salud' });
+    expect(on['den-assertion']).toEqual({ audience: 'salud' });
   });
 
   it('applies the plugin chain: request id, token for the gateway, header cleanup, OPA, logs', () => {
     const plugins = desiredGateway(version(), settings).route.plugins as Plugins;
     expect(Object.keys(plugins).sort()).toEqual([
+      'den-client-cert',
+      'den-header-guard',
+      'den-rate-limited',
       'http-logger',
       'limit-count',
       'opa',
@@ -124,53 +127,50 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       'prometheus',
       'proxy-rewrite',
       'request-id',
-      'rid-client-cert',
-      'rid-header-guard',
-      'rid-rate-limited',
     ]);
-    expect(plugins['rid-header-guard']).toEqual({});
+    expect(plugins['den-header-guard']).toEqual({});
     // Per-subscription limit (S-2): from OPA's headers, counted on each node.
     expect(plugins['limit-count']).toMatchObject({
-      count: '$http_x_rid_rate_limit',
+      count: '$http_x_den_rate_limit',
       key_type: 'var',
-      key: 'http_x_rid_subscription',
+      key: 'http_x_den_subscription',
       time_window: 60,
       policy: 'local',
       rejected_code: 429,
     });
-    expect(plugins.opa?.send_headers_upstream as string[]).toContain('X-RID-Rate-Limit');
+    expect(plugins.opa?.send_headers_upstream as string[]).toContain('X-DEN-Rate-Limit');
     // The client never chooses the certificate thumbprint OPA reads, nor the provider sees it.
-    expect(plugins['rid-client-cert']).toEqual({});
+    expect(plugins['den-client-cert']).toEqual({});
     expect(plugins['proxy-rewrite']?.headers).not.toMatchObject({
-      remove: expect.arrayContaining(['X-RID-Client-Cert-S256']) as unknown,
+      remove: expect.arrayContaining(['X-DEN-Client-Cert-S256']) as unknown,
     });
     expect(plugins['openid-connect']).toMatchObject({
-      client_id: 'rid-gateway',
+      client_id: 'den-gateway',
       bearer_only: true,
       use_jwks: true,
       set_access_token_header: false,
       claim_validator: { audience: { required: true, match_with_client_id: true } },
     });
     expect(plugins.opa).toMatchObject({
-      policy: 'rid/authz/decision',
+      policy: 'den/authz/decision',
       with_route: true,
       keepalive: true,
       keepalive_pool: 64,
     });
     // Clients cannot forge gateway headers; purpose and end user stay for OPA to read.
     const removed = (plugins['proxy-rewrite']?.headers as { remove: string[] }).remove;
-    expect(removed).toContain('X-RID-Subscription');
-    expect(removed).toContain('X-RID-Subject-Ref');
-    expect(removed).not.toContain('X-RID-Purpose');
-    expect(removed).not.toContain('X-RID-End-User');
-    expect(removed).not.toContain('X-RID-Body-Subject');
+    expect(removed).toContain('X-DEN-Subscription');
+    expect(removed).toContain('X-DEN-Subject-Ref');
+    expect(removed).not.toContain('X-DEN-Purpose');
+    expect(removed).not.toContain('X-DEN-End-User');
+    expect(removed).not.toContain('X-DEN-Body-Subject');
     // OPA decides these; the clear official and data subject are listed and never returned.
     const decided = plugins.opa?.send_headers_upstream as string[];
     for (const header of [
-      'X-RID-Subject-Ref',
-      'X-RID-End-User',
-      'X-RID-Body-Subject',
-      'X-RID-Client-Cert-S256',
+      'X-DEN-Subject-Ref',
+      'X-DEN-End-User',
+      'X-DEN-Body-Subject',
+      'X-DEN-Client-Cert-S256',
     ]) {
       expect(decided).toContain(header);
     }
@@ -187,30 +187,30 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
       '$args',
       '$http_authorization',
       // Analytics never learn whose data was consulted (ADR-0015).
-      '$http_x_rid_subject_ref',
-      '$http_x_rid_data_subject',
-      '$http_x_rid_body_subject',
+      '$http_x_den_subject_ref',
+      '$http_x_den_data_subject',
+      '$http_x_den_body_subject',
       // The official only as its salted hash (M3-06).
-      '$http_x_rid_end_user',
+      '$http_x_den_end_user',
     ]) {
       expect(values).not.toContain(forbidden);
     }
-    expect(values).toContain('$http_x_rid_end_user_hash');
+    expect(values).toContain('$http_x_den_end_user_hash');
   });
 
   it('the transparency record carries the official only as its salted hash (M3-06)', () => {
     const values = Object.values(TRANSPARENCY_LOG_FORMAT);
     for (const forbidden of [
-      '$http_x_rid_end_user',
-      '$http_x_rid_body_subject',
-      '$http_x_rid_data_subject',
+      '$http_x_den_end_user',
+      '$http_x_den_body_subject',
+      '$http_x_den_data_subject',
       '$uri',
       '$request_uri',
       '$args',
     ]) {
       expect(values).not.toContain(forbidden);
     }
-    expect(values).toContain('$http_x_rid_end_user_hash');
+    expect(values).toContain('$http_x_den_end_user_hash');
   });
 
   it('reaches a direct upstream over verified HTTPS, pinned to the addresses checked', () => {
@@ -245,7 +245,7 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     };
     const xroadSettings = {
       ...settings,
-      xroad: { securityServerUrl: 'https://ss.and.example:8443', client: 'CO/GOV/1/RID' },
+      xroad: { securityServerUrl: 'https://ss.and.example:8443', client: 'CO/GOV/1/DEN' },
     };
     const onXroad = (member: VersionForGateway['xroadMember']) =>
       version({ upstream: { type: 'xroad', serviceId, servicePath: '/v1' }, xroadMember: member });
@@ -259,12 +259,12 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
         scheme: 'https',
         nodes: { 'ss.and.example:8443': 1 },
         upstream_host: 'ss.and.example',
-        tls: { verify: true, client_cert_id: 'rid-ssl-gateway-xroad' },
+        tls: { verify: true, client_cert_id: 'den-ssl-gateway-xroad' },
       });
       const plugins = route.plugins as Plugins;
       expect(plugins['proxy-rewrite']).toMatchObject({
         regex_uri: ['^/salud/afiliacion/v1/(.*)$', '/r1/CO/GOV/8999999999/consultaHogar/v1/$1'],
-        headers: { set: { 'X-Road-Client': 'CO/GOV/1/RID' } },
+        headers: { set: { 'X-Road-Client': 'CO/GOV/1/DEN' } },
       });
       expect((plugins.opa as { send_headers_upstream: string[] }).send_headers_upstream).toEqual(
         expect.arrayContaining(['X-Road-UserId', 'X-Road-Issue']),
@@ -323,7 +323,7 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
         scheme: 'https',
         nodes: { 'wg-hub:8443': 1 },
         pass_host: 'rewrite',
-        upstream_host: `rid-node-${NODE}`,
+        upstream_host: `den-node-${NODE}`,
         tls: {
           verify: true,
           client_cert_id: gatewayClientSslId(PROVIDER),
@@ -393,7 +393,7 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     expect((other.tls as { client_cert_id: string }).client_cert_id).not.toBe(
       gatewayClientSslId(PROVIDER),
     );
-    expect(gatewayClientName(settings, 'salud')).toBe('rid-gateway.salud');
+    expect(gatewayClientName(settings, 'salud')).toBe('den-gateway.salud');
     expect(
       needsGatewayPki({ type: 'direct', url: 'https://a.example', mtls: true }, 'salud', settings),
     ).toBe(true);
@@ -453,8 +453,8 @@ describe('transparency register (ADR-0015, MT-03)', () => {
       expect(variables).not.toContain(forbidden);
     }
     expect(variables).not.toMatch(/body_subject|data_subject/);
-    // The official only as their keyed hash, never X-RID-End-User in clear.
-    expect(Object.values(TRANSPARENCY_LOG_FORMAT)).not.toContain('$http_x_rid_end_user');
+    // The official only as their keyed hash, never X-DEN-End-User in clear.
+    expect(Object.values(TRANSPARENCY_LOG_FORMAT)).not.toContain('$http_x_den_end_user');
     // The idempotency key is nginx's own id, not the client-chosen X-Request-Id.
     expect(TRANSPARENCY_LOG_FORMAT.gateway_request_id).toBe('$request_id');
     // The analytics log stays without the data subject.
@@ -476,12 +476,12 @@ describe('parseHostPort', () => {
 
 describe('matches', () => {
   it('accepts defaults APISIX adds but not changed or missing fields', () => {
-    const desired = { a: 1, plugins: { opa: { policy: 'rid/authz' } }, methods: ['GET'] };
+    const desired = { a: 1, plugins: { opa: { policy: 'den/authz' } }, methods: ['GET'] };
     expect(
       matches(desired, {
         ...desired,
         create_time: 1,
-        plugins: { opa: { policy: 'rid/authz', timeout: 3000 } },
+        plugins: { opa: { policy: 'den/authz', timeout: 3000 } },
       }),
     ).toBe(true);
     expect(matches(desired, { ...desired, plugins: {} })).toBe(false);
@@ -607,18 +607,18 @@ describe('node control route (M4-02)', () => {
       upstream: { scheme: 'http', nodes: { 'api:4000': 1 }, pass_host: 'node' },
     });
     const plugins = route?.plugins as Record<string, unknown>;
-    // The client's X-RID-* (a forged control token included) go first; then the thumbprint.
-    expect(plugins['rid-header-guard']).toEqual({});
-    expect(plugins['rid-client-cert']).toEqual({});
+    // The client's X-DEN-* (a forged control token included) go first; then the thumbprint.
+    expect(plugins['den-header-guard']).toEqual({});
+    expect(plugins['den-client-cert']).toEqual({});
     expect(plugins['proxy-rewrite']).toEqual({
-      headers: { set: { 'X-RID-Node-Control': 'control-token' } },
+      headers: { set: { 'X-DEN-Node-Control': 'control-token' } },
     });
     expect(plugins).not.toHaveProperty('openid-connect');
   });
 });
 
 describe('token route (S-4, M3-10)', () => {
-  it('forwards to the rid-gateway token endpoint with the verified certificate', () => {
+  it('forwards to the den-gateway token endpoint with the verified certificate', () => {
     const route = desiredTokenRoute(settings);
     expect(route).toMatchObject({
       uri: '/oauth/token',
@@ -627,7 +627,7 @@ describe('token route (S-4, M3-10)', () => {
     });
     const plugins = route.plugins as Record<string, Record<string, unknown>>;
     expect(plugins['proxy-rewrite']).toEqual({
-      uri: '/realms/rid-gateway/protocol/openid-connect/token',
+      uri: '/realms/den-gateway/protocol/openid-connect/token',
       headers: {
         // The other spellings of the two headers go; the exact names are always overwritten.
         remove: ['SSL-CLIENT-CERT', 'ssl_client_verify'],
@@ -637,22 +637,22 @@ describe('token route (S-4, M3-10)', () => {
         },
       },
     });
-    expect(plugins).toHaveProperty('rid-header-guard');
+    expect(plugins).toHaveProperty('den-header-guard');
   });
 
   it('keeps the base path of a Keycloak served under one (the pilot: /auth)', () => {
     const route = desiredTokenRoute({
       ...settings,
       keycloakDiscoveryUrl:
-        'http://keycloak:8080/auth/realms/rid-gateway/.well-known/openid-configuration',
+        'http://keycloak:8080/auth/realms/den-gateway/.well-known/openid-configuration',
     });
     expect((route.plugins as Record<string, { uri?: string }>)['proxy-rewrite']?.uri).toBe(
-      '/auth/realms/rid-gateway/protocol/openid-connect/token',
+      '/auth/realms/den-gateway/protocol/openid-connect/token',
     );
   });
 });
 
-describe('development nodes (RID_DEV_NODES)', () => {
+describe('development nodes (DEN_DEV_NODES)', () => {
   it('uses the entity slug first, then the longest prefix (M6-03)', () => {
     const nodes = parseDevNodes(
       'salud=mock-salud:8000,carga-*=mock-socioeconomico:8000,carga-0*=https://mock-salud:8443',

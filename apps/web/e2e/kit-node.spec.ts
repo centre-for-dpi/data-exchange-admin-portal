@@ -59,8 +59,8 @@ test.describe('upstream on a kit node (M4-04)', () => {
     const res = await gatewayFetch(url, {
       headers: {
         authorization: `Bearer ${token}`,
-        'x-rid-purpose': 'eligibility_check',
-        'x-rid-end-user': 'funcionario-e2e',
+        'x-den-purpose': 'eligibility_check',
+        'x-den-end-user': 'funcionario-e2e',
         'x-request-id': requestId,
       },
     });

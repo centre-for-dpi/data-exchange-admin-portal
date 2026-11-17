@@ -1,8 +1,8 @@
-# Local development and pilot stack for the RID portal.
+# Local development and pilot stack for the DEN portal.
 # Start with `pnpm infra:up` (all services) or `pnpm infra:up:core` (without OpenSearch/Fluent Bit).
 # Every published port binds to 127.0.0.1 only and can be moved with *_PORT variables in .env.
 # Secrets come from the repo-root .env (see .env.example).
-name: rid
+name: den
 
 x-healthcheck-defaults: &healthcheck-defaults
   interval: 5s
@@ -14,7 +14,7 @@ services:
     # postgres:18.6-alpine with pgBackRest (infra/postgres, M6-06). Development does not archive;
     # the pilot does (docker-compose.deploy.yml).
     build: ../postgres
-    image: rid/postgres:local
+    image: den/postgres:local
     networks: [default]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
@@ -22,7 +22,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
       KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:?set KEYCLOAK_DB_USER in .env}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
-      RID_APP_DB_PASSWORD: ${RID_APP_DB_PASSWORD:?set RID_APP_DB_PASSWORD in .env}
+      DEN_APP_DB_PASSWORD: ${DEN_APP_DB_PASSWORD:?set DEN_APP_DB_PASSWORD in .env}
     volumes:
       - pg-data:/var/lib/postgresql
       - ../postgres/init:/docker-entrypoint-initdb.d:ro
@@ -38,7 +38,7 @@ services:
     command:
       - start-dev
       - --import-realm
-      # The email event listener (realm rid-portal) tells the account owner when a password or a
+      # The email event listener (realm den-portal) tells the account owner when a password or a
       # second factor is set or removed (M3-08): a first-use OTP enrollment does not go unnoticed.
       - --spi-events-listener--email--include-events=UPDATE_CREDENTIAL,REMOVE_CREDENTIAL
       # The client certificate of applications arrives from the gateway's token route, which
@@ -59,14 +59,14 @@ services:
       KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'true'
       # Placeholders resolved by --import-realm in infra/keycloak/*-realm.json (M0-03).
-      RID_PORTAL_WEB_CLIENT_SECRET: ${RID_PORTAL_WEB_CLIENT_SECRET:?set RID_PORTAL_WEB_CLIENT_SECRET in .env}
-      RID_GATEWAY_PROVISIONER_SECRET: ${RID_GATEWAY_PROVISIONER_SECRET:?set RID_GATEWAY_PROVISIONER_SECRET in .env}
-      RID_WEB_URL: ${RID_WEB_URL:-http://localhost:3000}
-      RID_CARPETA_CLIENT_SECRET: ${RID_CARPETA_CLIENT_SECRET:?set RID_CARPETA_CLIENT_SECRET in .env}
-      RID_CARPETA_URL: ${RID_CARPETA_URL:-http://localhost:3100}
-      RID_DEMO_USER_PASSWORD: ${RID_DEMO_USER_PASSWORD:-rid-demo-password}
+      DEN_PORTAL_WEB_CLIENT_SECRET: ${DEN_PORTAL_WEB_CLIENT_SECRET:?set DEN_PORTAL_WEB_CLIENT_SECRET in .env}
+      DEN_GATEWAY_PROVISIONER_SECRET: ${DEN_GATEWAY_PROVISIONER_SECRET:?set DEN_GATEWAY_PROVISIONER_SECRET in .env}
+      DEN_WEB_URL: ${DEN_WEB_URL:-http://localhost:3000}
+      DEN_CITIZEN_APP_CLIENT_SECRET: ${DEN_CITIZEN_APP_CLIENT_SECRET:?set DEN_CITIZEN_APP_CLIENT_SECRET in .env}
+      DEN_CITIZEN_APP_URL: ${DEN_CITIZEN_APP_URL:-http://localhost:3100}
+      DEN_DEMO_USER_PASSWORD: ${DEN_DEMO_USER_PASSWORD:-den-demo-password}
       # TOTP key of the seed users with a critical role (M3-08); random in the pilot.
-      RID_DEMO_TOTP_SECRET: ${RID_DEMO_TOTP_SECRET:-rid-demo-totp-secret}
+      DEN_DEMO_TOTP_SECRET: ${DEN_DEMO_TOTP_SECRET:-den-demo-totp-secret}
     volumes:
       - ../keycloak:/opt/keycloak/data/import:ro
     ports:
@@ -108,11 +108,11 @@ services:
     networks: [gateway, providers]
     environment:
       # The deployment's own key for the private keys APISIX keeps in etcd (M6-01).
-      RID_APISIX_KEYRING: ${RID_APISIX_KEYRING:?set RID_APISIX_KEYRING in .env (16 characters)}
+      DEN_APISIX_KEYRING: ${DEN_APISIX_KEYRING:?set DEN_APISIX_KEYRING in .env (16 characters)}
       APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?set APISIX_ADMIN_KEY in .env}
     volumes:
       - ../apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - ../apisix/plugins:/usr/local/apisix/rid:ro
+      - ../apisix/plugins:/usr/local/apisix/den:ro
     # Development only: tests run upstreams with mTLS on the host (M3-03). The deployment removes it.
     extra_hosts:
       - host.docker.internal:host-gateway
@@ -189,16 +189,16 @@ services:
     image: smallstep/step-ca:0.30.2
     networks: [default]
     environment:
-      DOCKER_STEPCA_INIT_NAME: RID Dev CA
+      DOCKER_STEPCA_INIT_NAME: DEN Dev CA
       DOCKER_STEPCA_INIT_DNS_NAMES: localhost,step-ca
-      DOCKER_STEPCA_INIT_PROVISIONER_NAME: rid-portal
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: den-portal
       DOCKER_STEPCA_INIT_PASSWORD: ${STEP_CA_PASSWORD:?set STEP_CA_PASSWORD in .env}
     # The image's entrypoint initialises the CA once; configure.sh then sets the provisioner of
     # the portal (template and durations, M3-01) and starts step-ca.
-    command: ['bash', '/rid/configure.sh']
+    command: ['bash', '/den/configure.sh']
     volumes:
       - step-ca-data:/home/step
-      - ../step-ca:/rid:ro
+      - ../step-ca:/den:ro
     ports:
       - 127.0.0.1:${STEP_CA_PORT:-9000}:9000
     healthcheck:
@@ -248,9 +248,9 @@ services:
     image: fluent/fluent-bit:5.1.5-debug
     networks: [default, gateway]
     profiles: [observability]
-    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/fluent-bit.yaml']
+    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/fluent-bit.yaml']
     volumes:
-      - ../fluent-bit:/fluent-bit/etc/rid:ro
+      - ../fluent-bit:/fluent-bit/etc/den:ro
     # Not published: APISIX ships logs over the Compose network (http://fluent-bit:9880).
     depends_on:
       opensearch:
@@ -261,7 +261,7 @@ services:
       test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:2020/api/v1/health']
 
   # Metrics and alerts (ARCHITECTURE.md §9, M5-06): Prometheus scrapes the gateway, the portal
-  # API (with RID_METRICS_TOKEN) and OPA, and evaluates the alerts of infra/prometheus/rules;
+  # API (with DEN_METRICS_TOKEN) and OPA, and evaluates the alerts of infra/prometheus/rules;
   # Alertmanager mails them to the operator; Grafana shows the operator's dashboard.
   prometheus:
     image: prom/prometheus:v3.15.1
@@ -272,11 +272,11 @@ services:
     entrypoint: ['/bin/sh', '-c']
     command:
       - >-
-        mkdir -p /tmp/rid && printf %s "$$RID_METRICS_TOKEN" > /tmp/rid/metrics-token &&
+        mkdir -p /tmp/den && printf %s "$$DEN_METRICS_TOKEN" > /tmp/den/metrics-token &&
         exec /bin/prometheus --config.file=/etc/prometheus/prometheus.yml
         --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=$$PROMETHEUS_RETENTION
     environment:
-      RID_METRICS_TOKEN: ${RID_METRICS_TOKEN:?set RID_METRICS_TOKEN in .env}
+      DEN_METRICS_TOKEN: ${DEN_METRICS_TOKEN:?set DEN_METRICS_TOKEN in .env}
       PROMETHEUS_RETENTION: ${PROMETHEUS_RETENTION:-30d}
     volumes:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -320,7 +320,7 @@ services:
       GF_USERS_DEFAULT_LANGUAGE: es-ES
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001/}
       GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_SERVE_FROM_SUB_PATH:-false}
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/rid-operator.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/den-operator.json
     volumes:
       - ../grafana/provisioning:/etc/grafana/provisioning:ro
       - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -337,14 +337,14 @@ services:
   fluent-bit-transparency:
     image: fluent/fluent-bit:5.1.5-debug
     networks: [default, gateway]
-    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/transparency.yaml']
+    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/transparency.yaml']
     environment:
       FLUENT_BIT_HTTP_PORT: '2020'
-      RID_TRANSPARENCY_INGEST_TOKEN: ${RID_TRANSPARENCY_INGEST_TOKEN:?set RID_TRANSPARENCY_INGEST_TOKEN in .env}
-      RID_TRANSPARENCY_COLLECTOR_HOST: ${RID_TRANSPARENCY_COLLECTOR_HOST:-host.docker.internal}
-      RID_TRANSPARENCY_COLLECTOR_PORT: ${RID_TRANSPARENCY_COLLECTOR_PORT:-4000}
+      DEN_TRANSPARENCY_INGEST_TOKEN: ${DEN_TRANSPARENCY_INGEST_TOKEN:?set DEN_TRANSPARENCY_INGEST_TOKEN in .env}
+      DEN_TRANSPARENCY_COLLECTOR_HOST: ${DEN_TRANSPARENCY_COLLECTOR_HOST:-host.docker.internal}
+      DEN_TRANSPARENCY_COLLECTOR_PORT: ${DEN_TRANSPARENCY_COLLECTOR_PORT:-4000}
     volumes:
-      - ../fluent-bit:/fluent-bit/etc/rid:ro
+      - ../fluent-bit:/fluent-bit/etc/den:ro
       - transparency-buffer:/var/lib/fluent-bit
     extra_hosts:
       # The portal API runs on the host during development.
@@ -360,11 +360,11 @@ services:
   fluent-bit-errors:
     image: fluent/fluent-bit:5.1.5-debug
     networks: [gateway]
-    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/gateway-errors.yaml']
+    command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/gateway-errors.yaml']
     environment:
       FLUENT_BIT_HTTP_PORT: '2020'
     volumes:
-      - ../fluent-bit:/fluent-bit/etc/rid:ro
+      - ../fluent-bit:/fluent-bit/etc/den:ro
     # Not published: APISIX sends to fluent-bit-errors:5140/udp over the Compose network.
     healthcheck:
       <<: *healthcheck-defaults
@@ -403,11 +403,11 @@ services:
     volumes:
       - tsa-data:/tsa:ro
     ports:
-      - 127.0.0.1:${RID_TSA_PORT:-3004}:3004
+      - 127.0.0.1:${DEN_TSA_PORT:-3004}:3004
     # Distroless image, nothing to run a health check with: the API retries while it is down.
 
   # Antivirus of uploaded documents (M6-08): clamd, GPL-2.0 in its own container (CLAUDE.md rule
-  # 1). Optional: profile `antivirus`, and RID_CLAMAV_URL=tcp://localhost:3310 (development) or
+  # 1). Optional: profile `antivirus`, and DEN_CLAMAV_URL=tcp://localhost:3310 (development) or
   # tcp://clamav:3310 (pilot) for the API. freshclam inside updates the signatures from the
   # internet; the first start takes a few minutes and about 1.2 GB of memory.
   clamav:
@@ -439,16 +439,16 @@ services:
       context: ../..
       dockerfile: infra/mock-providers/Dockerfile
     networks: [providers]
-    image: rid/mock-providers:dev
+    image: den/mock-providers:dev
     environment: &mock-env
       PROVIDER: salud
       PORT: '8000'
       # The gateway's signed assertion (M6-10): verified with the portal's JWKS and logged. The
       # portal runs on the host in development; the pilot sets MOCK_GATEWAY_JWKS_URL.
-      RID_GATEWAY_JWKS_URL: ${MOCK_GATEWAY_JWKS_URL:-http://host.docker.internal:4000/api/v1/gateway/jwks}
-      RID_ASSERTION_REQUIRED: ${MOCK_ASSERTION_REQUIRED:-false}
+      DEN_GATEWAY_JWKS_URL: ${MOCK_GATEWAY_JWKS_URL:-http://host.docker.internal:4000/api/v1/gateway/jwks}
+      DEN_ASSERTION_REQUIRED: ${MOCK_ASSERTION_REQUIRED:-false}
       # The assertions' iss: the gateway's public URL.
-      RID_ASSERTION_ISSUER: ${RID_GATEWAY_PUBLIC_URL:-https://localhost:9443}
+      DEN_ASSERTION_ISSUER: ${DEN_GATEWAY_PUBLIC_URL:-https://localhost:9443}
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
@@ -461,7 +461,7 @@ services:
     # Same image as mock-salud (the build is cached); the provider is chosen by PROVIDER.
     build: *mock-build
     networks: [providers]
-    image: rid/mock-providers:dev
+    image: den/mock-providers:dev
     environment:
       <<: *mock-env
       PROVIDER: socioeconomico
@@ -478,15 +478,15 @@ services:
     build:
       context: ../wg-hub
     networks: [default, providers]
-    image: rid/wg-hub:dev
+    image: den/wg-hub:dev
     cap_add: [NET_ADMIN]
     devices: ['/dev/net/tun:/dev/net/tun']
     sysctls:
       net.ipv4.ip_forward: '0'
     environment:
-      RID_WG_SUBNET: ${RID_WG_SUBNET:-10.77.0.0/16}
-      RID_WG_HUB_PRIVATE_KEY: ${RID_WG_HUB_PRIVATE_KEY:?set RID_WG_HUB_PRIVATE_KEY in .env}
-      RID_WG_HUB_AGENT_TOKEN: ${RID_WG_HUB_AGENT_TOKEN:?set RID_WG_HUB_AGENT_TOKEN in .env}
+      DEN_WG_SUBNET: ${DEN_WG_SUBNET:-10.77.0.0/16}
+      DEN_WG_HUB_PRIVATE_KEY: ${DEN_WG_HUB_PRIVATE_KEY:?set DEN_WG_HUB_PRIVATE_KEY in .env}
+      DEN_WG_HUB_AGENT_TOKEN: ${DEN_WG_HUB_AGENT_TOKEN:?set DEN_WG_HUB_AGENT_TOKEN in .env}
     ports:
       - 127.0.0.1:${WG_HUB_UDP_PORT:-51820}:51820/udp
       # The agent, for the portal API that runs on the host during development.
@@ -503,9 +503,9 @@ services:
     build:
       context: ../contract-runner
     networks: [providers]
-    image: rid/contract-runner:dev
+    image: den/contract-runner:dev
     environment:
-      RID_CONTRACT_RUNNER_TOKEN: ${RID_CONTRACT_RUNNER_TOKEN:?set RID_CONTRACT_RUNNER_TOKEN in .env}
+      DEN_CONTRACT_RUNNER_TOKEN: ${DEN_CONTRACT_RUNNER_TOKEN:?set DEN_CONTRACT_RUNNER_TOKEN in .env}
     ports:
       - 127.0.0.1:${CONTRACT_RUNNER_PORT:-8096}:8096
     healthcheck:
@@ -514,17 +514,17 @@ services:
 
   mock-node:
     # Simulated kit node (M4-03): a test fixture, not the kit (ADR-0011). Profile `nodes`. It
-    # waits for an enrollment token in /var/lib/mock-node/token (or RID_ENROLLMENT_TOKEN), then
+    # waits for an enrollment token in /var/lib/mock-node/token (or DEN_ENROLLMENT_TOKEN), then
     # enrolls, joins the hub and serves mock-salud over mTLS on its tunnel address.
     profiles: [nodes]
     networks: [providers]
     build:
       context: ../mock-node
-    image: rid/mock-node:dev
+    image: den/mock-node:dev
     cap_add: [NET_ADMIN]
     devices: ['/dev/net/tun:/dev/net/tun']
     environment:
-      RID_PORTAL_URL: ${MOCK_NODE_PORTAL_URL:-http://host.docker.internal:4000}
+      DEN_PORTAL_URL: ${MOCK_NODE_PORTAL_URL:-http://host.docker.internal:4000}
       # The gateway's TLS name stays the controlUrl's (localhost in development).
       MOCK_NODE_CONTROL_HOST: apisix
       MOCK_NODE_BACKEND: http://mock-salud:8000

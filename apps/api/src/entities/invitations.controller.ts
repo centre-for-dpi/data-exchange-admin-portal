@@ -3,7 +3,7 @@ import {
   invitationIdParamsSchema,
   invitationListSchema,
   membershipSummarySchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { type AuthenticatedRequest, CurrentPrincipal, SignedIn } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';

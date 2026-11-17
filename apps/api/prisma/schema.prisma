@@ -294,7 +294,7 @@ enum UserStatus {
 
 model User {
   id                   String     @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  /// Subject (sub) of the user in the Keycloak realm rid-portal.
+  /// Subject (sub) of the user in the Keycloak realm den-portal.
   keycloakSub          String     @unique @map("keycloak_sub")
   email                String     @unique
   fullName             String     @map("full_name")
@@ -589,7 +589,7 @@ model Application {
   name             String
   description      String
   environment      AppEnvironment
-  /// Deterministic client id in the Keycloak realm rid-gateway: rid-app-<id>.
+  /// Deterministic client id in the Keycloak realm den-gateway: den-app-<id>.
   keycloakClientId String            @unique @map("keycloak_client_id")
   status           ApplicationStatus @default(active)
   technicalContact String            @map("technical_contact")
@@ -631,7 +631,7 @@ model Credential {
   fingerprint        String?
   /// SHA-256 of a client secret (identifies it; the secret itself is never stored in clear).
   secretHash         String?          @map("secret_hash")
-  /// Client secret sealed with AES-256-GCM (RID_SECRETS_KEY) only until the Keycloak reconciler
+  /// Client secret sealed with AES-256-GCM (DEN_SECRETS_KEY) only until the Keycloak reconciler
   /// has set it on the client; then it is erased.
   sealedSecret       String?          @map("sealed_secret")
   serial             String?
@@ -776,7 +776,7 @@ enum SyncStatus {
 
 /// Last desired and applied state per external object (APISIX route, Keycloak client, OPA bundle).
 model SyncState {
-  /// Deterministic external id, e.g. apisix:route:rid-route-<apiVersionId>.
+  /// Deterministic external id, e.g. apisix:route:den-route-<apiVersionId>.
   target          String     @id
   /// apisix | keycloak | opa
   system          String
@@ -842,7 +842,7 @@ enum SubjectSource {
 
 /// Transparency register (ADR-0015, MT-03): one row per call that reached a provider on an
 /// operation with a data subject. The subject is only the keyed pseudonym OPA computed; never
-/// the document number, the path or any content. Insert-only: rid_app may not update or delete,
+/// the document number, the path or any content. Insert-only: den_app may not update or delete,
 /// a trigger refuses it to everyone, and only purge_subject_access_records() removes rows past
 /// retention. Ids are snapshots, without foreign keys: the record is evidence and must outlive
 /// later changes to what it points to.
@@ -1032,9 +1032,9 @@ model AuditAnchor {
 // ---------------------------------------------------------------------------------------------
 
 enum GatewayCertificatePurpose {
-  /// TLS server certificate of the gateway's public names (APISIX SSL object rid-ssl-gateway).
+  /// TLS server certificate of the gateway's public names (APISIX SSL object den-ssl-gateway).
   server
-  /// TLS client certificate the gateway presents to upstreams (SSL object rid-ssl-gateway-client,
+  /// TLS client certificate the gateway presents to upstreams (SSL object den-ssl-gateway-client,
   /// M3-03).
   upstream_client
 
@@ -1042,7 +1042,7 @@ enum GatewayCertificatePurpose {
 }
 
 /// The portal generates the key, has step-ca sign it and hands both to APISIX through the
-/// reconciler. The key is sealed with RID_SECRETS_KEY, bound to the row id.
+/// reconciler. The key is sealed with DEN_SECRETS_KEY, bound to the row id.
 model GatewayCertificate {
   id             String                    @id @default(dbgenerated("uuidv7()")) @db.Uuid
   purpose        GatewayCertificatePurpose
@@ -1061,7 +1061,7 @@ model GatewayCertificate {
   @@map("gateway_certificate")
 }
 
-/// Keys the gateway signs its assertions to providers with (X-RID-Assertion, ADR-0024, M6-10).
+/// Keys the gateway signs its assertions to providers with (X-DEN-Assertion, ADR-0024, M6-10).
 /// The newest one without retiredAt signs; every key ever used stays published in the JWKS
 /// (/api/v1/gateway/jwks) so that the assertions providers archived keep verifying, unless it was
 /// compromised.
@@ -1071,7 +1071,7 @@ model GatewaySigningKey {
   kid              String    @unique
   /// Public key as a JWK (EC P-256).
   publicJwk        Json      @map("public_jwk")
-  /// PKCS#8 PEM of the private key, sealed with RID_SECRETS_KEY (AAD: the kid).
+  /// PKCS#8 PEM of the private key, sealed with DEN_SECRETS_KEY (AAD: the kid).
   sealedPrivateKey String    @map("sealed_private_key")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   /// When a newer key took over the signing.

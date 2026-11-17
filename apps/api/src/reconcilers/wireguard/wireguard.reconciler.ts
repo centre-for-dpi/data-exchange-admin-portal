@@ -6,7 +6,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { nodeDnsName } from '@rid/contracts';
+import { nodeDnsName } from '@den/contracts';
 import { ENROLLED_NODE_STATUSES } from '../../domain/node/state-machine.js';
 import { PrismaService, type Tx } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';
@@ -16,7 +16,7 @@ import { HUB_AGENT, type HubAgent, type HubDesiredState, HUB_TIMEOUT_MS } from '
 export const WIREGUARD_SYNC_TOPIC = 'wireguard.sync';
 export const WIREGUARD_SYNC_TARGET = 'wg-hub:state';
 const FULL_RECONCILE_MS = 60 * 1000;
-/** Serializes passes across API replicas ("rid_wgsy"): see reconcile(). */
+/** Serializes passes across API replicas ("den_wgsy"): see reconcile(). */
 const RECONCILE_LOCK = 0x7269645f77677379n;
 /** Lifetime of a pass's transaction, which holds the lock. */
 const PASS_TIMEOUT_MS = 60_000;
@@ -54,7 +54,7 @@ export class WireguardReconciler implements OnApplicationBootstrap, OnApplicatio
   async onApplicationBootstrap(): Promise<void> {
     if (!QueueService.enabled()) return;
     if (!this.hub) {
-      this.logger.warn('RID_WG_HUB_AGENT_URL / RID_WG_HUB_AGENT_TOKEN not set: no tunnel peers');
+      this.logger.warn('DEN_WG_HUB_AGENT_URL / DEN_WG_HUB_AGENT_TOKEN not set: no tunnel peers');
       return;
     }
     await this.queue.work(WIREGUARD_SYNC_TOPIC, () => this.reconcile());

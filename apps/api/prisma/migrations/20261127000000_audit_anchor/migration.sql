@@ -17,4 +17,4 @@ CREATE TRIGGER audit_anchor_insert_only BEFORE UPDATE OR DELETE ON "audit_anchor
   FOR EACH ROW EXECUTE FUNCTION transparency_insert_only();
 CREATE TRIGGER audit_anchor_no_truncate BEFORE TRUNCATE ON "audit_anchor"
   FOR EACH STATEMENT EXECUTE FUNCTION transparency_insert_only();
-REVOKE UPDATE, DELETE, TRUNCATE ON "audit_anchor" FROM rid_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON "audit_anchor" FROM den_app;

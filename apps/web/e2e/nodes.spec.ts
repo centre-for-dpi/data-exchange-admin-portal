@@ -20,7 +20,7 @@ test.describe('nodes of the kit and enrollment tokens (M4-01)', () => {
       page.getByRole('heading', { name: `Token de enrolamiento de ${name}` }),
     ).toBeFocused();
     const token = (await page.getByTestId('enrollment-token').textContent()) ?? '';
-    expect(token).toMatch(/^rid-enroll-[A-Za-z0-9_-]{43}$/);
+    expect(token).toMatch(/^den-enroll-[A-Za-z0-9_-]{43}$/);
     await expectNoAccessibilityViolations(page);
 
     const row = page.getByRole('row', { name: new RegExp(name) });
@@ -51,13 +51,13 @@ test.describe('nodes of the kit and enrollment tokens (M4-01)', () => {
     // The kit enrolls through the contract (ARCHITECTURE.md §10) with the token.
     const { x } = generateKeyPairSync('x25519').publicKey.export({ format: 'jwk' });
     const res = await fetch(
-      `${process.env.RID_API_URL ?? 'http://localhost:4000'}/api/v1/nodes/enroll`,
+      `${process.env.DEN_API_URL ?? 'http://localhost:4000'}/api/v1/nodes/enroll`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           token,
-          csr: (await makeCsr('rid-node')).csr,
+          csr: (await makeCsr('den-node')).csr,
           wireguardPublicKey: Buffer.from(x ?? '', 'base64url').toString('base64'),
           kitVersion: '1.0.0',
         }),

@@ -1,5 +1,5 @@
 {{- $c := dict "root" . "component" "etcd" }}
-{{- $name := include "rid.name" "etcd" }}
+{{- $name := include "den.name" "etcd" }}
 {{- /*
 etcd for APISIX: a cluster of `etcd.replicas` members (3 in production, ARCHITECTURE §11), each
 with its stable name (StatefulSet) and its disk. Only the gateway reaches it (NetworkPolicy).
@@ -9,7 +9,7 @@ kind: StatefulSet
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   serviceName: {{ $name }}
   replicas: {{ .Values.etcd.replicas }}
@@ -17,11 +17,11 @@ spec:
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -35,7 +35,7 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              {{- include "rid.selector" $c | nindent 14 }}
+              {{- include "den.selector" $c | nindent 14 }}
       containers:
         - name: etcd
           image: {{ .Values.images.etcd }}
@@ -89,7 +89,7 @@ spec:
             - { name: tls, mountPath: /etc/etcd/tls, readOnly: true }
       volumes:
         - name: tls
-          secret: { secretName: {{ include "rid.name" "etcd-tls" }} }
+          secret: { secretName: {{ include "den.name" "etcd-tls" }} }
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -108,12 +108,12 @@ kind: Service
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   clusterIP: None
   publishNotReadyAddresses: true
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: client, port: 2379 }
     - { name: peer, port: 2380 }
@@ -123,10 +123,10 @@ kind: PodDisruptionBudget
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   # Quorum: a 3-member cluster survives one member down.
   maxUnavailable: 1
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}

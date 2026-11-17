@@ -2,20 +2,20 @@
 # Scheduled backups of the Compose PostgreSQL with pgBackRest (M6-06, ADR-0026). Runs in the
 # `pgbackrest` service, which shares the database's data, socket and repository volumes.
 #
-#   rid-backup-scheduler          # prepare, then a backup a day at RID_BACKUP_HOUR (UTC): a full
-#                                 # one on RID_BACKUP_FULL_DAY (0 = Sunday), differential otherwise
-#   rid-backup-scheduler --once   # prepare and take a full backup now, then exit
+#   den-backup-scheduler          # prepare, then a backup a day at DEN_BACKUP_HOUR (UTC): a full
+#                                 # one on DEN_BACKUP_FULL_DAY (0 = Sunday), differential otherwise
+#   den-backup-scheduler --once   # prepare and take a full backup now, then exit
 #
 # "Prepare" creates the stanza (idempotent), checks that WAL archiving reaches the repository and
 # takes a first full backup when the repository has none. pgBackRest expires what falls outside
 # the retention (pgbackrest.conf) after each backup.
 set -eu
 
-STANZA=rid
-HOUR=${RID_BACKUP_HOUR:-2}
-FULL_DAY=${RID_BACKUP_FULL_DAY:-0}
+STANZA=den
+HOUR=${DEN_BACKUP_HOUR:-2}
+FULL_DAY=${DEN_BACKUP_FULL_DAY:-0}
 
-log() { echo "rid-backup-scheduler: $*"; }
+log() { echo "den-backup-scheduler: $*"; }
 
 backup() {
   log "starting $1 backup"

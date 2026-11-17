@@ -1,4 +1,4 @@
-import type { EntityRole } from '@rid/contracts';
+import type { EntityRole } from '@den/contracts';
 
 /**
  * Texts of the e-mails the API sends, in the portal's languages (CLAUDE.md, rule 7). Names of

@@ -9,7 +9,7 @@ import {
   entityMemberSchema,
   inviteMemberSchema,
   updateMemberRolesSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import {
   type AuthenticatedRequest,
@@ -51,7 +51,7 @@ export class EntityMembersController {
     summary: 'Invite a person by e-mail with the given roles',
     description:
       'The invitation is e-mailed; only a user whose verified e-mail is that address can accept ' +
-      'it (ADR-0018). It expires after RID_INVITATION_TTL_DAYS days.',
+      'it (ADR-0018). It expires after DEN_INVITATION_TTL_DAYS days.',
     tags: ['entities'],
     params: entityIdParamsSchema,
     body: inviteMemberSchema,

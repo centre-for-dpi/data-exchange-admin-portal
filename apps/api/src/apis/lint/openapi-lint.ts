@@ -6,7 +6,7 @@ import spectralParsers from '@stoplight/spectral-parsers';
 import spectralRefResolver from '@stoplight/spectral-ref-resolver';
 import spectralRulesets from '@stoplight/spectral-rulesets';
 import { parseDocument } from 'yaml';
-import type { DataSubject, LintIssue, LintReport, Operation } from '@rid/contracts';
+import type { DataSubject, LintIssue, LintReport, Operation } from '@den/contracts';
 
 const { Spectral, Document, createRulesetFunction } = spectralCore;
 const { oas } = spectralRulesets;
@@ -16,7 +16,7 @@ const { Resolver } = spectralRefResolver;
 /**
  * The document is untrusted input. Spectral's default resolver follows $refs over HTTP and the
  * file system (SSRF, local file read): this one has no readers at all, so only local `#/...`
- * references resolve. External references are also reported by the rid-no-external-ref rule.
+ * references resolve. External references are also reported by the den-no-external-ref rule.
  */
 const localOnlyResolver = () => new Resolver({ resolvers: {} });
 
@@ -32,7 +32,7 @@ const onlyLocalRefs = createRulesetFunction<unknown, null>({ input: null, option
 
 /**
  * Words that mark a parameter as an identifier. Identifiers in the query string end up in URLs,
- * proxies and logs; RID asks for them in the path or in a POST body (SPEC.md §4.2,
+ * proxies and logs; DEN asks for them in the path or in a POST body (SPEC.md §4.2,
  * features.lint.noIdInQuery). Generic words (Spanish and English), not country document names.
  */
 const ID_WORDS = new Set(['id', 'ids', 'uuid', 'doc', 'num', 'nro', 'numero', 'number']);
@@ -66,14 +66,14 @@ export interface LintOptions {
   /** features.lint.noIdInQuery of the country config. */
   noIdInQuery: boolean;
   /**
-   * Data subject declarations (x-rid-data-subject, ADR-0015). `required` for APIs with personal or
+   * Data subject declarations (x-den-data-subject, ADR-0015). `required` for APIs with personal or
    * sensitive data; `documentTypes` are the country's person document types. Without it, declared
    * extensions are still checked for shape.
    */
   dataSubject?: { required: boolean; documentTypes: readonly string[] };
 }
 
-export const DATA_SUBJECT_EXTENSION = 'x-rid-data-subject';
+export const DATA_SUBJECT_EXTENSION = 'x-den-data-subject';
 
 /** Path template parameters of an OpenAPI path, e.g. /a/{id}/b/{x}.json -> [id, x]. */
 const templateParams = (path: string): string[] =>
@@ -83,7 +83,7 @@ const templateParams = (path: string): string[] =>
 export const JSON_POINTER = /^(\/([^~/]|~[01])*)+$/;
 
 /**
- * Reads x-rid-data-subject: "none", or an object { in: path, name, documentType?,
+ * Reads x-den-data-subject: "none", or an object { in: path, name, documentType?,
  * documentTypeParam? } | { in: body, pointer, documentType?, documentTypePointer? } | { in: none }.
  * Returns 'invalid' for any other shape and undefined when the extension is absent.
  */
@@ -133,10 +133,10 @@ export function parseDataSubject(raw: unknown): DataSubject | 'invalid' | undefi
   return 'invalid';
 }
 
-/** RID ruleset (M1-03): minimal and strict. Grows with M2-05 (compatibility) and M4-06. */
+/** DEN ruleset (M1-03): minimal and strict. Grows with M2-05 (compatibility) and M4-06. */
 function ruleset(options: LintOptions) {
   return {
-    // Start from the OAS ruleset with every rule off, then enable only what RID requires.
+    // Start from the OAS ruleset with every rule off, then enable only what DEN requires.
     extends: [[oas, 'off']] as [typeof oas, 'off'][],
     rules: {
       'oas3-schema': 'error',
@@ -146,7 +146,7 @@ function ruleset(options: LintOptions) {
       'operation-parameters': 'error',
       'path-params': 'error',
       'no-$ref-siblings': 'error',
-      'rid-no-external-ref': {
+      'den-no-external-ref': {
         description: 'Every $ref must point inside the document',
         severity: 'error',
         resolved: false,
@@ -155,7 +155,7 @@ function ruleset(options: LintOptions) {
       },
       ...(options.noIdInQuery
         ? {
-            'rid-no-id-in-query': {
+            'den-no-id-in-query': {
               description: 'Identifiers must not travel in the query string',
               severity: 'error',
               given: [
@@ -211,7 +211,7 @@ export function listOperations(spec: Record<string, unknown>): ParsedOpenApi['op
 }
 
 /**
- * Checks x-rid-data-subject on every operation (ADR-0015): its shape, that the parameters it
+ * Checks x-den-data-subject on every operation (ADR-0015): its shape, that the parameters it
  * names exist in the path template, that document types are the country's, and, for personal or
  * sensitive APIs, that every operation declares one.
  */
@@ -234,7 +234,7 @@ function dataSubjectIssues(
       if (subject === undefined) {
         if (options.dataSubject?.required) {
           issue(
-            'rid-data-subject-required',
+            'den-data-subject-required',
             `Operation ${name} must declare whose data it handles: ${DATA_SUBJECT_EXTENSION} with a path parameter, a body pointer, or none`,
             at,
           );
@@ -244,7 +244,7 @@ function dataSubjectIssues(
       const atExtension = [...at, DATA_SUBJECT_EXTENSION];
       if (subject === 'invalid') {
         issue(
-          'rid-data-subject-invalid',
+          'den-data-subject-invalid',
           `${DATA_SUBJECT_EXTENSION} must be "none", { in: path, name, documentType? or documentTypeParam? } or { in: body, pointer, documentType? or documentTypePointer? }`,
           atExtension,
         );
@@ -254,7 +254,7 @@ function dataSubjectIssues(
       const types = options.dataSubject?.documentTypes;
       if (subject.documentType && types && !types.includes(subject.documentType)) {
         issue(
-          'rid-data-subject-document-type',
+          'den-data-subject-document-type',
           `Unknown document type "${subject.documentType}" (allowed: ${types.join(', ')})`,
           atExtension,
         );
@@ -264,7 +264,7 @@ function dataSubjectIssues(
         for (const param of [subject.name, subject.documentTypeParam]) {
           if (param && !params.includes(param)) {
             issue(
-              'rid-data-subject-parameter',
+              'den-data-subject-parameter',
               `Path parameter "${param}" is not in ${path}`,
               atExtension,
             );
@@ -272,7 +272,7 @@ function dataSubjectIssues(
         }
         if (subject.documentType && subject.documentTypeParam) {
           issue(
-            'rid-data-subject-invalid',
+            'den-data-subject-invalid',
             'Use either documentType or documentTypeParam, not both',
             atExtension,
           );
@@ -284,7 +284,7 @@ function dataSubjectIssues(
           .requestBody;
         if (!body?.content?.['application/json']) {
           issue(
-            'rid-data-subject-body',
+            'den-data-subject-body',
             `Operation ${name} declares its data subject in the body but takes no application/json request body`,
             atExtension,
           );
@@ -292,7 +292,7 @@ function dataSubjectIssues(
         for (const pointer of [subject.pointer, subject.documentTypePointer]) {
           if (pointer && !JSON_POINTER.test(pointer)) {
             issue(
-              'rid-data-subject-pointer',
+              'den-data-subject-pointer',
               `"${pointer}" is not a JSON pointer (RFC 6901), e.g. /numeroIdentificacion`,
               atExtension,
             );
@@ -300,7 +300,7 @@ function dataSubjectIssues(
         }
         if (subject.documentType && subject.documentTypePointer) {
           issue(
-            'rid-data-subject-invalid',
+            'den-data-subject-invalid',
             'Use either documentType or documentTypePointer, not both',
             atExtension,
           );
@@ -334,7 +334,7 @@ function preflight(source: string): LintIssue[] {
   } catch {
     return [
       {
-        code: 'rid-yaml-too-complex',
+        code: 'den-yaml-too-complex',
         message: `The YAML uses too many aliases (limit ${MAX_YAML_ALIASES})`,
         severity: 'error',
         path: [],
@@ -345,7 +345,7 @@ function preflight(source: string): LintIssue[] {
   if (JSON.stringify(data ?? null).length > MAX_PARSED_JSON_BYTES) {
     return [
       {
-        code: 'rid-openapi-too-large',
+        code: 'den-openapi-too-large',
         message: 'The document is too large once parsed',
         severity: 'error',
         path: [],
@@ -357,7 +357,7 @@ function preflight(source: string): LintIssue[] {
 }
 
 /**
- * Parses an OpenAPI 3.x document given as YAML or JSON text and lints it with the RID ruleset.
+ * Parses an OpenAPI 3.x document given as YAML or JSON text and lints it with the DEN ruleset.
  * Issues carry 1-based line numbers so the UI can point at them (M1-03).
  */
 
@@ -385,7 +385,7 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
   const version = typeof spec.openapi === 'string' ? spec.openapi : undefined;
   if (!version?.startsWith('3.')) {
     issues.push({
-      code: 'rid-openapi-3',
+      code: 'den-openapi-3',
       message: 'The document must be OpenAPI 3.x (field "openapi": "3.0.x" or "3.1.x")',
       severity: 'error',
       path: ['openapi'],
@@ -411,7 +411,7 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
         const at = ['paths', path];
         const range = document.getRangeForJsonPath(at, true);
         issues.push({
-          code: 'rid-path-traversal',
+          code: 'den-path-traversal',
           message: `Path ${path} must not contain . or .. segments, encoded dots or slashes, backslashes or empty segments`,
           severity: 'error',
           path: at,

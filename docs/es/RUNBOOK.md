@@ -6,7 +6,7 @@ Procedimientos del operador de la red (en Colombia, la AND) para lo que no es ru
 
 Convenciones:
 
-- `dc` es Docker Compose con los archivos del piloto (`OPERATIONS.md §0`). En Kubernetes, el equivalente es `kubectl -n rid`.
+- `dc` es Docker Compose con los archivos del piloto (`OPERATIONS.md §0`). En Kubernetes, el equivalente es `kubectl -n den`.
 - **Consola** es la consola del operador del portal (`/operator`). Las acciones de `platform_admin` piden segundo factor.
 - Toda acción del portal queda en la bitácora de auditoría. Lo que se hace fuera del portal (en Keycloak, en el servidor) se anota en el registro del incidente (§2.1).
 
@@ -28,7 +28,7 @@ Hay dos caminos (`SPEC.md §4.1`). En los dos, la entidad queda activa y el port
 2. Decide:
    - **Pedir correcciones** si falta o sobra algo: el comentario lo lee el solicitante.
    - **Rechazar** si la solicitud es falsa o no corresponde. Es definitivo, pero libera el identificador para una solicitud legítima.
-   - **Aprobar**: la entidad queda activa, el solicitante queda como `entity_admin` y los responsables reciben su invitación (vence a los 14 días, `RID_INVITATION_TTL_DAYS`).
+   - **Aprobar**: la entidad queda activa, el solicitante queda como `entity_admin` y los responsables reciben su invitación (vence a los 14 días, `DEN_INVITATION_TTL_DAYS`).
 3. Nadie revisa una solicitud que presentó o en la que figura como responsable: el portal no lo deja.
 
 ### 1.2 Después del alta
@@ -77,7 +77,7 @@ Comprobación: la entidad figura activa en Consola → Entidades, su nodo en lí
 | **Clave privada de una aplicación filtrada** (su certificado de cliente) | El desarrollador de la aplicación revoca el certificado (Mis aplicaciones → la aplicación). Si la entidad no responde: revocación masiva filtrada por la entidad y la fecha de emisión (§4), o suspender las suscripciones de la aplicación como operador | La aplicación emite un certificado nuevo con una clave nueva |
 | **Secreto de cliente filtrado** | El desarrollador rota el secreto y revoca el anterior (Mis aplicaciones → Credenciales). Un secreto solo no basta para llamar si la red exige mTLS: el token queda ligado al certificado | — |
 | **Entidad comprometida** (varias aplicaciones, o no se sabe cuáles) | Suspender la entidad (§1.3) y revocar en masa sus certificados (§4) | Reactivar cuando la entidad confirme que limpió su entorno; sus aplicaciones emiten certificados nuevos |
-| **Cuenta de usuario comprometida** | En la consola de administración de Keycloak (realm `rid-portal`): deshabilitar al usuario y cerrar sus sesiones. El administrador de la entidad le quita los roles si corresponde (Mi entidad, miembros). Si el aviso fue un enrolamiento de segundo factor que el dueño no hizo (correo de Keycloak, M3-08): borrar ese segundo factor en Keycloak | El dueño restablece su contraseña y enrola su segundo factor de nuevo |
+| **Cuenta de usuario comprometida** | En la consola de administración de Keycloak (realm `den-portal`): deshabilitar al usuario y cerrar sus sesiones. El administrador de la entidad le quita los roles si corresponde (Mi entidad, miembros). Si el aviso fue un enrolamiento de segundo factor que el dueño no hizo (correo de Keycloak, M3-08): borrar ese segundo factor en Keycloak | El dueño restablece su contraseña y enrola su segundo factor de nuevo |
 | **Nodo de una entidad comprometido** | Dar de baja el nodo: el administrador de la entidad en Mi entidad → Nodos, o el operador por el API (`POST /api/v1/entities/{entityId}/nodes/{nodeId}/decommission`). El gateway deja de enrutarle y su certificado deja de valer para el canal de control | Instalar el kit en un servidor limpio y enrolarlo con un token nuevo |
 | **Datos personales en un log** (un número de identificación, un cuerpo de respuesta) | Detener la fuente. Borrar lo escrito: el índice de OpenSearch afectado, los archivos o la salida del colector | Corregir el enmascarado y agregar una prueba de regresión (`tests/infra`, regla 2 de CLAUDE.md) |
 | **Gateway caído** | `dc ps apisix opa etcd`; `dc logs apisix opa`. OPA sin bundle niega todo: ver `OPERATIONS.md §7` | Reiniciar el componente (`OPERATIONS.md §5.1`); comprobar con una llamada de prueba |
@@ -86,7 +86,7 @@ Comprobación: la entidad figura activa en Consola → Entidades, su nodo en lí
 | **Base de datos dañada o borrado por error** | Detener el API | `sudo ./install.sh restore [instante]` (`OPERATIONS.md §6`) |
 | **Clave privada de la CA intermedia comprometida** | §3.3 | §3.3 |
 | **Clave de firma de la aserción del gateway comprometida** (M6-10) | Rotarla como comprometida: `POST /api/v1/admin/gateway-signing-keys/rotate` con `{"compromised": true, "reason": "…"}` (`platform_admin`). El gateway firma con la nueva desde la siguiente pasada del reconciliador, en segundos; la anterior sale del JWKS | Avisar a los proveedores: lo que firmó la clave comprometida ya no verifica, y quien lo archivó debe saber desde cuándo dejó de ser confiable (la fecha está en la bitácora, `gateway_signing_key.created`) |
-| **Nodos del gateway agregados o quitados** (no es un incidente, pero altera los límites) | — | Ajustar `RID_GATEWAY_NODES` (en el chart, sale de `gateway.replicas`): cada nodo cuenta los límites por su lado y el bundle le da a cada uno su parte (ADR-0020) |
+| **Nodos del gateway agregados o quitados** (no es un incidente, pero altera los límites) | — | Ajustar `DEN_GATEWAY_NODES` (en el chart, sale de `gateway.replicas`): cada nodo cuenta los límites por su lado y el bundle le da a cada uno su parte (ADR-0020) |
 
 ## 3. Rotación de la CA intermedia
 
@@ -106,7 +106,7 @@ La CA de desarrollo guarda la raíz, la intermedia y sus claves en el volumen `s
 
    ```bash
    dc exec step-ca sh -c 'cd /home/step &&
-     step certificate create "RID Dev CA Intermediate CA $(date +%Y-%m)" \
+     step certificate create "DEN Dev CA Intermediate CA $(date +%Y-%m)" \
        certs/intermediate_ca.next.crt secrets/intermediate_ca_key.next \
        --profile intermediate-ca --ca certs/root_ca.crt --ca-key secrets/root_ca_key \
        --ca-password-file secrets/password --password-file secrets/password --not-after 43800h &&
@@ -131,9 +131,9 @@ La CA de desarrollo guarda la raíz, la intermedia y sus claves en el volumen `s
 
 La raíz no está en el clúster. La intermedia y su clave viven en el Secret `stepCa.pkiSecret`.
 
-1. Con la raíz fuera de línea, en la máquina de la ceremonia de la CA: crear la intermedia nueva (`step certificate create ... --profile intermediate-ca`, como en §3.1) y cifrar su clave con `RID_STEP_CA_PROVISIONER_PASSWORD`.
+1. Con la raíz fuera de línea, en la máquina de la ceremonia de la CA: crear la intermedia nueva (`step certificate create ... --profile intermediate-ca`, como en §3.1) y cifrar su clave con `DEN_STEP_CA_PROVISIONER_PASSWORD`.
 2. Reemplazar `intermediate_ca.crt` e `intermediate_ca_key` en el Secret (en el almacén de secretos, si lo sincroniza External Secrets).
-3. `kubectl -n rid rollout restart statefulset/rid-step-ca`. En cada arranque, step-ca toma la PKI del Secret.
+3. `kubectl -n den rollout restart statefulset/den-step-ca`. En cada arranque, step-ca toma la PKI del Secret.
 4. Seguir con los pasos 3 a 5 de §3.1.
 
 ### 3.3 Intermedia comprometida (emergencia)
@@ -145,7 +145,7 @@ Quien tiene la clave de la intermedia puede emitir certificados que encadenan a 
 3. **Evaluar** lo que la lista de huellas no cubre: un atacante con la intermedia y una posición en la red podría hacerse pasar por el gateway ante las aplicaciones. El gateway no consulta listas de revocación (CRL) de intermedias. Si el riesgo es real, la salida completa es una raíz nueva:
    - ceremonia de una raíz y una intermedia nuevas;
    - distribuir la raíz nueva a las aplicaciones y a los nodos;
-   - fijar su huella en el portal (`RID_STEP_CA_ROOT_FINGERPRINT` o `stepCa.rootFingerprint`);
+   - fijar su huella en el portal (`DEN_STEP_CA_ROOT_FINGERPRINT` o `stepCa.rootFingerprint`);
    - reemitir todo.
 
    Se planifica con las entidades, porque cada aplicación cambia su confianza.

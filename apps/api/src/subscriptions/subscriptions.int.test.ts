@@ -2,13 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   createdApplicationSchema,
   type EntityRole,
   subscriptionDetailSchema,
   subscriptionPageSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -58,7 +58,7 @@ describe('access requests and approval (M1-07)', () => {
       sector: 'salud',
       tags: [],
       classification,
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -96,7 +96,7 @@ describe('access requests and approval (M1-07)', () => {
       name: `Validador ${randomUUID().slice(0, 6)}`,
       description: 'Valida requisitos al asignar subsidios.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     expect(res.statusCode, res.body).toBe(201);
     return createdApplicationSchema.parse(res.json()).application.id;

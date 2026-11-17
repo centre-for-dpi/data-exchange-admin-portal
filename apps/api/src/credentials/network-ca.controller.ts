@@ -1,5 +1,5 @@
 import { Controller, Get, Inject, Res } from '@nestjs/common';
-import { PEM_CHAIN_MEDIA_TYPE } from '@rid/contracts';
+import { PEM_CHAIN_MEDIA_TYPE } from '@den/contracts';
 import type { FastifyReply } from 'fastify';
 import { Public } from '../auth/decorators.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
@@ -29,7 +29,7 @@ export class NetworkCaController {
     await reply
       .status(200)
       .header('content-type', PEM_CHAIN_MEDIA_TYPE)
-      .header('content-disposition', 'attachment; filename="rid-network-ca.pem"')
+      .header('content-disposition', 'attachment; filename="den-network-ca.pem"')
       .header('x-content-type-options', 'nosniff')
       .header('cache-control', 'public, max-age=3600')
       .send(pem);

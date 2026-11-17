@@ -1,5 +1,5 @@
 # Template for a new country. Copy it to config/country/<code>.yaml (ISO 3166-1 alpha-2 in lower
-# case, e.g. pe.yaml), fill every field and start the stack with RID_COUNTRY=<code>.
+# case, e.g. pe.yaml), fill every field and start the stack with DEN_COUNTRY=<code>.
 # Schema and validation rules: packages/config/src/schema.ts. Unknown keys are rejected.
 #
 # Texts marked "localized" accept a plain string or { es: ..., en: ... } (the portal's UI languages).

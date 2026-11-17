@@ -1,5 +1,5 @@
-import { USAGE_DEFAULT_DAYS, USAGE_MAX_DAYS, FieldErrorKey } from '@rid/contracts';
-import { getCountryConfig } from '@rid/config';
+import { USAGE_DEFAULT_DAYS, USAGE_MAX_DAYS, FieldErrorKey } from '@den/contracts';
+import { getCountryConfig } from '@den/config';
 import { ServiceUnavailableError, ValidationError } from '../common/errors.js';
 import { localDay, nextDay, startOfLocalDay } from '../common/local-day.js';
 import { ACCESS_LOG_INDICES, type OpenSearch, OpenSearchUnavailableError } from './opensearch.js';

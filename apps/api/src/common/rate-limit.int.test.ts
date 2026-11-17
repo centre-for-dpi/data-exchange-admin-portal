@@ -10,23 +10,23 @@ import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/tes
  */
 describe('rate limits of the portal API (M6-01)', () => {
   const saved = {
-    general: process.env.RID_RATE_LIMIT_PER_MINUTE,
-    strict: process.env.RID_RATE_LIMIT_STRICT_PER_MINUTE,
+    general: process.env.DEN_RATE_LIMIT_PER_MINUTE,
+    strict: process.env.DEN_RATE_LIMIT_STRICT_PER_MINUTE,
   };
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
 
   beforeAll(async () => {
-    process.env.RID_RATE_LIMIT_PER_MINUTE = '5';
-    process.env.RID_RATE_LIMIT_STRICT_PER_MINUTE = '2';
+    process.env.DEN_RATE_LIMIT_PER_MINUTE = '5';
+    process.env.DEN_RATE_LIMIT_STRICT_PER_MINUTE = '2';
     issuer = await createTestIssuer();
     app = await createTestApp(issuer);
   });
   afterAll(async () => {
     await app.close();
     for (const [name, value] of [
-      ['RID_RATE_LIMIT_PER_MINUTE', saved.general],
-      ['RID_RATE_LIMIT_STRICT_PER_MINUTE', saved.strict],
+      ['DEN_RATE_LIMIT_PER_MINUTE', saved.general],
+      ['DEN_RATE_LIMIT_STRICT_PER_MINUTE', saved.strict],
     ] as const) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;

@@ -1,6 +1,6 @@
-import { PEM_CHAIN_MEDIA_TYPE } from '@rid/contracts';
+import { PEM_CHAIN_MEDIA_TYPE } from '@den/contracts';
 
-const apiUrl = (): string => process.env.RID_API_URL ?? 'http://localhost:4000';
+const apiUrl = (): string => process.env.DEN_API_URL ?? 'http://localhost:4000';
 
 /**
  * The root of the network CA (M3-10), public: applications trust the gateway's certificate with
@@ -13,7 +13,7 @@ export async function GET(): Promise<Response> {
     status: 200,
     headers: {
       'content-type': PEM_CHAIN_MEDIA_TYPE,
-      'content-disposition': 'attachment; filename="rid-network-ca.pem"',
+      'content-disposition': 'attachment; filename="den-network-ca.pem"',
       'x-content-type-options': 'nosniff',
       'content-security-policy': "default-src 'none'; sandbox",
       'cache-control': 'public, max-age=3600',

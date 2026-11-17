@@ -9,9 +9,9 @@ if [ -f chain.pem ] && [ -f tsa.key ]; then
   echo "TSA chain already present"
   exit 0
 fi
-step certificate create "RID Dev TSA Root" root.crt root.key \
+step certificate create "DEN Dev TSA Root" root.crt root.key \
   --profile root-ca --kty EC --crv P-256 --no-password --insecure --not-after 87600h -f
-step certificate create "RID Dev TSA" tsa.crt tsa.key \
+step certificate create "DEN Dev TSA" tsa.crt tsa.key \
   --template /init/leaf.tpl --ca root.crt --ca-key root.key \
   --kty EC --crv P-256 --no-password --insecure --not-after 43800h -f
 cat tsa.crt root.crt > chain.pem

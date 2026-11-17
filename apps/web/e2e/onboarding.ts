@@ -40,7 +40,7 @@ export async function waitForMail(address: string, subject: RegExp): Promise<str
 export async function registerAccount(page: Page, person: NewPerson): Promise<void> {
   await page.goto('/');
   await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
-  await page.waitForURL(/\/realms\/rid-portal\//);
+  await page.waitForURL(/\/realms\/den-portal\//);
   await page.locator('a[href*="/login-actions/registration"]').click();
   await page.locator('#email').fill(person.email);
   const username = page.locator('#username');

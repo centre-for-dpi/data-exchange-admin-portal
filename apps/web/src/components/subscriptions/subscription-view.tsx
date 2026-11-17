@@ -1,4 +1,4 @@
-import type { SubscriptionDetail, SubscriptionSummary } from '@rid/contracts';
+import type { SubscriptionDetail, SubscriptionSummary } from '@den/contracts';
 import { getFormatter, getLocale, getTranslations } from 'next-intl/server';
 import { Link } from '../../i18n/navigation';
 import { localize } from '../../lib/localize';

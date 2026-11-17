@@ -32,7 +32,7 @@ const { values: args } = parseArgs({
 const RATE = Number(args.rate);
 const P95_LIMIT_MS = 50;
 const K6_IMAGE = 'grafana/k6:2.3.0';
-const PROMETHEUS = process.env.RID_PROMETHEUS_PUBLIC_URL ?? 'http://localhost:9090';
+const PROMETHEUS = process.env.DEN_PROMETHEUS_PUBLIC_URL ?? 'http://localhost:9090';
 
 const seconds = (text) => {
   const m = /^(\d+)(s|m)$/.exec(text);
@@ -61,7 +61,7 @@ async function preflight() {
 
 /** k6 in its container, outside the stack's networks, like any consumer. */
 function runK6(target) {
-  const dir = mkdtempSync(join(tmpdir(), 'rid-load-'));
+  const dir = mkdtempSync(join(tmpdir(), 'den-load-'));
   try {
     writeFileSync(join(dir, 'gateway.js'), readFileSync(resolve(root, 'tests/load/gateway.js')));
     writeFileSync(join(dir, 'app.crt'), tls.client.cert);
@@ -77,7 +77,7 @@ function runK6(target) {
       RATE: String(RATE),
       DURATION: args.duration,
       WARMUP: args.warmup,
-      DEBUG: process.env.RID_LOAD_DEBUG ?? '',
+      DEBUG: process.env.DEN_LOAD_DEBUG ?? '',
     };
     const result = spawnSync(
       'docker',
@@ -142,7 +142,7 @@ async function main() {
   // Prometheus needs one more scrape to have the last sample of the sustained phase.
   const end = k6.finished;
   await new Promise((r) => setTimeout(r, 35_000));
-  const route = `route="rid-route-${target.versionId}"`;
+  const route = `route="den-route-${target.versionId}"`;
   const window = `${duration}s`;
   const quantile = (q, type) =>
     prometheus(

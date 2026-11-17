@@ -1,6 +1,6 @@
 'use server';
 
-import { certificateRevocationResultSchema } from '@rid/contracts';
+import { certificateRevocationResultSchema } from '@den/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from '../i18n/navigation';

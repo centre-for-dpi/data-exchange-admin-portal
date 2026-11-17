@@ -10,7 +10,7 @@ import { redirect } from 'next/navigation';
 export const STEP_UP_PATH = '/api/session/step-up';
 
 /** Set while a step-up is under way: if the session still lacks the factor, show a notice. */
-export const STEP_UP_COOKIE = 'rid-step-up';
+export const STEP_UP_COOKIE = 'den-step-up';
 export const STEP_UP_COOKIE_MAX_AGE = 120;
 
 export const isMfaRequired = (problem: unknown): boolean =>

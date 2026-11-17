@@ -35,12 +35,12 @@ test.describe('applications and OAuth2 credentials', () => {
     await page.getByLabel(/^Nombre de la aplicación/).fill(name);
     await page.getByLabel(/^Para qué la usará/).fill('Verifica requisitos de subsidios.');
     await page.getByLabel(/^Entorno/).selectOption('sandbox');
-    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.rid.example');
+    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.den.example');
     await page.getByRole('button', { name: 'Crear aplicación' }).click();
 
     const clientId = (await page.getByTestId('client-id').textContent()) ?? '';
     const clientSecret = (await page.getByTestId('client-secret').textContent()) ?? '';
-    expect(clientId).toMatch(/^rid-app-[0-9a-f-]{36}$/);
+    expect(clientId).toMatch(/^den-app-[0-9a-f-]{36}$/);
     expect(clientSecret.length).toBeGreaterThanOrEqual(43);
     await expectNoAccessibilityViolations(page);
 
@@ -53,7 +53,7 @@ test.describe('applications and OAuth2 credentials', () => {
     await expect(
       page
         .locator('pre')
-        .getByText(/RID_CLIENT_SECRET/)
+        .getByText(/DEN_CLIENT_SECRET/)
         .first(),
     ).toBeVisible();
     await expectNoAccessibilityViolations(page);
@@ -61,7 +61,7 @@ test.describe('applications and OAuth2 credentials', () => {
     await issueCertificate(page, clientId);
     const claims = decodeJwt(await gatewayToken(clientId, clientSecret));
     expect(claims.azp).toBe(clientId);
-    expect([claims.aud].flat()).toContain('rid-gateway');
+    expect([claims.aud].flat()).toContain('den-gateway');
     if (country().features.mtls.required) {
       // Bound to the certificate (RFC 8705): the thumbprint of the leaf the portal issued.
       const leaf = new X509Certificate(certificateOf(clientId)?.cert ?? '');
@@ -81,7 +81,7 @@ test.describe('applications and OAuth2 credentials', () => {
     await page.getByLabel(/^Nombre de la aplicación/).fill(name);
     await page.getByLabel(/^Para qué la usará/).fill('Consulta con certificado de cliente.');
     await page.getByLabel(/^Entorno/).selectOption('sandbox');
-    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.rid.example');
+    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.den.example');
     await page.getByRole('button', { name: 'Crear aplicación' }).click();
     const clientId = (await page.getByTestId('client-id').textContent()) ?? '';
     await page.getByRole('link', { name: 'Ir a la aplicación' }).click();
@@ -93,7 +93,7 @@ test.describe('applications and OAuth2 credentials', () => {
 
     // A CSR for another application is refused before the CA, with a translated message.
     const csrField = section.getByLabel(/^Solicitud de certificado \(CSR\)/);
-    await csrField.fill((await makeCsr('rid-app-someone-else')).csr);
+    await csrField.fill((await makeCsr('den-app-someone-else')).csr);
     await section.getByRole('button', { name: 'Solicitar certificado' }).click();
     await expect(section.getByText(/debe nombrar solo a esta aplicación: CN igual/)).toBeVisible();
     await expectNoAccessibilityViolations(page);
@@ -136,7 +136,7 @@ test.describe('applications and OAuth2 credentials', () => {
     await page.getByLabel(/^Nombre de la aplicación/).fill(name);
     await page.getByLabel(/^Para qué la usará/).fill('Prueba la rotación del secreto.');
     await page.getByLabel(/^Entorno/).selectOption('sandbox');
-    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.rid.example');
+    await page.getByLabel(/^Correo del contacto técnico/).fill('dev@programas.demo.den.example');
     await page.getByRole('button', { name: 'Crear aplicación' }).click();
     const clientId = (await page.getByTestId('client-id').textContent()) ?? '';
     const oldSecret = (await page.getByTestId('client-secret').textContent()) ?? '';

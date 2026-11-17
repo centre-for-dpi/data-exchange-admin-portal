@@ -3,13 +3,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   entityRequestSchema,
   type EntityRequest,
   invitationListSchema,
   meResponseSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -38,12 +38,12 @@ describe('entity onboarding (M2-01)', () => {
   const realmUsers = readRealmUsers();
   const subOf = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
   const sent: MailMessage[] = [];
-  const documentsDir = mkdtempSync(join(tmpdir(), 'rid-documents-'));
+  const documentsDir = mkdtempSync(join(tmpdir(), 'den-documents-'));
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
 
   beforeAll(async () => {
-    process.env.RID_DOCUMENTS_DIR = documentsDir;
+    process.env.DEN_DOCUMENTS_DIR = documentsDir;
     await runSeed(prisma, new AuditService(), {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers,

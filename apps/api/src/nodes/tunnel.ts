@@ -2,7 +2,7 @@ import { isIPv4 } from 'node:net';
 
 /**
  * Addresses of the WireGuard network between the hub and the kit nodes (M4-02, M4-03). IPv4
- * only: one subnet (RID_WG_SUBNET, 10.77.0.0/16 by default), the hub on its first host address
+ * only: one subnet (DEN_WG_SUBNET, 10.77.0.0/16 by default), the hub on its first host address
  * and each node on a /32 of its own, never reused.
  */
 export interface TunnelSubnet {
@@ -21,7 +21,7 @@ export function parseSubnet(cidr: string): TunnelSubnet {
   const [ip = '', bits = ''] = cidr.split('/');
   const prefix = Number(bits);
   if (!isIPv4(ip) || !Number.isInteger(prefix) || prefix < 8 || prefix > 29) {
-    throw new Error(`RID_WG_SUBNET must be an IPv4 CIDR between /8 and /29, got "${cidr}"`);
+    throw new Error(`DEN_WG_SUBNET must be an IPv4 CIDR between /8 and /29, got "${cidr}"`);
   }
   const size = 2 ** (32 - prefix);
   const network = toInt(ip) - (toInt(ip) % size);
@@ -56,5 +56,5 @@ export function nextNodeAddress(subnet: TunnelSubnet, used: readonly string[]): 
 }
 
 export function tunnelSubnet(env: NodeJS.ProcessEnv = process.env): TunnelSubnet {
-  return parseSubnet(env.RID_WG_SUBNET ?? '10.77.0.0/16');
+  return parseSubnet(env.DEN_WG_SUBNET ?? '10.77.0.0/16');
 }

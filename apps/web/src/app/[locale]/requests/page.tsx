@@ -1,4 +1,4 @@
-import { subscriptionPageSchema } from '@rid/contracts';
+import { subscriptionPageSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

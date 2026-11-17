@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   type CredentialView,
   type RevokeCredentialInput,
   revokeCredentialSchema,
   type RotatedSecret,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError } from '../common/errors.js';

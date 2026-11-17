@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import type { DataSubject } from '@rid/contracts';
+import type { DataSubject } from '@den/contracts';
 import { canonicalJson } from '../common/canonical-json.js';
 
 /** Escapes RE2 metacharacters (OPA's regex.match uses Go's RE2). */
@@ -27,8 +27,8 @@ export function pathRegex(basePath: string, openapiPath: string): string {
  * How OPA finds the data subject of an operation (ADR-0015):
  * - path: `regex` is the operation's path regex with capture groups around the subject's number
  *   (and, if any, its document type); the group numbers say which is which.
- * - body: the gateway plugin rid-data-subject reads it from the JSON body (ADR-0017) and passes
- *   it as X-RID-Body-Subject, "TYPE:NUMBER" or just "NUMBER" (then `documentType`, or the
+ * - body: the gateway plugin den-data-subject reads it from the JSON body (ADR-0017) and passes
+ *   it as X-DEN-Body-Subject, "TYPE:NUMBER" or just "NUMBER" (then `documentType`, or the
  *   country's default). The consumer cannot assert it.
  * - none: the operation has no data subject.
  * Operations of versions published before MT-01 carry no `subject`: no reference is computed.
@@ -56,7 +56,7 @@ export interface BundleRoute {
 }
 
 /**
- * The bundle form of an operation's x-rid-data-subject. For a path subject, the regex captures the
+ * The bundle form of an operation's x-den-data-subject. For a path subject, the regex captures the
  * named parameters, numbered by their order in the path.
  */
 export function bundleSubject(
@@ -130,7 +130,7 @@ export interface BundleData {
   clients: Record<string, BundleClient>;
   config: {
     endUserHashSalt: string;
-    /** HMAC key of the data subject reference (RID_SUBJECT_REF_KEY, ADR-0015). */
+    /** HMAC key of the data subject reference (DEN_SUBJECT_REF_KEY, ADR-0015). */
     subjectRefKey: string;
     /** Country code, part of the reference: CC 123 in one country is not CC 123 in another. */
     country: string;
@@ -139,7 +139,7 @@ export interface BundleData {
     /** features.mtls.required: every call needs a client certificate and a bound token. */
     mtlsRequired: boolean;
     /**
-     * Nodes of the gateway (RID_GATEWAY_NODES, ADR-0020): each counts locally, so the policy
+     * Nodes of the gateway (DEN_GATEWAY_NODES, ADR-0020): each counts locally, so the policy
      * gives each node its share of a subscription's limit.
      */
     gatewayNodes: number;
@@ -147,7 +147,7 @@ export interface BundleData {
 }
 
 /** Top-level data paths the bundle owns; OPA refuses data outside them. */
-export const BUNDLE_ROOTS = ['rid', 'routes', 'clients', 'config'];
+export const BUNDLE_ROOTS = ['den', 'routes', 'clients', 'config'];
 
 // --- tar (ustar) ---------------------------------------------------------------------------
 

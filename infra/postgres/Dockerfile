@@ -8,5 +8,5 @@ RUN apk add --no-cache 'pgbackrest~2.58' \
  && chown postgres:postgres /var/lib/pgbackrest /var/log/pgbackrest /tmp/pgbackrest \
  && chmod 750 /var/lib/pgbackrest
 COPY pgbackrest.conf /etc/pgbackrest/pgbackrest.conf
-COPY backup-scheduler.sh /usr/local/bin/rid-backup-scheduler
-RUN chmod 755 /usr/local/bin/rid-backup-scheduler
+COPY backup-scheduler.sh /usr/local/bin/den-backup-scheduler
+RUN chmod 755 /usr/local/bin/den-backup-scheduler

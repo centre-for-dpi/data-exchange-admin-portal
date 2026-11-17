@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { afterAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -19,7 +19,7 @@ describe('access-log index template and retention in OpenSearch (M5-01)', () => 
   const prisma = new PrismaService();
   const openSearch = new HttpOpenSearch(openSearchUrl());
   const reconciler = new AccessLogIndexReconciler(prisma, openSearch);
-  const index = `rid-access-test-${randomUUID().slice(0, 8)}`;
+  const index = `den-access-test-${randomUUID().slice(0, 8)}`;
 
   afterAll(async () => {
     await openSearch.request('DELETE', `/${index}`);
@@ -41,7 +41,7 @@ describe('access-log index template and retention in OpenSearch (M5-01)', () => 
     await reconciler.reconcileTemplate();
     const ok = await openSearch.request('POST', `/${index}/_doc?refresh=true`, {
       ts: '2026-11-16T01:02:08+00:00',
-      route_id: 'rid-route-x',
+      route_id: 'den-route-x',
       status: 200,
       latency_ms: 12.5,
       consumer_entity: 'programas-sociales',
@@ -86,7 +86,7 @@ describe('access-log index template and retention in OpenSearch (M5-01)', () => 
     expect(policy.body.policy.states[0]?.transitions[0]?.conditions.min_index_age).toBe(
       `${(months + 1) * 31}d`,
     );
-    expect(policy.body.policy.ism_template[0]?.index_patterns).toEqual(['rid-access-*']);
+    expect(policy.body.policy.ism_template[0]?.index_patterns).toEqual(['den-access-*']);
     expect(await prisma.syncState.findUnique({ where: { target: policyTarget } })).toMatchObject({
       status: 'in_sync',
     });

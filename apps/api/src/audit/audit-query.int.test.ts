@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   auditEventPageSchema,
   chainCheckSchema,
   createdApplicationSchema,
   subscriptionDetailSchema,
   timelineSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -70,7 +70,7 @@ describe('audit trail: verification and timelines (M1-11)', () => {
       sector: 'salud',
       tags: [],
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -97,7 +97,7 @@ describe('audit trail: verification and timelines (M1-11)', () => {
       name: `Validador ${run}`,
       description: 'Valida requisitos al asignar subsidios.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     const applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const requested = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {

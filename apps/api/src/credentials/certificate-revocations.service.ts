@@ -6,7 +6,7 @@ import {
   certificateRevocationFilterSchema,
   type ExecuteCertificateRevocationInput,
   executeCertificateRevocationSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError } from '../common/errors.js';

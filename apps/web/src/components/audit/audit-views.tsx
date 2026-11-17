@@ -1,4 +1,4 @@
-import type { AuditItem } from '@rid/contracts';
+import type { AuditItem } from '@den/contracts';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Link } from '../../i18n/navigation';
 

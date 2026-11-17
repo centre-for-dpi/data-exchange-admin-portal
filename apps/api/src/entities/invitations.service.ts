@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
-import type { EntityRole, Invitation, MembershipSummary } from '@rid/contracts';
+import { getCountryConfig } from '@den/config';
+import type { EntityRole, Invitation, MembershipSummary } from '@den/contracts';
 import { z } from 'zod';
 import { type AuditActor, AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
@@ -13,9 +13,9 @@ import { QueueService } from '../queue/queue.service.js';
 
 export const INVITATION_EMAIL_TOPIC = 'invitation.email';
 
-/** Days an invitation stays valid (RID_INVITATION_TTL_DAYS, default 14). */
+/** Days an invitation stays valid (DEN_INVITATION_TTL_DAYS, default 14). */
 export function invitationExpiry(now = new Date()): Date {
-  const days = Number(process.env.RID_INVITATION_TTL_DAYS ?? 14);
+  const days = Number(process.env.DEN_INVITATION_TTL_DAYS ?? 14);
   const ttl = Number.isFinite(days) && days > 0 ? days : 14;
   return new Date(now.getTime() + ttl * 24 * 60 * 60 * 1000);
 }
@@ -286,7 +286,7 @@ export class InvitationsService implements OnApplicationBootstrap {
     if (!invitation || invitation.status !== 'pending') return;
     const config = getCountryConfig();
     const locale = mailLocale(config.country.locale);
-    const webUrl = (process.env.RID_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+    const webUrl = (process.env.DEN_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
     // Spanish is the default locale and has no prefix (apps/web/src/i18n/routing.ts).
     const link = `${webUrl}${locale === 'es' ? '' : `/${locale}`}/invitations`;
     const expires = new Intl.DateTimeFormat(config.country.locale, {

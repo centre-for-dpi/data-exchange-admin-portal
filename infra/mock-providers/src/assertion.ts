@@ -1,7 +1,7 @@
 import { createHash, createPublicKey, type KeyObject, verify } from 'node:crypto';
 
 /**
- * Verification of the gateway's signed assertion (X-RID-Assertion, ADR-0024, M6-10), as a real
+ * Verification of the gateway's signed assertion (X-DEN-Assertion, ADR-0024, M6-10), as a real
  * provider would do it: Node's crypto only, the gateway's public keys from the portal's JWKS.
  *
  * Accepted only when:

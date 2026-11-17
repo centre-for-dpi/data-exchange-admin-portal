@@ -2,15 +2,15 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   createdApplicationSchema,
   subscriptionDetailSchema,
   transparencyCheckpointPageSchema,
   transparencyReceiptSchema,
   transparencyVerificationSchema,
-} from '@rid/contracts';
-import { verifyReceipt } from '@rid/transparency-verifier';
+} from '@den/contracts';
+import { verifyReceipt } from '@den/transparency-verifier';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../../test/test-auth.js';
@@ -67,7 +67,7 @@ describe('transparency evidence (MT-04)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/internal/subject-access',
-      headers: { authorization: `Bearer ${process.env.RID_TRANSPARENCY_INGEST_TOKEN}` },
+      headers: { authorization: `Bearer ${process.env.DEN_TRANSPARENCY_INGEST_TOKEN}` },
       payload: records,
     });
     expect(res.json()).toMatchObject({ accepted: count });
@@ -131,7 +131,7 @@ describe('transparency evidence (MT-04)', () => {
       sector: 'salud',
       tags: [],
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -157,7 +157,7 @@ describe('transparency evidence (MT-04)', () => {
       name: `Evidencia ${run}`,
       description: 'Verifica afiliación.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     const applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const requested = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {
@@ -205,7 +205,7 @@ describe('transparency evidence (MT-04)', () => {
           expect((await call('GET', path, who)).statusCode, `${who} ${path}`).toBe(200);
         }
       }
-      // The re-check walks every record of rid_test, which keeps those of every earlier run.
+      // The re-check walks every record of den_test, which keeps those of every earlier run.
     }, 180_000);
   });
 
@@ -268,9 +268,9 @@ describe('transparency evidence (MT-04)', () => {
     });
 
     it('keeps a batch pending while the TSA does not answer, and stamps it later', async () => {
-      const tsaUrl = process.env.RID_TSA_URL;
+      const tsaUrl = process.env.DEN_TSA_URL;
       const [id] = await ingest(1);
-      process.env.RID_TSA_URL = 'http://127.0.0.1:9';
+      process.env.DEN_TSA_URL = 'http://127.0.0.1:9';
       try {
         const [seq] = await evidence.sealPending();
         expect(await evidence.stampPending()).toEqual([]);
@@ -281,10 +281,10 @@ describe('transparency evidence (MT-04)', () => {
         }>();
         expect(receipt.timestamp).toBeNull();
         expect((await verification()).pendingTimestamps).toBeGreaterThanOrEqual(1);
-        process.env.RID_TSA_URL = tsaUrl;
+        process.env.DEN_TSA_URL = tsaUrl;
         expect(await evidence.stampPending()).toContain(seq);
       } finally {
-        process.env.RID_TSA_URL = tsaUrl;
+        process.env.DEN_TSA_URL = tsaUrl;
       }
     });
   });

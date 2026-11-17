@@ -1,6 +1,6 @@
 /**
- * Minimal Keycloak Admin API client for the realm rid-gateway, authenticated as the portal's
- * service account (rid-portal-provisioner, manage-clients only: ARCHITECTURE.md §3.2). Used only
+ * Minimal Keycloak Admin API client for the realm den-gateway, authenticated as the portal's
+ * service account (den-portal-provisioner, manage-clients only: ARCHITECTURE.md §3.2). Used only
  * by the reconciler, never by HTTP handlers (CLAUDE.md).
  */
 export const KEYCLOAK_ADMIN = Symbol('KEYCLOAK_ADMIN');
@@ -24,7 +24,7 @@ export interface GatewayClient {
 
 /**
  * Keycloak binds the client's tokens to the certificate of the request (RFC 8705, cnf.x5t#S256).
- * The reconciler manages it, like the rid.* attributes (M3-10).
+ * The reconciler manages it, like the den.* attributes (M3-10).
  */
 export const BOUND_TOKENS_ATTRIBUTE = 'tls.client.certificate.bound.access.tokens';
 
@@ -33,8 +33,8 @@ export interface KeycloakGatewayAdmin {
   createClient(client: GatewayClient): Promise<void>;
   updateClient(id: string, client: GatewayClient): Promise<void>;
   /**
-   * Secret rotation (M3-04), with the realm's client policy rid-secret-rotation (executor
-   * secret-rotation, clients with rid.managed = true): regenerating moves the current secret to
+   * Secret rotation (M3-04), with the realm's client policy den-secret-rotation (executor
+   * secret-rotation, clients with den.managed = true): regenerating moves the current secret to
    * the client's rotated secret, which keeps working until it expires or is deleted; a later
    * update with `secret` replaces only the current one. The values only pass through the
    * reconciler's memory to compare their hashes.
@@ -134,7 +134,7 @@ export class HttpKeycloakGatewayAdmin implements KeycloakGatewayAdmin {
       description: typeof found.description === 'string' ? found.description : '',
       attributes: Object.fromEntries(
         Object.entries((found.attributes ?? {}) as Record<string, string>).filter(
-          ([k]) => k.startsWith('rid.') || k === BOUND_TOKENS_ATTRIBUTE,
+          ([k]) => k.startsWith('den.') || k === BOUND_TOKENS_ATTRIBUTE,
         ),
       ),
     };

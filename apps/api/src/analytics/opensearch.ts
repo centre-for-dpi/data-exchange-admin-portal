@@ -1,5 +1,5 @@
-/** Where the access logs live (ARCHITECTURE.md §8): rid-access-YYYY.MM, written by Fluent Bit. */
-export const ACCESS_LOG_INDICES = 'rid-access-*';
+/** Where the access logs live (ARCHITECTURE.md §8): den-access-YYYY.MM, written by Fluent Bit. */
+export const ACCESS_LOG_INDICES = 'den-access-*';
 
 /** Injection token of the OpenSearch client (tests can replace it). */
 export const OPENSEARCH = Symbol('OPENSEARCH');
@@ -21,16 +21,16 @@ export interface OpenSearch {
 export class OpenSearchUnavailableError extends Error {}
 
 export const openSearchUrl = (): string =>
-  process.env.RID_OPENSEARCH_URL ?? 'http://localhost:9200';
+  process.env.DEN_OPENSEARCH_URL ?? 'http://localhost:9200';
 
 /**
  * OpenSearch over HTTP. In the Compose network it has no authentication (dev and the pilot);
- * RID_OPENSEARCH_AUTH ("user:password") is sent as Basic when the security plugin is on.
+ * DEN_OPENSEARCH_AUTH ("user:password") is sent as Basic when the security plugin is on.
  */
 export class HttpOpenSearch implements OpenSearch {
   constructor(
     private readonly baseUrl: string,
-    private readonly auth = process.env.RID_OPENSEARCH_AUTH,
+    private readonly auth = process.env.DEN_OPENSEARCH_AUTH,
     private readonly timeoutMs = 10_000,
   ) {}
 

@@ -19,7 +19,7 @@ const batchSchema = z.array(z.unknown()).max(100_000);
  * so an unauthenticated caller cannot make the API buffer and parse large bodies.
  */
 export function ingestTokenMatches(authorization: string | undefined): boolean {
-  const expected = process.env.RID_TRANSPARENCY_INGEST_TOKEN ?? '';
+  const expected = process.env.DEN_TRANSPARENCY_INGEST_TOKEN ?? '';
   const given = /^Bearer (.+)$/.exec(authorization ?? '')?.[1] ?? '';
   const a = Buffer.from(given);
   const b = Buffer.from(expected);
@@ -34,7 +34,7 @@ const ingestResultSchema = z.object({
 
 /**
  * Collector of the transparency register (ADR-0015, ARCHITECTURE.md §13), for the Fluent Bit of
- * the gateways only: service token RID_TRANSPARENCY_INGEST_TOKEN, internal network. A record that
+ * the gateways only: service token DEN_TRANSPARENCY_INGEST_TOKEN, internal network. A record that
  * does not add up is dropped and counted, never rejected with the batch: a 4xx would make Fluent
  * Bit retry the same chunk forever. Errors of the database answer 5xx, so Fluent Bit retries.
  */
@@ -53,7 +53,7 @@ export class SubjectAccessController {
     operationId: 'ingestSubjectAccessRecords',
     summary: 'Transparency register: records of calls per data subject from the gateway',
     description:
-      'For the gateways’ Fluent Bit only (Bearer RID_TRANSPARENCY_INGEST_TOKEN, internal ' +
+      'For the gateways’ Fluent Bit only (Bearer DEN_TRANSPARENCY_INGEST_TOKEN, internal ' +
       'network). Insert-only and idempotent; records that do not match an authorized ' +
       'subscription are dropped and counted.',
     tags: ['transparency'],

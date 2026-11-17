@@ -1,4 +1,4 @@
-import { type ApiVersionDetail, xroadServicePath } from '@rid/contracts';
+import { type ApiVersionDetail, xroadServicePath } from '@den/contracts';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Badge, StatusBadge } from '../ui/badge';
 import { Notice } from '../ui/notice';

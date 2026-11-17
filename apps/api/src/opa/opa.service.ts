@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { USABLE_CREDENTIAL_STATUSES } from '../domain/credential/state-machine.js';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -50,10 +50,10 @@ export class OpaService implements OnApplicationBootstrap {
     await this.queue.work(POLICY_SYNC_TOPIC, () => this.refreshSyncState());
   }
 
-  /** Key of X-RID-End-User-Hash: without it the official's hash is reversible. Fail closed. */
+  /** Key of X-DEN-End-User-Hash: without it the official's hash is reversible. Fail closed. */
   private salt(): string {
     try {
-      return deploymentSecret('RID_END_USER_HASH_SALT', process.env.RID_END_USER_HASH_SALT, 16);
+      return deploymentSecret('DEN_END_USER_HASH_SALT', process.env.DEN_END_USER_HASH_SALT, 16);
     } catch (error) {
       throw new BundleUnavailableError((error as Error).message);
     }
@@ -62,18 +62,18 @@ export class OpaService implements OnApplicationBootstrap {
   /** Document numbers are a small space: without a strong key the reference is reversible. */
   private subjectRefKey(): string {
     try {
-      return deploymentSecret('RID_SUBJECT_REF_KEY', process.env.RID_SUBJECT_REF_KEY, 32);
+      return deploymentSecret('DEN_SUBJECT_REF_KEY', process.env.DEN_SUBJECT_REF_KEY, 32);
     } catch (error) {
       throw new BundleUnavailableError((error as Error).message);
     }
   }
 
-  /** RID_GATEWAY_NODES (ADR-0020), 1 by default; a malformed value is not guessed (fail closed). */
+  /** DEN_GATEWAY_NODES (ADR-0020), 1 by default; a malformed value is not guessed (fail closed). */
   private gatewayNodes(): number {
-    const raw = process.env.RID_GATEWAY_NODES ?? '1';
+    const raw = process.env.DEN_GATEWAY_NODES ?? '1';
     const nodes = Number(raw);
     if (!Number.isInteger(nodes) || nodes < 1 || nodes > 100) {
-      throw new BundleUnavailableError('RID_GATEWAY_NODES must be an integer from 1 to 100');
+      throw new BundleUnavailableError('DEN_GATEWAY_NODES must be an integer from 1 to 100');
     }
     return nodes;
   }

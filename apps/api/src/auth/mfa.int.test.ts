@@ -1,6 +1,6 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { meResponseSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { meResponseSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -64,7 +64,7 @@ describe('second factor for critical roles (M3-08)', () => {
         expect(res.statusCode, `acr=${acr}`).toBe(403);
         expect(res.headers['content-type']).toContain('application/problem+json');
         expect(res.json()).toMatchObject({
-          type: 'https://rid.example/errors/mfa_required',
+          type: 'https://den.example/errors/mfa_required',
           code: 'mfa_required',
           status: 403,
         });

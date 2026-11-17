@@ -1,5 +1,5 @@
 import { createPublicKey } from 'node:crypto';
-import type { CsrError } from '@rid/contracts';
+import type { CsrError } from '@den/contracts';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 
@@ -133,7 +133,7 @@ export async function checkCsr(
   } catch {
     throw new CsrRejected('malformed');
   }
-  // Kit nodes (M4-02) ask with the fixed CN=rid-node and no names: the CA adds the node's own
+  // Kit nodes (M4-02) ask with the fixed CN=den-node and no names: the CA adds the node's own
   // name, which the kit does not know before enrolling.
   const badAltNames =
     options.altNames === 'none'

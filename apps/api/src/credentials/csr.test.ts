@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { makeCsr } from '../../test/csr.js';
 import { checkCsr, CsrRejected } from './csr.js';
 
-const CLIENT = 'rid-app-0190aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee';
+const CLIENT = 'den-app-0190aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee';
 
 const reason = async (pem: string, clientId = CLIENT) => {
   try {
@@ -34,8 +34,8 @@ describe('CSR checks before signing (M3-01)', () => {
   });
 
   it('rejects a subject that does not name this application only', async () => {
-    expect(await reason(await makeCsr('rid-app-other'))).toBe('subject');
-    expect(await reason(await makeCsr(CLIENT, { secondCn: 'rid-app-other' }))).toBe('subject');
+    expect(await reason(await makeCsr('den-app-other'))).toBe('subject');
+    expect(await reason(await makeCsr(CLIENT, { secondCn: 'den-app-other' }))).toBe('subject');
     expect(await reason(await makeCsr(CLIENT, { dnsNames: [CLIENT, 'evil.example'] }))).toBe(
       'subject',
     );

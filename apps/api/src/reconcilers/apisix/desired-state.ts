@@ -7,31 +7,31 @@ import {
   xroadPartSchema,
   xroadServicePath,
   xroadServicePathSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { ApisixObject } from './apisix-admin.js';
 
 /** Deterministic ids (ARCHITECTURE.md §4): reconciling needs no extra state. */
-export const ROUTE_PREFIX = 'rid-route-';
+export const ROUTE_PREFIX = 'den-route-';
 export const routeId = (apiVersionId: string): string => `${ROUTE_PREFIX}${apiVersionId}`;
-export const upstreamId = (apiVersionId: string): string => `rid-upstream-${apiVersionId}`;
+export const upstreamId = (apiVersionId: string): string => `den-upstream-${apiVersionId}`;
 /** The gateway's TLS (server certificate and, with mTLS, the client CA) on its public names. */
-export const GATEWAY_SSL_ID = 'rid-ssl-gateway';
+export const GATEWAY_SSL_ID = 'den-ssl-gateway';
 /**
  * The gateway's client certificates towards upstreams with mTLS (M3-03): one per provider entity,
  * CN=<clientName>.<entity slug>. A provider accepts only its own name, so a route of another
  * entity pointed at its API cannot borrow the gateway's identity (confused deputy).
  */
-export const GATEWAY_CLIENT_SSL_PREFIX = 'rid-ssl-gateway-client-';
+export const GATEWAY_CLIENT_SSL_PREFIX = 'den-ssl-gateway-client-';
 export const gatewayClientSslId = (entityId: string): string =>
   `${GATEWAY_CLIENT_SSL_PREFIX}${entityId}`;
 export const gatewayClientName = (settings: GatewaySettings, entitySlug: string): string =>
   `${settings.tls.clientName}.${entitySlug}`;
 /** Only objects with this prefix belong to the portal; anything else in APISIX is left alone. */
-export const MANAGED_PREFIX = 'rid-';
+export const MANAGED_PREFIX = 'den-';
 
 /** Where the gateway reaches the platform services (container network names in development). */
 export interface GatewaySettings {
-  /** OIDC discovery of the rid-gateway realm, as APISIX reaches Keycloak. */
+  /** OIDC discovery of the den-gateway realm, as APISIX reaches Keycloak. */
   keycloakDiscoveryUrl: string;
   /** Audience every application token must carry (= client_id of the openid-connect plugin). */
   audience: string;
@@ -43,32 +43,32 @@ export interface GatewaySettings {
   transparencyLog: { host: string; port: number };
   /**
    * Development stand-in for kit nodes until M4: entity slug -> host:port of its mock provider
-   * (RID_DEV_NODES). Nodes enrolled through the portal replace it.
+   * (DEN_DEV_NODES). Nodes enrolled through the portal replace it.
    */
   devNodes: ReadonlyMap<string, DevNode>;
   /** Every address a host name resolves to (A and AAAA); injectable for tests. */
   resolveHost: (host: string) => Promise<string[]>;
   /**
-   * TLS of the gateway (M3-02): its public host names (RID_GATEWAY_TLS_HOSTS) and whether every
+   * TLS of the gateway (M3-02): its public host names (DEN_GATEWAY_TLS_HOSTS) and whether every
    * call must present a client certificate of the network CA (features.mtls.required).
    */
   tls: {
     hosts: string[];
     mtlsRequired: boolean;
     /**
-     * Prefix of the CN the gateway presents to upstreams (RID_GATEWAY_CLIENT_NAME), followed by the
+     * Prefix of the CN the gateway presents to upstreams (DEN_GATEWAY_CLIENT_NAME), followed by the
      * provider entity's slug.
      */
     clientName: string;
   };
   /**
    * Control channel of kit nodes (M4-02): the portal's API as APISIX reaches it
-   * (RID_GATEWAY_PORTAL_API_URL) and the token that proves a request came through the gateway
-   * (RID_NODE_CONTROL_TOKEN). Without both, the gateway has no control route.
+   * (DEN_GATEWAY_PORTAL_API_URL) and the token that proves a request came through the gateway
+   * (DEN_NODE_CONTROL_TOKEN). Without both, the gateway has no control route.
    */
   nodeControl?: { portalUrl: string; token: string };
   /**
-   * The hub's SNI router as APISIX reaches it (RID_GATEWAY_WG_HUB, `wg-hub:8443`): versions on
+   * The hub's SNI router as APISIX reaches it (DEN_GATEWAY_WG_HUB, `wg-hub:8443`): versions on
    * enrolled kit nodes go there (M4-04, ADR-0023).
    */
   wgHub?: string;
@@ -80,46 +80,46 @@ export interface GatewaySettings {
   xroad?: { securityServerUrl: string; client: string; caPem?: string };
   /**
    * The gateway's signed assertion to providers (features.gatewayAssertion, ADR-0024, M6-10):
-   * its issuer (the gateway's public URL). Without it, routes carry no rid-assertion.
+   * its issuer (the gateway's public URL). Without it, routes carry no den-assertion.
    */
   assertion?: { issuer: string };
   /**
-   * Token of the check routes of versions in review (M4-06, RID_VALIDATION_TOKEN): only the
+   * Token of the check routes of versions in review (M4-06, DEN_VALIDATION_TOKEN): only the
    * portal's validations reach them. Without it there are no check routes.
    */
   validationToken?: string;
 }
 
 /**
- * Sandbox of a published version (M4-08): its own route, outside rid-route-, under /sandbox, to
+ * Sandbox of a published version (M4-08): its own route, outside den-route-, under /sandbox, to
  * the version's sandbox upstream. Only sandbox applications reach it (OPA).
  */
-export const SANDBOX_ROUTE_PREFIX = 'rid-sandbox-';
+export const SANDBOX_ROUTE_PREFIX = 'den-sandbox-';
 export const sandboxRouteId = (apiVersionId: string): string =>
   `${SANDBOX_ROUTE_PREFIX}${apiVersionId}`;
 export const sandboxBasePath = (basePath: string): string => `/sandbox${basePath}`;
 
-/** Check routes of a version in review (M4-06): ids outside rid-route-, paths under /__rid/. */
-export const CHECK_ROUTE_PREFIX = 'rid-check-';
+/** Check routes of a version in review (M4-06): ids outside den-route-, paths under /__den/. */
+export const CHECK_ROUTE_PREFIX = 'den-check-';
 export const checkRouteId = (apiVersionId: string): string =>
   `${CHECK_ROUTE_PREFIX}${apiVersionId}`;
 export const sandboxCheckRouteId = (apiVersionId: string): string =>
   `${CHECK_ROUTE_PREFIX}sandbox-${apiVersionId}`;
-export const checkRoutePath = (apiVersionId: string): string => `/__rid/check/${apiVersionId}`;
+export const checkRoutePath = (apiVersionId: string): string => `/__den/check/${apiVersionId}`;
 export const sandboxCheckRoutePath = (apiVersionId: string): string =>
-  `/__rid/check-sandbox/${apiVersionId}`;
+  `/__den/check-sandbox/${apiVersionId}`;
 /** Only a request with the validation token matches a check route (APISIX `vars`). */
-export const VALIDATION_TOKEN_HEADER = 'X-RID-Validation';
+export const VALIDATION_TOKEN_HEADER = 'X-DEN-Validation';
 
 /**
- * The token of one version's check routes: HMAC of RID_VALIDATION_TOKEN and the version id. A
+ * The token of one version's check routes: HMAC of DEN_VALIDATION_TOKEN and the version id. A
  * token that leaks (a redirect, a log of the provider) opens only that version's routes.
  */
 export const versionCheckToken = (secret: string, apiVersionId: string): string =>
-  createHmac('sha256', secret).update(`rid-check:${apiVersionId}`).digest('base64url');
+  createHmac('sha256', secret).update(`den-check:${apiVersionId}`).digest('base64url');
 
 /** The gateway's client certificate towards the operator's Security Server (one for X-Road). */
-export const GATEWAY_XROAD_SSL_ID = 'rid-ssl-gateway-xroad';
+export const GATEWAY_XROAD_SSL_ID = 'den-ssl-gateway-xroad';
 /** X-Road request headers a consumer could use to steer the Security Server (SPIKE S-5). */
 export const XROAD_CONTROL_HEADERS = [
   'X-Road-Security-Server',
@@ -132,36 +132,36 @@ export const XROAD_OPA_HEADERS = ['X-Road-UserId', 'X-Road-Issue'];
 
 /** Headers only the gateway may set: removed if a client sends them (ARCHITECTURE.md §4.1). */
 export const GATEWAY_ONLY_HEADERS = [
-  'X-RID-Consumer-Entity',
-  'X-RID-Consumer-App',
-  'X-RID-Subscription',
-  'X-RID-Operation',
-  'X-RID-End-User-Hash',
-  'X-RID-Subject-Ref',
+  'X-DEN-Consumer-Entity',
+  'X-DEN-Consumer-App',
+  'X-DEN-Subscription',
+  'X-DEN-Operation',
+  'X-DEN-End-User-Hash',
+  'X-DEN-Subject-Ref',
 ];
 
 /**
  * Headers OPA decides on; any of them the policy does not return is removed (S-1). The policy
- * never returns X-RID-End-User nor X-RID-Body-Subject: the clear values OPA reads (the official,
+ * never returns X-DEN-End-User nor X-DEN-Body-Subject: the clear values OPA reads (the official,
  * the data subject the gateway took from the body) do not reach the provider (ADR-0015, ADR-0017).
  */
 export const OPA_UPSTREAM_HEADERS = [
-  'X-RID-Consumer-Entity',
-  'X-RID-Consumer-App',
-  'X-RID-Subscription',
-  'X-RID-Purpose',
-  'X-RID-Operation',
+  'X-DEN-Consumer-Entity',
+  'X-DEN-Consumer-App',
+  'X-DEN-Subscription',
+  'X-DEN-Purpose',
+  'X-DEN-Operation',
   // The subscription's limit for limit-count (S-2): the client never chooses it.
-  'X-RID-Rate-Limit',
-  'X-RID-End-User-Hash',
-  'X-RID-Subject-Ref',
-  'X-RID-End-User',
-  'X-RID-Body-Subject',
-  // Thumbprint of the verified client certificate, set by rid-client-cert (S-3): OPA reads it,
+  'X-DEN-Rate-Limit',
+  'X-DEN-End-User-Hash',
+  'X-DEN-Subject-Ref',
+  'X-DEN-End-User',
+  'X-DEN-Body-Subject',
+  // Thumbprint of the verified client certificate, set by den-client-cert (S-3): OPA reads it,
   // the provider never gets it.
-  'X-RID-Client-Cert-S256',
+  'X-DEN-Client-Cert-S256',
   // Legacy consumer-declared header (before ADR-0017): never forwarded either.
-  'X-RID-Data-Subject',
+  'X-DEN-Data-Subject',
   'X-Request-Id',
 ];
 
@@ -173,23 +173,23 @@ const ACCESS_LOG_FORMAT = {
   ts: '$time_iso8601',
   request_id: '$http_x_request_id',
   route_id: '$route_id',
-  operation: '$http_x_rid_operation',
+  operation: '$http_x_den_operation',
   method: '$request_method',
   status: '$status',
   latency_ms: '$request_time',
   upstream_latency_ms: '$upstream_response_time',
-  consumer_entity: '$http_x_rid_consumer_entity',
-  consumer_app: '$http_x_rid_consumer_app',
-  subscription_id: '$http_x_rid_subscription',
-  purpose: '$http_x_rid_purpose',
-  end_user_hash: '$http_x_rid_end_user_hash',
+  consumer_entity: '$http_x_den_consumer_entity',
+  consumer_app: '$http_x_den_consumer_app',
+  subscription_id: '$http_x_den_subscription',
+  purpose: '$http_x_den_purpose',
+  end_user_hash: '$http_x_den_end_user_hash',
   bytes_sent: '$bytes_sent',
   gateway_node: '$hostname',
-  deny_reason: '$sent_http_x_rid_deny_reason',
+  deny_reason: '$sent_http_x_den_deny_reason',
   // On a denial OPA names a known client in its response (M5-03); Fluent Bit folds these into
   // consumer_app and consumer_entity and drops them (infra/fluent-bit/allowlist.lua).
-  deny_consumer_app: '$sent_http_x_rid_consumer_app',
-  deny_consumer_entity: '$sent_http_x_rid_consumer_entity',
+  deny_consumer_app: '$sent_http_x_den_consumer_app',
+  deny_consumer_entity: '$sent_http_x_den_consumer_entity',
 };
 
 /**
@@ -206,13 +206,13 @@ export const TRANSPARENCY_LOG_FORMAT = {
   gateway_request_id: '$request_id',
   request_id: '$http_x_request_id',
   route_id: '$route_id',
-  operation: '$http_x_rid_operation',
-  subscription_id: '$http_x_rid_subscription',
-  consumer_entity: '$http_x_rid_consumer_entity',
-  consumer_app: '$http_x_rid_consumer_app',
-  purpose: '$http_x_rid_purpose',
-  end_user_hash: '$http_x_rid_end_user_hash',
-  subject_ref: '$http_x_rid_subject_ref',
+  operation: '$http_x_den_operation',
+  subscription_id: '$http_x_den_subscription',
+  consumer_entity: '$http_x_den_consumer_entity',
+  consumer_app: '$http_x_den_consumer_app',
+  purpose: '$http_x_den_purpose',
+  end_user_hash: '$http_x_den_end_user_hash',
+  subject_ref: '$http_x_den_subject_ref',
   status: '$status',
   upstream_status: '$upstream_status',
 };
@@ -227,7 +227,7 @@ export interface VersionForGateway {
   addresses?: readonly string[];
   /** HTTP methods declared in the OpenAPI document. */
   methods: readonly string[];
-  /** Operations whose data subject is in the JSON body (x-rid-data-subject in: body). */
+  /** Operations whose data subject is in the JSON body (x-den-data-subject in: body). */
   bodySubjects: ReadonlyArray<{
     method: string;
     /** Anchored regex on the full public path (as in the OPA bundle). */
@@ -298,7 +298,7 @@ function resolveUpstream(
   const base = {
     type: 'roundrobin',
     timeout: { connect: 5, send: 30, read: 30 },
-    labels: { 'rid-managed': 'true', 'rid-api-version': v.id },
+    labels: { 'den-managed': 'true', 'den-api-version': v.id },
   };
   if (v.upstream.type === 'direct') {
     const url = new URL(v.upstream.url);
@@ -338,7 +338,7 @@ function resolveUpstream(
   const node = devNodeOf(settings.devNodes, v.entitySlug);
   if (!node) {
     throw new UnsupportedUpstreamError(
-      `No development node for entity "${v.entitySlug}" (set RID_DEV_NODES)`,
+      `No development node for entity "${v.entitySlug}" (set DEN_DEV_NODES)`,
     );
   }
   const pathPrefix = v.upstream.servicePath.replace(/\/$/, '');
@@ -382,7 +382,7 @@ function xroadUpstream(
   if (v.upstream.type !== 'xroad') throw new UnsupportedUpstreamError('Not an xroad upstream');
   const { serviceId, servicePath } = v.upstream;
   if (!settings.xroad) {
-    throw new UnsupportedUpstreamError('X-Road is not configured (RID_XROAD_SECURITY_SERVER_URL)');
+    throw new UnsupportedUpstreamError('X-Road is not configured (DEN_XROAD_SECURITY_SERVER_URL)');
   }
   const parts = [
     serviceId.instance,
@@ -456,7 +456,7 @@ function nodeUpstream(
     throw new UnsupportedUpstreamError(`Node ${nodeId} is ${node.status}`);
   }
   if (!settings.wgHub) {
-    throw new UnsupportedUpstreamError('The WireGuard hub is not configured (RID_GATEWAY_WG_HUB)');
+    throw new UnsupportedUpstreamError('The WireGuard hub is not configured (DEN_GATEWAY_WG_HUB)');
   }
   const ca = pki ? certificatesOf(pki.networkCaPem) : [];
   if (ca.length === 0) {
@@ -516,12 +516,12 @@ export function desiredGateway(
     methods: [...new Set(v.methods.map((m) => m.toUpperCase()))].sort(),
     upstream_id: upstreamId(v.id),
     status: 1,
-    labels: { 'rid-managed': 'true', 'rid-entity': v.entitySlug, 'rid-api-version': v.id },
+    labels: { 'den-managed': 'true', 'den-entity': v.entitySlug, 'den-api-version': v.id },
     plugins: {
       'request-id': { header_name: 'X-Request-Id', include_in_response: true },
-      // Anti-spoofing (M3-07): every client-sent X-RID-* header except X-RID-Purpose and
-      // X-RID-End-User is removed before anything reads it.
-      'rid-header-guard': {},
+      // Anti-spoofing (M3-07): every client-sent X-DEN-* header except X-DEN-Purpose and
+      // X-DEN-End-User is removed before anything reads it.
+      'den-header-guard': {},
       'openid-connect': {
         client_id: settings.audience,
         discovery: settings.keycloakDiscoveryUrl,
@@ -530,12 +530,12 @@ export function desiredGateway(
         set_userinfo_header: false,
         set_access_token_header: false,
         set_id_token_header: false,
-        // Tokens must be issued for the gateway (aud = rid-gateway), not for another client.
+        // Tokens must be issued for the gateway (aud = den-gateway), not for another client.
         claim_validator: { audience: { required: true, match_with_client_id: true } },
       },
       // Thumbprint of the client certificate verified in the handshake, for OPA (S-3). A value the
       // client sends in that header is always removed, with or without mTLS.
-      'rid-client-cert': {},
+      'den-client-cert': {},
       'proxy-rewrite': {
         // Only upstream_uri changes; OPA still sees the full public path.
         regex_uri: [`^${escapeRegex(v.basePath)}/(.*)$`, `${pathPrefix}/$1`],
@@ -550,8 +550,8 @@ export function desiredGateway(
       },
       opa: {
         host: settings.opaUrl,
-        // Only what the plugin reads (M6-03): see decision in packages/policy/rid/authz.rego.
-        policy: 'rid/authz/decision',
+        // Only what the plugin reads (M6-03): see decision in packages/policy/den/authz.rego.
+        policy: 'den/authz/decision',
         with_route: true,
         // Kept connections to the local OPA per worker (M6-03). With the default of 5, every call
         // beyond them opened and closed its own: at 500 req/s, thousands in TIME_WAIT and connects
@@ -567,19 +567,19 @@ export function desiredGateway(
       // Per-subscription limit (S-2, ADR-0020): OPA puts the subscription and its share of the
       // limit for this node in headers; counters live in each node. A denied call never gets here.
       'limit-count': {
-        count: '$http_x_rid_rate_limit',
+        count: '$http_x_den_rate_limit',
         time_window: 60,
         key_type: 'var',
-        key: 'http_x_rid_subscription',
+        key: 'http_x_den_subscription',
         policy: 'local',
         rejected_code: 429,
         show_limit_quota_header: true,
       },
       // That 429 in problem+json; a provider's own 429 passes untouched.
-      'rid-rate-limited': {},
+      'den-rate-limited': {},
       // The signed assertion of what OPA authorized, for the provider entity (ADR-0024, M6-10);
       // its key is in the plugin's metadata (ApisixReconciler.reconcileAssertionKey).
-      ...(settings.assertion ? { 'rid-assertion': { audience: v.entitySlug } } : {}),
+      ...(settings.assertion ? { 'den-assertion': { audience: v.entitySlug } } : {}),
       prometheus: { prefer_name: false },
       ...(v.deprecation
         ? { 'response-rewrite': { headers: { set: deprecationHeaders(v.deprecation) } } }
@@ -614,7 +614,7 @@ export function desiredGateway(
       // consumer (ADR-0017). Only routes that have such operations carry the plugin.
       ...(v.bodySubjects.length > 0
         ? {
-            'rid-data-subject': {
+            'den-data-subject': {
               operations: v.bodySubjects.map((s) => ({
                 method: s.method.toUpperCase(),
                 uri: s.pathRegex,
@@ -655,7 +655,7 @@ export function desiredSsl(
     cert: certificate.certificatePem,
     key: certificate.keyPem,
     ssl_protocols: ['TLSv1.2', 'TLSv1.3'],
-    labels: { 'rid-managed': 'true' },
+    labels: { 'den-managed': 'true' },
     status: 1,
     // Leaf, intermediate and root: depth 2.
     client: settings.tls.mtlsRequired
@@ -668,8 +668,8 @@ export function desiredSsl(
   };
 }
 
-/** The gateway's own route to the token endpoint of rid-gateway (S-4, M3-10). */
-export const TOKEN_ROUTE_ID = 'rid-oauth-token';
+/** The gateway's own route to the token endpoint of den-gateway (S-4, M3-10). */
+export const TOKEN_ROUTE_ID = 'den-oauth-token';
 /** Where applications ask for their token: the same name and TLS as their calls. */
 export const GATEWAY_TOKEN_PATH = '/oauth/token';
 
@@ -688,7 +688,7 @@ export const CLIENT_CERT_HEADERS = { cert: 'SSL_CLIENT_CERT', verify: 'ssl-clien
  * HTTP, or a network without mTLS) the headers carry nothing.
  */
 export function desiredTokenRoute(settings: GatewaySettings): ApisixObject {
-  // The discovery URL is <keycloak>/realms/rid-gateway/.well-known/openid-configuration.
+  // The discovery URL is <keycloak>/realms/den-gateway/.well-known/openid-configuration.
   const discovery = new URL(settings.keycloakDiscoveryUrl);
   const realmPath = discovery.pathname.replace(/\/\.well-known\/openid-configuration$/, '');
   const port = discovery.port || (discovery.protocol === 'https:' ? '443' : '80');
@@ -699,11 +699,11 @@ export function desiredTokenRoute(settings: GatewaySettings): ApisixObject {
     .flatMap((name) => [name.replaceAll('_', '-'), name.replaceAll('-', '_')])
     .filter((spelling) => !names.includes(spelling));
   return {
-    name: 'rid-gateway token endpoint',
+    name: 'den-gateway token endpoint',
     uri: GATEWAY_TOKEN_PATH,
     methods: ['POST'],
     status: 1,
-    labels: { 'rid-managed': 'true' },
+    labels: { 'den-managed': 'true' },
     upstream: {
       type: 'roundrobin',
       scheme: discovery.protocol.replace(':', ''),
@@ -713,7 +713,7 @@ export function desiredTokenRoute(settings: GatewaySettings): ApisixObject {
     },
     plugins: {
       'request-id': { header_name: 'X-Request-Id', include_in_response: true },
-      'rid-header-guard': {},
+      'den-header-guard': {},
       'proxy-rewrite': {
         uri: `${realmPath}/protocol/openid-connect/token`,
         headers: {
@@ -744,15 +744,15 @@ export function sslMatches(desired: ApisixObject, actual: ApisixObject): boolean
 }
 
 /** The gateway's route for the control channel of kit nodes (M4-02). */
-export const NODE_CONTROL_ROUTE_ID = 'rid-node-control';
+export const NODE_CONTROL_ROUTE_ID = 'den-node-control';
 /** Set by the control route: proves to the portal that the request came through the gateway. */
-export const NODE_CONTROL_TOKEN_HEADER = 'X-RID-Node-Control';
+export const NODE_CONTROL_TOKEN_HEADER = 'X-DEN-Node-Control';
 
 /**
  * The node control route (ARCHITECTURE.md §10, M4-02). Nodes call the portal's control channel
- * on the gateway's TLS with their certificate; APISIX verifies it in the handshake, rid-client-cert
- * puts its thumbprint in X-RID-Client-Cert-S256 (always replacing the client's), and proxy-rewrite
- * adds the control token. rid-header-guard first removes every other X-RID-* the client sent,
+ * on the gateway's TLS with their certificate; APISIX verifies it in the handshake, den-client-cert
+ * puts its thumbprint in X-DEN-Client-Cert-S256 (always replacing the client's), and proxy-rewrite
+ * adds the control token. den-header-guard first removes every other X-DEN-* the client sent,
  * the control token included. The portal believes the thumbprint only with the token.
  */
 export function desiredNodeControlRoute(settings: GatewaySettings): ApisixObject | null {
@@ -764,7 +764,7 @@ export function desiredNodeControlRoute(settings: GatewaySettings): ApisixObject
     uri: `${NODE_CONTROL_PATH_PREFIX}*`,
     methods: ['GET', 'POST'],
     status: 1,
-    labels: { 'rid-managed': 'true' },
+    labels: { 'den-managed': 'true' },
     upstream: {
       type: 'roundrobin',
       scheme: portal.protocol.replace(':', ''),
@@ -773,8 +773,8 @@ export function desiredNodeControlRoute(settings: GatewaySettings): ApisixObject
     },
     plugins: {
       'request-id': { header_name: 'X-Request-Id', include_in_response: true },
-      'rid-header-guard': {},
-      'rid-client-cert': {},
+      'den-header-guard': {},
+      'den-client-cert': {},
       'proxy-rewrite': {
         headers: { set: { [NODE_CONTROL_TOKEN_HEADER]: settings.nodeControl.token } },
       },
@@ -814,7 +814,7 @@ export interface DevNode {
 export const OPA_KEEPALIVE_POOL = 64;
 
 /**
- * RID_DEV_NODES="salud=mock-salud:8000,socioeconomico=https://mock-socioeconomico:8443": an
+ * DEN_DEV_NODES="salud=mock-salud:8000,socioeconomico=https://mock-socioeconomico:8443": an
  * https:// node gets mTLS like an enrolled kit node (M3-03). A slug ending in `*` is a prefix
  * (`carga-*=mock-salud:8000`: the synthetic entities of the load test, M6-03).
  */
@@ -849,7 +849,7 @@ export function devNodeOf(nodes: ReadonlyMap<string, DevNode>, slug: string): De
   return best?.node;
 }
 
-/** `host:port` (e.g. RID_GATEWAY_TRANSPARENCY_LOG); a malformed value is a startup error. */
+/** `host:port` (e.g. DEN_GATEWAY_TRANSPARENCY_LOG); a malformed value is a startup error. */
 export function parseHostPort(value: string): { host: string; port: number } {
   const match = /^([a-z0-9.-]+):(\d{1,5})$/i.exec(value.trim());
   const port = Number(match?.[2]);
@@ -860,7 +860,7 @@ export function parseHostPort(value: string): { host: string; port: number } {
 }
 
 /**
- * RID_GATEWAY_TLS_HOSTS="gw.example.org,gateway" -> DNS names of the gateway's certificate, in
+ * DEN_GATEWAY_TLS_HOSTS="gw.example.org,gateway" -> DNS names of the gateway's certificate, in
  * order (the first is its common name). A malformed name is a startup error.
  */
 export function parseHostNames(value: string): string[] {
@@ -871,7 +871,7 @@ export function parseHostNames(value: string): string[] {
       throw new Error(`Invalid gateway host name "${host}"`);
     }
   }
-  if (hosts.length === 0) throw new Error('RID_GATEWAY_TLS_HOSTS has no host name');
+  if (hosts.length === 0) throw new Error('DEN_GATEWAY_TLS_HOSTS has no host name');
   return hosts;
 }
 
@@ -894,10 +894,10 @@ export function desiredCheckRoutes(
   ];
   const plugins = (extra: Record<string, unknown>) => ({
     'request-id': { header_name: 'X-Request-Id', include_in_response: true },
-    'rid-header-guard': {},
+    'den-header-guard': {},
     'proxy-rewrite': { ...extra, headers: { remove: [VALIDATION_TOKEN_HEADER] } },
   });
-  const label = { 'rid-managed': 'true', 'rid-api-version': v.id, 'rid-check': 'true' };
+  const label = { 'den-managed': 'true', 'den-api-version': v.id, 'den-check': 'true' };
   const production = resolveUpstream(v, settings, pki);
   const health: ApisixObject = {
     name: `check ${v.entitySlug} ${v.apiName} ${v.version}`.slice(0, 100),

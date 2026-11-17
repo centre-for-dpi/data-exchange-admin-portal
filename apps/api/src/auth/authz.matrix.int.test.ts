@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { ENTITY_ROLES, type EntityRole, PLATFORM_ROLES, type PlatformRole } from '@rid/contracts';
+import { ENTITY_ROLES, type EntityRole, PLATFORM_ROLES, type PlatformRole } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { API_PREFIX } from '../app.js';

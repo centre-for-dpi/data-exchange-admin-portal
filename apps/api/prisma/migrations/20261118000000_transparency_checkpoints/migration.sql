@@ -51,7 +51,7 @@ ALTER TABLE "transparency_timestamp" ADD CONSTRAINT "transparency_timestamp_chec
 -- Insert-only, for everyone: the runtime role has no UPDATE, DELETE or TRUNCATE, and a trigger
 -- refuses them to any role, owner included (changing evidence takes dropping the trigger, a DDL
 -- change visible in the schema history).
-REVOKE UPDATE, DELETE, TRUNCATE ON "transparency_checkpoint", "transparency_leaf", "transparency_timestamp" FROM rid_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON "transparency_checkpoint", "transparency_leaf", "transparency_timestamp" FROM den_app;
 
 CREATE FUNCTION transparency_insert_only() RETURNS trigger
 LANGUAGE plpgsql AS $$

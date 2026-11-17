@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Applies the client profiles and policies of infra/keycloak/rid-gateway-realm.json (secret
+// Applies the client profiles and policies of infra/keycloak/den-gateway-realm.json (secret
 // rotation, M3-04) to a Keycloak that imported the realm before they existed: --import-realm
 // skips realms that already exist. Idempotent: it replaces both lists with the file's.
 //
@@ -16,7 +16,7 @@ if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env')
 
 const url = (process.env.KEYCLOAK_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
 const realmFile = JSON.parse(
-  readFileSync(resolve(root, 'infra/keycloak/rid-gateway-realm.json'), 'utf8'),
+  readFileSync(resolve(root, 'infra/keycloak/den-gateway-realm.json'), 'utf8'),
 );
 
 const login = await fetch(`${url}/realms/master/protocol/openid-connect/token`, {

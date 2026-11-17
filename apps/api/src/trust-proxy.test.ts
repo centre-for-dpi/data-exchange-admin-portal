@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { trustedProxies } from './app.js';
 
 /** Who may set X-Forwarded-For (M6-01): the proxy by address, or a number of hops, or nobody. */
-describe('RID_TRUST_PROXY', () => {
+describe('DEN_TRUST_PROXY', () => {
   it('trusts nobody when unset, empty or 0', () => {
     expect(trustedProxies(undefined)).toBe(false);
     expect(trustedProxies('')).toBe(false);

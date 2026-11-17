@@ -3,14 +3,14 @@ import {
   type MembershipSummary,
   type PlatformRole,
   type Role,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { cookies } from 'next/headers';
 import { cache } from 'react';
 import { auth } from '../auth';
 import { apiGet } from './api';
 import { redirectToStepUp } from './step-up';
 
-export const ACTIVE_ENTITY_COOKIE = 'rid-active-entity';
+export const ACTIVE_ENTITY_COOKIE = 'den-active-entity';
 
 export interface Viewer {
   authenticated: boolean;

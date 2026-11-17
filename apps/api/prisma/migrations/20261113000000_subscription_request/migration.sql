@@ -11,4 +11,4 @@ ALTER TABLE "subscription" ALTER COLUMN "requested_validity_months" SET NOT NULL
 
 -- Subscription decisions are a record of who decided what (SPEC.md §3): the runtime role may only
 -- insert them, like api_version_review. DELETE and TRUNCATE were already revoked in domain_base.
-REVOKE UPDATE ON "subscription_decision" FROM rid_app;
+REVOKE UPDATE ON "subscription_decision" FROM den_app;

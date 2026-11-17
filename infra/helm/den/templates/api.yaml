@@ -2,18 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "rid.name" "api" }}
+  name: {{ include "den.name" "api" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   replicas: {{ .Values.api.replicas }}
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{- toYaml . | nindent 8 }}
@@ -30,37 +30,37 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              {{- include "rid.selector" $c | nindent 14 }}
+              {{- include "den.selector" $c | nindent 14 }}
       initContainers:
-        # Pending migrations, as the schema owner (the API itself runs as rid_app). Prisma takes an
+        # Pending migrations, as the schema owner (the API itself runs as den_app). Prisma takes an
         # advisory lock: replicas starting together do not migrate twice.
         - name: migrate
-          image: {{ include "rid.image" (dict "root" . "name" "api") }}
+          image: {{ include "den.image" (dict "root" . "name" "api") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
           command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
           env:
             - name: DATABASE_MIGRATION_URL
               valueFrom:
-                secretKeyRef: { name: {{ include "rid.name" "migrate" }}, key: DATABASE_MIGRATION_URL }
+                secretKeyRef: { name: {{ include "den.name" "migrate" }}, key: DATABASE_MIGRATION_URL }
           securityContext: &containerSecurity
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
-            - { name: db-ca, mountPath: /var/run/rid/db-ca, readOnly: true }
+            - { name: db-ca, mountPath: /var/run/den/db-ca, readOnly: true }
       containers:
         - name: api
-          image: {{ include "rid.image" (dict "root" . "name" "api") }}
+          image: {{ include "den.image" (dict "root" . "name" "api") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
           # The image's default command also migrates and seeds (pilots): here only the server.
           command: ['node', '--enable-source-maps', 'dist/main.js']
           ports:
             - { name: http, containerPort: {{ .Values.api.port }} }
           env:
-            {{- include "rid.apiEnv" . | nindent 12 }}
+            {{- include "den.apiEnv" . | nindent 12 }}
           envFrom:
-            - secretRef: { name: {{ include "rid.name" "api" }} }
+            - secretRef: { name: {{ include "den.name" "api" }} }
           securityContext: *containerSecurity
           readinessProbe:
             httpGet: { path: /api/v1/health, port: http }
@@ -73,10 +73,10 @@ spec:
             {{- toYaml .Values.api.resources | nindent 12 }}
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
-            - { name: documents, mountPath: /var/lib/rid/documents }
-            - { name: db-ca, mountPath: /var/run/rid/db-ca, readOnly: true }
+            - { name: documents, mountPath: /var/lib/den/documents }
+            - { name: db-ca, mountPath: /var/run/den/db-ca, readOnly: true }
             {{- if .Values.opensearch.enabled }}
-            - { name: internal-ca, mountPath: /var/run/rid/internal-ca, readOnly: true }
+            - { name: internal-ca, mountPath: /var/run/den/internal-ca, readOnly: true }
             {{- end }}
       volumes:
         - { name: tmp, emptyDir: {} }
@@ -84,24 +84,24 @@ spec:
         # certificate: the Secret also holds the CA's key, which must not reach the API.
         - name: db-ca
           secret:
-            secretName: {{ include "rid.name" "db" }}-ca
+            secretName: {{ include "den.name" "db" }}-ca
             items: [{ key: ca.crt, path: ca.crt }]
         {{- if .Values.opensearch.enabled }}
         # OpenSearch's certificate is of the internal CA (NODE_EXTRA_CA_CERTS).
         - name: internal-ca
           secret:
-            secretName: {{ include "rid.name" "opensearch" }}-tls
+            secretName: {{ include "den.name" "opensearch" }}-tls
             items: [{ key: ca.crt, path: ca.crt }]
         {{- end }}
         - name: documents
-          persistentVolumeClaim: { claimName: {{ include "rid.name" "api-documents" }} }
+          persistentVolumeClaim: { claimName: {{ include "den.name" "api-documents" }} }
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "rid.name" "api-documents" }}
+  name: {{ include "den.name" "api-documents" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
   annotations:
     # Uploaded documents outlive the release.
     helm.sh/resource-policy: keep
@@ -117,23 +117,23 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "api" }}
+  name: {{ include "den.name" "api" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: http, port: {{ .Values.api.port }}, targetPort: http }
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "rid.name" "api" }}
+  name: {{ include "den.name" "api" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}

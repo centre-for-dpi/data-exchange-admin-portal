@@ -10,7 +10,7 @@ import {
   type NodeService,
   type NodeSummary,
   nodeServiceSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { type AuditActor, AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
@@ -27,11 +27,11 @@ import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconci
 import { scopedRepo } from '../prisma/scoped-repo.js';
 
 /** Prefix of enrollment tokens: recognizable in a leaked log or a secret scanner. */
-export const ENROLLMENT_TOKEN_PREFIX = 'rid-enroll-';
+export const ENROLLMENT_TOKEN_PREFIX = 'den-enroll-';
 
-/** Hours an enrollment token stays valid (RID_NODE_ENROLLMENT_TTL_HOURS, 72 by SPEC.md §4.6). */
+/** Hours an enrollment token stays valid (DEN_NODE_ENROLLMENT_TTL_HOURS, 72 by SPEC.md §4.6). */
 export function enrollmentTokenExpiry(now = new Date()): Date {
-  const hours = Number(process.env.RID_NODE_ENROLLMENT_TTL_HOURS ?? 72);
+  const hours = Number(process.env.DEN_NODE_ENROLLMENT_TTL_HOURS ?? 72);
   const ttl = Number.isFinite(hours) && hours > 0 && hours <= 24 * 30 ? hours : 72;
   return new Date(now.getTime() + ttl * 60 * 60 * 1000);
 }

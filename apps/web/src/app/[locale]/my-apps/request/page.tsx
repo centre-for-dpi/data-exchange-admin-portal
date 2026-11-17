@@ -1,9 +1,9 @@
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   applicationPageSchema,
   catalogDetailSchema,
   subscriptionDetailSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

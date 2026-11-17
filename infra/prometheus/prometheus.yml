@@ -1,5 +1,5 @@
-# Prometheus of the RID portal + gateway (ARCHITECTURE.md §9, M5-06). Observability profile.
-# Scrapes the gateway, the portal API and OPA; evaluates the alerts of rules/rid.rules.yml and
+# Prometheus of the DEN portal + gateway (ARCHITECTURE.md §9, M5-06). Observability profile.
+# Scrapes the gateway, the portal API and OPA; evaluates the alerts of rules/den.rules.yml and
 # sends them to Alertmanager. Metrics carry route ids, states and kinds, never personal data.
 global:
   scrape_interval: 15s
@@ -25,13 +25,13 @@ scrape_configs:
       - targets: ['apisix:9091']
 
   # The portal API (apps/api, GET /metrics). In development the API runs on the host: the
-  # compose file points `api` there. The token is RID_METRICS_TOKEN, written to this file when
+  # compose file points `api` there. The token is DEN_METRICS_TOKEN, written to this file when
   # the container starts.
   - job_name: api
     metrics_path: /metrics
     authorization:
       type: Bearer
-      credentials_file: /tmp/rid/metrics-token
+      credentials_file: /tmp/den/metrics-token
     static_configs:
       - targets: ['api:4000']
 

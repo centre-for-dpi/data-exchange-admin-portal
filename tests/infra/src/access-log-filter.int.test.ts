@@ -16,7 +16,7 @@ function filter(records: Record[], script = 'allowlist.lua', call = 'allowlist')
       '--rm',
       '-i',
       '-v',
-      `${fromRoot('infra/fluent-bit')}:/rid:ro`,
+      `${fromRoot('infra/fluent-bit')}:/den:ro`,
       IMAGE,
       '/fluent-bit/bin/fluent-bit',
       '-q',
@@ -27,7 +27,7 @@ function filter(records: Record[], script = 'allowlist.lua', call = 'allowlist')
       '-m',
       '*',
       '-p',
-      `script=/rid/${script}`,
+      `script=/den/${script}`,
       '-p',
       `call=${call}`,
       '-o',
@@ -60,14 +60,14 @@ function filter(records: Record[], script = 'allowlist.lua', call = 'allowlist')
 const call = (overrides: Record = {}): Record => ({
   ts: '2026-11-16T01:02:08+00:00',
   request_id: 'demo-mwiiqve0',
-  route_id: 'rid-route-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
+  route_id: 'den-route-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
   operation: 'getAfiliado',
   method: 'GET',
   status: '200',
   latency_ms: '0.012',
   upstream_latency_ms: '0.010',
   consumer_entity: 'programas-sociales',
-  consumer_app: 'rid-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
+  consumer_app: 'den-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
   subscription_id: '01a1e1bb-e6e8-72d0-8fd0-9ae31776f31d',
   purpose: 'eligibility_check',
   end_user_hash: '96954dc22b760bf38d4d7922b0938cc626cc98be90f356e7220d4878a2d4bedd',
@@ -85,7 +85,7 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
     expect(out).toEqual({
       ts: '2026-11-16T01:02:08+00:00',
       request_id: 'demo-mwiiqve0',
-      route_id: 'rid-route-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
+      route_id: 'den-route-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
       operation: 'getAfiliado',
       method: 'GET',
       status: 200,
@@ -93,7 +93,7 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
       // Two upstreams tried: the time spent in both.
       upstream_latency_ms: 14,
       consumer_entity: 'programas-sociales',
-      consumer_app: 'rid-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
+      consumer_app: 'den-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
       subscription_id: '01a1e1bb-e6e8-72d0-8fd0-9ae31776f31d',
       purpose: 'eligibility_check',
       end_user_hash: '96954dc22b760bf38d4d7922b0938cc626cc98be90f356e7220d4878a2d4bedd',
@@ -145,7 +145,7 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
   });
 
   it('names the consumer of a denied call from the deny response, never on an allowed one', () => {
-    const app = 'rid-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b';
+    const app = 'den-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b';
     const [denied, allowed] = filter([
       call({
         status: '403',
@@ -158,7 +158,7 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
         deny_consumer_app: app,
         deny_consumer_entity: 'programas-sociales',
       }),
-      call({ deny_consumer_app: 'rid-app-other', deny_consumer_entity: 'otra' }),
+      call({ deny_consumer_app: 'den-app-other', deny_consumer_entity: 'otra' }),
     ]);
     expect(denied).toMatchObject({
       status: 403,
@@ -169,7 +169,7 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
     expect(denied).not.toHaveProperty('deny_consumer_app');
     expect(denied).not.toHaveProperty('upstream_latency_ms');
     expect(allowed).toMatchObject({ consumer_app: app, consumer_entity: 'programas-sociales' });
-    expect(JSON.stringify(allowed)).not.toContain('rid-app-other');
+    expect(JSON.stringify(allowed)).not.toContain('den-app-other');
   });
 
   it('a deny reason a provider sent is not a denial: only the gateway denies', () => {
@@ -178,10 +178,10 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
         status: '403',
         consumer_app: '',
         deny_reason: 'purpose_not_allowed',
-        deny_consumer_app: 'rid-app-falsa',
+        deny_consumer_app: 'den-app-falsa',
       }),
     ]);
-    // The upstream answered (it has an upstream time): its X_RID_Deny_Reason does not count.
+    // The upstream answered (it has an upstream time): its X_DEN_Deny_Reason does not count.
     expect(out).toMatchObject({ status: 403, upstream_latency_ms: 10 });
     expect(out).not.toHaveProperty('deny_reason');
     expect(out).not.toHaveProperty('consumer_app');

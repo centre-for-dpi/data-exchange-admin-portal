@@ -8,8 +8,8 @@ export interface SessionTokens {
   error?: 'RefreshTokenError';
 }
 
-/** Refresh this many seconds before the access token (5 min in rid-portal) expires. */
-export const REFRESH_BEFORE_SECONDS = Number(process.env.RID_AUTH_REFRESH_BEFORE_SECONDS ?? 60);
+/** Refresh this many seconds before the access token (5 min in den-portal) expires. */
+export const REFRESH_BEFORE_SECONDS = Number(process.env.DEN_AUTH_REFRESH_BEFORE_SECONDS ?? 60);
 
 export const needsRefresh = (tokens: SessionTokens, nowSeconds = Date.now() / 1000): boolean =>
   tokens.expiresAt === undefined || nowSeconds >= tokens.expiresAt - REFRESH_BEFORE_SECONDS;

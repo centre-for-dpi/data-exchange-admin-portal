@@ -6,7 +6,7 @@ import {
   type RevokeCredentialInput,
   revokeCredentialSchema,
   rotatedSecretSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import {
   type AuthenticatedRequest,

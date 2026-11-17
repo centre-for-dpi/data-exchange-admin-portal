@@ -1,7 +1,7 @@
 import { SetMetadata } from '@nestjs/common';
 import type { z } from 'zod';
 
-export const OPENAPI_OPERATION = 'rid:openapi-operation';
+export const OPENAPI_OPERATION = 'den:openapi-operation';
 
 export interface ResponseSpec {
   description: string;

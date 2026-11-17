@@ -1,4 +1,4 @@
-# RID Portal — Data Exchange Network
+# DEN Portal — Data Exchange Network
 
 > Versión en español: [docs/es/README.md](docs/es/README.md)
 
@@ -24,7 +24,7 @@ pnpm dev
 
 Open http://localhost:3000. Test users are listed in `docs/DEMO.md`. The reference citizen folder ("Who accessed my data?", MT-07) runs at http://localhost:3100, with `ciudadana.demo`.
 
-For the e2e tests (`pnpm test:e2e`, with the stack up), install the browser once: `pnpm --filter @rid/web exec playwright install chromium`.
+For the e2e tests (`pnpm test:e2e`, with the stack up), install the browser once: `pnpm --filter @den/web exec playwright install chromium`.
 
 ### Local infrastructure
 

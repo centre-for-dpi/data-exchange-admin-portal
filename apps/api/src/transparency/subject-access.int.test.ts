@@ -2,8 +2,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { createdApplicationSchema, subscriptionDetailSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { createdApplicationSchema, subscriptionDetailSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -25,7 +25,7 @@ describe('transparency register collector (MT-03)', () => {
   const realmUsers = readRealmUsers();
   const subOf = (username: string) => realmUsers.find((u) => u.username === username)?.id ?? '';
   const run = randomUUID().slice(0, 6);
-  const token = process.env.RID_TRANSPARENCY_INGEST_TOKEN ?? '';
+  const token = process.env.DEN_TRANSPARENCY_INGEST_TOKEN ?? '';
   let app: NestFastifyApplication;
   let issuer: TestIssuer;
   let salud = '';
@@ -89,7 +89,7 @@ describe('transparency register collector (MT-03)', () => {
       sector: 'salud',
       tags: [],
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -116,7 +116,7 @@ describe('transparency register collector (MT-03)', () => {
       name: `Verificador ${run}`,
       description: 'Verifica afiliación.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const requested = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {
@@ -271,7 +271,7 @@ describe('transparency register collector (MT-03)', () => {
       // Nor can it switch the purge flag on and delete by itself.
       await expect(
         prisma.$transaction(async (tx) => {
-          await tx.$executeRaw`SELECT set_config('rid.subject_access_purge', 'on', true)`;
+          await tx.$executeRaw`SELECT set_config('den.subject_access_purge', 'on', true)`;
           await tx.$executeRaw`DELETE FROM subject_access_record WHERE id = ${row.id}::uuid`;
         }),
       ).rejects.toThrow();
@@ -310,7 +310,7 @@ describe('transparency register collector (MT-03)', () => {
       const logged = await prisma.subjectAccessPurgeLog.findFirstOrThrow({
         orderBy: { purgedAt: 'desc' },
       });
-      expect(logged).toMatchObject({ calledBy: 'rid_app', retentionMonths: months, deleted: 0n });
+      expect(logged).toMatchObject({ calledBy: 'den_app', retentionMonths: months, deleted: 0n });
 
       // The runtime role cannot shorten retention: the floor is the schema owner's, and the
       // database refuses anything under it.

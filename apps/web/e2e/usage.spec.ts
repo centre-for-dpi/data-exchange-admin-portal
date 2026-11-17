@@ -5,7 +5,7 @@ import { expectNoAccessibilityViolations } from './helpers';
 
 // M5-02: usage of the entity's APIs for the provider, from the access logs.
 test.describe('usage of my APIs (M5-02)', () => {
-  const index = `rid-access-e2e-usage-${Date.now().toString(36)}`;
+  const index = `den-access-e2e-usage-${Date.now().toString(36)}`;
   test.afterAll(async () => {
     await dropIndex(index);
   });
@@ -20,7 +20,7 @@ test.describe('usage of my APIs (M5-02)', () => {
     await publishNewApi(browser, { slug, name });
     await signIn(page, 'lucia.datos', '/catalog');
     const { apiId, versionId } = await publishedIds(page, name);
-    const route = `rid-route-${versionId}`;
+    const route = `den-route-${versionId}`;
     const ok = {
       route_id: route,
       status: 200,
@@ -89,7 +89,7 @@ test.describe('usage of my APIs (M5-02)', () => {
 
 // M5-03: usage of the entity's applications for the consumer, with the gateway's refusals.
 test.describe('usage of my applications (M5-03)', () => {
-  const index = `rid-access-e2e-consumed-${Date.now().toString(36)}`;
+  const index = `den-access-e2e-consumed-${Date.now().toString(36)}`;
   test.afterAll(async () => {
     await dropIndex(index);
   });
@@ -106,7 +106,7 @@ test.describe('usage of my applications (M5-03)', () => {
     const { versionId } = await publishedIds(page, name);
     const appName = `Consumo ${slug}`;
     const clientId = await createApplication(page, appName);
-    const route = `rid-route-${versionId}`;
+    const route = `den-route-${versionId}`;
     const base = { route_id: route, consumer_app: clientId, consumer_entity: 'programas-sociales' };
     await indexAccessLogs(index, [
       { ...base, ts: '2026-04-10T15:00:00Z', status: 200, latency_ms: 10 },

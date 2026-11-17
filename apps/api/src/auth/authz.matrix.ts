@@ -1,4 +1,4 @@
-import { ENTITY_ROLES, PLATFORM_ROLES } from '@rid/contracts';
+import { ENTITY_ROLES, PLATFORM_ROLES } from '@den/contracts';
 import type { DiscoveredRoute } from '../openapi/openapi.service.js';
 import { ENTITY_PERMISSIONS, MFA_ENTITY_ROLES, PLATFORM_PERMISSIONS } from './authz.policy.js';
 
@@ -28,7 +28,7 @@ const TEXT = {
       '> Versión en español: [docs/es/AUTHZ.md](es/AUTHZ.md)',
       '',
       '> Generated from `apps/api/src/auth/authz.policy.ts` and the API routes. Do not edit it by hand:',
-      '> `RID_UPDATE_AUTHZ_DOC=1 pnpm --filter @rid/api test -- authz.matrix`.',
+      '> `DEN_UPDATE_AUTHZ_DOC=1 pnpm --filter @den/api test -- authz.matrix`.',
       '',
       'Rules of the global guard (ADR-0014): without a session, 401. On entity routes: someone who is not a member',
       'and has no allowed platform role gets 404; a member without the role, 403. On platform',
@@ -62,7 +62,7 @@ const TEXT = {
       '> English version (official): [docs/AUTHZ.md](../AUTHZ.md)',
       '',
       '> Generado desde `apps/api/src/auth/authz.policy.ts` y las rutas del API. No lo edites a mano:',
-      '> `RID_UPDATE_AUTHZ_DOC=1 pnpm --filter @rid/api test -- authz.matrix`.',
+      '> `DEN_UPDATE_AUTHZ_DOC=1 pnpm --filter @den/api test -- authz.matrix`.',
       '',
       'Reglas del guard global (ADR-0014): sin sesión, 401. En rutas de una entidad: quien no es miembro',
       'ni tiene un rol de plataforma permitido recibe 404; un miembro sin el rol, 403. En rutas de',

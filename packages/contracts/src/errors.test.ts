@@ -4,7 +4,7 @@ import { ERROR_HTTP_STATUS, ErrorCode, problemDetailsSchema, problemType } from 
 describe('errors', () => {
   it('builds the problem type URL from the code', () => {
     expect(problemType(ErrorCode.InvalidTransition)).toBe(
-      'https://rid.example/errors/invalid_transition',
+      'https://den.example/errors/invalid_transition',
     );
   });
 

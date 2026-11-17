@@ -1,4 +1,4 @@
-# Installing on a server — RID Portal (portal + gateway)
+# Installing on a server — DEN Portal (portal + gateway)
 
 > Versión en español: [docs/es/INSTALL.md](es/INSTALL.md)
 
@@ -31,7 +31,7 @@ Where the numbers come from (measured on the demo pilot, November 2026):
 | What | Details |
 | :-- | :-- |
 | **Fixed public IP** | The server must be reachable from the internet (the entities and their systems connect to it) |
-| **Two DNS names** (A record) pointing to that IP | **Portal**, e.g. `rid.and.gov.co`: people, web portal, portal API and sign-in. **Gateway**, e.g. `gw.rid.and.gov.co`: system-to-system traffic, with mTLS |
+| **Two DNS names** (A record) pointing to that IP | **Portal**, e.g. `portal.den.example`: people, web portal, portal API and sign-in. **Gateway**, e.g. `gw.den.example`: system-to-system traffic, with mTLS |
 | **Inbound** | `443/tcp`: portal and gateway, on a single port, told apart by name (SNI). `80/tcp`: only for Let's Encrypt and the redirect to HTTPS. `51820/udp`: WireGuard tunnels from the kit nodes |
 | **Outbound during installation** | HTTPS to Docker Hub, quay.io, ghcr.io, the npm registry and PyPI (images and build dependencies) |
 | **Portal certificate** | Let's Encrypt, automatic, or the entity's own certificate (PEM with the full chain and the private key) |
@@ -57,7 +57,7 @@ The installer checks everything, and if Docker is missing it offers to install i
 ## 2. Installation
 
 ```bash
-git clone <repository-url> rid && cd rid
+git clone <repository-url> den && cd den
 sudo ./install.sh
 ```
 
@@ -69,9 +69,9 @@ The script asks its questions one at a time, shows a summary and asks for confir
 | :-- | :-- | :-- |
 | 1 | — | Server check: system, CPU, RAM, disk, Docker, `/dev/net/tun`. It stops if something essential is missing |
 | 2 | **Country** | The code of `config/country/<code>.yaml`. For Colombia, `co` |
-| 3 | **Portal name** | Just the name, without `https://` (e.g. `rid.and.gov.co`) |
+| 3 | **Portal name** | Just the name, without `https://` (e.g. `portal.den.example`) |
 | 3 | **Gateway name** | Defaults to `gw.<portal>`. It must differ from the portal |
-| 4 | **Inbound proxy** | `1` Bundled (recommended): the installer puts Traefik on 80/443. `2` I already have Traefik: it joins its Docker network and you configure the routes yourself, as in `DEPLOYMENT.md §5.2` |
+| 4 | **Inbound proxy** | `1` Bundled (recommended): the installer puts Traefik on 80/443. `2` I already have Traefik: it joins its Docker network and writes the routes of the portal and the gateway for it (file provider). It asks for the HTTPS entryPoint (`websecure`), the certResolver for the portal's certificate (`-`: your Traefik already has it) and Traefik's dynamic folder on this server (`-`: it only writes `infra/edge/den-external.yml`, for you to copy) |
 | 4 | **Portal certificate** | `1` Let's Encrypt (contact email optional; port 80 must be reachable). `2` Your own: paths to the certificate (full chain) and to the private key, in PEM. It must come from a recognized public CA: the API and the web also call the portal by its name and verify the certificate |
 | 5 | **Observability** (OpenSearch, Prometheus, Alertmanager, Grafana) | Yes, if the server has 16 GB: it provides the usage indicators, email alerts and the operator dashboard at `/grafana`. You can do without it: it does not affect traffic, audit or transparency |
 | 5 | **Document antivirus** (ClamAV) | Yes, if the server has 8 GB: it scans every uploaded document before storing it. Adds ~1.2 GB of RAM and downloads its signatures from the internet |
@@ -101,7 +101,7 @@ Then, with no more questions:
 | `https://<gateway>` | **Gateway**: traffic between entities with mTLS, tokens at `/oauth/token`, control channel for the nodes | Entity systems |
 | `<gateway>:51820/udp` | WireGuard hub: tunnels from the kit nodes | Nodes |
 | `https://<portal>/mail` | Test mailbox (Mailpit): all the pilot's email arrives here, behind a user and password | Operator |
-| `https://<portal>/carpeta` | Reference citizen folder (transparency demo) | Demos |
+| `https://<portal>/citizen-app` | Reference citizen folder (transparency demo) | Demos |
 | `https://<portal>/grafana/` | Operator dashboard (with observability enabled), with its own `admin` user | Operator |
 
 The other services (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, the contract runner, the test providers) are not published. Each one is explained in [`guides/operator.md`](guides/operator.md).
@@ -132,7 +132,7 @@ The pilot **always** loads the seed: three fictitious entities (the operator, a 
 | `sudo ./install.sh credentials` | Demo users, Keycloak administrator, test mailbox user and Grafana user |
 | `sudo ./install.sh otp` | Current second-factor code for the demo users with a critical role |
 | `sudo ./install.sh logs [service]` | Logs (e.g. `logs api`) |
-| `sudo ./install.sh backup` | Full pgBackRest backup and a copy in `backups/<date>/`: dumps of `rid` and `keycloak`, the backup repository (encrypted), the CA, TSA, documents and citizen folder volumes, and `.env`. Daily backups already run on their own (`OPERATIONS.md §6`) |
+| `sudo ./install.sh backup` | Full pgBackRest backup and a copy in `backups/<date>/`: dumps of `den` and `keycloak`, the backup repository (encrypted), the CA, TSA, documents and citizen folder volumes, and `.env`. Daily backups already run on their own (`OPERATIONS.md §6`) |
 | `sudo ./install.sh restore [instant]` | Restores the database to the last archived state, or to the given instant (`"2026-11-20 14:30:00-05"`). Stops and starts everything |
 | `sudo ./install.sh update` | Backup, `git pull --ff-only`, rebuild and restart |
 | `sudo ./install.sh stop` / `start` | Stops or starts everything, without losing data |
@@ -146,7 +146,7 @@ alias dc='docker compose -f infra/compose/docker-compose.yml -f infra/compose/do
 
 Without observability, remove `--profile observability`; with the antivirus, add `--profile antivirus`; with your own Traefik, remove `-f infra/compose/docker-compose.edge.yml`.
 
-An `.env` written by hand or by `make-deploy-env.mjs` (like the one on the demo pilot) does not have the installer's answers. Add `RID_PORTAL_HOST`, `RID_GATEWAY_HOST`, `RID_INSTALL_PROXY` (`bundled` or `external`), `RID_INSTALL_TLS`, `RID_INSTALL_OBSERVABILITY` and `RID_INSTALL_ANTIVIRUS` (`true` or `false`; with the antivirus, also `RID_CLAMAV_URL=tcp://clamav:3310`), or keep using Compose directly.
+An `.env` written by hand or by `make-deploy-env.mjs` (like the one on the demo pilot) does not have the installer's answers. Add `DEN_PORTAL_HOST`, `DEN_GATEWAY_HOST`, `DEN_INSTALL_PROXY` (`bundled` or `external`), `DEN_INSTALL_TLS`, `DEN_INSTALL_OBSERVABILITY` and `DEN_INSTALL_ANTIVIRUS` (`true` or `false`; with the antivirus, also `DEN_CLAMAV_URL=tcp://clamav:3310`), or keep using Compose directly.
 
 ## 8. Common installation problems
 
@@ -156,9 +156,9 @@ An `.env` written by hand or by `make-deploy-env.mjs` (like the one on the demo 
 | The portal shows an invalid certificate | Let's Encrypt could not validate: the portal's DNS does not point here or port 80 is closed. Fix it and wait, because Traefik retries on its own. `sudo ./install.sh logs edge` |
 | A service does not become healthy and the installation stops | `sudo ./install.sh logs <service>`. Keycloak can take up to 5 minutes on a small machine. Run `sudo ./install.sh` again |
 | OpenSearch keeps restarting | Not enough memory, or `vm.max_map_count`. Reinstall without analytics or add RAM |
-| Sign-in loops | The portal name does not match the one in `.env` (`RID_PUBLIC_URL`). `OPERATIONS.md §7` |
-| The nodes do not connect | 51820/udp closed in the cloud firewall, or the gateway's DNS does not point here (`RID_WG_HUB_ENDPOINT`) |
-| `.env` was lost | Without a copy, there is no recovery: reinstall from scratch, deleting the `rid_*` volumes |
+| Sign-in loops | The portal name does not match the one in `.env` (`DEN_PUBLIC_URL`). `OPERATIONS.md §7` |
+| The nodes do not connect | 51820/udp closed in the cloud firewall, or the gateway's DNS does not point here (`DEN_WG_HUB_ENDPOINT`) |
+| `.env` was lost | Without a copy, there is no recovery: reinstall from scratch, deleting the `den_*` volumes |
 
 More diagnostics in `OPERATIONS.md §4` and §7.
 
@@ -169,5 +169,5 @@ sudo ./install.sh stop
 # Deletes containers AND DATA (databases, CA, audit log). Irreversible: back up first.
 docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
   -f infra/compose/docker-compose.edge.yml --env-file .env --profile observability down --volumes
-docker network rm rid-edge
+docker network rm den-edge
 ```

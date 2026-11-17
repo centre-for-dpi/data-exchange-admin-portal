@@ -1,9 +1,9 @@
 apiVersion: v2
-name: rid-platform
+name: den-platform
 description: >-
-  The cluster's operators the RID chart builds on (M6-05): CloudNativePG (PostgreSQL with replicas)
+  The cluster's operators the DEN chart builds on (M6-05): CloudNativePG (PostgreSQL with replicas)
   with its Barman Cloud plugin (backups, M6-06), External Secrets Operator (secrets from OpenBao or
-  another store) and cert-manager (internal certificates). Installed once per cluster, before the rid chart: Helm cannot create an operator
+  another store) and cert-manager (internal certificates). Installed once per cluster, before the den chart: Helm cannot create an operator
   and its resources in one release, since the resources reach the operator's webhook first.
 type: application
 version: 0.1.0

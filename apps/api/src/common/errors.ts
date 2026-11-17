@@ -1,4 +1,4 @@
-import { ErrorCode, type FieldErrorDetail } from '@rid/contracts';
+import { ErrorCode, type FieldErrorDetail } from '@den/contracts';
 
 /**
  * A field error: the English message for API clients, and the key and parameters the portal

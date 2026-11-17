@@ -1,5 +1,5 @@
-import { purposeListSchema, reviewDetailSchema } from '@rid/contracts';
-import { getCountryConfig } from '@rid/config';
+import { purposeListSchema, reviewDetailSchema } from '@den/contracts';
+import { getCountryConfig } from '@den/config';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

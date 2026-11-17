@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   CSR_ERRORS,
   type IssueCertificateInput,
   issueCertificateSchema,
   type IssuedCertificate,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError, ValidationError } from '../common/errors.js';

@@ -6,12 +6,12 @@ import type { FastifyRequest } from 'fastify';
  * Rate limits of the portal API (M6-01, ASVS 2.4.1): anti-automation in front of every handler,
  * before the body is read (onRequest), so a flood of large uploads is refused before buffering.
  *
- * - Every caller: RID_RATE_LIMIT_PER_MINUTE (600) by its verified user (the `sub` of a token the
+ * - Every caller: DEN_RATE_LIMIT_PER_MINUTE (600) by its verified user (the `sub` of a token the
  *   API accepts), or by its address otherwise. A made-up or expired token is not a bucket of its
  *   own: rotating invented tokens lands on the address's quota. Pages of the portal call the API
  *   server-side with the user's own token, all from one address, hence the user as the key.
  * - Expensive routes (PDF uploads, a new version and its OpenAPI lint, onboarding requests,
- *   invitations, a node's enrollment): RID_RATE_LIMIT_STRICT_PER_MINUTE (30), per user or address.
+ *   invitations, a node's enrollment): DEN_RATE_LIMIT_STRICT_PER_MINUTE (30), per user or address.
  * - Not limited: only the routes of the platform's own services, each with its own credential
  *   (the transparency collector, OPA's bundle and status, a node's control channel after its
  *   enrollment, which needs the node's certificate), the metrics and the health check. Matched
@@ -58,8 +58,8 @@ export async function registerRateLimit(
   app: NestFastifyApplication,
   verifiedSubject: VerifiedSubject,
 ): Promise<void> {
-  const general = perMinute('RID_RATE_LIMIT_PER_MINUTE', 600);
-  const tight = perMinute('RID_RATE_LIMIT_STRICT_PER_MINUTE', 30);
+  const general = perMinute('DEN_RATE_LIMIT_PER_MINUTE', 600);
+  const tight = perMinute('DEN_RATE_LIMIT_STRICT_PER_MINUTE', 30);
   await app.register(rateLimit, {
     global: true,
     hook: 'onRequest',

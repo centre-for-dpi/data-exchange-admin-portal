@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
-import type { CountryConfig } from '@rid/config';
+import type { CountryConfig } from '@den/config';
 import type { AuditService } from '../audit/audit.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import type { PrismaService, Tx } from '../prisma/prisma.service.js';
@@ -7,7 +7,7 @@ import { SEED_ENTITIES, SEED_ROLES, type SeedEntity, type SeedRoles } from './se
 
 export const SEED_ACTOR = 'system:seed';
 
-/** A user from the Keycloak realm export (infra/keycloak/rid-portal-realm.json). */
+/** A user from the Keycloak realm export (infra/keycloak/den-portal-realm.json). */
 export interface RealmUser {
   id: string;
   username: string;

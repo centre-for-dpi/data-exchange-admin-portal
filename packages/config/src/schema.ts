@@ -108,7 +108,7 @@ export const countryConfigSchema = z.strictObject({
     approval: z.strictObject({ regulatorForSensitive: z.boolean() }),
     lint: z.strictObject({ noIdInQuery: z.boolean() }),
     /**
-     * The gateway signs each call to the provider (X-RID-Assertion, ADR-0024, M6-10): a JWS the
+     * The gateway signs each call to the provider (X-DEN-Assertion, ADR-0024, M6-10): a JWS the
      * provider verifies with the portal's JWKS and can keep as proof. Off by default.
      */
     gatewayAssertion: z.boolean().default(false),

@@ -17,7 +17,7 @@ import {
   type PaginationQuery,
   paginationQuerySchema,
   replaceOpenapiSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import {
   type AuthenticatedRequest,

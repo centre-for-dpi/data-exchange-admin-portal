@@ -3,11 +3,11 @@
 // that the reconcilers turn into APISIX routes, Keycloak clients and OPA data. Synthetic and
 // recognisable (slug prefix `carga-`), idempotent (only creates what is missing), and audited
 // like any other change (CLAUDE.md, rule 4). Load environments only: refused in production
-// unless RID_ALLOW_LOAD_SEED=true.
+// unless DEN_ALLOW_LOAD_SEED=true.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import type { Prisma } from '../generated/prisma/client.js';
 import { lintOpenApi } from '../apis/lint/openapi-lint.js';
 import { type AuditActor, AuditService } from '../audit/audit.service.js';
@@ -88,9 +88,9 @@ export async function seedScale(
             kind: 'national',
             sector: sectors[i % sectors.length] ?? 'general',
             status: 'active',
-            contactEmail: `contacto@${slug}.load.rid.example`,
+            contactEmail: `contacto@${slug}.load.den.example`,
             dpoName: 'Responsable sintético',
-            dpoEmail: `dpo@${slug}.load.rid.example`,
+            dpoEmail: `dpo@${slug}.load.den.example`,
             createdBy: ACTOR.id,
             decidedAt: now,
           },
@@ -151,7 +151,7 @@ export async function seedScale(
             name: `Aplicación de carga ${pad(i)}`,
             description: 'Consumidor sintético de la prueba de carga.',
             environment: 'production',
-            keycloakClientId: `rid-app-${slug}`,
+            keycloakClientId: `den-app-${slug}`,
             technicalContact: entity.contactEmail,
             createdBy: ACTOR.id,
           },
@@ -175,7 +175,7 @@ export async function seedScale(
   // Subscriptions: each application asks for APIs of the other entities, round robin, until the
   // network has the target. They are approved: OPA activates them when it confirms the bundle.
   const apps = await prisma.application.findMany({
-    where: { keycloakClientId: { startsWith: `rid-app-${LOAD_PREFIX}-` } },
+    where: { keycloakClientId: { startsWith: `den-app-${LOAD_PREFIX}-` } },
     select: { id: true, entityId: true },
     orderBy: { keycloakClientId: 'asc' },
   });
@@ -224,7 +224,7 @@ export async function seedScale(
 async function ensureCredentials(prisma: PrismaService, audit: AuditService): Promise<number> {
   const apps = await prisma.application.findMany({
     where: {
-      keycloakClientId: { startsWith: `rid-app-${LOAD_PREFIX}-` },
+      keycloakClientId: { startsWith: `den-app-${LOAD_PREFIX}-` },
       credentials: { none: { kind: 'client_secret', status: 'active' } },
     },
     select: { id: true },
@@ -264,7 +264,7 @@ async function syntheticRequester(prisma: PrismaService, audit: AuditService): P
     const user = await tx.user.create({
       data: {
         keycloakSub,
-        email: `${ACTOR.id}@load.rid.example`,
+        email: `${ACTOR.id}@load.den.example`,
         fullName: 'Solicitante sintético (prueba de carga)',
         status: 'disabled',
         createdBy: ACTOR.id,
@@ -310,8 +310,8 @@ function subscriptionOf(
 
 async function main(): Promise<void> {
   loadDevEnv();
-  if (process.env.NODE_ENV === 'production' && process.env.RID_ALLOW_LOAD_SEED !== 'true') {
-    throw new Error('Refusing the load seed in production (RID_ALLOW_LOAD_SEED=true)');
+  if (process.env.NODE_ENV === 'production' && process.env.DEN_ALLOW_LOAD_SEED !== 'true') {
+    throw new Error('Refusing the load seed in production (DEN_ALLOW_LOAD_SEED=true)');
   }
   const { values } = parseArgs({
     options: {

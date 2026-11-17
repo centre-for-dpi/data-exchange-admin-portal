@@ -20,8 +20,8 @@ export const CERTIFICATE_AUTHORITY = Symbol('CERTIFICATE_AUTHORITY');
 
 /**
  * Which provisioner signs (infra/step-ca/configure.sh): `application` certificates for TLS client
- * authentication (rid-portal, M3-01), the gateway's TLS `server` certificate (M3-02), or a kit
- * `node` certificate, for server and client authentication (rid-nodes, M4-02).
+ * authentication (den-portal, M3-01), the gateway's TLS `server` certificate (M3-02), or a kit
+ * `node` certificate, for server and client authentication (den-nodes, M4-02).
  */
 export type CertificateProfile = 'application' | 'gateway-server' | 'node';
 
@@ -54,13 +54,13 @@ export interface StepCaSettings {
 
 export function stepCaSettings(env: NodeJS.ProcessEnv = process.env): StepCaSettings {
   return {
-    url: (env.RID_STEP_CA_URL ?? 'https://localhost:9000').replace(/\/+$/, ''),
-    provisioner: env.RID_STEP_CA_PROVISIONER ?? 'rid-portal',
-    gatewayProvisioner: env.RID_STEP_CA_GATEWAY_PROVISIONER ?? 'rid-gateway-tls',
-    nodeProvisioner: env.RID_STEP_CA_NODE_PROVISIONER ?? 'rid-nodes',
-    password: env.RID_STEP_CA_PROVISIONER_PASSWORD ?? '',
-    rootFile: env.RID_STEP_CA_ROOT_FILE || undefined,
-    rootFingerprint: env.RID_STEP_CA_ROOT_FINGERPRINT?.toLowerCase().replace(/:/g, '') || undefined,
+    url: (env.DEN_STEP_CA_URL ?? 'https://localhost:9000').replace(/\/+$/, ''),
+    provisioner: env.DEN_STEP_CA_PROVISIONER ?? 'den-portal',
+    gatewayProvisioner: env.DEN_STEP_CA_GATEWAY_PROVISIONER ?? 'den-gateway-tls',
+    nodeProvisioner: env.DEN_STEP_CA_NODE_PROVISIONER ?? 'den-nodes',
+    password: env.DEN_STEP_CA_PROVISIONER_PASSWORD ?? '',
+    rootFile: env.DEN_STEP_CA_ROOT_FILE || undefined,
+    rootFingerprint: env.DEN_STEP_CA_ROOT_FINGERPRINT?.toLowerCase().replace(/:/g, '') || undefined,
     trustOnFirstUse: env.NODE_ENV !== 'production',
   };
 }
@@ -132,9 +132,9 @@ interface Provisioner {
  * minutes, unique jti) with the provisioner key, and posts it with the CSR to `/1.0/sign`.
  *
  * The provisioner key travels encrypted (JWE, PBES2) in the CA's public provisioner list; the
- * API decrypts it once with RID_STEP_CA_PROVISIONER_PASSWORD. The CA's TLS is verified against
- * its root: RID_STEP_CA_ROOT_FILE, or the root the CA serves pinned by
- * RID_STEP_CA_ROOT_FINGERPRINT, or (development only) the root it serves on first use.
+ * API decrypts it once with DEN_STEP_CA_PROVISIONER_PASSWORD. The CA's TLS is verified against
+ * its root: DEN_STEP_CA_ROOT_FILE, or the root the CA serves pinned by
+ * DEN_STEP_CA_ROOT_FINGERPRINT, or (development only) the root it serves on first use.
  */
 export class StepCaClient implements CertificateAuthority {
   private readonly logger = new Logger(StepCaClient.name);
@@ -158,7 +158,7 @@ export class StepCaClient implements CertificateAuthority {
       const pem = readFileSync(rootFile, 'utf8');
       if (rootFingerprint && fingerprintOf(pem) !== rootFingerprint) {
         throw new Error(
-          'step-ca: RID_STEP_CA_ROOT_FILE does not match RID_STEP_CA_ROOT_FINGERPRINT',
+          'step-ca: DEN_STEP_CA_ROOT_FILE does not match DEN_STEP_CA_ROOT_FINGERPRINT',
         );
       }
       return pem;
@@ -170,12 +170,12 @@ export class StepCaClient implements CertificateAuthority {
         'root',
       );
       if (fingerprintOf(ca) !== rootFingerprint) {
-        throw new Error('step-ca: the root served does not match RID_STEP_CA_ROOT_FINGERPRINT');
+        throw new Error('step-ca: the root served does not match DEN_STEP_CA_ROOT_FINGERPRINT');
       }
       return ca;
     }
     if (!this.settings.trustOnFirstUse) {
-      throw new Error('step-ca: set RID_STEP_CA_ROOT_FILE or RID_STEP_CA_ROOT_FINGERPRINT');
+      throw new Error('step-ca: set DEN_STEP_CA_ROOT_FILE or DEN_STEP_CA_ROOT_FINGERPRINT');
     }
     const { crts } = json<{ crts: string[] }>(
       await call(`${url}/roots`, { insecure: true }),
@@ -185,7 +185,7 @@ export class StepCaClient implements CertificateAuthority {
     if (!pem) throw new Error('step-ca: no root certificate');
     this.logger.warn(
       `Development: trusting the step-ca root served at ${url} (SHA-256 ${fingerprintOf(pem)}). ` +
-        'Set RID_STEP_CA_ROOT_FILE or RID_STEP_CA_ROOT_FINGERPRINT outside development.',
+        'Set DEN_STEP_CA_ROOT_FILE or DEN_STEP_CA_ROOT_FINGERPRINT outside development.',
     );
     return pem;
   }
@@ -204,7 +204,7 @@ export class StepCaClient implements CertificateAuthority {
 
   private async loadKey(provisioner: string): Promise<{ key: SigningKey; kid: string }> {
     const { url, password } = this.settings;
-    if (!password) throw new Error('step-ca: set RID_STEP_CA_PROVISIONER_PASSWORD');
+    if (!password) throw new Error('step-ca: set DEN_STEP_CA_PROVISIONER_PASSWORD');
     const ca = await this.rootCertificate();
     let found: Provisioner | undefined;
     let cursor = '';

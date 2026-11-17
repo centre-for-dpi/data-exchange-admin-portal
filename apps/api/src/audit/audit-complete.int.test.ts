@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { auditEventPageSchema, chainCheckSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { auditEventPageSchema, chainCheckSchema } from '@den/contracts';
 import { compactVerify, importJWK, type JWK } from 'jose';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -104,8 +104,8 @@ describe('complete audit (M2-09)', () => {
       expect(res.statusCode, res.body).toBe(200);
       const body = res.rawPayload;
       const sha = createHash('sha256').update(body).digest('hex');
-      expect(res.headers['x-rid-export-sha256']).toBe(sha);
-      expect(res.headers['x-rid-export-count']).toBe('3');
+      expect(res.headers['x-den-export-sha256']).toBe(sha);
+      expect(res.headers['x-den-export-count']).toBe('3');
       const lines = body.toString('utf8').trim().split('\r\n');
       expect(lines[0]).toContain('seq,occurredAt');
       expect(lines).toHaveLength(4);
@@ -115,12 +115,12 @@ describe('complete audit (M2-09)', () => {
       const jwks = (await app.inject({ method: 'GET', url: '/api/v1/transparency/jwks' })).json<{
         keys: JWK[];
       }>();
-      const jws = String(res.headers['x-rid-export-signature']);
+      const jws = String(res.headers['x-den-export-signature']);
       const { protectedHeader } = await compactVerify(jws, async (header) => {
         const key = jwks.keys.find((k) => k.kid === header.kid);
         return importJWK(key ?? {}, 'EdDSA');
       });
-      expect(protectedHeader.typ).toBe('rid-audit-export+jws');
+      expect(protectedHeader.typ).toBe('den-audit-export+jws');
       const manifest = JSON.parse(
         Buffer.from(jws.split('.')[1] ?? '', 'base64url').toString('utf8'),
       ) as Record<string, unknown>;

@@ -64,14 +64,14 @@ describe('APISIX (M0-04)', () => {
       `${gatewayUrl()}/unknown-${randomUUID()}/v1/afiliados/${identifier}?doc=${identifier}`,
     );
     await new Promise((r) => setTimeout(r, 1_000));
-    expect(containerLogsSince('rid-apisix-1', since)).not.toContain(identifier);
+    expect(containerLogsSince('den-apisix-1', since)).not.toContain(identifier);
   });
 
   it('refuses plugins outside its list, serverless functions above all (M6-01)', async () => {
-    const res = await asAdmin(`/routes/rid-test-serverless-${randomUUID()}`, {
+    const res = await asAdmin(`/routes/den-test-serverless-${randomUUID()}`, {
       method: 'PUT',
       body: JSON.stringify({
-        uri: '/__rid-test/serverless/*',
+        uri: '/__den-test/serverless/*',
         plugins: {
           'serverless-pre-function': {
             phase: 'rewrite',
@@ -100,7 +100,7 @@ describe('APISIX (M0-04)', () => {
     const pem = generateKeyPairSync('ec', { namedCurve: 'P-256' })
       .privateKey.export({ format: 'pem', type: 'pkcs8' })
       .toString();
-    const put = await asAdmin('/plugin_metadata/rid-assertion', {
+    const put = await asAdmin('/plugin_metadata/den-assertion', {
       method: 'PUT',
       body: JSON.stringify({ issuer: 'test', kid: 'k-test', private_key: pem }),
     });
@@ -110,29 +110,29 @@ describe('APISIX (M0-04)', () => {
         'docker',
         [
           'exec',
-          'rid-etcd-1',
+          'den-etcd-1',
           'etcdctl',
           'get',
-          '/apisix/plugin_metadata/rid-assertion',
+          '/apisix/plugin_metadata/den-assertion',
           '--print-value-only',
         ],
         { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } },
       ).stdout;
       const value = (JSON.parse(stored) as { private_key: string }).private_key;
       expect(value).not.toContain('BEGIN');
-      expect(decrypts(value, env('RID_APISIX_KEYRING'))).toBe(true);
+      expect(decrypts(value, env('DEN_APISIX_KEYRING'))).toBe(true);
       // Not with APISIX's factory key, which is public.
       expect(decrypts(value, 'qeddd145sfvddff3')).toBe(false);
     } finally {
-      await asAdmin('/plugin_metadata/rid-assertion', { method: 'DELETE' });
+      await asAdmin('/plugin_metadata/den-assertion', { method: 'DELETE' });
     }
   });
 
   it('a real error reaches the operator masked, never with the path (M5-01)', async () => {
     // nginx appends the request line and the upstream URI to an upstream error: its error log
     // goes over syslog to fluent-bit-errors, which masks them (infra/fluent-bit/gateway-errors.lua).
-    const routeId = `rid-test-errors-${randomUUID()}`;
-    const prefix = `/__rid-test/${routeId}`;
+    const routeId = `den-test-errors-${randomUUID()}`;
+    const prefix = `/__den-test/${routeId}`;
     const created = await asAdmin(`/routes/${routeId}`, {
       method: 'PUT',
       body: JSON.stringify({
@@ -153,8 +153,8 @@ describe('APISIX (M0-04)', () => {
       }
       expect(status).toBe(502);
       await new Promise((r) => setTimeout(r, 2_000));
-      expect(containerLogsSince('rid-apisix-1', since)).not.toContain(identifier);
-      const errors = containerLogsSince('rid-fluent-bit-errors-1', since);
+      expect(containerLogsSince('den-apisix-1', since)).not.toContain(identifier);
+      const errors = containerLogsSince('den-fluent-bit-errors-1', since);
       const line = errors.split('\n').find((l) => l.includes('while connecting to upstream'));
       expect(line, errors.slice(-500)).toBeDefined();
       expect(line).toContain('request: \\"[masked]\\"');
@@ -170,8 +170,8 @@ describe('APISIX (M0-04)', () => {
 describe('APISIX reaches the mock providers over the Compose network (M0-04)', () => {
   // Temporary route created directly through the Admin API for this connectivity test only.
   // Real routes are created by the portal reconciler (M1-08), never by hand.
-  const routeId = `rid-test-${randomUUID()}`;
-  const prefix = `/__rid-test/${routeId}`;
+  const routeId = `den-test-${randomUUID()}`;
+  const prefix = `/__den-test/${routeId}`;
 
   afterAll(async () => {
     await asAdmin(`/routes/${routeId}`, { method: 'DELETE' });
@@ -197,7 +197,7 @@ describe('APISIX reaches the mock providers over the Compose network (M0-04)', (
     // APISIX picks up new routes from etcd asynchronously; retry briefly.
     for (let attempt = 0; attempt < 20; attempt += 1) {
       res = await fetch(`${gatewayUrl()}${prefix}/afiliados/1000000001`, {
-        headers: { 'x-rid-purpose': 'eligibility_check', 'x-request-id': requestId },
+        headers: { 'x-den-purpose': 'eligibility_check', 'x-request-id': requestId },
       });
       if (res.status !== 404) break;
       await new Promise((r) => setTimeout(r, 250));
@@ -207,10 +207,10 @@ describe('APISIX reaches the mock providers over the Compose network (M0-04)', (
       '1000000001',
     );
 
-    const logs = containerLogsSince('rid-mock-salud-1', since);
+    const logs = containerLogsSince('den-mock-salud-1', since);
     const line = logs.split('\n').find((l) => l.includes(requestId));
     expect(line, logs.slice(-500)).toBeDefined();
-    expect(line).toContain('"x-rid-purpose":"eligibility_check"');
+    expect(line).toContain('"x-den-purpose":"eligibility_check"');
     expect(line).toContain('"route":"/afiliados/:numeroIdentificacion"');
     expect(logs).not.toContain('1000000001');
   });
@@ -230,7 +230,7 @@ describe('mock providers on the host (M0-04)', () => {
 });
 
 describe('OPA (M0-04)', () => {
-  it('is configured to pull the rid bundle from the portal API, without decision logs', async () => {
+  it('is configured to pull the den bundle from the portal API, without decision logs', async () => {
     const res = await fetch(`${opaUrl()}/v1/config`);
     const { result } = (await res.json()) as {
       result: {
@@ -240,13 +240,13 @@ describe('OPA (M0-04)', () => {
       };
     };
     expect(result.services.portal?.url).toMatch(/\/api\/v1\/opa$/);
-    expect(result.bundles.rid).toMatchObject({ service: 'portal', resource: 'bundle.tar.gz' });
+    expect(result.bundles.den).toMatchObject({ service: 'portal', resource: 'bundle.tar.gz' });
     expect(result.decision_logs).toBeUndefined();
     expect(JSON.stringify(result)).not.toContain(env('OPA_BUNDLE_TOKEN'));
   });
 
   it('denies by default while no bundle is loaded', async () => {
-    const res = await fetch(`${opaUrl()}/v1/data/rid/authz/allow`, {
+    const res = await fetch(`${opaUrl()}/v1/data/den/authz/allow`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ input: {} }),

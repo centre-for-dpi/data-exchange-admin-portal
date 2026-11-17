@@ -18,7 +18,7 @@ import {
   nodeDnsName,
   nodeHeartbeatSchema,
   renewNodeCertificateSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { type AuditActor, AuditService } from '../audit/audit.service.js';
 import {
@@ -42,7 +42,7 @@ import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconci
 import { hubAddress, nextNodeAddress, tunnelSubnet } from './tunnel.js';
 
 const HOUR = 60 * 60 * 1000;
-/** Serializes address allocation across API replicas ("rid_node"). */
+/** Serializes address allocation across API replicas ("den_node"). */
 const ADDRESS_LOCK = 0x7269645f6e6f6465n;
 
 const positive = (value: string | undefined, fallback: number): number => {
@@ -53,24 +53,24 @@ const positive = (value: string | undefined, fallback: number): number => {
 /** Timing and the hub, from the deployment (ARCHITECTURE.md §10). */
 export function nodeControlSettings(env: NodeJS.ProcessEnv = process.env) {
   return {
-    heartbeatIntervalSeconds: positive(env.RID_NODE_HEARTBEAT_SECONDS, 60),
+    heartbeatIntervalSeconds: positive(env.DEN_NODE_HEARTBEAT_SECONDS, 60),
     /** SPEC.md §4.6: five minutes without a heartbeat is offline. */
-    offlineAfterSeconds: positive(env.RID_NODE_OFFLINE_AFTER_SECONDS, 300),
-    certificateValidityHours: Math.min(positive(env.RID_NODE_CERT_VALIDITY_HOURS, 2160), 2160),
+    offlineAfterSeconds: positive(env.DEN_NODE_OFFLINE_AFTER_SECONDS, 300),
+    certificateValidityHours: Math.min(positive(env.DEN_NODE_CERT_VALIDITY_HOURS, 2160), 2160),
     /** How long the certificate replaced by a renewal keeps opening the control channel. */
-    renewalGraceHours: positive(env.RID_NODE_RENEWAL_GRACE_HOURS, 24),
+    renewalGraceHours: positive(env.DEN_NODE_RENEWAL_GRACE_HOURS, 24),
     controlUrl: (
-      env.RID_NODE_CONTROL_URL ??
-      env.RID_GATEWAY_PUBLIC_URL ??
+      env.DEN_NODE_CONTROL_URL ??
+      env.DEN_GATEWAY_PUBLIC_URL ??
       'https://localhost:9443'
     ).replace(/\/+$/, ''),
-    hubPublicKey: env.RID_WG_HUB_PUBLIC_KEY || undefined,
-    hubEndpoint: env.RID_WG_HUB_ENDPOINT || undefined,
-    minimumKitVersion: env.RID_NODE_MIN_KIT_VERSION || null,
-    /** Same prefix as the gateway's client certificates (RID_GATEWAY_CLIENT_NAME, M3-03). */
-    gatewayClientPrefix: (env.RID_GATEWAY_CLIENT_NAME ?? 'rid-gateway').trim().toLowerCase(),
+    hubPublicKey: env.DEN_WG_HUB_PUBLIC_KEY || undefined,
+    hubEndpoint: env.DEN_WG_HUB_ENDPOINT || undefined,
+    minimumKitVersion: env.DEN_NODE_MIN_KIT_VERSION || null,
+    /** Same prefix as the gateway's client certificates (DEN_GATEWAY_CLIENT_NAME, M3-03). */
+    gatewayClientPrefix: (env.DEN_GATEWAY_CLIENT_NAME ?? 'den-gateway').trim().toLowerCase(),
     /** Shared with the gateway's control route: proves a request came through APISIX. */
-    controlToken: env.RID_NODE_CONTROL_TOKEN || undefined,
+    controlToken: env.DEN_NODE_CONTROL_TOKEN || undefined,
   };
 }
 
@@ -120,7 +120,7 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
 
   onApplicationBootstrap(): void {
     if (!QueueService.enabled()) return;
-    const seconds = positive(process.env.RID_NODE_LIFECYCLE_INTERVAL_SECONDS, 60);
+    const seconds = positive(process.env.DEN_NODE_LIFECYCLE_INTERVAL_SECONDS, 60);
     this.timer = setInterval(() => {
       this.markOffline().catch((error: unknown) =>
         this.logger.error(error instanceof Error ? error.message : String(error)),
@@ -188,7 +188,7 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
     const node = token.node;
     const checked = await this.checkedCsr(data.csr);
     if (!settings.hubPublicKey || !settings.hubEndpoint) {
-      this.logger.error('RID_WG_HUB_PUBLIC_KEY or RID_WG_HUB_ENDPOINT is not set');
+      this.logger.error('DEN_WG_HUB_PUBLIC_KEY or DEN_WG_HUB_ENDPOINT is not set');
       throw new ServiceUnavailableError('The tunnel hub is not configured');
     }
     const issued = await this.sign(node.id, checked);

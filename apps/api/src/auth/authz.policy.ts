@@ -1,4 +1,4 @@
-import { ENTITY_ROLES, type EntityRole, PLATFORM_ROLES, type PlatformRole } from '@rid/contracts';
+import { ENTITY_ROLES, type EntityRole, PLATFORM_ROLES, type PlatformRole } from '@den/contracts';
 
 /**
  * Who may do what on resources that belong to an entity (SPEC.md §2). Evaluated in the backend on

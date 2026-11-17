@@ -3,8 +3,8 @@ import { createServer, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { FieldErrorKey } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { FieldErrorKey } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -22,13 +22,13 @@ const EICAR = Buffer.from(
 );
 
 /**
- * Uploads through the antivirus (M6-08): with RID_CLAMAV_URL set, nothing is stored until clamd
+ * Uploads through the antivirus (M6-08): with DEN_CLAMAV_URL set, nothing is stored until clamd
  * says it is clean. A clamd stand-in answers by the content (EICAR found, the rest clean), and can
  * be stopped to see the upload fail closed.
  */
 describe('documents through the antivirus (M6-08)', () => {
   const prisma = new PrismaService();
-  const documentsDir = mkdtempSync(join(tmpdir(), 'rid-documents-'));
+  const documentsDir = mkdtempSync(join(tmpdir(), 'den-documents-'));
   const sockets: Socket[] = [];
   let clamd: Server;
   let app: NestFastifyApplication;
@@ -50,8 +50,8 @@ describe('documents through the antivirus (M6-08)', () => {
     });
     await new Promise<void>((resolve) => clamd.listen(0, '127.0.0.1', resolve));
     const address = clamd.address();
-    process.env.RID_CLAMAV_URL = `tcp://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
-    process.env.RID_DOCUMENTS_DIR = documentsDir;
+    process.env.DEN_CLAMAV_URL = `tcp://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+    process.env.DEN_DOCUMENTS_DIR = documentsDir;
     await runSeed(prisma, new AuditService(), {
       config: loadCountryConfig({ code: 'co' }),
       realmUsers: readRealmUsers(),
@@ -60,7 +60,7 @@ describe('documents through the antivirus (M6-08)', () => {
     app = await createTestApp(await createTestIssuer());
   });
   afterAll(async () => {
-    delete process.env.RID_CLAMAV_URL;
+    delete process.env.DEN_CLAMAV_URL;
     await app.close();
     await prisma.$disconnect();
     for (const s of sockets) s.destroy();

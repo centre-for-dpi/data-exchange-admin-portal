@@ -1,6 +1,6 @@
 'use server';
 
-import { issuedEnrollmentTokenSchema, nodeDetailSchema } from '@rid/contracts';
+import { issuedEnrollmentTokenSchema, nodeDetailSchema } from '@den/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';

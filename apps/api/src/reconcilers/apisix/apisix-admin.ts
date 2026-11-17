@@ -5,7 +5,7 @@
  */
 export const APISIX_ADMIN = Symbol('APISIX_ADMIN');
 
-/** plugin_metadata: per plugin, shared by every route (rid-assertion's signing key, M6-10). */
+/** plugin_metadata: per plugin, shared by every route (den-assertion's signing key, M6-10). */
 export type ApisixKind = 'routes' | 'upstreams' | 'ssls' | 'plugin_metadata';
 export type ApisixObject = Record<string, unknown>;
 

@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import type { SubjectAccessWebhook, SubjectAlerts } from '@rid/contracts';
+import type { SubjectAccessWebhook, SubjectAlerts } from '@den/contracts';
 import { z } from 'zod';
 import { AuditService } from '../../audit/audit.service.js';
 import type { Classification } from '../../generated/prisma/client.js';
@@ -17,7 +17,7 @@ const alertable = (values: Classification[]): AlertClassification[] =>
   values.filter((c): c is AlertClassification => ALERTABLE.has(c));
 
 /**
- * Citizen apps that receive notices (RID_CITIZEN_APPS): by client id, where to POST and the
+ * Citizen apps that receive notices (DEN_CITIZEN_APPS): by client id, where to POST and the
  * Standard Webhooks secret. Operator configuration, never user input.
  */
 const citizenAppsSchema = z.record(
@@ -30,7 +30,7 @@ const citizenAppsSchema = z.record(
 export type CitizenApps = z.infer<typeof citizenAppsSchema>;
 
 export function citizenApps(): CitizenApps {
-  const raw = process.env.RID_CITIZEN_APPS;
+  const raw = process.env.DEN_CITIZEN_APPS;
   return raw ? citizenAppsSchema.parse(JSON.parse(raw)) : {};
 }
 

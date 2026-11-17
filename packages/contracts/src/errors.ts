@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Base URL for RFC 9457 problem `type` values. */
-export const PROBLEM_TYPE_BASE = 'https://rid.example/errors/';
+export const PROBLEM_TYPE_BASE = 'https://den.example/errors/';
 
 /**
  * Stable error codes exposed by the portal API. The code is the last path segment

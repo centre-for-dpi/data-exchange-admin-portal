@@ -8,7 +8,7 @@ import { expectNoAccessibilityViolations } from './helpers';
 function sql(statement: string): void {
   const result = spawnSync(
     'docker',
-    ['exec', '-i', 'rid-postgres-1', 'psql', '-U', 'rid', '-d', 'rid', '-v', 'ON_ERROR_STOP=1'],
+    ['exec', '-i', 'den-postgres-1', 'psql', '-U', 'den', '-d', 'den', '-v', 'ON_ERROR_STOP=1'],
     { input: statement, encoding: 'utf8' },
   );
   expect(result.status, result.stderr).toBe(0);
@@ -17,7 +17,7 @@ function sql(statement: string): void {
 // M5-07: the operator's sync console: state, drift and a manual retry.
 test.describe("the operator's sync console (M5-07)", () => {
   const versionId = randomUUID();
-  const target = `apisix:route:rid-route-${versionId}`;
+  const target = `apisix:route:den-route-${versionId}`;
   test.beforeAll(() => {
     sql(
       `INSERT INTO sync_state (target, system, desired_hash, applied_hash, status, last_error, attempts, drift_detected_at, drift_count, updated_at)

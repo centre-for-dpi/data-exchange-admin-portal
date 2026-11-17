@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>RID operator guide</title>
+<title>DEN operator guide</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -614,7 +614,7 @@ details.faq[open] summary { color: var(--gov); }
         </article>
         <article class="comp g">
           <div><h4>Keycloak</h4><span class="tech">identity · OpenID Connect</span></div>
-          <p>It <b>authenticates, it does not authorize</b>: roles live in PostgreSQL. Three realms: <code>rid-portal</code> (people, with a second factor), <code>rid-gateway</code> (the entities' applications; the portal creates their clients) and <code>rid-citizens</code> (simulated citizen identity; in production, the country's own).</p>
+          <p>It <b>authenticates, it does not authorize</b>: roles live in PostgreSQL. Three realms: <code>den-portal</code> (people, with a second factor), <code>den-gateway</code> (the entities' applications; the portal creates their clients) and <code>den-citizens</code> (simulated citizen identity; in production, the country's own).</p>
           <dl><dt>If down</dt><dd><span class="tag bad">no new tokens</span>Nobody can sign in. Tokens last 5 minutes: after that, calls fail.</dd><dt>Stores</dt><dd>Users and clients, in PostgreSQL.</dd></dl>
         </article>
         <article class="comp g">
@@ -686,7 +686,7 @@ details.faq[open] summary { color: var(--gov); }
       <h3>Pilot tooling (does not go to production)</h3>
       <ul class="ticks">
         <li><b>Test providers</b> (<code>mock-salud</code>, <code>mock-socioeconomico</code>): they simulate two entities with synthetic data.</li>
-        <li><b>Reference citizen folder</b> (<code>/carpeta</code>): shows what the country's real citizen folder must implement.</li>
+        <li><b>Reference citizen folder</b> (<code>/citizen-app</code>): shows what the country's real citizen folder must implement.</li>
         <li><b>Seed data:</b> three fictitious entities and the demo users.</li>
       </ul>
     </section>
@@ -765,14 +765,14 @@ details.faq[open] summary { color: var(--gov); }
             <line x1="105" y1="248" x2="328" y2="248" class="d-strong" marker-end="url(#s-ahd)"></line>
             <text x="217" y="241" text-anchor="middle" class="d-lab">GET /salud/afiliacion/v1/…</text>
             <text x="217" y="264" text-anchor="middle" class="d-ts">certificate + token</text>
-            <text x="217" y="279" text-anchor="middle" class="d-ts">X-RID-Purpose · X-RID-End-User</text>
+            <text x="217" y="279" text-anchor="middle" class="d-ts">X-DEN-Purpose · X-DEN-End-User</text>
             <line x1="330" y1="300" x2="698" y2="300" class="d-line" marker-end="url(#s-ah)"></line>
             <text x="515" y="293" text-anchor="middle" class="d-ts">allowed? (subscription, purpose, operation, certificate)</text>
             <line x1="700" y1="335" x2="332" y2="335" class="d-dash" marker-end="url(#s-ah)"></line>
             <text x="515" y="328" text-anchor="middle" class="d-ts">yes + traceability headers · or 403 with its reason</text>
             <line x1="330" y1="375" x2="898" y2="375" class="d-strong" marker-end="url(#s-ahd)"></line>
             <text x="615" y="368" text-anchor="middle" class="d-ts">request + who, what for, under which subscription</text>
-            <text x="615" y="391" text-anchor="middle" class="d-ts">+ assertion signed by the gateway (X-RID-Assertion)</text>
+            <text x="615" y="391" text-anchor="middle" class="d-ts">+ assertion signed by the gateway (X-DEN-Assertion)</text>
             <line x1="900" y1="415" x2="332" y2="415" class="d-dash" marker-end="url(#s-ah)"></line>
             <text x="615" y="408" text-anchor="middle" class="d-ts">response</text>
             <line x1="330" y1="455" x2="107" y2="455" class="d-strong" marker-end="url(#s-ahd)"></line>
@@ -784,7 +784,7 @@ details.faq[open] summary { color: var(--gov); }
 
       <div class="flowcard">
         <h3>Accountability to citizens</h3>
-        <p class="prose">Every authorized request for a person's data is recorded in the transparency log with the data subject's pseudonym. Every 10 seconds the records are grouped into batches signed by the operator and sealed by the TSA. From their folder, citizens see who queried them and what for, receive notifications, and download a receipt that <b>anyone can verify without trusting the portal</b>, with the open verifier <code>rid-verify-receipt</code>.</p>
+        <p class="prose">Every authorized request for a person's data is recorded in the transparency log with the data subject's pseudonym. Every 10 seconds the records are grouped into batches signed by the operator and sealed by the TSA. From their folder, citizens see who queried them and what for, receive notifications, and download a receipt that <b>anyone can verify without trusting the portal</b>, with the open verifier <code>den-verify-receipt</code>.</p>
       </div>
     </section>
 
@@ -832,8 +832,8 @@ details.faq[open] summary { color: var(--gov); }
           <thead><tr><th>What</th><th>Details</th></tr></thead>
           <tbody>
             <tr><td>Fixed public IP</td><td class="wrap">Entities and their systems reach it from the internet.</td></tr>
-            <tr><td>Portal name</td><td class="wrap">A record, e.g. <code>rid.and.gov.co</code>: people, web portal, portal API and sign-in.</td></tr>
-            <tr><td>Gateway name</td><td class="wrap">A record, e.g. <code>gw.rid.and.gov.co</code>: system-to-system traffic, with mTLS.</td></tr>
+            <tr><td>Portal name</td><td class="wrap">A record, e.g. <code>portal.den.example</code>: people, web portal, portal API and sign-in.</td></tr>
+            <tr><td>Gateway name</td><td class="wrap">A record, e.g. <code>gw.den.example</code>: system-to-system traffic, with mTLS.</td></tr>
             <tr><td>Outbound during install</td><td class="wrap">HTTPS to Docker Hub, quay.io, ghcr.io, the npm registry and PyPI.</td></tr>
             <tr><td>Portal certificate</td><td class="wrap">Automatic Let's Encrypt, or your own from a recognized public CA (PEM with the full chain and the private key).</td></tr>
             <tr><td>Gateway certificate</td><td class="wrap">No need to request one: the network's CA (step-ca) issues it.</td></tr>
@@ -853,7 +853,7 @@ details.faq[open] summary { color: var(--gov); }
 
     <section id="instalar">
       <h2><span class="num">8</span>Install</h2>
-      <div class="code"><button class="copy" type="button">Copy</button><pre><code>git clone &lt;repository-url&gt; rid &amp;&amp; cd rid
+      <div class="code"><button class="copy" type="button">Copy</button><pre><code>git clone &lt;repository-url&gt; den &amp;&amp; cd den
 sudo ./install.sh</code></pre></div>
       <p>The script checks the server, asks the questions in steps 2 to 6, shows a summary and asks for confirmation before touching anything. It then builds and starts everything (10–20 minutes the first time) and checks that it works. If Docker is missing, it offers to install it.</p>
 
@@ -903,7 +903,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td><code>https://&lt;portal&gt;/mail</code></td><td class="wrap">Test mailbox: all the pilot's email arrives here, behind a username and password</td><td>Operator</td></tr>
             <tr><td><code>https://&lt;portal&gt;/grafana/</code></td><td class="wrap">The operator's dashboard, with its own <code>admin</code> user (with observability)</td><td>Operator</td></tr>
             <tr><td><code>https://&lt;portal&gt;/api/v1/gateway/jwks</code></td><td class="wrap">Public keys that providers use to verify the gateway assertion</td><td>Providers</td></tr>
-            <tr><td><code>https://&lt;portal&gt;/carpeta</code></td><td class="wrap">Reference citizen folder (transparency demo)</td><td>Demos</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/citizen-app</code></td><td class="wrap">Reference citizen folder (transparency demo)</td><td>Demos</td></tr>
           </tbody>
         </table>
       </div>
@@ -918,7 +918,7 @@ sudo ./install.sh</code></pre></div>
       </ol>
       <div class="callout info">
         <b>Demo data and the first administrator</b>
-        <p>The pilot always loads three fictitious entities and the demo users. That is how the first <code>platform_admin</code> (<code>pablo.plataforma</code>) exists. Real entities are registered from the portal; the fictitious ones are for practice. In production there are no seed users: the first <code>platform_admin</code> is whoever signs in first with the address in <code>RID_BOOTSTRAP_ADMIN_EMAIL</code>, verified by Keycloak, while the network has none. This is audited, and the value is deleted afterwards.</p>
+        <p>The pilot always loads three fictitious entities and the demo users. That is how the first <code>platform_admin</code> (<code>pablo.plataforma</code>) exists. Real entities are registered from the portal; the fictitious ones are for practice. In production there are no seed users: the first <code>platform_admin</code> is whoever signs in first with the address in <code>DEN_BOOTSTRAP_ADMIN_EMAIL</code>, verified by Keycloak, while the network has none. This is audited, and the value is deleted afterwards.</p>
       </div>
     </section>
 
@@ -930,10 +930,10 @@ sudo ./install.sh</code></pre></div>
           <thead><tr><th>Secret</th><th>Why it matters</th><th>Suggested custodian</th></tr></thead>
           <tbody>
             <tr><td>The full <code>.env</code></td><td class="wrap">Without it, the data cannot be recovered and receipts cannot be verified</td><td class="wrap">AND, encrypted copy off the server</td></tr>
-            <tr><td><code>RID_SUBJECT_REF_KEY</code><br><code>RID_END_USER_HASH_SALT</code></td><td class="wrap">They define the pseudonyms; <b>they are not rotated</b></td><td>AND</td></tr>
+            <tr><td><code>DEN_SUBJECT_REF_KEY</code><br><code>DEN_END_USER_HASH_SALT</code></td><td class="wrap">They define the pseudonyms; <b>they are not rotated</b></td><td>AND</td></tr>
             <tr><td>The step-ca volume</td><td class="wrap">The network CA's keys</td><td class="wrap">AND, encrypted backup</td></tr>
             <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Encrypts the database backups: without it, none of them can be restored</td><td class="wrap">AND, copy off the server, next to the <code>.env</code></td></tr>
-            <tr><td><code>RID_SECRETS_KEY</code></td><td class="wrap">Seals the clients' secrets and the key the gateway signs with</td><td class="wrap">AND, inside the <code>.env</code></td></tr>
+            <tr><td><code>DEN_SECRETS_KEY</code></td><td class="wrap">Seals the clients' secrets and the key the gateway signs with</td><td class="wrap">AND, inside the <code>.env</code></td></tr>
             <tr><td>Keycloak administrator</td><td class="wrap">Control over identities</td><td class="wrap">AND, two people</td></tr>
             <tr><td><code>regulator</code> users</td><td class="wrap">Oversight</td><td>MinTIC</td></tr>
           </tbody>
@@ -950,7 +950,7 @@ sudo ./install.sh</code></pre></div>
         <div class="cmd"><code>sudo ./install.sh credentials</code><button class="copy" type="button">Copy</button><span>Demo users, Keycloak administrator, test mailbox and Grafana.</span></div>
         <div class="cmd"><code>sudo ./install.sh otp</code><button class="copy" type="button">Copy</button><span>Current second-factor code for the demo users with a critical role.</span></div>
         <div class="cmd"><code>sudo ./install.sh logs api</code><button class="copy" type="button">Copy</button><span>Logs for one service (<code>api</code>, <code>apisix</code>, <code>keycloak</code>, <code>edge</code>…), or for all of them with no argument.</span></div>
-        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copy</button><span>Full backup and a copy in <code>backups/&lt;date&gt;/</code>: dumps of <code>rid</code> and <code>keycloak</code>, the (encrypted) backup repository, the volumes for the CA, the TSA, documents and the citizen folder, and <code>.env</code>. The files go off the server. Daily backups already run on their own.</span></div>
+        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copy</button><span>Full backup and a copy in <code>backups/&lt;date&gt;/</code>: dumps of <code>den</code> and <code>keycloak</code>, the (encrypted) backup repository, the volumes for the CA, the TSA, documents and the citizen folder, and <code>.env</code>. The files go off the server. Daily backups already run on their own.</span></div>
         <div class="cmd"><code>sudo ./install.sh restore</code><button class="copy" type="button">Copy</button><span>Restores the database to the latest archived state; with a point in time (<code>"2026-11-20 14:30:00-05"</code>), to that moment. It stops and starts everything.</span></div>
         <div class="cmd"><code>sudo ./install.sh update</code><button class="copy" type="button">Copy</button><span>Backup, <code>git pull --ff-only</code>, rebuild and restart.</span></div>
         <div class="cmd"><code>sudo ./install.sh stop</code><button class="copy" type="button">Copy</button><span>Stops everything without losing data; <code>start</code> starts it again.</span></div>
@@ -978,9 +978,9 @@ sudo ./install.sh</code></pre></div>
             <tr><td class="wrap">OpenSearch keeps restarting</td><td class="wrap">Not enough memory, or <code>vm.max_map_count</code>. Reinstall without observability or add RAM.</td></tr>
             <tr><td class="wrap">Keycloak does not import its realm (demo users)</td><td class="wrap">The password is shorter than 12 characters: the realm's policy rejects it on import. The installer no longer accepts it; in a hand-written <code>.env</code>, change it.</td></tr>
             <tr><td class="wrap">Uploading a document returns "service unavailable"</td><td class="wrap">The antivirus is not responding (it fails closed). On first start it downloads its signatures, which takes a few minutes: <code>sudo ./install.sh logs clamav</code>.</td></tr>
-            <tr><td class="wrap">Sign-in loop</td><td class="wrap">The portal name does not match the one in <code>.env</code> (<code>RID_PUBLIC_URL</code>).</td></tr>
+            <tr><td class="wrap">Sign-in loop</td><td class="wrap">The portal name does not match the one in <code>.env</code> (<code>DEN_PUBLIC_URL</code>).</td></tr>
             <tr><td class="wrap">Nodes do not connect</td><td class="wrap">51820/udp is closed in the cloud firewall, or the gateway's DNS does not point here.</td></tr>
-            <tr><td class="wrap"><code>.env</code> was lost</td><td class="wrap">Without a copy there is no recovery: reinstall from scratch, deleting the <code>rid_*</code> volumes.</td></tr>
+            <tr><td class="wrap"><code>.env</code> was lost</td><td class="wrap">Without a copy there is no recovery: reinstall from scratch, deleting the <code>den_*</code> volumes.</td></tr>
           </tbody>
         </table>
       </div>
@@ -999,8 +999,8 @@ sudo ./install.sh</code></pre></div>
             <tr><td>Timestamping</td><td class="wrap">Development TSA</td><td class="wrap">The country's accredited TSA</td></tr>
             <tr><td>Email</td><td class="wrap">Mailpit</td><td class="wrap">The operator's SMTP</td></tr>
             <tr><td>Secrets</td><td class="wrap"><code>.env</code> on disk</td><td class="wrap">Secrets manager (OpenBao)</td></tr>
-            <tr><td>Citizen identity</td><td class="wrap">Simulated (<code>rid-citizens</code>)</td><td class="wrap">The country's own</td></tr>
-            <tr><td>Initial data</td><td class="wrap">Fictitious entities and demo users</td><td class="wrap">No demo data; the first administrator via <code>RID_BOOTSTRAP_ADMIN_EMAIL</code></td></tr>
+            <tr><td>Citizen identity</td><td class="wrap">Simulated (<code>den-citizens</code>)</td><td class="wrap">The country's own</td></tr>
+            <tr><td>Initial data</td><td class="wrap">Fictitious entities and demo users</td><td class="wrap">No demo data; the first administrator via <code>DEN_BOOTSTRAP_ADMIN_EMAIL</code></td></tr>
             <tr><td>Antivirus</td><td class="wrap">Optional (step 5)</td><td class="wrap">Enabled, with two replicas</td></tr>
             <tr><td>Backups</td><td class="wrap">Automatic with pgBackRest on the same server; the off-server copy with <code>install.sh backup</code></td><td class="wrap">Automatic, to the operator's object storage (Barman Cloud)</td></tr>
             <tr><td>Metrics and alerts</td><td class="wrap">Prometheus, Alertmanager and Grafana on the same server; notifications to Mailpit</td><td class="wrap">The same, with the operator's SMTP</td></tr>
@@ -1036,7 +1036,7 @@ sudo ./install.sh</code></pre></div>
       <div>
         <details class="faq"><summary>Can the operator see the data being exchanged?</summary><p>No. The gateway passes it through without storing it, and the logs only hold masked metadata.</p></details>
         <details class="faq"><summary>What happens if the portal goes down?</summary><p>Traffic between entities keeps flowing with the latest configuration and the latest policy. Only changes stop: new approvals and publications. It is tested: with the portal down, calls keep going; OPA and APISIX restart without it, and when the portal comes back it recovers the transparency records from the outage.</p></details>
-        <details class="faq"><summary>How does the provider know a request really comes from the gateway?</summary><p>Through the signed assertion (<code>X-RID-Assertion</code>): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.</p></details>
+        <details class="faq"><summary>How does the provider know a request really comes from the gateway?</summary><p>Through the signed assertion (<code>X-DEN-Assertion</code>): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.</p></details>
         <details class="faq"><summary>How much traffic can it handle?</summary><p>On the development machine, 200 requests per second with a p95 of 13 ms added by the gateway. The target, 500 per second, will be validated in a production-like environment. Capacity grows with more gateway nodes: each one counts limits on its own, and the policy gives it its share.</p></details>
         <details class="faq"><summary>Is the portal available in English?</summary><p>Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen folder are bilingual too.</p></details>
         <details class="faq"><summary>Does an entity have to open inbound ports?</summary><p>Not if it uses the kit: the node opens the tunnel outbound (UDP 51820). With an existing API, the entity must allow the gateway to reach it.</p></details>
@@ -1057,8 +1057,8 @@ sudo ./install.sh</code></pre></div>
   function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function setBig(on) { root.classList.toggle('big', on); big.setAttribute('aria-pressed', on ? 'true' : 'false'); }
-  setBig(load('rid-big') === '1');
-  big.addEventListener('click', function () { var on = !root.classList.contains('big'); setBig(on); store('rid-big', on ? '1' : '0'); });
+  setBig(load('den-big') === '1');
+  big.addEventListener('click', function () { var on = !root.classList.contains('big'); setBig(on); store('den-big', on ? '1' : '0'); });
 
   document.querySelectorAll('.copy').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -1071,8 +1071,8 @@ sudo ./install.sh</code></pre></div>
   });
 
   document.querySelectorAll('#pre input').forEach(function (box) {
-    box.checked = load('rid-' + box.id) === '1';
-    box.addEventListener('change', function () { store('rid-' + box.id, box.checked ? '1' : '0'); });
+    box.checked = load('den-' + box.id) === '1';
+    box.addEventListener('change', function () { store('den-' + box.id, box.checked ? '1' : '0'); });
   });
 
   var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));

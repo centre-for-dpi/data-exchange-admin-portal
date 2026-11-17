@@ -13,7 +13,7 @@ export const OPENAPI_JSON_PATH = `${DOCS_PATH}/openapi.json`;
 export function registerApiDocs(app: NestFastifyApplication, prefix: string): void {
   const openApi = app.get(OpenApiService);
   openApi.setGlobalPrefix(prefix);
-  const document = openApi.document({ title: 'Portal RID API', version: '1' });
+  const document = openApi.document({ title: 'Portal DEN API', version: '1' });
 
   const fastify = app.getHttpAdapter().getInstance();
   fastify.get(OPENAPI_JSON_PATH, (_request, reply) => reply.send(document));

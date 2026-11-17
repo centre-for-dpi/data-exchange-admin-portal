@@ -1,4 +1,4 @@
-import type { ApiVersionStatus } from '@rid/contracts';
+import type { ApiVersionStatus } from '@den/contracts';
 import { InvalidTransitionError } from '../../common/errors.js';
 
 /**

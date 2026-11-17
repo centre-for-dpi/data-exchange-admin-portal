@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { apiDetailSchema, apiVersionDetailSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { apiDetailSchema, apiVersionDetailSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -31,7 +31,7 @@ const openapi = readFileSync(
 /**
  * Validations at submission (M4-06) against the real APISIX: the check routes of a version in
  * review (narrow, behind the validation token), the healthcheck through them, and, when a
- * contract runner is configured (RID_CONTRACT_RUNNER_URL), Schemathesis against the sandbox.
+ * contract runner is configured (DEN_CONTRACT_RUNNER_URL), Schemathesis against the sandbox.
  * The operator's gate is tested with fixed probe results.
  */
 describe('validations when a version goes to review (M4-06)', () => {
@@ -49,11 +49,11 @@ describe('validations when a version goes to review (M4-06)', () => {
 
   beforeAll(async () => {
     for (const [k, v] of Object.entries({
-      RID_VERSION_VALIDATION: 'on',
-      RID_VALIDATION_TOKEN: TOKEN,
-      RID_GATEWAY_INTERNAL_URL: GATEWAY,
+      DEN_VERSION_VALIDATION: 'on',
+      DEN_VALIDATION_TOKEN: TOKEN,
+      DEN_GATEWAY_INTERNAL_URL: GATEWAY,
       // The runner (if any) runs on the host in development and reaches APISIX there.
-      RID_CONTRACT_RUNNER_GATEWAY_URL: process.env.RID_CONTRACT_RUNNER_GATEWAY_URL ?? GATEWAY,
+      DEN_CONTRACT_RUNNER_GATEWAY_URL: process.env.DEN_CONTRACT_RUNNER_GATEWAY_URL ?? GATEWAY,
     })) {
       saved[k] = process.env[k];
       process.env[k] = v;
@@ -95,7 +95,7 @@ describe('validations when a version goes to review (M4-06)', () => {
           description: 'API de prueba de las validaciones al enviar a revisión.',
           sector: 'salud',
           classification: 'personal',
-          ownerContact: 'apis@salud.demo.rid.example',
+          ownerContact: 'apis@salud.demo.den.example',
         })
       ).json(),
     );
@@ -148,32 +148,32 @@ describe('validations when a version goes to review (M4-06)', () => {
     const sandbox = `${GATEWAY}${sandboxCheckRoutePath(versionId)}/afiliados/1000000001`;
     let ok = 0;
     for (let i = 0; i < 40 && ok !== 200; i += 1) {
-      ok = (await fetch(sandbox, { headers: { 'x-rid-validation': own } })).status;
+      ok = (await fetch(sandbox, { headers: { 'x-den-validation': own } })).status;
       if (ok !== 200) await new Promise((r) => setTimeout(r, 250));
     }
     expect(ok).toBe(200);
     // Without the token the routes do not exist, nor with the global token or another version's.
     expect((await fetch(health)).status).toBe(404);
     for (const other of [TOKEN, versionCheckToken(TOKEN, randomUUID())]) {
-      expect((await fetch(health, { headers: { 'x-rid-validation': other } })).status).toBe(404);
+      expect((await fetch(health, { headers: { 'x-den-validation': other } })).status).toBe(404);
     }
-    expect((await fetch(sandbox, { headers: { 'x-rid-validation': 'otro' } })).status).toBe(404);
+    expect((await fetch(sandbox, { headers: { 'x-den-validation': 'otro' } })).status).toBe(404);
     // The production upstream: GET on the service root only, never a data path.
-    expect((await fetch(health, { headers: { 'x-rid-validation': own } })).status).toBeLessThan(
+    expect((await fetch(health, { headers: { 'x-den-validation': own } })).status).toBeLessThan(
       500,
     );
     expect(
-      (await fetch(`${health}/afiliados/1000000001`, { headers: { 'x-rid-validation': own } }))
+      (await fetch(`${health}/afiliados/1000000001`, { headers: { 'x-den-validation': own } }))
         .status,
     ).toBe(404);
     expect(
-      (await fetch(health, { method: 'POST', headers: { 'x-rid-validation': own } })).status,
+      (await fetch(health, { method: 'POST', headers: { 'x-den-validation': own } })).status,
     ).toBe(404);
 
     // The healthcheck through the route passes; the contract test runs if a runner is set.
     const report = await app.get(VersionValidationService).run(versionId);
     expect(report?.healthcheck).toMatchObject({ status: 'passed' });
-    if (process.env.RID_CONTRACT_RUNNER_URL) {
+    if (process.env.DEN_CONTRACT_RUNNER_URL) {
       expect(report?.contract?.status).not.toBe('error');
       expect(report?.contract?.operations.map((o) => o.operation).sort()).toEqual([
         'GET /afiliados/{numeroIdentificacion}',

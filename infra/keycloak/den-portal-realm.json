@@ -1,7 +1,7 @@
 {
-  "realm": "rid-portal",
+  "realm": "den-portal",
   "enabled": true,
-  "displayName": "Portal RID",
+  "displayName": "Portal DEN",
   "sslRequired": "external",
   "registrationAllowed": true,
   "verifyEmail": true,
@@ -20,38 +20,38 @@
   "smtpServer": {
     "host": "mailpit",
     "port": "1025",
-    "from": "no-reply@rid.example",
-    "fromDisplayName": "Portal RID"
+    "from": "no-reply@den.example",
+    "fromDisplayName": "Portal DEN"
   },
   "clients": [
     {
-      "clientId": "rid-portal-web",
-      "name": "Portal RID (web)",
+      "clientId": "den-portal-web",
+      "name": "Portal DEN (web)",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${RID_PORTAL_WEB_CLIENT_SECRET}",
+      "secret": "${DEN_PORTAL_WEB_CLIENT_SECRET}",
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": true,
-      "rootUrl": "${RID_WEB_URL:http://localhost:3000}",
-      "redirectUris": ["${RID_WEB_URL:http://localhost:3000}/api/auth/callback/keycloak"],
-      "webOrigins": ["${RID_WEB_URL:http://localhost:3000}"],
+      "rootUrl": "${DEN_WEB_URL:http://localhost:3000}",
+      "redirectUris": ["${DEN_WEB_URL:http://localhost:3000}/api/auth/callback/keycloak"],
+      "webOrigins": ["${DEN_WEB_URL:http://localhost:3000}"],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${RID_WEB_URL:http://localhost:3000}/##${RID_WEB_URL:http://localhost:3000}/en"
+        "post.logout.redirect.uris": "${DEN_WEB_URL:http://localhost:3000}/##${DEN_WEB_URL:http://localhost:3000}/en"
       },
       "protocolMappers": [
         {
-          "name": "audience-rid-portal-api",
+          "name": "audience-den-portal-api",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.custom.audience": "rid-portal-api",
+            "included.custom.audience": "den-portal-api",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
@@ -66,19 +66,19 @@
       "username": "ana.operadora",
       "firstName": "Ana",
       "lastName": "Operadora",
-      "email": "ana.operadora@demo.rid.example",
+      "email": "ana.operadora@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
           "type": "otp",
           "userLabel": "Demo",
-          "secretData": "{\"value\": \"${RID_DEMO_TOTP_SECRET:rid-demo-totp-secret}\"}",
+          "secretData": "{\"value\": \"${DEN_DEMO_TOTP_SECRET:den-demo-totp-secret}\"}",
           "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ]
@@ -88,13 +88,13 @@
       "username": "pedro.publicador",
       "firstName": "Pedro",
       "lastName": "Publicador",
-      "email": "pedro.publicador@demo.rid.example",
+      "email": "pedro.publicador@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         }
       ]
@@ -104,19 +104,19 @@
       "username": "lucia.datos",
       "firstName": "Lucía",
       "lastName": "Datos",
-      "email": "lucia.datos@demo.rid.example",
+      "email": "lucia.datos@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
           "type": "otp",
           "userLabel": "Demo",
-          "secretData": "{\"value\": \"${RID_DEMO_TOTP_SECRET:rid-demo-totp-secret}\"}",
+          "secretData": "{\"value\": \"${DEN_DEMO_TOTP_SECRET:den-demo-totp-secret}\"}",
           "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ]
@@ -126,13 +126,13 @@
       "username": "carlos.dev",
       "firstName": "Carlos",
       "lastName": "Desarrollador",
-      "email": "carlos.dev@demo.rid.example",
+      "email": "carlos.dev@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         }
       ]
@@ -142,19 +142,19 @@
       "username": "marta.regulador",
       "firstName": "Marta",
       "lastName": "Reguladora",
-      "email": "marta.regulador@demo.rid.example",
+      "email": "marta.regulador@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
           "type": "otp",
           "userLabel": "Demo",
-          "secretData": "{\"value\": \"${RID_DEMO_TOTP_SECRET:rid-demo-totp-secret}\"}",
+          "secretData": "{\"value\": \"${DEN_DEMO_TOTP_SECRET:den-demo-totp-secret}\"}",
           "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ]
@@ -164,19 +164,19 @@
       "username": "pablo.plataforma",
       "firstName": "Pablo",
       "lastName": "Plataforma",
-      "email": "pablo.plataforma@demo.rid.example",
+      "email": "pablo.plataforma@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
           "type": "otp",
           "userLabel": "Demo",
-          "secretData": "{\"value\": \"${RID_DEMO_TOTP_SECRET:rid-demo-totp-secret}\"}",
+          "secretData": "{\"value\": \"${DEN_DEMO_TOTP_SECRET:den-demo-totp-secret}\"}",
           "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ]
@@ -186,19 +186,19 @@
       "username": "sofia.auditora",
       "firstName": "Sofía",
       "lastName": "Auditora",
-      "email": "sofia.auditora@demo.rid.example",
+      "email": "sofia.auditora@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
           "type": "otp",
           "userLabel": "Demo",
-          "secretData": "{\"value\": \"${RID_DEMO_TOTP_SECRET:rid-demo-totp-secret}\"}",
+          "secretData": "{\"value\": \"${DEN_DEMO_TOTP_SECRET:den-demo-totp-secret}\"}",
           "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ]
@@ -208,13 +208,13 @@
       "username": "elena.admin",
       "firstName": "Elena",
       "lastName": "Administradora",
-      "email": "elena.admin@demo.rid.example",
+      "email": "elena.admin@demo.den.example",
       "emailVerified": true,
       "enabled": true,
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
+          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
           "temporary": false
         }
       ]
@@ -228,10 +228,10 @@
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
   "otpPolicyLookAheadWindow": 1,
-  "browserFlow": "rid-browser",
+  "browserFlow": "den-browser",
   "authenticationFlows": [
     {
-      "alias": "rid-browser",
+      "alias": "den-browser",
       "description": "Browser login with step-up to a second factor (M3-08)",
       "providerId": "basic-flow",
       "topLevel": true,
@@ -245,7 +245,7 @@
           "userSetupAllowed": false
         },
         {
-          "flowAlias": "rid-browser-forms",
+          "flowAlias": "den-browser-forms",
           "requirement": "ALTERNATIVE",
           "priority": 20,
           "authenticatorFlow": true,
@@ -254,21 +254,21 @@
       ]
     },
     {
-      "alias": "rid-browser-forms",
+      "alias": "den-browser-forms",
       "description": "Password, then the second factor when the portal asks for acr=mfa",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
-          "flowAlias": "rid-browser-password",
+          "flowAlias": "den-browser-password",
           "requirement": "CONDITIONAL",
           "priority": 10,
           "authenticatorFlow": true,
           "userSetupAllowed": false
         },
         {
-          "flowAlias": "rid-browser-otp",
+          "flowAlias": "den-browser-otp",
           "requirement": "CONDITIONAL",
           "priority": 20,
           "authenticatorFlow": true,
@@ -277,7 +277,7 @@
       ]
     },
     {
-      "alias": "rid-browser-password",
+      "alias": "den-browser-password",
       "description": "Level 1: password",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -289,7 +289,7 @@
           "priority": 10,
           "authenticatorFlow": false,
           "userSetupAllowed": false,
-          "authenticatorConfig": "rid-loa-1"
+          "authenticatorConfig": "den-loa-1"
         },
         {
           "authenticator": "auth-username-password-form",
@@ -301,7 +301,7 @@
       ]
     },
     {
-      "alias": "rid-browser-otp",
+      "alias": "den-browser-otp",
       "description": "Level 2: one-time code (TOTP)",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -313,7 +313,7 @@
           "priority": 10,
           "authenticatorFlow": false,
           "userSetupAllowed": false,
-          "authenticatorConfig": "rid-loa-2"
+          "authenticatorConfig": "den-loa-2"
         },
         {
           "authenticator": "auth-otp-form",
@@ -327,14 +327,14 @@
   ],
   "authenticatorConfig": [
     {
-      "alias": "rid-loa-1",
+      "alias": "den-loa-1",
       "config": {
         "loa-condition-level": "1",
         "loa-max-age": "36000"
       }
     },
     {
-      "alias": "rid-loa-2",
+      "alias": "den-loa-2",
       "config": {
         "loa-condition-level": "2",
         "loa-max-age": "36000"

@@ -1,4 +1,4 @@
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';

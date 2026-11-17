@@ -6,7 +6,7 @@ import {
   manualBootcampItemSchema,
   updateBootcampItemSchema,
   FieldErrorKey,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';

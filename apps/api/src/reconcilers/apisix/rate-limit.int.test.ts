@@ -5,17 +5,17 @@ import { desiredGateway, type GatewaySettings, parseDevNodes } from './desired-s
 
 const GATEWAY = `http://127.0.0.1:${process.env.APISIX_HTTP_PORT ?? 9080}`;
 const OPA = `http://localhost:${process.env.OPA_PORT ?? 8181}`;
-// Outside the reconciler's rid- prefix and the bundle's roots: nothing else manages them.
+// Outside the reconciler's den- prefix and the bundle's roots: nothing else manages them.
 const ROUTE = 'test-m3-05-limit';
 const PROVIDER_ROUTE = 'test-m3-05-provider';
 const PROXIED_ROUTE = 'test-m3-05-proxied';
-const POLICY = 'ridtestm305';
-const PATH = '/__rid_m3_05__';
+const POLICY = 'dentestm305';
+const PATH = '/__den_m3_05__';
 
 /**
  * Per-subscription limit against the real APISIX and OPA (SPIKE S-2 turned into a test, M3-05).
- * The route carries the limit-count and rid-rate-limited configuration the reconciler writes;
- * a stand-in policy plays rid.authz: it puts X-RID-Subscription and X-RID-Rate-Limit, like the
+ * The route carries the limit-count and den-rate-limited configuration the reconciler writes;
+ * a stand-in policy plays den.authz: it puts X-DEN-Subscription and X-DEN-Rate-Limit, like the
  * real one (tested with opa test), from data the test changes.
  */
 describe('per-subscription limit at the gateway (M3-05)', () => {
@@ -26,14 +26,14 @@ describe('per-subscription limit at the gateway (M3-05)', () => {
   const run = randomUUID().slice(0, 8);
   const settings: GatewaySettings = {
     keycloakDiscoveryUrl:
-      'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-    audience: 'rid-gateway',
+      'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+    audience: 'den-gateway',
     opaUrl: 'http://opa:8181',
     accessLogUrl: 'http://fluent-bit:9880/',
     transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     resolveHost: () => Promise.resolve([]),
-    tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
+    tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
   };
   const plugins = desiredGateway(
     {
@@ -51,7 +51,7 @@ describe('per-subscription limit at the gateway (M3-05)', () => {
     settings,
   ).route.plugins as Record<string, Record<string, unknown>>;
 
-  /** The stand-in for rid.authz: client -> subscription and its limit, from data.ridtestm305. */
+  /** The stand-in for den.authz: client -> subscription and its limit, from data.dentestm305. */
   const policy = `package ${POLICY}
 
 import rego.v1
@@ -64,9 +64,9 @@ default allow := false
 
 allow if grant
 
-headers := {"X-RID-Subscription": grant.subscription, "X-RID-Rate-Limit": format_int(grant.limit, 10)} if allow
+headers := {"X-DEN-Subscription": grant.subscription, "X-DEN-Rate-Limit": format_int(grant.limit, 10)} if allow
 
-headers := {"Content-Type": "application/problem+json", "X-RID-Deny-Reason": "no_subscription"} if not allow
+headers := {"Content-Type": "application/problem+json", "X-DEN-Deny-Reason": "no_subscription"} if not allow
 
 status_code := 403
 `;
@@ -91,7 +91,7 @@ status_code := 403
       status: res.status,
       contentType: res.headers.get('content-type'),
       limit: res.headers.get('x-ratelimit-limit'),
-      denyReason: res.headers.get('x-rid-deny-reason'),
+      denyReason: res.headers.get('x-den-deny-reason'),
       body: await res.text(),
     };
   };
@@ -114,13 +114,13 @@ status_code := 403
         opa: {
           host: 'http://opa:8181',
           policy: POLICY,
-          send_headers_upstream: ['X-RID-Subscription', 'X-RID-Rate-Limit'],
+          send_headers_upstream: ['X-DEN-Subscription', 'X-DEN-Rate-Limit'],
         },
         'limit-count': plugins['limit-count'],
-        'rid-rate-limited': plugins['rid-rate-limited'],
+        'den-rate-limited': plugins['den-rate-limited'],
       },
     });
-    // A provider that answers 429 itself, reached through a route with rid-rate-limited.
+    // A provider that answers 429 itself, reached through a route with den-rate-limited.
     await admin.put('routes', PROVIDER_ROUTE, {
       uri: `${PATH}-provider`,
       plugins: { 'fault-injection': { abort: { http_status: 429, body: 'provider: slow down' } } },
@@ -130,7 +130,7 @@ status_code := 403
       upstream: { type: 'roundrobin', scheme: 'http', nodes: { '127.0.0.1:9080': 1 } },
       plugins: {
         'proxy-rewrite': { uri: `${PATH}-provider` },
-        'rid-rate-limited': {},
+        'den-rate-limited': {},
       },
     });
     // APISIX applies what etcd says within moments.
@@ -158,7 +158,7 @@ status_code := 403
     expect(limited.status).toBe(429);
     expect(limited.contentType).toBe('application/problem+json');
     expect(JSON.parse(limited.body)).toMatchObject({
-      type: 'https://rid.example/errors/rate_limited',
+      type: 'https://den.example/errors/rate_limited',
       status: 429,
       code: 'rate_limited',
     });
@@ -167,8 +167,8 @@ status_code := 403
   });
 
   it('a client can neither raise its limit nor reset its counter', async () => {
-    expect(await statuses('a', 1, { 'X-RID-Rate-Limit': '1000' })).toEqual([429]);
-    expect(await statuses('a', 1, { 'X-RID-Subscription': `fresh-${run}` })).toEqual([429]);
+    expect(await statuses('a', 1, { 'X-DEN-Rate-Limit': '1000' })).toEqual([429]);
+    expect(await statuses('a', 1, { 'X-DEN-Subscription': `fresh-${run}` })).toEqual([429]);
   });
 
   it('a call OPA denies never reaches the limit (403, no quota headers)', async () => {
@@ -189,6 +189,6 @@ status_code := 403
     expect(res.status).toBe(429);
     expect(await res.text()).toContain('provider: slow down');
     expect(res.headers.get('content-type')).not.toBe('application/problem+json');
-    expect(res.headers.get('x-rid-deny-reason')).toBeNull();
+    expect(res.headers.get('x-den-deny-reason')).toBeNull();
   });
 });

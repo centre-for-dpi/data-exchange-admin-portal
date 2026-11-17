@@ -1,6 +1,6 @@
-import { FieldErrorKey } from '@rid/contracts';
+import { FieldErrorKey } from '@den/contracts';
 import { Injectable } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import type {
   ApiDetail,
   ApiSummary,
@@ -11,13 +11,13 @@ import type {
   CreateApiVersionInput,
   LintReport,
   PaginationQuery,
-} from '@rid/contracts';
+} from '@den/contracts';
 import {
   createApiSchema,
   createApiVersionSchema,
   type Upstream,
   upstreamSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError, ValidationError } from '../common/errors.js';
@@ -255,7 +255,7 @@ export class ApisService {
 
   /**
    * Lints an OpenAPI document. APIs with personal or sensitive data must declare the data subject
-   * of every operation (x-rid-data-subject, ADR-0015) with the country's document types.
+   * of every operation (x-den-data-subject, ADR-0015) with the country's document types.
    */
   private lint(source: string, classification: string) {
     const config = getCountryConfig();
@@ -308,7 +308,7 @@ export class ApisService {
           },
         ]);
       }
-      const instance = process.env.RID_XROAD_CLIENT?.split('/')[0];
+      const instance = process.env.DEN_XROAD_CLIENT?.split('/')[0];
       if (instance && upstream.serviceId.instance !== instance) {
         throw new ValidationError([
           {
@@ -468,7 +468,7 @@ export class ApisService {
   }
 
   /**
-   * Compatible revision of a published version (ADR-0019): the RID lint and the compatibility
+   * Compatible revision of a published version (ADR-0019): the DEN lint and the compatibility
    * check against the published document must pass. The same row moves to the next minor, so the
    * route and every subscription stay; the previous document is kept in api_version_revision.
    */

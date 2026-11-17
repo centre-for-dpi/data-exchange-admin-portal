@@ -14,7 +14,7 @@ import {
 } from './gateway-flows';
 
 // MT-02 (ADR-0015, ADR-0017): the gateway turns the data subject of every call into a keyed
-// pseudonym, X-RID-Subject-Ref, reading it from the path or from the JSON body itself (never from
+// pseudonym, X-DEN-Subject-Ref, reading it from the path or from the JSON body itself (never from
 // a consumer claim). The provider gets the pseudonym only; an operation that declares a data
 // subject is denied without one.
 test.describe('data subject pseudonym at the gateway (MT-02)', () => {
@@ -65,11 +65,11 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
         ...init,
         headers: {
           authorization: `Bearer ${token}`,
-          'x-rid-purpose': 'eligibility_check',
-          'x-rid-end-user': 'funcionario-42',
+          'x-den-purpose': 'eligibility_check',
+          'x-den-end-user': 'funcionario-42',
           'x-request-id': requestId,
           // A client cannot choose its own reference: the gateway overwrites it.
-          'x-rid-subject-ref': 'forged-reference',
+          'x-den-subject-ref': 'forged-reference',
           ...init.headers,
         },
       });
@@ -83,7 +83,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     // Subject in the path.
     const byPath = await call('/1000000001');
     expect(byPath.res.status).toBe(200);
-    const ref = (await seenBy(byPath.requestId))['x-rid-subject-ref'] ?? '';
+    const ref = (await seenBy(byPath.requestId))['x-den-subject-ref'] ?? '';
     expect(ref).toMatch(/^[0-9a-f]{64}$/);
 
     // Same person, identifier in the body: the gateway reads it there (ADR-0017) and gets the same
@@ -97,18 +97,18 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
       });
     const byBody = await verify(
       { numeroIdentificacion: '1000000001' },
-      { 'x-rid-body-subject': 'CC:1000000999', 'x-rid-data-subject': 'CC:1000000999' },
+      { 'x-den-body-subject': 'CC:1000000999', 'x-den-data-subject': 'CC:1000000999' },
     );
     expect(byBody.res.status).toBe(200);
     const bodySeen = await seenBy(byBody.requestId);
-    expect(bodySeen['x-rid-subject-ref']).toBe(ref);
-    expect(bodySeen).not.toHaveProperty('x-rid-body-subject');
-    expect(bodySeen).not.toHaveProperty('x-rid-data-subject');
+    expect(bodySeen['x-den-subject-ref']).toBe(ref);
+    expect(bodySeen).not.toHaveProperty('x-den-body-subject');
+    expect(bodySeen).not.toHaveProperty('x-den-data-subject');
 
     // A body without the identifier: the gateway does not know whose data it is, denied.
     const anonymous = await verify({});
     expect(anonymous.res.status).toBe(403);
-    expect(anonymous.res.headers.get('x-rid-deny-reason')).toBe('data_subject_required');
+    expect(anonymous.res.headers.get('x-den-deny-reason')).toBe('data_subject_required');
 
     // Bodies the gateway and the provider could read as different people are denied too: a
     // repeated member name (parsers disagree on which wins), a body not declared as JSON, and a
@@ -128,7 +128,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     ];
     for (const { res } of await Promise.all(ambiguous)) {
       expect(res.status).toBe(403);
-      expect(res.headers.get('x-rid-deny-reason')).toBe('data_subject_required');
+      expect(res.headers.get('x-den-deny-reason')).toBe('data_subject_required');
     }
     // A JSON media type with parameters still counts as JSON, and the same name in different
     // objects is no repetition: the gateway lets it through (the strict mock provider then
@@ -139,7 +139,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
       body: JSON.stringify({ numeroIdentificacion: '1000000001', otros: { a: 1, b: [{ a: 2 }] } }),
     });
     expect(nested.res.status).toBe(400);
-    expect(nested.res.headers.get('x-rid-deny-reason')).toBeNull();
+    expect(nested.res.headers.get('x-den-deny-reason')).toBeNull();
     const withCharset = await verify(
       { numeroIdentificacion: '1000000001' },
       {
@@ -151,7 +151,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     // Another person, another reference.
     const other = await call('/1000000002');
     expect(other.res.status).toBe(200);
-    const otherRef = (await seenBy(other.requestId))['x-rid-subject-ref'];
+    const otherRef = (await seenBy(other.requestId))['x-den-subject-ref'];
     expect(otherRef).not.toBe(ref);
 
     // MT-03: a number never seen before, for a person the provider does not know (404). The call

@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   NOTIFICATION_KINDS,
   type Notification,
   type NotificationKind,
   notificationKindSchema,
   notificationParamsSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
@@ -85,7 +85,7 @@ export class NotificationsService implements OnApplicationBootstrap {
     });
     const config = getCountryConfig();
     const locale = mailLocale(config.country.locale);
-    const webUrl = (process.env.RID_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+    const webUrl = (process.env.DEN_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
     const prefix = locale === 'es' ? '' : `/${locale}`;
     const day = (iso?: string) =>
       iso

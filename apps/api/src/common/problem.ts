@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { ERROR_HTTP_STATUS, ErrorCode, problemType, type ProblemDetails } from '@rid/contracts';
+import { ERROR_HTTP_STATUS, ErrorCode, problemType, type ProblemDetails } from '@den/contracts';
 import { DomainError } from './errors.js';
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json';

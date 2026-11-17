@@ -1,6 +1,6 @@
 'use server';
 
-import { subscriptionDetailSchema } from '@rid/contracts';
+import { subscriptionDetailSchema } from '@den/contracts';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from '../i18n/navigation';

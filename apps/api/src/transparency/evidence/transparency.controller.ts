@@ -8,7 +8,7 @@ import {
   transparencyJwksSchema,
   transparencyReceiptSchema,
   transparencyVerificationSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { PlatformAccess, Public } from '../../auth/decorators.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
@@ -93,7 +93,7 @@ export class TransparencyController {
     summary: 'Verifiable receipt of one call in the transparency register',
     description:
       'The record, its audit path in the batch, the signed checkpoint and the TSA time-stamp. ' +
-      'Check it offline with rid-verify-receipt. 409 while the record is not sealed yet.',
+      'Check it offline with den-verify-receipt. 409 while the record is not sealed yet.',
     tags: ['transparency'],
     params: recordParamsSchema,
     responses: { 200: { description: 'The receipt', schema: transparencyReceiptSchema } },

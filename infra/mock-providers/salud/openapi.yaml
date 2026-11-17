@@ -7,7 +7,7 @@ info:
     afiliación de una persona al sistema de salud a partir de su número de identificación.
   contact:
     name: Entidad de Salud (ficticia)
-    email: soporte@salud.demo.rid.example
+    email: soporte@salud.demo.den.example
 tags:
   - name: Afiliación
     description: Consultas sobre la afiliación de una persona.
@@ -16,7 +16,7 @@ paths:
     get:
       operationId: getAfiliado
       # Whose data this operation returns (ADR-0015): the person in the path, a cédula.
-      x-rid-data-subject:
+      x-den-data-subject:
         in: path
         name: numeroIdentificacion
         documentType: CC
@@ -40,7 +40,7 @@ paths:
     post:
       operationId: verificarAfiliacion
       # The identifier travels in the body: the gateway reads it there (ADR-0017).
-      x-rid-data-subject:
+      x-den-data-subject:
         in: body
         pointer: /numeroIdentificacion
         documentType: CC

@@ -1,26 +1,26 @@
 {{- /*
-PostgreSQL with CloudNativePG (rid-platform installs the operator): the portal's database and
+PostgreSQL with CloudNativePG (den-platform installs the operator): the portal's database and
 Keycloak's own (ARCHITECTURE §11), each a primary with replicas in other zones and automatic
-failover. The roles are those of infra/postgres/init: `rid` owns the schema (migrations), the API
-runs as `rid_app` with the default privileges the owner gives it. Clients connect with TLS
+failover. The roles are those of infra/postgres/init: `den` owns the schema (migrations), the API
+runs as `den_app` with the default privileges the owner gives it. Clients connect with TLS
 verified against the cluster's CA (sslmode=verify-full).
 */}}
 {{- $pg := .Values.postgres }}
-{{- range $db := list (dict "component" "db" "database" "rid" "owner" "rid" "secret" "db-owner" "spec" $pg.portal)
+{{- range $db := list (dict "component" "db" "database" "den" "owner" "den" "secret" "db-owner" "spec" $pg.portal)
                      (dict "component" "keycloak-db" "database" "keycloak" "owner" "keycloak" "secret" "keycloak-db" "spec" $pg.keycloak) }}
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: {{ include "rid.name" $db.component }}
+  name: {{ include "den.name" $db.component }}
   labels:
-    {{- include "rid.labels" (dict "root" $ "component" $db.component) | nindent 4 }}
+    {{- include "den.labels" (dict "root" $ "component" $db.component) | nindent 4 }}
 spec:
   # On the instances' pods too: the default deny and the NetworkPolicies below select them.
   inheritedMetadata:
     labels:
-      app.kubernetes.io/part-of: rid
-      app.kubernetes.io/name: {{ include "rid.name" $db.component }}
+      app.kubernetes.io/part-of: den
+      app.kubernetes.io/name: {{ include "den.name" $db.component }}
   instances: {{ $db.spec.instances }}
   {{- with $pg.imageName }}
   imageName: {{ . }}
@@ -38,28 +38,28 @@ spec:
       database: {{ $db.database }}
       owner: {{ $db.owner }}
       secret:
-        name: {{ include "rid.name" $db.secret }}
+        name: {{ include "den.name" $db.secret }}
       {{- if eq $db.component "db" }}
       # infra/postgres/init/02-app-role.sh: the runtime role and the owner's default privileges.
       # The role starts without login; `managed.roles` below gives it its password.
       postInitApplicationSQL:
-        - CREATE ROLE rid_app NOLOGIN
-        - GRANT CONNECT ON DATABASE rid TO rid_app
-        - GRANT USAGE ON SCHEMA public TO rid_app
-        - ALTER DEFAULT PRIVILEGES FOR ROLE rid GRANT USAGE ON SCHEMAS TO rid_app
-        - ALTER DEFAULT PRIVILEGES FOR ROLE rid GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO rid_app
-        - ALTER DEFAULT PRIVILEGES FOR ROLE rid GRANT USAGE, SELECT ON SEQUENCES TO rid_app
-        - ALTER DEFAULT PRIVILEGES FOR ROLE rid GRANT EXECUTE ON FUNCTIONS TO rid_app
-        - ALTER DEFAULT PRIVILEGES FOR ROLE rid GRANT USAGE ON TYPES TO rid_app
+        - CREATE ROLE den_app NOLOGIN
+        - GRANT CONNECT ON DATABASE den TO den_app
+        - GRANT USAGE ON SCHEMA public TO den_app
+        - ALTER DEFAULT PRIVILEGES FOR ROLE den GRANT USAGE ON SCHEMAS TO den_app
+        - ALTER DEFAULT PRIVILEGES FOR ROLE den GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO den_app
+        - ALTER DEFAULT PRIVILEGES FOR ROLE den GRANT USAGE, SELECT ON SEQUENCES TO den_app
+        - ALTER DEFAULT PRIVILEGES FOR ROLE den GRANT EXECUTE ON FUNCTIONS TO den_app
+        - ALTER DEFAULT PRIVILEGES FOR ROLE den GRANT USAGE ON TYPES TO den_app
       {{- end }}
   {{- if eq $db.component "db" }}
   managed:
     roles:
-      - name: rid_app
+      - name: den_app
         ensure: present
         login: true
         passwordSecret:
-          name: {{ include "rid.name" "db-app" }}
+          name: {{ include "den.name" "db-app" }}
   {{- end }}
   resources:
     {{- toYaml $db.spec.resources | nindent 4 }}
@@ -69,6 +69,6 @@ spec:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
-        barmanObjectName: {{ include "rid.name" "db-backup" }}
+        barmanObjectName: {{ include "den.name" "db-backup" }}
   {{- end }}
 {{- end }}

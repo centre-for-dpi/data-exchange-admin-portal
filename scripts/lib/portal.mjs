@@ -12,16 +12,16 @@ import { DEFAULT_DEMO_TOTP_SECRET, totp } from '../totp.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const env = (name, fallback) => process.env[name] ?? fallback;
-export const API = `${env('RID_API_URL', 'http://localhost:4000')}/api/v1`;
+export const API = `${env('DEN_API_URL', 'http://localhost:4000')}/api/v1`;
 export const KEYCLOAK = env('KEYCLOAK_URL', 'http://localhost:8080');
-export const GATEWAY = env('RID_GATEWAY_PUBLIC_URL', 'https://localhost:9443');
+export const GATEWAY = env('DEN_GATEWAY_PUBLIC_URL', 'https://localhost:9443');
 // The plain-HTTP listener of the local gateway: only for "does the route exist yet?" (no token).
-export const GATEWAY_HTTP = env('RID_GATEWAY_HTTP_URL', 'http://localhost:9080');
+export const GATEWAY_HTTP = env('DEN_GATEWAY_HTTP_URL', 'http://localhost:9080');
 // With mTLS (M3-10) the gateway is HTTPS and every call presents the application's certificate.
 export const MTLS = GATEWAY.startsWith('https://');
-export const WEB = env('RID_WEB_URL', 'http://localhost:3000');
-const PASSWORD = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
-const TOTP_SECRET = env('RID_DEMO_TOTP_SECRET', DEFAULT_DEMO_TOTP_SECRET);
+export const WEB = env('DEN_WEB_URL', 'http://localhost:3000');
+const PASSWORD = env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
+const TOTP_SECRET = env('DEN_DEMO_TOTP_SECRET', DEFAULT_DEMO_TOTP_SECRET);
 
 /** A step that did not behave as the script promises. */
 export class ScriptError extends Error {}
@@ -45,22 +45,22 @@ export async function waitFor(probe, { timeoutMs, everyMs = 1_000, what }) {
 // --- Keycloak login (Authorization Code + PKCE, like the web app) ------------------------------
 
 const PORTAL_CLIENT = {
-  realm: 'rid-portal',
-  clientId: env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web'),
-  secret: env('RID_PORTAL_WEB_CLIENT_SECRET', ''),
+  realm: 'den-portal',
+  clientId: env('DEN_PORTAL_WEB_CLIENT_ID', 'den-portal-web'),
+  secret: env('DEN_PORTAL_WEB_CLIENT_SECRET', ''),
   redirectUri: `${WEB}/api/auth/callback/keycloak`,
 };
 /** The reference citizen folder in the (simulated) national identity (MT-05, MT-07). */
 export const CITIZEN_CLIENT = {
-  realm: 'rid-citizens',
-  clientId: 'carpeta-ciudadana',
-  secret: env('RID_CARPETA_CLIENT_SECRET', ''),
-  redirectUri: `${env('RID_CARPETA_URL', 'http://localhost:3100')}/auth/callback`,
+  realm: 'den-citizens',
+  clientId: 'citizen-app',
+  secret: env('DEN_CITIZEN_APP_CLIENT_SECRET', ''),
+  redirectUri: `${env('DEN_CITIZEN_APP_URL', 'http://localhost:3100')}/auth/callback`,
 };
 
 /** Seed users with a critical role: their realm entry has a one-time code (M3-08). */
 const MFA_USERS = new Set(
-  JSON.parse(readFileSync(resolve(root, 'infra/keycloak/rid-portal-realm.json'), 'utf8'))
+  JSON.parse(readFileSync(resolve(root, 'infra/keycloak/den-portal-realm.json'), 'utf8'))
     .users.filter((u) => u.credentials?.some((c) => c.type === 'otp'))
     .map((u) => u.username),
 );
@@ -90,7 +90,7 @@ async function submitOtp(username, html, post) {
     html = await res.text();
   }
   throw new ScriptError(
-    `Keycloak refused the one-time codes of ${username} (is RID_DEMO_TOTP_SECRET right?)`,
+    `Keycloak refused the one-time codes of ${username} (is DEN_DEMO_TOTP_SECRET right?)`,
   );
 }
 
@@ -140,7 +140,7 @@ export async function login(username, client = PORTAL_CLIENT) {
     submitted = await submitOtp(username, await submitted.text(), post);
   }
   const code = new URL(submitted.headers.get('location') ?? 'http://x/').searchParams.get('code');
-  expect(code, `Login failed for ${username} (is RID_DEMO_USER_PASSWORD right?)`);
+  expect(code, `Login failed for ${username} (is DEN_DEMO_USER_PASSWORD right?)`);
   const { clientId, secret } = client;
   const tokens = await fetch(`${realm}/token`, {
     method: 'POST',
@@ -232,7 +232,7 @@ export async function gatewayFetch(url, { method = 'GET', headers = {}, body } =
  * here a temporary folder); the portal has the network CA sign it. The key never leaves.
  */
 export async function clientCertificate(carlos, entityId, applicationId, clientId) {
-  const dir = mkdtempSync(join(tmpdir(), 'rid-script-'));
+  const dir = mkdtempSync(join(tmpdir(), 'den-script-'));
   try {
     const run = spawnSync(
       'openssl',
@@ -301,7 +301,7 @@ export async function callingApplication({ slug, purpose, rateLimitPerMinute, lo
     sector: 'salud',
     tags: ['prueba'],
     classification: 'personal',
-    ownerContact: 'apis@salud.demo.rid.example',
+    ownerContact: 'apis@salud.demo.den.example',
   });
   const version = await pedro.call('POST', `/entities/${salud}/apis/${api.id}/versions`, {
     version: '1.0',
@@ -328,7 +328,7 @@ export async function callingApplication({ slug, purpose, rateLimitPerMinute, lo
     name: `Prueba ${slug}`,
     description: purpose,
     environment: 'production',
-    technicalContact: 'dev@programas.demo.rid.example',
+    technicalContact: 'dev@programas.demo.den.example',
   });
   const app = created.application;
   await waitFor(
@@ -367,8 +367,8 @@ export async function callingApplication({ slug, purpose, rateLimitPerMinute, lo
         await gatewayFetch(`${GATEWAY}${path.replace('{n}', TEST_PERSON)}`, {
           headers: {
             authorization: `Bearer ${token}`,
-            'x-rid-purpose': 'eligibility_check',
-            'x-rid-end-user': 'funcionario-prueba',
+            'x-den-purpose': 'eligibility_check',
+            'x-den-end-user': 'funcionario-prueba',
           },
         })
       ).status === 200,

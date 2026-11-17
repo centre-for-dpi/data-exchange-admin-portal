@@ -4,7 +4,7 @@
 -- for the analytics (numbers as numbers, latencies in milliseconds) and checks the format of
 -- every value: one that does not look like what the gateway puts there is dropped, so a client
 -- cannot smuggle an identification number into the index through a header it chooses
--- (X-RID-Purpose, X-Request-Id).
+-- (X-DEN-Purpose, X-Request-Id).
 local ALLOWED = {
   ts = true,
   request_id = true,
@@ -30,7 +30,7 @@ local FORMAT = {
   ts = "^%d%d%d%d%-%d%d%-%d%dT[%d:%.]+[Z%+%-][%d:]*$",
   -- Chosen by the consumer: its own trace id.
   request_id = "^[%w%.:_%-]+$",
-  route_id = "^rid%-[%w%-]+$",
+  route_id = "^den%-[%w%-]+$",
   operation = "^[%w%._%-]+$",
   method = "^%u+$",
   consumer_entity = "^[%l%d%-]+$",
@@ -112,7 +112,7 @@ function allowlist(tag, timestamp, record)
   end
   -- A denial is the gateway's own answer: no upstream was contacted, so nginx set no upstream
   -- time. When a provider answered, a deny reason is one it sent (a response header the gateway
-  -- could not strip, such as X_RID_Deny_Reason) and is not kept.
+  -- could not strip, such as X_DEN_Deny_Reason) and is not kept.
   if filtered.upstream_latency_ms ~= nil then
     filtered.deny_reason = nil
   end

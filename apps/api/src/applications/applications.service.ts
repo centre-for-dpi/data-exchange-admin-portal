@@ -6,8 +6,8 @@ import type {
   CreateApplicationInput,
   PaginationQuery,
   Provisioning,
-} from '@rid/contracts';
-import { createApplicationSchema } from '@rid/contracts';
+} from '@den/contracts';
+import { createApplicationSchema } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { NotFoundError } from '../common/errors.js';
@@ -28,7 +28,7 @@ type AppRow = Prisma.ApplicationGetPayload<{ include: { credentials: true } }>;
  * client certificate; Keycloak itself is not published for applications.
  */
 export const gatewayTokenUrl = (): string =>
-  `${(process.env.RID_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(/\/$/, '')}/oauth/token`;
+  `${(process.env.DEN_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080').replace(/\/$/, '')}/oauth/token`;
 
 /**
  * Consumer applications and their OAuth2 credentials (SPEC.md §4.3, M1-06). The Keycloak client is
@@ -141,7 +141,7 @@ export class ApplicationsService {
           id: applicationId,
           entityId,
           ...data,
-          keycloakClientId: `rid-app-${applicationId}`,
+          keycloakClientId: `den-app-${applicationId}`,
           status: 'active',
           createdBy: principal.userId,
         },

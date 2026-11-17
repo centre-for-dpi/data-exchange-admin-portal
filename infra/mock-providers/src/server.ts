@@ -14,9 +14,9 @@ export const openapiPath = (provider: Provider): string =>
 const ID_PATTERN = '^[0-9]{6,12}$';
 
 /** Headers the gateway adds (ARCHITECTURE.md §6). Logged so the demo can show what arrived. */
-const TRACE_HEADER = /^x-rid-|^x-request-id$/;
+const TRACE_HEADER = /^x-den-|^x-request-id$/;
 /** Never log these values in clear, even if the gateway forwards them. */
-const MASKED_HEADERS = new Set(['x-rid-end-user', 'x-rid-data-subject', 'x-rid-body-subject']);
+const MASKED_HEADERS = new Set(['x-den-end-user', 'x-den-data-subject', 'x-den-body-subject']);
 
 export function traceHeaders(
   headers: Record<string, string | string[] | undefined>,
@@ -51,25 +51,25 @@ export interface ServerOptions {
   assertion?: {
     jwksUrl: string;
     audience: string;
-    /** The gateway's public URL (RID_ASSERTION_ISSUER): the assertions' `iss`. */
+    /** The gateway's public URL (DEN_ASSERTION_ISSUER): the assertions' `iss`. */
     issuer?: string;
     required: boolean;
     fetchFn?: typeof fetch;
   };
 }
 
-/** The assertion settings from the environment (RID_GATEWAY_JWKS_URL); undefined without it. */
+/** The assertion settings from the environment (DEN_GATEWAY_JWKS_URL); undefined without it. */
 export function assertionFromEnv(
   provider: Provider,
   env: NodeJS.ProcessEnv = process.env,
 ): ServerOptions['assertion'] {
-  const jwksUrl = env.RID_GATEWAY_JWKS_URL?.trim();
+  const jwksUrl = env.DEN_GATEWAY_JWKS_URL?.trim();
   if (!jwksUrl) return undefined;
   return {
     jwksUrl,
-    audience: env.RID_ASSERTION_AUDIENCE?.trim() || provider,
-    ...(env.RID_ASSERTION_ISSUER?.trim() ? { issuer: env.RID_ASSERTION_ISSUER.trim() } : {}),
-    required: env.RID_ASSERTION_REQUIRED === 'true',
+    audience: env.DEN_ASSERTION_AUDIENCE?.trim() || provider,
+    ...(env.DEN_ASSERTION_ISSUER?.trim() ? { issuer: env.DEN_ASSERTION_ISSUER.trim() } : {}),
+    required: env.DEN_ASSERTION_REQUIRED === 'true',
   };
 }
 
@@ -124,13 +124,13 @@ export function buildServer(provider: Provider, options: ServerOptions = {}): Fa
     app.addHook('preHandler', async (request, reply) => {
       const route = request.routeOptions.url;
       if (route === '/health' || route === '/openapi.yaml') return;
-      const result: AssertionResult = await checkAssertion(request.headers['x-rid-assertion'], {
+      const result: AssertionResult = await checkAssertion(request.headers['x-den-assertion'], {
         method: request.method,
         url: request.raw.url ?? '',
         body: (request as { rawBody?: Buffer }).rawBody,
       });
       request.log.info(
-        { provider, rid: { 'x-request-id': request.headers['x-request-id'] }, assertion: result },
+        { provider, den: { 'x-request-id': request.headers['x-request-id'] }, assertion: result },
         'gateway assertion',
       );
       if (required && result !== 'verified') {
@@ -147,7 +147,7 @@ export function buildServer(provider: Provider, options: ServerOptions = {}): Fa
           provider,
           method: request.method,
           route: request.routeOptions.url ?? 'unmatched',
-          rid: traceHeaders(request.headers),
+          den: traceHeaders(request.headers),
         },
         'request received',
       );

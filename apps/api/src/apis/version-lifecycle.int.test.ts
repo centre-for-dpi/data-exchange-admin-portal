@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   apiVersionDetailSchema,
   createdApplicationSchema,
   subscriptionDetailSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
@@ -81,7 +81,7 @@ describe('API version lifecycle (M2-05, ADR-0019)', () => {
       description: 'Datos sintéticos.',
       sector: 'salud',
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -112,7 +112,7 @@ describe('API version lifecycle (M2-05, ADR-0019)', () => {
       name: `Ciclo ${randomUUID().slice(0, 6)}`,
       description: 'Aplicación de prueba del ciclo de vida.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     const applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const requested = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {

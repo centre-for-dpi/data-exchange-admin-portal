@@ -1,12 +1,12 @@
 import { createHash, randomUUID, X509Certificate } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   applicationDetailSchema,
   CSR_ERRORS,
   createdApplicationSchema,
   issuedCertificateSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeCsr } from '../../test/csr.js';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
@@ -83,7 +83,7 @@ describe('client certificates through step-ca (M3-01)', () => {
       name: `Certificados ${randomUUID().slice(0, 6)}`,
       description: 'Consulta con certificado de cliente.',
       environment: 'sandbox',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     expect(res.statusCode, res.body).toBe(201);
     return createdApplicationSchema.parse(res.json()).application;
@@ -217,7 +217,7 @@ describe('client certificates through step-ca (M3-01)', () => {
   it('refuses a CSR for another subject, a weak key or a broken request, before the CA', async () => {
     const application = await newApp();
     const cases: Array<[string, string]> = [
-      [await makeCsr('rid-app-someone-else'), CSR_ERRORS.subject],
+      [await makeCsr('den-app-someone-else'), CSR_ERRORS.subject],
       [await makeCsr(application.clientId, { key: 'RSA-1024' }), CSR_ERRORS.key],
       [await makeCsr(application.clientId, { tamper: true }), CSR_ERRORS.signature],
       ['not a csr', CSR_ERRORS.malformed],
@@ -312,12 +312,12 @@ describe('client certificates through step-ca (M3-01)', () => {
       });
       await expect(wrong.rootCertificate()).rejects.toThrow();
       const none = new StepCaClient({ ...stepCaSettings(), trustOnFirstUse: false });
-      await expect(none.rootCertificate()).rejects.toThrow(/RID_STEP_CA_ROOT/);
+      await expect(none.rootCertificate()).rejects.toThrow(/DEN_STEP_CA_ROOT/);
     });
 
     it('answers 503 when the CA is unreachable or the provisioner password is wrong', async () => {
-      const csrPem = await makeCsr('rid-app-x');
-      const request = { csrPem, commonName: 'rid-app-x', validityHours: 24 };
+      const csrPem = await makeCsr('den-app-x');
+      const request = { csrPem, commonName: 'den-app-x', validityHours: 24 };
       const down = new StepCaClient({ ...stepCaSettings(), url: 'https://127.0.0.1:1' });
       await expect(down.sign(request)).rejects.toBeInstanceOf(ServiceUnavailableError);
       const badPassword = new StepCaClient({ ...stepCaSettings(), password: 'not-the-password' });

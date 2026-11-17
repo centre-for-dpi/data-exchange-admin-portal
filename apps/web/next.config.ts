@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
     ]);
   },
   experimental: {
-    // Designation documents (PDF, up to the API's RID_DOCUMENT_MAX_BYTES of 10 MiB) go through a
+    // Designation documents (PDF, up to the API's DEN_DOCUMENT_MAX_BYTES of 10 MiB) go through a
     // server action, which first passes the proxy; both default to smaller limits.
     serverActions: { bodySizeLimit: '11mb' },
     proxyClientMaxBodySize: '11mb',

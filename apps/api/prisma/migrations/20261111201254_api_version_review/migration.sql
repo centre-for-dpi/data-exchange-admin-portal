@@ -25,4 +25,4 @@ CREATE INDEX "api_version_review_api_version_id_created_at_idx" ON "api_version_
 ALTER TABLE "api_version_review" ADD CONSTRAINT "api_version_review_api_version_id_fkey" FOREIGN KEY ("api_version_id") REFERENCES "api_version"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- Review decisions are part of the record: append-only for the runtime role.
-REVOKE UPDATE, DELETE, TRUNCATE ON "api_version_review" FROM rid_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON "api_version_review" FROM den_app;

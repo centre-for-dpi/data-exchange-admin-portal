@@ -1,7 +1,7 @@
 apiVersion: v2
-name: rid
+name: den
 description: >-
-  Portal and gateway of the data exchange network (RID) for production, with the topology of
+  Portal and gateway of the data exchange network (DEN) for production, with the topology of
   docs/ARCHITECTURE.md §11: the portal (web, API), the gateway (APISIX with its local OPA, on
   each node), etcd, the kit nodes' hub and the platform's dependencies.
 type: application

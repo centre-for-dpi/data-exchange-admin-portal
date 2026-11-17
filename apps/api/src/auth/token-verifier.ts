@@ -1,9 +1,9 @@
-import { MFA_ACR } from '@rid/contracts';
+import { MFA_ACR } from '@den/contracts';
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 
 export const TOKEN_VERIFIER = Symbol('TOKEN_VERIFIER');
 
-/** Identity proven by a valid access token of the people realm (rid-portal). */
+/** Identity proven by a valid access token of the people realm (den-portal). */
 export interface VerifiedIdentity {
   sub: string;
   email?: string;
@@ -12,7 +12,7 @@ export interface VerifiedIdentity {
   name?: string;
   /**
    * The session was opened with the second factor: Keycloak's `acr` claim is MFA_ACR, the level
-   * of authentication realm rid-portal reaches only after the one-time code (M3-08, ADR-0021).
+   * of authentication realm den-portal reaches only after the one-time code (M3-08, ADR-0021).
    */
   mfa: boolean;
 }
@@ -22,15 +22,15 @@ export interface TokenVerifier {
   verify(token: string): Promise<VerifiedIdentity>;
 }
 
-export const PORTAL_API_AUDIENCE = 'rid-portal-api';
+export const PORTAL_API_AUDIENCE = 'den-portal-api';
 
 /** Issuer of the people realm; must equal the `iss` Keycloak puts in tokens (KC_HOSTNAME). */
 export const portalIssuer = (): string =>
-  `${process.env.KEYCLOAK_URL ?? 'http://localhost:8080'}/realms/rid-portal`;
+  `${process.env.KEYCLOAK_URL ?? 'http://localhost:8080'}/realms/den-portal`;
 
 /**
  * Verifies Keycloak access tokens: RS256 signature against the realm keys (JWKS), issuer,
- * audience `rid-portal-api` and expiry (ARCHITECTURE.md §3.1). Keycloak only authenticates;
+ * audience `den-portal-api` and expiry (ARCHITECTURE.md §3.1). Keycloak only authenticates;
  * roles are never read from the token (ADR-0004).
  */
 export function createTokenVerifier(options: {

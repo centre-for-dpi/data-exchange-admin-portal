@@ -3,7 +3,7 @@ import type {
   NotificationKind,
   NotificationParams,
   PlatformRole,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { PrismaService } from '../prisma/prisma.service.js';
 
 export interface ResolvedNotification {

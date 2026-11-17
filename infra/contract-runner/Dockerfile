@@ -6,7 +6,7 @@ RUN apk add --no-cache python3 \
  && /opt/st/bin/pip install --no-cache-dir schemathesis==4.33.4 \
  && adduser -D -H runner
 ENV PATH="/opt/st/bin:${PATH}"
-COPY runner.py /rid/runner.py
+COPY runner.py /den/runner.py
 USER runner
 EXPOSE 8096
-CMD ["python3", "/rid/runner.py"]
+CMD ["python3", "/den/runner.py"]

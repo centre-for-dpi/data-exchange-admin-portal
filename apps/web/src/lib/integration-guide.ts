@@ -1,8 +1,8 @@
 /**
- * The integration guide's snippets (M5-08): get a token and call an API with the RID headers, in
+ * The integration guide's snippets (M5-08): get a token and call an API with the DEN headers, in
  * curl, Python, Node.js, Java and C#. With mTLS (features.mtls.required) both calls present the
  * application's certificate and trust the gateway through the network CA: the token comes bound
- * to that certificate. Every program reads the secret from the environment (RID_CLIENT_SECRET),
+ * to that certificate. Every program reads the secret from the environment (DEN_CLIENT_SECRET),
  * never from its source.
  */
 
@@ -31,7 +31,7 @@ export interface Snippet {
 const files = (clientId: string) => ({
   cert: `${clientId}.crt`,
   key: `${clientId}.key`,
-  ca: 'rid-network-ca.pem',
+  ca: 'den-network-ca.pem',
 });
 
 function curl(i: GuideInput): string {
@@ -44,8 +44,8 @@ function curl(i: GuideInput): string {
           '# certificate as a PFX file instead of --cert/--key.',
         ]
       : []),
-    '# 1. Token (5 minutes). The secret comes from the environment: export RID_CLIENT_SECRET=...',
-    `TOKEN=$(curl -s -u "${i.clientId}:$RID_CLIENT_SECRET" \\`,
+    '# 1. Token (5 minutes). The secret comes from the environment: export DEN_CLIENT_SECRET=...',
+    `TOKEN=$(curl -s -u "${i.clientId}:$DEN_CLIENT_SECRET" \\`,
     ...tls,
     '  -d grant_type=client_credentials \\',
     `  ${i.tokenUrl} | jq -r .access_token)`,
@@ -54,8 +54,8 @@ function curl(i: GuideInput): string {
     `curl ${i.gateway}${i.path} \\`,
     ...tls,
     '  -H "Authorization: Bearer $TOKEN" \\',
-    `  -H "X-RID-Purpose: ${i.purpose}" \\`,
-    `  -H "X-RID-End-User: ${i.endUser}"`,
+    `  -H "X-DEN-Purpose: ${i.purpose}" \\`,
+    `  -H "X-DEN-End-User: ${i.endUser}"`,
   ].join('\n');
 }
 
@@ -70,7 +70,7 @@ function python(i: GuideInput): string {
     `GATEWAY = "${i.gateway}"`,
     `TOKEN_URL = "${i.tokenUrl}"`,
     `CLIENT_ID = "${i.clientId}"`,
-    'CLIENT_SECRET = os.environ["RID_CLIENT_SECRET"]',
+    'CLIENT_SECRET = os.environ["DEN_CLIENT_SECRET"]',
     ...(i.mtls
       ? [
           '# The application certificate (mTLS) and the network CA, for both calls.',
@@ -90,8 +90,8 @@ function python(i: GuideInput): string {
     `    GATEWAY + "${i.path}",`,
     '    headers={',
     '        "Authorization": "Bearer " + token,',
-    `        "X-RID-Purpose": "${i.purpose}",`,
-    `        "X-RID-End-User": "${i.endUser}",`,
+    `        "X-DEN-Purpose": "${i.purpose}",`,
+    `        "X-DEN-End-User": "${i.endUser}",`,
     '    },',
     '    timeout=10,',
     '    **TLS,',
@@ -103,14 +103,14 @@ function python(i: GuideInput): string {
 function node(i: GuideInput): string {
   const f = files(i.clientId);
   return [
-    '// Node.js 20+, as an ES module (rid.mjs). npm install undici',
+    '// Node.js 20+, as an ES module (den.mjs). npm install undici',
     ...(i.mtls ? ["import { readFileSync } from 'node:fs';"] : []),
     "import { Agent, fetch } from 'undici';",
     '',
     `const GATEWAY = '${i.gateway}';`,
     `const TOKEN_URL = '${i.tokenUrl}';`,
     `const CLIENT_ID = '${i.clientId}';`,
-    'const CLIENT_SECRET = process.env.RID_CLIENT_SECRET;',
+    'const CLIENT_SECRET = process.env.DEN_CLIENT_SECRET;',
     ...(i.mtls
       ? [
           '// The application certificate (mTLS) and the network CA, for both calls.',
@@ -137,8 +137,8 @@ function node(i: GuideInput): string {
     '  dispatcher,',
     '  headers: {',
     '    authorization: `Bearer ${token}`,',
-    `    'x-rid-purpose': '${i.purpose}',`,
-    `    'x-rid-end-user': '${i.endUser}',`,
+    `    'x-den-purpose': '${i.purpose}',`,
+    `    'x-den-end-user': '${i.endUser}',`,
     '  },',
     '});',
     'console.log(`${response.status} ${await response.text()}`);',
@@ -152,7 +152,7 @@ function java(i: GuideInput): string {
     ...(i.mtls
       ? [
           '// Java 17+. The certificate and its key in one PKCS#12 file, once:',
-          `//   openssl pkcs12 -export -in ${f.cert} -inkey ${f.key} -out ${p12} -passout env:RID_P12_PASSWORD`,
+          `//   openssl pkcs12 -export -in ${f.cert} -inkey ${f.key} -out ${p12} -passout env:DEN_P12_PASSWORD`,
         ]
       : ['// Java 17+.']),
     'import java.io.FileInputStream;',
@@ -170,17 +170,17 @@ function java(i: GuideInput): string {
     'import javax.net.ssl.SSLContext;',
     'import javax.net.ssl.TrustManagerFactory;',
     '',
-    'public class RidClient {',
+    'public class DenClient {',
     `  static final String GATEWAY = "${i.gateway}";`,
     `  static final String TOKEN_URL = "${i.tokenUrl}";`,
     `  static final String CLIENT_ID = "${i.clientId}";`,
     '',
     '  public static void main(String[] args) throws Exception {',
-    '    String secret = System.getenv("RID_CLIENT_SECRET");',
+    '    String secret = System.getenv("DEN_CLIENT_SECRET");',
     ...(i.mtls
       ? [
           '    // The application certificate (mTLS) and the network CA, for both calls.',
-          '    char[] password = System.getenv("RID_P12_PASSWORD").toCharArray();',
+          '    char[] password = System.getenv("DEN_P12_PASSWORD").toCharArray();',
           '    KeyStore identity = KeyStore.getInstance("PKCS12");',
           `    try (FileInputStream in = new FileInputStream("${p12}")) {`,
           '      identity.load(in, password);',
@@ -190,7 +190,7 @@ function java(i: GuideInput): string {
           '    KeyStore trust = KeyStore.getInstance(KeyStore.getDefaultType());',
           '    trust.load(null, null);',
           `    try (FileInputStream in = new FileInputStream("${f.ca}")) {`,
-          '      trust.setCertificateEntry("rid-network-ca", CertificateFactory.getInstance("X.509").generateCertificate(in));',
+          '      trust.setCertificateEntry("den-network-ca", CertificateFactory.getInstance("X.509").generateCertificate(in));',
           '    }',
           '    TrustManagerFactory trusted = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());',
           '    trusted.init(trust);',
@@ -214,8 +214,8 @@ function java(i: GuideInput): string {
     '',
     `    HttpRequest call = HttpRequest.newBuilder(URI.create(GATEWAY + "${i.path}"))`,
     '        .header("Authorization", "Bearer " + m.group(1))',
-    `        .header("X-RID-Purpose", "${i.purpose}")`,
-    `        .header("X-RID-End-User", "${i.endUser}")`,
+    `        .header("X-DEN-Purpose", "${i.purpose}")`,
+    `        .header("X-DEN-End-User", "${i.endUser}")`,
     '        .GET()',
     '        .build();',
     '    HttpResponse<String> response = http.send(call, HttpResponse.BodyHandlers.ofString());',
@@ -239,7 +239,7 @@ function csharp(i: GuideInput): string {
     `const string Gateway = "${i.gateway}";`,
     `const string TokenUrl = "${i.tokenUrl}";`,
     `const string ClientId = "${i.clientId}";`,
-    'var secret = Environment.GetEnvironmentVariable("RID_CLIENT_SECRET");',
+    'var secret = Environment.GetEnvironmentVariable("DEN_CLIENT_SECRET");',
     '',
     'var handler = new HttpClientHandler();',
     ...(i.mtls
@@ -275,8 +275,8 @@ function csharp(i: GuideInput): string {
     '',
     `var call = new HttpRequestMessage(HttpMethod.Get, Gateway + "${i.path}");`,
     'call.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);',
-    `call.Headers.Add("X-RID-Purpose", "${i.purpose}");`,
-    `call.Headers.Add("X-RID-End-User", "${i.endUser}");`,
+    `call.Headers.Add("X-DEN-Purpose", "${i.purpose}");`,
+    `call.Headers.Add("X-DEN-End-User", "${i.endUser}");`,
     'using var response = await http.SendAsync(call);',
     'Console.WriteLine($"{(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");',
   ].join('\n');
@@ -291,10 +291,10 @@ const GENERATORS: Record<GuideLanguage, (i: GuideInput) => string> = {
 };
 
 const FILES: Record<GuideLanguage, string> = {
-  curl: 'rid.sh',
-  python: 'rid.py',
-  node: 'rid.mjs',
-  java: 'RidClient.java',
+  curl: 'den.sh',
+  python: 'den.py',
+  node: 'den.mjs',
+  java: 'DenClient.java',
   csharp: 'Program.cs',
 };
 

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { type MeResponse, meResponseSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { type MeResponse, meResponseSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -63,7 +63,7 @@ describe('session and entity context (M1-02)', () => {
       const lucia = sub('lucia.datos');
       for (const token of [
         await issuer.foreignToken(lucia),
-        await issuer.token(lucia, { audience: 'rid-gateway' }),
+        await issuer.token(lucia, { audience: 'den-gateway' }),
         await issuer.token(lucia, { expiresIn: Math.floor(Date.now() / 1000) - 60 }),
         'not-a-jwt',
       ]) {
@@ -164,7 +164,7 @@ describe('session and entity context (M1-02)', () => {
       const emails = res
         .json<{ items: Array<{ user: { email: string } }> }>()
         .items.map((m) => m.user.email);
-      expect(emails).toEqual(expect.arrayContaining(['lucia.datos@demo.rid.example']));
+      expect(emails).toEqual(expect.arrayContaining(['lucia.datos@demo.den.example']));
     });
 
     it('answers 403 to members without the role', async () => {

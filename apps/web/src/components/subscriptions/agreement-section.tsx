@@ -1,5 +1,5 @@
-import { getCountryConfig } from '@rid/config';
-import type { SubscriptionDetail } from '@rid/contracts';
+import { getCountryConfig } from '@den/config';
+import type { SubscriptionDetail } from '@den/contracts';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Section } from '../ui/page';
 import { AgreementUploadForm } from './subscription-forms';

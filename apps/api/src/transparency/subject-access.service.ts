@@ -4,7 +4,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { z } from 'zod';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';

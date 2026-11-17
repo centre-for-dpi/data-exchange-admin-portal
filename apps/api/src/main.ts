@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
-import { CountryConfigError, getCountryConfig } from '@rid/config';
+import { CountryConfigError, getCountryConfig } from '@den/config';
 import { createApp } from './app.js';
 import { loadDevEnv } from './dev-env.js';
 

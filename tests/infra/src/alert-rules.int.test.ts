@@ -30,7 +30,7 @@ describe('alert rules and Alertmanager configuration (M5-06)', () => {
       PROMETHEUS,
       'test',
       'rules',
-      'rid.rules.test.yml',
+      'den.rules.test.yml',
     ]);
     expect(run.status, run.out).toBe(0);
     expect(run.out).toContain('SUCCESS');
@@ -47,7 +47,7 @@ describe('alert rules and Alertmanager configuration (M5-06)', () => {
       PROMETHEUS,
       'check',
       'rules',
-      '/p/rules/rid.rules.yml',
+      '/p/rules/den.rules.yml',
     ]);
     expect(rules.status, rules.out).toBe(0);
     expect(rules.out).toContain('9 rules found');

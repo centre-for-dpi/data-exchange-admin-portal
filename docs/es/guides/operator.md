@@ -20,7 +20,7 @@ Esta guía explica **qué es cada pieza de la plataforma, por qué está y quié
 
 ## 1. La red en una página
 
-La Red de Intercambio de Datos (RID) permite que una entidad pública **consulte los datos de otra** sin copiarlos, con **permiso explícito**, para una **finalidad declarada** y dejando **rastro de cada consulta**.
+La red de intercambio de datos DEN (Data Exchange Network) permite que una entidad pública **consulte los datos de otra** sin copiarlos, con **permiso explícito**, para una **finalidad declarada** y dejando **rastro de cada consulta**.
 
 - **Los datos se quedan en cada entidad.** El gateway central solo pasa la consulta y la respuesta; no guarda contenidos (ni en base de datos ni en logs).
 - **Nadie entra sin permiso.** Cada acceso es una *suscripción*: una aplicación concreta, a una API concreta, para una finalidad concreta, aprobada por el responsable de datos de la entidad dueña. Si falta algo, el gateway niega la llamada.
@@ -125,7 +125,7 @@ Para cada uno: **qué hace**, **qué pasa si cae** y **qué guarda**. Todos corr
 | **API del portal** (NestJS) | El cerebro. Aplica los flujos (alta, publicación, solicitud, aprobación), verifica rol y entidad en **cada** petición, registra cada cambio en la bitácora. En segundo plano: reconcilia APISIX, Keycloak, OPA y el hub; firma certificados; sella la transparencia y la bitácora; envía correos y avisos; vence suscripciones y certificados; rota cada 90 días la clave con la que el gateway firma sus aserciones y publica las claves públicas (JWKS) | No hay portal ni cambios; el tráfico sigue con lo último | Nada propio: todo en PostgreSQL |
 | **PostgreSQL** | **Única fuente de verdad**: entidades, personas y roles, APIs, aplicaciones, suscripciones, bitácora, registro de transparencia, colas de trabajos. La bitácora es de solo inserción, incluso para el dueño de la base | Se detiene el plano de gobierno; el tráfico sigue | Todo. **Se respalda** |
 | **pgBackRest** | Archiva cada cambio de PostgreSQL en pocos minutos (como mucho 5 minutos de pérdida), toma un respaldo completo por semana y uno diferencial por día, y conserva cuatro semanas, en un repositorio **cifrado**. Permite volver al último estado o a un instante exacto; la restauración se prueba en CI | Los cambios nuevos esperan a ser archivados; el tráfico sigue | El repositorio cifrado. **Se copia fuera del servidor** |
-| **Keycloak** | Identidad: **autentica, no autoriza** (los roles viven en PostgreSQL). Tres realms: `rid-portal` (personas, con segundo factor), `rid-gateway` (aplicaciones de las entidades; sus clientes los crea el portal) y `rid-citizens` (identidad ciudadana simulada; en producción se usa la del país) | Nadie inicia sesión; las aplicaciones no obtienen tokens nuevos | Usuarios y clientes (en PostgreSQL) |
+| **Keycloak** | Identidad: **autentica, no autoriza** (los roles viven en PostgreSQL). Tres realms: `den-portal` (personas, con segundo factor), `den-gateway` (aplicaciones de las entidades; sus clientes los crea el portal) y `den-citizens` (identidad ciudadana simulada; en producción se usa la del país) | Nadie inicia sesión; las aplicaciones no obtienen tokens nuevos | Usuarios y clientes (en PostgreSQL) |
 | **step-ca** | **Autoridad certificadora de la red.** Firma los certificados de las aplicaciones (a partir del CSR que sube la entidad: la llave privada nunca sale de la entidad), el del gateway y los de los nodos. Solo le habla el API | No se emiten certificados; los vigentes siguen sirviendo | Llaves de la CA. **Perderla invalida todos los certificados: se respalda** |
 | **TSA** (sellado de tiempo RFC 3161) | Sella el anclaje diario de la bitácora y los lotes del registro de transparencia: prueba que existían en ese momento y que nadie los reescribió | Los sellos quedan pendientes y se hacen al volver | Su llave (la de desarrollo; en producción, la TSA acreditada del país) |
 | **Correo** (Mailpit en el piloto) | Captura todo el correo (invitaciones, avisos, verificación de cuentas, anclajes al regulador) y lo muestra en `/mail` con contraseña. En producción, el SMTP del operador | No salen correos | Correos del piloto |
@@ -147,7 +147,7 @@ Para cada uno: **qué hace**, **qué pasa si cae** y **qué guarda**. Todos corr
 ### 4.4 Utilería del piloto (no va a producción)
 
 - **Proveedores de prueba** (`mock-salud`, `mock-socioeconomico`): simulan dos entidades con datos sintéticos.
-- **Carpeta ciudadana de referencia** (`/carpeta`): muestra lo que debe implementar la carpeta real del país (consultas, avisos, comprobantes).
+- **Carpeta ciudadana de referencia** (`/citizen-app`): muestra lo que debe implementar la carpeta real del país (consultas, avisos, comprobantes).
 - **Datos semilla:** tres entidades ficticias y los usuarios de demo.
 
 ## 5. Cómo fluye todo
@@ -186,10 +186,10 @@ sequenceDiagram
   C->>GW: POST /oauth/token (mTLS + secreto)
   GW->>KC: con el certificado verificado
   KC-->>C: token de 5 min ligado al certificado
-  C->>GW: GET /salud/afiliacion/v1/... (mTLS + token + X-RID-Purpose + X-RID-End-User)
+  C->>GW: GET /salud/afiliacion/v1/... (mTLS + token + X-DEN-Purpose + X-DEN-End-User)
   GW->>OPA: ¿se permite?
   OPA-->>GW: sí + cabeceras de trazabilidad
-  GW->>P: consulta + quién, para qué, con qué suscripción + aserción firmada (X-RID-Assertion)
+  GW->>P: consulta + quién, para qué, con qué suscripción + aserción firmada (X-DEN-Assertion)
   P-->>GW: respuesta
   GW-->>C: respuesta (no se guarda)
 ```
@@ -198,7 +198,7 @@ El proveedor recibe en cada consulta la entidad y la aplicación consumidoras, l
 
 ### 5.4 Rendición de cuentas al ciudadano
 
-Cada consulta autorizada a datos de una persona queda en el registro de transparencia con el seudónimo del titular. Cada 10 segundos se agrupan en lotes firmados por el operador y sellados por la TSA. Desde su carpeta, el ciudadano ve quién lo consultó y para qué, recibe avisos y descarga un comprobante que **cualquiera puede verificar sin confiar en el portal** (verificador abierto `rid-verify-receipt`).
+Cada consulta autorizada a datos de una persona queda en el registro de transparencia con el seudónimo del titular. Cada 10 segundos se agrupan en lotes firmados por el operador y sellados por la TSA. Desde su carpeta, el ciudadano ve quién lo consultó y para qué, recibe avisos y descarga un comprobante que **cualquiera puede verificar sin confiar en el portal** (verificador abierto `den-verify-receipt`).
 
 ## 6. Seguridad y privacidad: qué garantiza la plataforma
 
@@ -222,7 +222,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 1. **Requisitos:** VPS Linux de 4–8 vCPU, 16 GB de RAM y 100 GB SSD; IP pública; **dos nombres DNS** (portal y gateway); puertos 443/tcp, 80/tcp y 51820/udp abiertos.
 2. **Instalar:**
    ```bash
-   git clone <url-del-repositorio> rid && cd rid
+   git clone <url-del-repositorio> den && cd den
    sudo ./install.sh
    ```
    El script pregunta el país, los dos nombres, el proxy y el certificado, si se activan la observabilidad y el antivirus de documentos, y la contraseña de demo (12 caracteres o más). Después genera todos los secretos, compila, arranca y comprueba.
@@ -237,10 +237,10 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | Secreto | Por qué importa | Custodia sugerida |
 | :-- | :-- | :-- |
 | `.env` completo | Sin él no se recuperan los datos ni se verifican comprobantes | AND, copia cifrada fuera del servidor |
-| `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | Definen los seudónimos; **no se rotan** | AND |
+| `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | Definen los seudónimos; **no se rotan** | AND |
 | Volumen de step-ca | Llaves de la CA de la red | AND (respaldo cifrado) |
 | `PGBACKREST_REPO1_CIPHER_PASS` | Cifra los respaldos de la base: sin ella no se restaura ninguno | AND, copia fuera del servidor, junto al `.env` |
-| `RID_SECRETS_KEY` | Sella los secretos de los clientes y la clave con la que firma el gateway | AND, dentro del `.env` |
+| `DEN_SECRETS_KEY` | Sella los secretos de los clientes y la clave con la que firma el gateway | AND, dentro del `.env` |
 | Administrador de Keycloak | Control de las identidades | AND, dos personas |
 | Usuarios con rol `regulator` | Supervisión | MinTIC |
 
@@ -268,8 +268,8 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | Sellado de tiempo | TSA de desarrollo | TSA acreditada del país |
 | Correo | Mailpit | SMTP del operador |
 | Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
-| Identidad ciudadana | Simulada (`rid-citizens`) | La del país |
-| Datos iniciales | Entidades ficticias y usuarios de demo | Sin datos de demo; el primer `platform_admin` es quien entra primero con la dirección de `RID_BOOTSTRAP_ADMIN_EMAIL`, verificada por Keycloak (`DEPLOYMENT.md §9`) |
+| Identidad ciudadana | Simulada (`den-citizens`) | La del país |
+| Datos iniciales | Entidades ficticias y usuarios de demo | Sin datos de demo; el primer `platform_admin` es quien entra primero con la dirección de `DEN_BOOTSTRAP_ADMIN_EMAIL`, verificada por Keycloak (`DEPLOYMENT.md §9`) |
 | Antivirus | Opcional (paso 5 del instalador) | Activado, con dos réplicas |
 | Respaldos | Automáticos con pgBackRest en el mismo servidor; la copia fuera de él con `install.sh backup` | Automáticos al almacenamiento de objetos del operador (Barman Cloud) |
 | Métricas y alertas | Prometheus, Alertmanager y Grafana en el mismo servidor; avisos a Mailpit | Los mismos, con el SMTP del operador y almacenamiento de métricas de larga duración |
@@ -295,7 +295,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 
 - **¿El operador puede ver los datos que se intercambian?** No. El gateway los pasa sin guardarlos y los logs solo tienen metadatos enmascarados.
 - **¿Qué pasa si se cae el portal?** El tráfico entre entidades sigue con la última configuración y la última política. Solo se detienen los cambios (nuevas aprobaciones, publicaciones). Está probado: con el portal caído, las llamadas siguen; OPA y APISIX reinician sin él, y al volver el portal recupera los registros de transparencia de la caída.
-- **¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?** Por la aserción firmada (`X-RID-Assertion`): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.
+- **¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?** Por la aserción firmada (`X-DEN-Assertion`): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.
 - **¿Cuánto tráfico aguanta?** En la máquina de desarrollo, 200 consultas por segundo con un p95 de 13 ms agregados por el gateway. La meta, 500 por segundo, se valida en un entorno tipo producción. La capacidad crece con más nodos de gateway: cada uno cuenta los límites por su lado y la política le da su parte.
 - **¿El portal está en inglés?** Sí, completo, además del español, que es el idioma por omisión. Los correos y la carpeta ciudadana también son bilingües.
 - **¿Una entidad tiene que abrir puertos de entrada?** No, si usa el kit: el nodo abre el túnel hacia afuera (UDP 51820). Con una API existente, la entidad debe permitir que el gateway llegue a ella.

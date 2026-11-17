@@ -6,15 +6,15 @@ together), with the hosts it has here: etcd's pods, and the error log to its own
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "rid.name" "gateway-config" }}
+  name: {{ include "den.name" "gateway-config" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 data:
   config.yaml: |
     apisix:
       node_listen: 9080
       enable_ipv6: false
-      extra_lua_path: /usr/local/apisix/rid/?.lua
+      extra_lua_path: /usr/local/apisix/den/?.lua
       ssl:
         enable: true
         listen:
@@ -30,7 +30,7 @@ data:
       data_encryption:
         enable_encrypt_fields: true
         keyring:
-          - '${{"{{"}}RID_APISIX_KEYRING{{"}}"}}'
+          - '${{"{{"}}DEN_APISIX_KEYRING{{"}}"}}'
           - qeddd145sfvddff3
     deployment:
       role: traditional
@@ -53,7 +53,7 @@ data:
       etcd:
         host:
           {{- range $i := until (int .Values.etcd.replicas) }}
-          - https://{{ include "rid.name" "etcd" }}-{{ $i }}.{{ include "rid.name" "etcd" }}:2379
+          - https://{{ include "den.name" "etcd" }}-{{ $i }}.{{ include "den.name" "etcd" }}:2379
           {{- end }}
         prefix: /apisix
         timeout: 30
@@ -80,15 +80,15 @@ data:
           port: 9091
     plugins:
       - request-id
-      - rid-header-guard
+      - den-header-guard
       - openid-connect
-      - rid-client-cert
-      - rid-data-subject
+      - den-client-cert
+      - den-data-subject
       - proxy-rewrite
       - opa
-      - rid-assertion
+      - den-assertion
       - limit-count
-      - rid-rate-limited
+      - den-rate-limited
       - response-rewrite
       - fault-injection
       - prometheus
@@ -108,9 +108,9 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "rid.name" "gateway-plugins" }}
+  name: {{ include "den.name" "gateway-plugins" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 data:
   {{- range $path, $_ := .Files.Glob "files/apisix/plugins/*.lua" }}
   {{ base $path }}: |

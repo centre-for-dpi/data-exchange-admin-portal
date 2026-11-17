@@ -5,8 +5,8 @@ import es from '../../messages/es.json';
 import { GUIDE_LANGUAGES, guideSnippets } from './integration-guide';
 
 const base = {
-  clientId: 'rid-app-0190d0c4-0000-7000-8000-000000000001',
-  tokenUrl: 'https://gw.example/realms/rid-gateway/protocol/openid-connect/token',
+  clientId: 'den-app-0190d0c4-0000-7000-8000-000000000001',
+  tokenUrl: 'https://gw.example/realms/den-gateway/protocol/openid-connect/token',
   gateway: 'https://gw.example',
   path: '/salud/afiliacion/v1/afiliados/1000000001',
   purpose: 'eligibility_check',
@@ -14,7 +14,7 @@ const base = {
 };
 
 describe('integration guide snippets (M5-08)', () => {
-  it('one program per language: token, call and the RID headers', () => {
+  it('one program per language: token, call and the DEN headers', () => {
     const snippets = guideSnippets({ ...base, mtls: true });
     expect(snippets.map((s) => s.language)).toEqual([...GUIDE_LANGUAGES]);
     for (const s of snippets) {
@@ -26,24 +26,24 @@ describe('integration guide snippets (M5-08)', () => {
         base.purpose,
         base.endUser,
         'client_credentials',
-        'RID_CLIENT_SECRET',
+        'DEN_CLIENT_SECRET',
       ]) {
         expect(s.code, `${s.language}: ${expected}`).toContain(expected);
       }
-      expect(s.code.toLowerCase(), s.language).toContain('x-rid-purpose');
-      expect(s.code.toLowerCase(), s.language).toContain('x-rid-end-user');
+      expect(s.code.toLowerCase(), s.language).toContain('x-den-purpose');
+      expect(s.code.toLowerCase(), s.language).toContain('x-den-end-user');
       expect(s.code.toLowerCase(), s.language).toContain('bearer');
     }
   });
 
   it('with mTLS every program presents the certificate and trusts the network CA', () => {
     for (const s of guideSnippets({ ...base, mtls: true })) {
-      expect(s.code, s.language).toContain('rid-network-ca.pem');
+      expect(s.code, s.language).toContain('den-network-ca.pem');
       // Java takes certificate and key in one PKCS#12 file, made from them.
       expect(s.code, s.language).toContain(`${base.clientId}.crt`);
     }
     for (const s of guideSnippets({ ...base, mtls: false })) {
-      expect(s.code, s.language).not.toContain('rid-network-ca.pem');
+      expect(s.code, s.language).not.toContain('den-network-ca.pem');
     }
   });
 

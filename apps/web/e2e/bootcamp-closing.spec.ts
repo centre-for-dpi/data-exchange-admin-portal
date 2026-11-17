@@ -130,7 +130,7 @@ test.describe('bootcamp simulation (M4 closing, M4-08)', () => {
     await consumer.getByLabel(/^Entorno/).selectOption('sandbox');
     await consumer
       .getByLabel(/^Correo del contacto técnico/)
-      .fill('dev@programas.demo.rid.example');
+      .fill('dev@programas.demo.den.example');
     await consumer.getByRole('button', { name: 'Crear aplicación' }).click();
     const clientId = (await consumer.getByTestId('client-id').textContent()) ?? '';
     const clientSecret = (await consumer.getByTestId('client-secret').textContent()) ?? '';
@@ -165,8 +165,8 @@ test.describe('bootcamp simulation (M4 closing, M4-08)', () => {
     const res = await gatewayFetch(sandboxUrl, {
       headers: {
         authorization: `Bearer ${token}`,
-        'x-rid-purpose': 'eligibility_check',
-        'x-rid-end-user': 'funcionario-bootcamp',
+        'x-den-purpose': 'eligibility_check',
+        'x-den-end-user': 'funcionario-bootcamp',
         'x-request-id': requestId,
       },
     });
@@ -177,12 +177,12 @@ test.describe('bootcamp simulation (M4 closing, M4-08)', () => {
     const real = await gatewayFetch(sandboxUrl.replace('/sandbox/', '/'), {
       headers: {
         authorization: `Bearer ${token}`,
-        'x-rid-purpose': 'eligibility_check',
-        'x-rid-end-user': 'funcionario-bootcamp',
+        'x-den-purpose': 'eligibility_check',
+        'x-den-end-user': 'funcionario-bootcamp',
       },
     });
     expect(real.status).toBe(403);
-    expect(real.headers.get('x-rid-deny-reason')).toBe('environment_mismatch');
+    expect(real.headers.get('x-den-deny-reason')).toBe('environment_mismatch');
     stopMockNode();
   });
 });

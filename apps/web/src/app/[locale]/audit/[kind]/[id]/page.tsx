@@ -1,4 +1,4 @@
-import { timelineKindSchema, timelineSchema } from '@rid/contracts';
+import { timelineKindSchema, timelineSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

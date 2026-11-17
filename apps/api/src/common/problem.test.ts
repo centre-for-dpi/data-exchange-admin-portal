@@ -1,6 +1,6 @@
 import { Body, Controller, ForbiddenException, Get, Module, Post } from '@nestjs/common';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { problemDetailsSchema } from '@rid/contracts';
+import { problemDetailsSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createApp } from '../app.js';
@@ -65,7 +65,7 @@ describe('RFC 9457 problem details', () => {
     expect(res.headers['content-type']).toContain('application/problem+json');
     const body = res.json<Record<string, unknown>>();
     expect(problemDetailsSchema.safeParse(body).success, JSON.stringify(body)).toBe(true);
-    expect(body).toMatchObject({ status, code, type: `https://rid.example/errors/${code}` });
+    expect(body).toMatchObject({ status, code, type: `https://den.example/errors/${code}` });
     return body;
   }
 

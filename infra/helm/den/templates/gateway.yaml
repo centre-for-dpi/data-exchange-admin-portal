@@ -1,5 +1,5 @@
 {{- $c := dict "root" . "component" "gateway" }}
-{{- $secret := include "rid.name" "gateway" }}
+{{- $secret := include "den.name" "gateway" }}
 {{- /*
 The gateway: one pod per node, each with APISIX and, on 127.0.0.1, its own OPA (decisions without
 leaving the pod, ARCHITECTURE §11), the transparency Fluent Bit (tcp-logger, buffered on its own
@@ -9,20 +9,20 @@ bundle (M6-04) and the transparency buffer (a consultation is never lost).
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "rid.name" "gateway" }}
+  name: {{ include "den.name" "gateway" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
-  serviceName: {{ include "rid.name" "gateway-pods" }}
+  serviceName: {{ include "den.name" "gateway-pods" }}
   replicas: {{ .Values.gateway.replicas }}
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/gateway-config.yaml") . | sha256sum }}
     spec:
@@ -40,14 +40,14 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              {{- include "rid.selector" $c | nindent 14 }}
+              {{- include "den.selector" $c | nindent 14 }}
         # One gateway per node: a node that fails takes one gateway down, not two.
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: {{ .Values.gateway.onePerNode | ternary "DoNotSchedule" "ScheduleAnyway" }}
           labelSelector:
             matchLabels:
-              {{- include "rid.selector" $c | nindent 14 }}
+              {{- include "den.selector" $c | nindent 14 }}
       initContainers:
         # One bundle of trusted CAs: the system's and the internal CA of etcd.
         - name: ca-bundle
@@ -69,8 +69,8 @@ spec:
           image: {{ .Values.images.apisix }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
           env:
-            - name: RID_APISIX_KEYRING
-              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: RID_APISIX_KEYRING } }
+            - name: DEN_APISIX_KEYRING
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: DEN_APISIX_KEYRING } }
             - name: APISIX_ADMIN_KEY
               valueFrom: { secretKeyRef: { name: {{ $secret }}, key: APISIX_ADMIN_KEY } }
           ports:
@@ -93,7 +93,7 @@ spec:
             {{- toYaml .Values.gateway.resources.apisix | nindent 12 }}
           volumeMounts:
             - { name: config, mountPath: /usr/local/apisix/conf/config.yaml, subPath: config.yaml }
-            - { name: plugins, mountPath: /usr/local/apisix/rid/apisix/plugins }
+            - { name: plugins, mountPath: /usr/local/apisix/den/apisix/plugins }
             - { name: etcd-client, mountPath: /usr/local/apisix/conf/etcd, readOnly: true }
             - { name: trust, mountPath: /usr/local/apisix/conf/trust, readOnly: true }
         - name: opa
@@ -110,7 +110,7 @@ spec:
             - --log-format=json
             - --config-file=/config/opa.yaml
           env:
-            - { name: OPA_PORTAL_URL, value: {{ printf "%s/api/v1/opa" (include "rid.url.api" .) | quote }} }
+            - { name: OPA_PORTAL_URL, value: {{ printf "%s/api/v1/opa" (include "den.url.api" .) | quote }} }
             - name: OPA_BUNDLE_TOKEN
               valueFrom: { secretKeyRef: { name: {{ $secret }}, key: OPA_BUNDLE_TOKEN } }
           ports:
@@ -136,13 +136,13 @@ spec:
         - name: transparency
           image: {{ .Values.images.fluentBit }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/transparency.yaml']
+          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/transparency.yaml']
           env:
             - { name: FLUENT_BIT_HTTP_PORT, value: '2020' }
-            - { name: RID_TRANSPARENCY_COLLECTOR_HOST, value: {{ include "rid.name" "api" }} }
-            - { name: RID_TRANSPARENCY_COLLECTOR_PORT, value: {{ .Values.api.port | quote }} }
-            - name: RID_TRANSPARENCY_INGEST_TOKEN
-              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: RID_TRANSPARENCY_INGEST_TOKEN } }
+            - { name: DEN_TRANSPARENCY_COLLECTOR_HOST, value: {{ include "den.name" "api" }} }
+            - { name: DEN_TRANSPARENCY_COLLECTOR_PORT, value: {{ .Values.api.port | quote }} }
+            - name: DEN_TRANSPARENCY_INGEST_TOKEN
+              valueFrom: { secretKeyRef: { name: {{ $secret }}, key: DEN_TRANSPARENCY_INGEST_TOKEN } }
           securityContext: &sidecarSecurity
             runAsNonRoot: true
             runAsUser: 1000
@@ -154,13 +154,13 @@ spec:
           resources:
             {{- toYaml .Values.gateway.resources.fluentBit | nindent 12 }}
           volumeMounts:
-            - { name: config, mountPath: /fluent-bit/etc/rid/transparency.yaml, subPath: transparency.yaml }
-            - { name: config, mountPath: /fluent-bit/etc/rid/transparency.lua, subPath: transparency.lua }
+            - { name: config, mountPath: /fluent-bit/etc/den/transparency.yaml, subPath: transparency.yaml }
+            - { name: config, mountPath: /fluent-bit/etc/den/transparency.lua, subPath: transparency.lua }
             - { name: transparency, mountPath: /var/lib/fluent-bit }
         - name: errors
           image: {{ .Values.images.fluentBit }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/rid/gateway-errors.yaml']
+          command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/gateway-errors.yaml']
           env:
             - { name: FLUENT_BIT_HTTP_PORT, value: '2021' }
           securityContext: *sidecarSecurity
@@ -169,15 +169,15 @@ spec:
           resources:
             {{- toYaml .Values.gateway.resources.fluentBit | nindent 12 }}
           volumeMounts:
-            - { name: config, mountPath: /fluent-bit/etc/rid/gateway-errors.yaml, subPath: gateway-errors.yaml }
-            - { name: config, mountPath: /fluent-bit/etc/rid/gateway-errors.lua, subPath: gateway-errors.lua }
+            - { name: config, mountPath: /fluent-bit/etc/den/gateway-errors.yaml, subPath: gateway-errors.yaml }
+            - { name: config, mountPath: /fluent-bit/etc/den/gateway-errors.lua, subPath: gateway-errors.lua }
       volumes:
         - name: config
-          configMap: { name: {{ include "rid.name" "gateway-config" }} }
+          configMap: { name: {{ include "den.name" "gateway-config" }} }
         - name: plugins
-          configMap: { name: {{ include "rid.name" "gateway-plugins" }} }
+          configMap: { name: {{ include "den.name" "gateway-plugins" }} }
         - name: etcd-client
-          secret: { secretName: {{ include "rid.name" "etcd-client" }} }
+          secret: { secretName: {{ include "den.name" "etcd-client" }} }
         - { name: trust, emptyDir: {} }
   volumeClaimTemplates:
     - metadata:
@@ -203,13 +203,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "gateway-pods" }}
+  name: {{ include "den.name" "gateway-pods" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   clusterIP: None
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: http, port: 9080 }
 ---
@@ -217,12 +217,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "gateway" }}
+  name: {{ include "den.name" "gateway" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: http, port: 9080, targetPort: http }
 ---
@@ -230,12 +230,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "gateway-admin" }}
+  name: {{ include "den.name" "gateway-admin" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: admin, port: 9180, targetPort: admin }
 ---
@@ -243,9 +243,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "gateway-public" }}
+  name: {{ include "den.name" "gateway-public" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
   {{- with .Values.gateway.service.annotations }}
   annotations: {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -259,7 +259,7 @@ spec:
   {{- end }}
   {{- end }}
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - name: https
       port: 443
@@ -271,11 +271,11 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "rid.name" "gateway" }}
+  name: {{ include "den.name" "gateway" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}

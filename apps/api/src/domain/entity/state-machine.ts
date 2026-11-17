@@ -1,4 +1,4 @@
-import type { EntityStatus } from '@rid/contracts';
+import type { EntityStatus } from '@den/contracts';
 import { InvalidTransitionError } from '../../common/errors.js';
 
 /**

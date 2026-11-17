@@ -47,7 +47,7 @@ describe('authorization matrix (M2-03)', () => {
   ] as [string, DocLang][])('%s is generated from the current policy and routes', (doc, lang) => {
     const file = join(repoRoot(), doc);
     const rendered = renderAuthzMatrix(routes, lang);
-    if (process.env.RID_UPDATE_AUTHZ_DOC === '1') writeFileSync(file, rendered);
+    if (process.env.DEN_UPDATE_AUTHZ_DOC === '1') writeFileSync(file, rendered);
     expect(readFileSync(file, 'utf8').replaceAll('\r\n', '\n')).toBe(rendered);
   });
 });

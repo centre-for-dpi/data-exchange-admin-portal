@@ -27,4 +27,4 @@ ALTER TABLE "bootcamp_checklist_item" ADD CONSTRAINT "bootcamp_checklist_item_en
 
 
 -- "Nada se borra en el dominio" (SPEC.md §5).
-REVOKE DELETE, TRUNCATE ON "bootcamp_checklist_item" FROM rid_app;
+REVOKE DELETE, TRUNCATE ON "bootcamp_checklist_item" FROM den_app;

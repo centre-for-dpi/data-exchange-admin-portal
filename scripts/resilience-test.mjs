@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// `pnpm resilience:test [--outage 45s] [--portal-container rid-api-1]`: the gateway without the
+// `pnpm resilience:test [--outage 45s] [--portal-container den-api-1]`: the gateway without the
 // portal (M6-04). The portal is the control plane: APISIX keeps its routes in etcd, OPA its last
 // bundle (in memory and, since M6-04, on disk), Keycloak issues the tokens and the transparency
 // pipeline buffers on disk. This script checks, against the running stack:
@@ -8,7 +8,7 @@
 //      which would deny everything), and so does APISIX with its routes;
 //   3. when the portal is back, no call of the outage is missing from the transparency register,
 //      and changes reach the gateway again (a revocation denies within the bundle's minute).
-// The portal is stopped and started through its container (pilot: rid-api-1) or, when there is
+// The portal is stopped and started through its container (pilot: den-api-1) or, when there is
 // none (development), as this script's own process (apps/api/dist/main.js; build it first and
 // stop `pnpm dev`). Exits 1 at the first expectation that does not hold.
 import { spawn, spawnSync } from 'node:child_process';
@@ -39,7 +39,7 @@ const { values: args } = parseArgs({
     'portal-container': { type: 'string' },
   },
 });
-const PROJECT = process.env.COMPOSE_PROJECT_NAME ?? 'rid';
+const PROJECT = process.env.COMPOSE_PROJECT_NAME ?? 'den';
 const container = (service) => `${PROJECT}-${service}-1`;
 const OUTAGE_S = Number(/^(\d+)s$/.exec(args.outage)?.[1] ?? 'NaN');
 const log = (text) => console.log(text);
@@ -68,7 +68,7 @@ function portalControl() {
     };
   }
   let child;
-  const logFile = join(tmpdir(), `rid-resilience-api-${Date.now()}.log`);
+  const logFile = join(tmpdir(), `den-resilience-api-${Date.now()}.log`);
   return {
     what: `proceso propio (apps/api/dist/main.js, log en ${logFile})`,
     start: async () => {
@@ -106,9 +106,9 @@ function registered(subscriptionId, status) {
     container('postgres'),
     'psql',
     '-U',
-    process.env.POSTGRES_USER ?? 'rid',
+    process.env.POSTGRES_USER ?? 'den',
     '-d',
-    process.env.POSTGRES_DB ?? 'rid',
+    process.env.POSTGRES_DB ?? 'den',
     '-At',
     '-c',
     `SELECT count(*) FROM subject_access_record WHERE subscription_id = '${subscriptionId}' AND status = ${status}`,
@@ -149,11 +149,11 @@ async function run(portal) {
     const res = await gatewayFetch(`${GATEWAY}${target.path.replace('{n}', TEST_PERSON)}`, {
       headers: {
         authorization: `Bearer ${token}`,
-        'x-rid-purpose': purpose,
-        'x-rid-end-user': 'funcionario-resiliencia',
+        'x-den-purpose': purpose,
+        'x-den-end-user': 'funcionario-resiliencia',
       },
     }).catch((error) => ({ status: 0, headers: new Headers(), error }));
-    return { status: res.status, reason: res.headers.get('x-rid-deny-reason') };
+    return { status: res.status, reason: res.headers.get('x-den-deny-reason') };
   };
   const expectAllowed = async (when) => {
     const r = await call();

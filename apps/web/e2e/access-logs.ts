@@ -3,7 +3,7 @@ import { expect, type Page } from '@playwright/test';
 import { openCatalogApi } from './flows';
 
 /** Access-log helpers of the usage and indicator e2e (M5): the store is OpenSearch on the host. */
-const OPENSEARCH = process.env.RID_OPENSEARCH_URL ?? 'http://localhost:9200';
+const OPENSEARCH = process.env.DEN_OPENSEARCH_URL ?? 'http://localhost:9200';
 
 /** The API and version ids of a published API, from its service-sheet link in the catalogue. */
 export async function publishedIds(page: Page, name: string) {

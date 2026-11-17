@@ -1,6 +1,6 @@
 'use server';
 
-import { apiVersionDetailSchema, purposeAdminListSchema } from '@rid/contracts';
+import { apiVersionDetailSchema, purposeAdminListSchema } from '@den/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';

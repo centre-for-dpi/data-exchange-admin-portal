@@ -1,4 +1,4 @@
-import { adminEntityListSchema, DOCUMENT_KINDS, documentPageSchema } from '@rid/contracts';
+import { adminEntityListSchema, DOCUMENT_KINDS, documentPageSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

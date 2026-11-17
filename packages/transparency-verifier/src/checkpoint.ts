@@ -32,7 +32,7 @@ export interface CheckpointPayload {
   sealedAt: string;
 }
 
-export const CHECKPOINT_JWS_TYPE = 'rid-checkpoint+jws';
+export const CHECKPOINT_JWS_TYPE = 'den-checkpoint+jws';
 
 /** Hash that links a checkpoint to the next one: SHA-256 of its canonical JSON. */
 export const checkpointHash = (payload: CheckpointPayload): string =>

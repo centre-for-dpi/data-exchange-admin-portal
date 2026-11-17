@@ -5,10 +5,10 @@
 #     -f infra/compose/docker-compose.edge.yml --env-file .env [--profile observability] up -d
 #
 # Traefik (MIT) takes 80 and 443 of the host:
-#   - the portal's name (RID_PORTAL_HOST): HTTPS ends here, routed by path as in DEPLOYMENT.md §5.2;
-#   - the gateway's name (RID_GATEWAY_HOST): TLS passthrough to APISIX 9443, which ends the mTLS of
+#   - the portal's name (DEN_PORTAL_HOST): HTTPS ends here, routed by path as in DEPLOYMENT.md §5.2;
+#   - the gateway's name (DEN_GATEWAY_HOST): TLS passthrough to APISIX 9443, which ends the mTLS of
 #     applications and kit nodes with the network CA (SPIKE S-3).
-# Routes live in infra/edge/dynamic/, written by install.sh from infra/edge/rid.yml.template.
+# Routes live in infra/edge/dynamic/, written by install.sh from infra/edge/den.yml.template.
 # No access log: the proxy keeps no paths or query strings (ARCHITECTURE.md §8).
 
 services:
@@ -22,10 +22,10 @@ services:
       - --entrypoints.websecure.address=:443
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
-      # Let's Encrypt (HTTP-01 on port 80), used only when the routers name it (RID_INSTALL_TLS).
+      # Let's Encrypt (HTTP-01 on port 80), used only when the routers name it (DEN_INSTALL_TLS).
       - --certificatesresolvers.le.acme.storage=/var/lib/traefik/acme.json
       - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
-      - --certificatesresolvers.le.acme.email=${RID_ACME_EMAIL:-}
+      - --certificatesresolvers.le.acme.email=${DEN_ACME_EMAIL:-}
       - --log.level=WARN
       - --ping=true
     ports:
@@ -45,8 +45,8 @@ services:
         # Containers that call the public names (the API and the web app reach Keycloak at
         # KEYCLOAK_URL) land here without leaving the host: no hairpin NAT, no public DNS needed.
         aliases:
-          - ${RID_PORTAL_HOST:?set RID_PORTAL_HOST in .env}
-          - ${RID_GATEWAY_HOST:?set RID_GATEWAY_HOST in .env}
+          - ${DEN_PORTAL_HOST:?set DEN_PORTAL_HOST in .env}
+          - ${DEN_GATEWAY_HOST:?set DEN_GATEWAY_HOST in .env}
 
 volumes:
   edge-acme:

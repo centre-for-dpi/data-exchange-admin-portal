@@ -7,7 +7,7 @@ info:
     socioeconómica del hogar de una persona a partir de su número de identificación.
   contact:
     name: Entidad de Programas Sociales (ficticia)
-    email: soporte@socioeconomico.demo.rid.example
+    email: soporte@socioeconomico.demo.den.example
 tags:
   - name: Hogares
     description: Consultas sobre la clasificación socioeconómica de los hogares.
@@ -16,7 +16,7 @@ paths:
     get:
       operationId: getHogar
       # Whose data this operation returns (ADR-0015): the person in the path, a cédula.
-      x-rid-data-subject:
+      x-den-data-subject:
         in: path
         name: numeroIdentificacion
         documentType: CC

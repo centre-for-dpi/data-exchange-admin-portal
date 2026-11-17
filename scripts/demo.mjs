@@ -33,7 +33,7 @@ const {
 const env = (name, fallback) => process.env[name] ?? fallback;
 const RUN = Date.now().toString(36);
 
-// The country of the deployment (RID_COUNTRY, RID_CONFIG_DIR): the demo runs in any of them
+// The country of the deployment (DEN_COUNTRY, DEN_CONFIG_DIR): the demo runs in any of them
 // (M6-09). Its sector, its purposes and its person document type come from its configuration.
 const { loadCountryConfig } = await import(
   pathToFileURL(resolve(root, 'packages/config/dist/index.js')).href
@@ -51,7 +51,7 @@ const providerOpenapi = () =>
     /documentType: CC$/gm,
     `documentType: ${PERSON_DOCUMENT_TYPE}`,
   );
-const MOCK_CONTAINER = `${env('COMPOSE_PROJECT_NAME', 'rid')}-mock-salud-1`;
+const MOCK_CONTAINER = `${env('COMPOSE_PROJECT_NAME', 'den')}-mock-salud-1`;
 const SLUG = `afiliacion-${RUN}`;
 
 // --- Output ----------------------------------------------------------------------------------
@@ -87,7 +87,7 @@ async function callGateway(token, headers = {}) {
   } catch {
     body = text;
   }
-  return { status: res.status, reason: res.headers.get('x-rid-deny-reason'), body };
+  return { status: res.status, reason: res.headers.get('x-den-deny-reason'), body };
 }
 
 /** What the provider (salud mock) logged for one request: its log entries, by message. */
@@ -100,7 +100,7 @@ function providerLog(requestId) {
     if (!line.includes(requestId)) continue;
     try {
       const entry = JSON.parse(line);
-      if (entry.rid?.['x-request-id'] === requestId) entries[entry.msg] = entry;
+      if (entry.den?.['x-request-id'] === requestId) entries[entry.msg] = entry;
     } catch {
       // not a JSON log line
     }
@@ -108,15 +108,15 @@ function providerLog(requestId) {
   return entries;
 }
 
-/** X-RID-* headers the provider logged for one request. */
-const providerSaw = (requestId) => providerLog(requestId)['request received']?.rid;
+/** X-DEN-* headers the provider logged for one request. */
+const providerSaw = (requestId) => providerLog(requestId)['request received']?.den;
 
 // --- Script ------------------------------------------------------------------------------------
 
 async function preflight() {
   const checks = [
     ['portal API', `${API}/health`],
-    ['Keycloak', `${KEYCLOAK}/realms/rid-portal`],
+    ['Keycloak', `${KEYCLOAK}/realms/den-portal`],
     ['gateway', `${GATEWAY_HTTP}/`],
   ];
   for (const [name, url] of checks) {
@@ -147,7 +147,7 @@ async function main() {
     sector: SECTOR,
     tags: ['afiliacion'],
     classification: 'personal',
-    ownerContact: 'apis@salud.demo.rid.example',
+    ownerContact: 'apis@salud.demo.den.example',
   });
   const version = await pedro.call('POST', `/entities/${salud}/apis/${api.id}/versions`, {
     version: '1.0',
@@ -201,7 +201,7 @@ async function main() {
     name: `Validador de subsidios (demo ${RUN})`,
     description: 'Verifica requisitos al asignar subsidios.',
     environment: 'production',
-    technicalContact: 'dev@programas.demo.rid.example',
+    technicalContact: 'dev@programas.demo.den.example',
   });
   const clientId = created.application.clientId;
   const clientSecret = created.clientSecret;
@@ -231,7 +231,7 @@ async function main() {
   // denied as certificate_revoked.
   const noSubscription = await waitFor(
     async () => {
-      const r = await callGateway(token, { 'x-rid-purpose': PURPOSE });
+      const r = await callGateway(token, { 'x-den-purpose': PURPOSE });
       return r.reason === 'certificate_revoked' ? undefined : r;
     },
     { timeoutMs: 60_000, what: 'the gateway did not learn the new client certificate' },
@@ -280,8 +280,8 @@ async function main() {
   step('Llamar a la API', 'terminal');
   const requestId = `demo-${RUN}`;
   const allowed = await callGateway(token, {
-    'x-rid-purpose': PURPOSE,
-    'x-rid-end-user': 'funcionario-42',
+    'x-den-purpose': PURPOSE,
+    'x-den-end-user': 'funcionario-42',
     'x-request-id': requestId,
   });
   expect(allowed.status === 200, `expected 200, got ${allowed.status} ${allowed.reason}`);
@@ -292,7 +292,7 @@ async function main() {
   });
   ok('Cabeceras que recibió el proveedor:');
   for (const [name, value] of Object.entries(seen)) info(`  ${name}: ${value}`);
-  expect(!('x-rid-end-user' in seen), 'the provider received the official in clear');
+  expect(!('x-den-end-user' in seen), 'the provider received the official in clear');
   if (country.features.gatewayAssertion) {
     // The gateway's signed assertion (ADR-0024, M6-10): the provider verified it with the JWKS.
     const checked = await waitFor(async () => providerLog(requestId)['gateway assertion'], {
@@ -303,13 +303,13 @@ async function main() {
       checked.assertion === 'verified',
       `the provider could not verify the gateway assertion: ${checked.assertion}`,
     );
-    ok('El proveedor verificó la aserción firmada del gateway (X-RID-Assertion) con el JWKS');
+    ok('El proveedor verificó la aserción firmada del gateway (X-DEN-Assertion) con el JWKS');
   }
 
   step('Finalidad incorrecta', 'terminal');
   const wrongPurpose = await callGateway(token, {
-    'x-rid-purpose': OTHER_PURPOSE,
-    'x-rid-end-user': 'funcionario-42',
+    'x-den-purpose': OTHER_PURPOSE,
+    'x-den-end-user': 'funcionario-42',
   });
   expect(
     wrongPurpose.status === 403 && wrongPurpose.reason === 'purpose_not_allowed',
@@ -326,8 +326,8 @@ async function main() {
   await waitFor(
     async () => {
       const r = await callGateway(token, {
-        'x-rid-purpose': PURPOSE,
-        'x-rid-end-user': 'funcionario-42',
+        'x-den-purpose': PURPOSE,
+        'x-den-end-user': 'funcionario-42',
       });
       return r.status === 403 && r.reason === 'no_subscription';
     },
@@ -348,7 +348,7 @@ async function main() {
     const certificateRevokedAt = Date.now();
     await waitFor(
       async () =>
-        (await callGateway(token, { 'x-rid-purpose': PURPOSE })).reason === 'certificate_revoked',
+        (await callGateway(token, { 'x-den-purpose': PURPOSE })).reason === 'certificate_revoked',
       { timeoutMs: 60_000, what: 'the revoked certificate kept working' },
     );
     const after = (Date.now() - certificateRevokedAt) / 1000;
@@ -415,13 +415,13 @@ async function main() {
   const verifierPath = resolve(root, 'packages/transparency-verifier/dist/index.js');
   expect(
     existsSync(verifierPath),
-    'build the verifier first: pnpm --filter @rid/transparency-verifier build',
+    'build the verifier first: pnpm --filter @den/transparency-verifier build',
   );
   const { verifyReceipt, certificatesInPem } = await import(pathToFileURL(verifierPath).href);
   const jwks = await (await fetch(`${API}/transparency/jwks`)).json();
   const tsaRootUrl = env(
     'CITIZEN_APP_TSA_ROOT_URL',
-    `${env('RID_TSA_URL', 'http://localhost:3004')}/api/v1/timestamp/certchain`,
+    `${env('DEN_TSA_URL', 'http://localhost:3004')}/api/v1/timestamp/certchain`,
   );
   const tsaChain = await (await fetch(tsaRootUrl)).text();
   const result = await verifyReceipt(receipt, { jwks, tsaRoots: certificatesInPem(tsaChain) });
@@ -429,7 +429,7 @@ async function main() {
   ok(
     `Comprobante válido: firma del operador, inclusión en el lote ${result.checkpoint.seq} y sello de tiempo (${result.stampedAt})`,
   );
-  info(`  Carpeta de referencia: ${env('RID_CARPETA_URL', 'http://localhost:3100')}`);
+  info(`  Carpeta de referencia: ${env('DEN_CITIZEN_APP_URL', 'http://localhost:3100')}`);
 
   console.log(
     `\n${green(bold('Demo completa en verde'))} ${dim(`(${((Date.now() - started) / 1000).toFixed(0)} s)`)}`,

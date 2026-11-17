@@ -1,4 +1,4 @@
-import type { NotificationKind, NotificationParams } from '@rid/contracts';
+import type { NotificationKind, NotificationParams } from '@den/contracts';
 import type { MailLocale } from './messages.js';
 
 type Text = (p: NotificationParams, date: string) => string;

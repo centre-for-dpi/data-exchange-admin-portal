@@ -26,7 +26,7 @@ export function startMockNode(token: string): void {
   compose('up', '-d', '--force-recreate', '--renew-anon-volumes', '--wait', 'mock-node');
   execFileSync(
     'docker',
-    ['exec', '-i', 'rid-mock-node-1', 'sh', '-c', 'cat > /var/lib/mock-node/token'],
+    ['exec', '-i', 'den-mock-node-1', 'sh', '-c', 'cat > /var/lib/mock-node/token'],
     { input: token },
   );
 }
@@ -37,7 +37,7 @@ export function stopMockNode(): void {
 
 /** The node logs to stderr, which docker logs passes on as its own stderr. */
 export const mockNodeLogs = (): string => {
-  const res = spawnSync('docker', ['logs', '--tail', '200', 'rid-mock-node-1'], {
+  const res = spawnSync('docker', ['logs', '--tail', '200', 'den-mock-node-1'], {
     encoding: 'utf8',
   });
   return `${res.stdout}${res.stderr}`;

@@ -3,7 +3,7 @@
 > Versión en español: [docs/es/AUTHZ.md](es/AUTHZ.md)
 
 > Generated from `apps/api/src/auth/authz.policy.ts` and the API routes. Do not edit it by hand:
-> `RID_UPDATE_AUTHZ_DOC=1 pnpm --filter @rid/api test -- authz.matrix`.
+> `DEN_UPDATE_AUTHZ_DOC=1 pnpm --filter @den/api test -- authz.matrix`.
 
 Rules of the global guard (ADR-0014): without a session, 401. On entity routes: someone who is not a member
 and has no allowed platform role gets 404; a member without the role, 403. On platform

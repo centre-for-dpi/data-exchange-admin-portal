@@ -1,4 +1,4 @@
-import type { UpstreamNode } from '@rid/contracts';
+import type { UpstreamNode } from '@den/contracts';
 import type { PrismaService } from '../prisma/prisma.service.js';
 
 /** The node a version's upstream names, if any (upstream JSON: { type: 'node', nodeId }). */

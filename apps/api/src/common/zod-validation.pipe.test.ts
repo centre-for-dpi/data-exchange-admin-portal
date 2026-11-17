@@ -3,7 +3,7 @@ import {
   RESERVED_ENTITY_SLUGS,
   ValidationMessage,
   ZOD_ISSUE_KEY,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ValidationError } from './errors.js';

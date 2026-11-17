@@ -4,7 +4,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import type { SubscriptionStatus } from '@rid/contracts';
+import type { SubscriptionStatus } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import { assertTransition } from '../domain/api-version/state-machine.js';
 import { OutboxService } from '../outbox/outbox.service.js';
@@ -21,7 +21,7 @@ const GRANTED: SubscriptionStatus[] = ['approved', 'active', 'suspended'];
 
 /**
  * Retirement of deprecated versions on their date (SPEC.md §4.2 step 5, ADR-0019). Every
- * RID_LIFECYCLE_INTERVAL_SECONDS (default 300) the API retires the deprecated versions whose
+ * DEN_LIFECYCLE_INTERVAL_SECONDS (default 300) the API retires the deprecated versions whose
  * sunsetAt has passed: the version becomes `retired` (the reconciler removes its route), live
  * subscriptions are revoked and pending requests rejected, all in one audited transaction per
  * version. Idempotent: each version moves only from `deprecated`.
@@ -40,7 +40,7 @@ export class VersionLifecycleService implements OnApplicationBootstrap, OnApplic
 
   onApplicationBootstrap(): void {
     if (!QueueService.enabled()) return;
-    const seconds = Number(process.env.RID_LIFECYCLE_INTERVAL_SECONDS ?? 300);
+    const seconds = Number(process.env.DEN_LIFECYCLE_INTERVAL_SECONDS ?? 300);
     this.timer = setInterval(
       () => {
         this.retireDue().catch((error: unknown) =>

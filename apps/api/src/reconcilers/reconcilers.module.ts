@@ -3,7 +3,7 @@ import { lookup } from 'node:dns/promises';
 import { Module } from '@nestjs/common';
 import { APISIX_ADMIN, HttpApisixAdmin } from './apisix/apisix-admin.js';
 import { APISIX_SETTINGS, ApisixReconciler } from './apisix/apisix.reconciler.js';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import {
   type GatewaySettings,
   parseDevNodes,
@@ -25,9 +25,9 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
       useFactory: () =>
         new HttpKeycloakGatewayAdmin({
           baseUrl: process.env.KEYCLOAK_URL ?? 'http://localhost:8080',
-          realm: 'rid-gateway',
-          clientId: process.env.RID_GATEWAY_PROVISIONER_CLIENT_ID ?? 'rid-portal-provisioner',
-          clientSecret: process.env.RID_GATEWAY_PROVISIONER_SECRET ?? '',
+          realm: 'den-gateway',
+          clientId: process.env.DEN_GATEWAY_PROVISIONER_CLIENT_ID ?? 'den-portal-provisioner',
+          clientSecret: process.env.DEN_GATEWAY_PROVISIONER_SECRET ?? '',
         }),
     },
     KeycloakReconciler,
@@ -43,47 +43,47 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
       provide: APISIX_SETTINGS,
       useFactory: (): GatewaySettings => ({
         // Addresses as APISIX (inside the container network) reaches each service.
-        keycloakDiscoveryUrl: `${process.env.RID_GATEWAY_KEYCLOAK_URL ?? 'http://keycloak:8080'}/realms/rid-gateway/.well-known/openid-configuration`,
-        audience: 'rid-gateway',
-        opaUrl: process.env.RID_GATEWAY_OPA_URL ?? 'http://opa:8181',
-        accessLogUrl: process.env.RID_GATEWAY_ACCESS_LOG_URL ?? 'http://fluent-bit:9880/',
+        keycloakDiscoveryUrl: `${process.env.DEN_GATEWAY_KEYCLOAK_URL ?? 'http://keycloak:8080'}/realms/den-gateway/.well-known/openid-configuration`,
+        audience: 'den-gateway',
+        opaUrl: process.env.DEN_GATEWAY_OPA_URL ?? 'http://opa:8181',
+        accessLogUrl: process.env.DEN_GATEWAY_ACCESS_LOG_URL ?? 'http://fluent-bit:9880/',
         transparencyLog: parseHostPort(
-          process.env.RID_GATEWAY_TRANSPARENCY_LOG ?? 'fluent-bit-transparency:5170',
+          process.env.DEN_GATEWAY_TRANSPARENCY_LOG ?? 'fluent-bit-transparency:5170',
         ),
-        devNodes: parseDevNodes(process.env.RID_DEV_NODES),
+        devNodes: parseDevNodes(process.env.DEN_DEV_NODES),
         resolveHost: async (host) =>
           (await lookup(host, { all: true, verbatim: true })).map((a) => a.address),
         tls: {
-          hosts: parseHostNames(process.env.RID_GATEWAY_TLS_HOSTS ?? 'localhost'),
-          clientName: parseHostNames(process.env.RID_GATEWAY_CLIENT_NAME ?? 'rid-gateway')[0] ?? '',
+          hosts: parseHostNames(process.env.DEN_GATEWAY_TLS_HOSTS ?? 'localhost'),
+          clientName: parseHostNames(process.env.DEN_GATEWAY_CLIENT_NAME ?? 'den-gateway')[0] ?? '',
           // Read when used: the country configuration is loaded at startup (main.ts).
           get mtlsRequired() {
             return getCountryConfig().features.mtls.required;
           },
         },
-        wgHub: process.env.RID_GATEWAY_WG_HUB ?? 'wg-hub:8443',
+        wgHub: process.env.DEN_GATEWAY_WG_HUB ?? 'wg-hub:8443',
         // Read when used, like mtlsRequired (M6-10).
         get assertion() {
           return getCountryConfig().features.gatewayAssertion
-            ? { issuer: process.env.RID_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443' }
+            ? { issuer: process.env.DEN_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443' }
             : undefined;
         },
-        validationToken: process.env.RID_VALIDATION_TOKEN || undefined,
+        validationToken: process.env.DEN_VALIDATION_TOKEN || undefined,
         xroad:
-          process.env.RID_XROAD_SECURITY_SERVER_URL && process.env.RID_XROAD_CLIENT
+          process.env.DEN_XROAD_SECURITY_SERVER_URL && process.env.DEN_XROAD_CLIENT
             ? {
-                securityServerUrl: process.env.RID_XROAD_SECURITY_SERVER_URL,
-                client: process.env.RID_XROAD_CLIENT,
-                ...(process.env.RID_XROAD_SECURITY_SERVER_CA
-                  ? { caPem: readFileSync(process.env.RID_XROAD_SECURITY_SERVER_CA, 'utf8') }
+                securityServerUrl: process.env.DEN_XROAD_SECURITY_SERVER_URL,
+                client: process.env.DEN_XROAD_CLIENT,
+                ...(process.env.DEN_XROAD_SECURITY_SERVER_CA
+                  ? { caPem: readFileSync(process.env.DEN_XROAD_SECURITY_SERVER_CA, 'utf8') }
                   : {}),
               }
             : undefined,
         nodeControl:
-          process.env.RID_GATEWAY_PORTAL_API_URL && process.env.RID_NODE_CONTROL_TOKEN
+          process.env.DEN_GATEWAY_PORTAL_API_URL && process.env.DEN_NODE_CONTROL_TOKEN
             ? {
-                portalUrl: process.env.RID_GATEWAY_PORTAL_API_URL,
-                token: process.env.RID_NODE_CONTROL_TOKEN,
+                portalUrl: process.env.DEN_GATEWAY_PORTAL_API_URL,
+                token: process.env.DEN_NODE_CONTROL_TOKEN,
               }
             : undefined,
       }),
@@ -94,10 +94,10 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
     {
       provide: HUB_AGENT,
       useFactory: () =>
-        process.env.RID_WG_HUB_AGENT_URL && process.env.RID_WG_HUB_AGENT_TOKEN
+        process.env.DEN_WG_HUB_AGENT_URL && process.env.DEN_WG_HUB_AGENT_TOKEN
           ? new HttpHubAgent({
-              baseUrl: process.env.RID_WG_HUB_AGENT_URL,
-              token: process.env.RID_WG_HUB_AGENT_TOKEN,
+              baseUrl: process.env.DEN_WG_HUB_AGENT_URL,
+              token: process.env.DEN_WG_HUB_AGENT_TOKEN,
             })
           : null,
     },

@@ -1,4 +1,4 @@
-import { notificationSchema } from '@rid/contracts';
+import { notificationSchema } from '@den/contracts';
 import { NextResponse } from 'next/server';
 import { ApiError, apiSend } from '../../../../../lib/api';
 import { routing } from '../../../../../i18n/routing';

@@ -1,4 +1,4 @@
-import { PEM_CHAIN_MEDIA_TYPE } from '@rid/contracts';
+import { PEM_CHAIN_MEDIA_TYPE } from '@den/contracts';
 import { ApiError, apiGetRaw } from '../../../../../../../../../lib/api';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -25,7 +25,7 @@ test.describe('access requests (M1-07)', () => {
     await expect(page.getByText('Todas las de solo lectura')).toBeVisible();
     await expect(page.getByText('GET /afiliados/{numeroIdentificacion}')).toBeVisible();
     await expect(
-      page.getByText('Obligatoria: cada llamada debe enviar X-RID-End-User.'),
+      page.getByText('Obligatoria: cada llamada debe enviar X-DEN-End-User.'),
     ).toBeVisible();
     await expectNoAccessibilityViolations(page);
 

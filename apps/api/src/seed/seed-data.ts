@@ -1,4 +1,4 @@
-import type { EntityRole, PlatformRole } from '@rid/contracts';
+import type { EntityRole, PlatformRole } from '@den/contracts';
 
 /**
  * Development and demo data (docs/DEMO.md). Every entity is fictitious. Country-specific values
@@ -27,9 +27,9 @@ export const SEED_ENTITIES: readonly SeedEntity[] = [
     taxId: '900000001',
     kind: 'national',
     sector: 'salud',
-    contactEmail: 'contacto@salud.demo.rid.example',
+    contactEmail: 'contacto@salud.demo.den.example',
     dpoName: 'Responsable de protección de datos (ficticio)',
-    dpoEmail: 'datos@salud.demo.rid.example',
+    dpoEmail: 'datos@salud.demo.den.example',
   },
   {
     slug: 'socioeconomico',
@@ -38,9 +38,9 @@ export const SEED_ENTITIES: readonly SeedEntity[] = [
     taxId: '900000002',
     kind: 'national',
     sector: 'vulnerabilidad',
-    contactEmail: 'contacto@socioeconomico.demo.rid.example',
+    contactEmail: 'contacto@socioeconomico.demo.den.example',
     dpoName: 'Responsable de protección de datos (ficticio)',
-    dpoEmail: 'datos@socioeconomico.demo.rid.example',
+    dpoEmail: 'datos@socioeconomico.demo.den.example',
   },
   {
     slug: 'programas-sociales',
@@ -49,9 +49,9 @@ export const SEED_ENTITIES: readonly SeedEntity[] = [
     taxId: '900000003',
     kind: 'national',
     sector: 'vulnerabilidad',
-    contactEmail: 'contacto@programas.demo.rid.example',
+    contactEmail: 'contacto@programas.demo.den.example',
     dpoName: 'Responsable de protección de datos (ficticio)',
-    dpoEmail: 'datos@programas.demo.rid.example',
+    dpoEmail: 'datos@programas.demo.den.example',
   },
 ];
 

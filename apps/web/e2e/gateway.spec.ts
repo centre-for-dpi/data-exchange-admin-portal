@@ -29,7 +29,7 @@ test.describe('gateway route (M1-08)', () => {
       .poll(async () => (await probeGateway(url)).status, { timeout: 30_000, intervals: [1_000] })
       .toBe(401);
 
-    // A token of a portal user (realm rid-portal) is not a gateway token.
+    // A token of a portal user (realm den-portal) is not a gateway token.
     await signIn(page, 'carlos.dev', '/my-apps');
     const { clientId, clientSecret } = await createGatewayApplication(page, `Gateway ${slug}`);
     await expect(page.getByTestId('provisioning')).toHaveText('Lista', { timeout: 60_000 });
@@ -48,10 +48,10 @@ test.describe('gateway route (M1-08)', () => {
     // has no subscription. The upstream is never reached.
     await untilCertificateKnown(url, token);
     const denied = await gatewayFetch(url, {
-      headers: { authorization: `Bearer ${token}`, 'x-rid-purpose': 'eligibility_check' },
+      headers: { authorization: `Bearer ${token}`, 'x-den-purpose': 'eligibility_check' },
     });
     expect(denied.status).toBe(403);
-    expect(denied.headers.get('x-rid-deny-reason')).toBe('no_subscription');
+    expect(denied.headers.get('x-den-deny-reason')).toBe('no_subscription');
     expect(denied.headers.get('x-request-id')).toBeTruthy();
 
     if (!country().features.mtls.required) return;
@@ -82,9 +82,9 @@ test.describe('gateway route (M1-08)', () => {
         async () =>
           (
             await gatewayFetch(url, {
-              headers: { authorization: `Bearer ${token}`, 'x-rid-purpose': 'eligibility_check' },
+              headers: { authorization: `Bearer ${token}`, 'x-den-purpose': 'eligibility_check' },
             })
-          ).headers.get('x-rid-deny-reason'),
+          ).headers.get('x-den-deny-reason'),
         { timeout: 60_000, intervals: [1_000] },
       )
       .toBe('certificate_revoked');

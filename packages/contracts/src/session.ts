@@ -27,7 +27,7 @@ export type MembershipSummary = z.infer<typeof membershipSummarySchema>;
 
 /**
  * The `acr` of a session opened with the second factor: the web asks Keycloak for it with
- * acr_values, and realm rid-portal maps it to level of authentication 2 (OTP).
+ * acr_values, and realm den-portal maps it to level of authentication 2 (OTP).
  */
 export const MFA_ACR = 'mfa';
 

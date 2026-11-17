@@ -1,4 +1,4 @@
-import { ENTITY_ROLES, PLATFORM_ROLES } from '@rid/contracts';
+import { ENTITY_ROLES, PLATFORM_ROLES } from '@den/contracts';
 import { describe, expect, it } from 'vitest';
 import { EntityRole, PlatformRole } from '../generated/prisma/enums.js';
 

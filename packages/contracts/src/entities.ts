@@ -48,7 +48,7 @@ export const RESERVED_ENTITY_SLUGS = [
   'internal',
   'metrics',
   'opa',
-  'rid',
+  'den',
   // Sandboxes of API versions live under /sandbox (M4-08).
   'sandbox',
   'status',

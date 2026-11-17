@@ -1,12 +1,12 @@
-package rid.authz_test
+package den.authz_test
 
 import rego.v1
 
-import data.rid.authz
+import data.den.authz
 
 # --- Fixtures -------------------------------------------------------------------------------
 
-route_id := "rid-route-v1"
+route_id := "den-route-v1"
 
 bundle := {
 	"routes": {route_id: {
@@ -36,7 +36,7 @@ bundle := {
 			{"id": "getLegado", "method": "GET", "pathRegex": "^/salud/afiliacion/v1/legado$"},
 		],
 	}},
-	"clients": {"rid-app-a": {
+	"clients": {"den-app-a": {
 		"status": "active",
 		"entityId": "e1",
 		"entitySlug": "programas-sociales",
@@ -103,9 +103,9 @@ request(overrides) := object.union(
 			"method": "GET",
 			"path": "/salud/afiliacion/v1/afiliados/1000000001",
 			"headers": {
-				"authorization": concat(" ", ["Bearer", token({"azp": "rid-app-a"})]),
-				"x-rid-purpose": "eligibility_check",
-				"x-rid-end-user": "funcionario-42",
+				"authorization": concat(" ", ["Bearer", token({"azp": "den-app-a"})]),
+				"x-den-purpose": "eligibility_check",
+				"x-den-end-user": "funcionario-42",
 				"x-request-id": "req-1",
 			},
 		},
@@ -138,7 +138,7 @@ denied(inp, data_override, code) if {
 		with time.now_ns as june_2026
 }
 
-with_subscription(changes) := object.union(bundle, {"clients": {"rid-app-a": {"subscriptions": [object.union(bundle.clients["rid-app-a"].subscriptions[0], changes)]}}})
+with_subscription(changes) := object.union(bundle, {"clients": {"den-app-a": {"subscriptions": [object.union(bundle.clients["den-app-a"].subscriptions[0], changes)]}}})
 
 # --- Allow ----------------------------------------------------------------------------------
 
@@ -156,19 +156,19 @@ test_allow_sends_trace_headers_and_only_the_end_user_hash if {
 		with data.clients as bundle.clients
 		with data.config as bundle.config
 		with time.now_ns as june_2026
-	h["X-RID-Consumer-Entity"] == "programas-sociales"
-	h["X-RID-Consumer-App"] == "rid-app-a"
-	h["X-RID-Subscription"] == "sub-1"
-	h["X-RID-Purpose"] == "eligibility_check"
-	h["X-RID-Operation"] == "getAfiliado"
+	h["X-DEN-Consumer-Entity"] == "programas-sociales"
+	h["X-DEN-Consumer-App"] == "den-app-a"
+	h["X-DEN-Subscription"] == "sub-1"
+	h["X-DEN-Purpose"] == "eligibility_check"
+	h["X-DEN-Operation"] == "getAfiliado"
 	h["X-Request-Id"] == "req-1"
-	h["X-RID-End-User-Hash"] == crypto.hmac.sha256("funcionario-42", "test-salt")
-	not h["X-RID-End-User"]
+	h["X-DEN-End-User-Hash"] == crypto.hmac.sha256("funcionario-42", "test-salt")
+	not h["X-DEN-End-User"]
 	not h["Content-Type"]
 }
 
 test_client_credentials_tokens_without_azp_use_client_id if {
-	inp := with_headers({"authorization": concat(" ", ["Bearer", token({"client_id": "rid-app-a"})])})
+	inp := with_headers({"authorization": concat(" ", ["Bearer", token({"client_id": "den-app-a"})])})
 	authz.allow with input as inp
 		with data.routes as bundle.routes
 		with data.clients as bundle.clients
@@ -178,14 +178,14 @@ test_client_credentials_tokens_without_azp_use_client_id if {
 
 test_end_user_not_required_omits_the_hash if {
 	# Neither the subscription nor the classification asks for it.
-	b := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"}])
-	h := authz.headers with input as without_header("x-rid-end-user")
+	b := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/den-route-v1/classification", "value": "internal"}])
+	h := authz.headers with input as without_header("x-den-end-user")
 		with data.routes as b.routes
 		with data.clients as b.clients
 		with data.config as b.config
 		with time.now_ns as june_2026
-	h["X-RID-Subscription"] == "sub-1"
-	not h["X-RID-End-User-Hash"]
+	h["X-DEN-Subscription"] == "sub-1"
+	not h["X-DEN-End-User-Hash"]
 }
 
 # --- Rule 1-2: token and client -------------------------------------------------------------
@@ -199,19 +199,19 @@ test_denies_a_malformed_authorization_header if {
 }
 
 test_denies_an_unknown_client if {
-	inp := with_headers({"authorization": concat(" ", ["Bearer", token({"azp": "rid-app-unknown"})])})
+	inp := with_headers({"authorization": concat(" ", ["Bearer", token({"azp": "den-app-unknown"})])})
 	denied(inp, bundle, "no_subscription")
 }
 
 test_denies_a_suspended_application if {
-	b := object.union(bundle, {"clients": {"rid-app-a": {"status": "suspended"}}})
+	b := object.union(bundle, {"clients": {"den-app-a": {"status": "suspended"}}})
 	denied(request({}), b, "app_suspended")
 }
 
 # --- Rule 3: route and operation ------------------------------------------------------------
 
 test_denies_a_route_missing_from_the_bundle if {
-	denied(request({"route": {"id": "rid-route-other"}}), bundle, "no_subscription")
+	denied(request({"route": {"id": "den-route-other"}}), bundle, "no_subscription")
 }
 
 test_denies_an_undeclared_path if {
@@ -229,7 +229,7 @@ test_path_regex_is_anchored if {
 # --- Rule 4: subscription, operation, purpose, validity -------------------------------------
 
 test_denies_a_client_without_subscription_to_the_route if {
-	b := object.union(bundle, {"clients": {"rid-app-a": {"subscriptions": []}}})
+	b := object.union(bundle, {"clients": {"den-app-a": {"subscriptions": []}}})
 	denied(request({}), b, "no_subscription")
 }
 
@@ -239,15 +239,15 @@ test_denies_an_operation_not_granted if {
 }
 
 test_denies_a_purpose_not_granted if {
-	denied(with_headers({"x-rid-purpose": "benefit_targeting"}), bundle, "purpose_not_allowed")
+	denied(with_headers({"x-den-purpose": "benefit_targeting"}), bundle, "purpose_not_allowed")
 }
 
 test_denies_without_a_purpose if {
-	denied(without_header("x-rid-purpose"), bundle, "purpose_not_allowed")
+	denied(without_header("x-den-purpose"), bundle, "purpose_not_allowed")
 }
 
 test_a_repeated_purpose_header_counts_as_absent if {
-	denied(with_headers({"x-rid-purpose": ["eligibility_check", "benefit_targeting"]}), bundle, "purpose_not_allowed")
+	denied(with_headers({"x-den-purpose": ["eligibility_check", "benefit_targeting"]}), bundle, "purpose_not_allowed")
 }
 
 test_denies_an_expired_subscription if {
@@ -261,34 +261,34 @@ test_denies_a_subscription_not_yet_valid if {
 # --- Rule 5: end user -----------------------------------------------------------------------
 
 test_denies_without_end_user_when_required if {
-	denied(without_header("x-rid-end-user"), bundle, "end_user_required")
+	denied(without_header("x-den-end-user"), bundle, "end_user_required")
 }
 
 # --- Data subject (ADR-0015) ----------------------------------------------------------------
 
 test_the_path_subject_becomes_a_keyed_reference if {
 	h := headers_for(request({}), bundle)
-	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+	h["X-DEN-Subject-Ref"] == subject_ref_of("CC", "1000000001")
 }
 
 # Shared vector with the portal API (apps/api/src/transparency/subject-ref.test.ts): the citizen
 # API derives the reference from the citizen's token and must get exactly what the gateway put
-# in X-RID-Subject-Ref.
+# in X-DEN-Subject-Ref.
 test_the_reference_matches_the_portal_vector if {
 	h := headers_for(request({}), bundle)
-	h["X-RID-Subject-Ref"] == "0d0deea2958985c2da0174f52dfb3bd1a9a88d0115ce41a4a3d1166e889b9062"
+	h["X-DEN-Subject-Ref"] == "0d0deea2958985c2da0174f52dfb3bd1a9a88d0115ce41a4a3d1166e889b9062"
 }
 
 test_the_same_person_gets_the_same_reference_and_another_a_different_one if {
 	formatted := headers_for(get_path("/salud/afiliacion/v1/afiliados/1.000.000.001"), bundle)
-	formatted["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+	formatted["X-DEN-Subject-Ref"] == subject_ref_of("CC", "1000000001")
 	other := headers_for(get_path("/salud/afiliacion/v1/afiliados/1000000002"), bundle)
-	other["X-RID-Subject-Ref"] != formatted["X-RID-Subject-Ref"]
+	other["X-DEN-Subject-Ref"] != formatted["X-DEN-Subject-Ref"]
 }
 
 test_the_document_type_may_come_from_the_path if {
 	h := headers_for(get_path("/salud/afiliacion/v1/personas/ce/123456"), all_operations)
-	h["X-RID-Subject-Ref"] == subject_ref_of("CE", "123456")
+	h["X-DEN-Subject-Ref"] == subject_ref_of("CE", "123456")
 }
 
 test_an_unknown_document_type_is_denied if {
@@ -301,28 +301,28 @@ test_a_malformed_number_is_denied if {
 }
 
 test_the_body_subject_read_by_the_gateway_becomes_a_reference if {
-	h := headers_for(post_verification({"x-rid-body-subject": "CC:1000000001"}), all_operations)
-	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
-	not h["X-RID-Body-Subject"]
-	not h["x-rid-body-subject"]
+	h := headers_for(post_verification({"x-den-body-subject": "CC:1000000001"}), all_operations)
+	h["X-DEN-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+	not h["X-DEN-Body-Subject"]
+	not h["x-den-body-subject"]
 }
 
 test_a_bare_number_uses_the_operation_document_type if {
-	h := headers_for(post_verification({"x-rid-body-subject": " 1000000001 "}), all_operations)
-	h["X-RID-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+	h := headers_for(post_verification({"x-den-body-subject": " 1000000001 "}), all_operations)
+	h["X-DEN-Subject-Ref"] == subject_ref_of("CC", "1000000001")
 }
 
 test_an_operation_with_a_body_subject_requires_it if {
 	denied(post_verification({}), all_operations, "data_subject_required")
-	denied(post_verification({"x-rid-body-subject": ["CC:1000000001", "CC:1000000002"]}), all_operations, "data_subject_required")
-	denied(post_verification({"x-rid-body-subject": "CC:1000:0001"}), all_operations, "data_subject_required")
-	denied(post_verification({"x-rid-body-subject": "XX:1000000001"}), all_operations, "data_subject_required")
+	denied(post_verification({"x-den-body-subject": ["CC:1000000001", "CC:1000000002"]}), all_operations, "data_subject_required")
+	denied(post_verification({"x-den-body-subject": "CC:1000:0001"}), all_operations, "data_subject_required")
+	denied(post_verification({"x-den-body-subject": "XX:1000000001"}), all_operations, "data_subject_required")
 }
 
 test_operations_without_a_subject_carry_no_reference if {
 	none := headers_for(get_path("/salud/afiliacion/v1/estadisticas"), all_operations)
-	none["X-RID-Subscription"] == "sub-1"
-	not none["X-RID-Subject-Ref"]
+	none["X-DEN-Subscription"] == "sub-1"
+	not none["X-DEN-Subject-Ref"]
 }
 
 test_personal_data_without_a_valid_declaration_fails_closed if {
@@ -333,8 +333,8 @@ test_personal_data_without_a_valid_declaration_fails_closed if {
 
 test_public_data_without_a_declaration_is_allowed if {
 	h := headers_for(get_path("/salud/afiliacion/v1/legado"), public_route(all_operations))
-	h["X-RID-Subscription"] == "sub-1"
-	not h["X-RID-Subject-Ref"]
+	h["X-DEN-Subscription"] == "sub-1"
+	not h["X-DEN-Subject-Ref"]
 }
 
 with_classification(b, classification) := object.union(b, {"routes": {route_id: object.union(b.routes[route_id], {"classification": classification})}})
@@ -344,27 +344,27 @@ sensitive_route(b) := with_classification(b, "sensitive")
 public_route(b) := with_classification(b, "public")
 
 test_a_denial_never_carries_the_reference if {
-	h := headers_for(with_headers({"x-rid-purpose": "benefit_targeting"}), bundle)
-	not h["X-RID-Subject-Ref"]
+	h := headers_for(with_headers({"x-den-purpose": "benefit_targeting"}), bundle)
+	not h["X-DEN-Subject-Ref"]
 }
 
 test_the_consumer_cannot_assert_the_subject_in_a_header if {
-	# Only the gateway plugin sets x-rid-body-subject; the old consumer header is ignored.
-	denied(post_verification({"x-rid-data-subject": "CC:1000000001"}), all_operations, "data_subject_required")
+	# Only the gateway plugin sets x-den-body-subject; the old consumer header is ignored.
+	denied(post_verification({"x-den-data-subject": "CC:1000000001"}), all_operations, "data_subject_required")
 }
 
 # --- Rule 6: deny response ------------------------------------------------------------------
 
 test_a_denial_of_an_unknown_client_names_no_consumer if {
-	inp := with_headers({"authorization": concat(" ", ["Bearer", token({"azp": "rid-app-unknown"})])})
+	inp := with_headers({"authorization": concat(" ", ["Bearer", token({"azp": "den-app-unknown"})])})
 	h := headers_for(inp, bundle)
-	h["X-RID-Deny-Reason"] == "no_subscription"
-	not h["X-RID-Consumer-App"]
-	not h["X-RID-Consumer-Entity"]
+	h["X-DEN-Deny-Reason"] == "no_subscription"
+	not h["X-DEN-Consumer-App"]
+	not h["X-DEN-Consumer-Entity"]
 }
 
 test_deny_returns_problem_json_and_the_reason_header if {
-	inp := with_headers({"x-rid-purpose": "benefit_targeting"})
+	inp := with_headers({"x-den-purpose": "benefit_targeting"})
 	h := authz.headers with input as inp
 		with data.routes as bundle.routes
 		with data.clients as bundle.clients
@@ -372,10 +372,10 @@ test_deny_returns_problem_json_and_the_reason_header if {
 		with time.now_ns as june_2026
 	h == {
 		"Content-Type": "application/problem+json",
-		"X-RID-Deny-Reason": "purpose_not_allowed",
+		"X-DEN-Deny-Reason": "purpose_not_allowed",
 		# The known client is named for the access log (M5-03).
-		"X-RID-Consumer-App": "rid-app-a",
-		"X-RID-Consumer-Entity": "programas-sociales",
+		"X-DEN-Consumer-App": "den-app-a",
+		"X-DEN-Consumer-Entity": "programas-sociales",
 	}
 	body := authz.reason with input as inp
 		with data.routes as bundle.routes
@@ -384,7 +384,7 @@ test_deny_returns_problem_json_and_the_reason_header if {
 		with time.now_ns as june_2026
 	body.code == "purpose_not_allowed"
 	body.status == 403
-	body.type == "https://rid.example/errors/purpose_not_allowed"
+	body.type == "https://den.example/errors/purpose_not_allowed"
 	authz.status_code == 403 with input as inp
 		with data.routes as bundle.routes
 		with data.clients as bundle.clients
@@ -401,11 +401,11 @@ test_denies_everything_without_data if {
 
 mtls_bundle := object.union(bundle, {"config": {"mtlsRequired": true}})
 
-bound_token(thumbprint) := concat(" ", ["Bearer", token({"azp": "rid-app-a", "cnf": {"x5t#S256": thumbprint}})])
+bound_token(thumbprint) := concat(" ", ["Bearer", token({"azp": "den-app-a", "cnf": {"x5t#S256": thumbprint}})])
 
 mtls_call(thumbprint, bound) := with_headers({
 	"authorization": bound_token(bound),
-	"x-rid-client-cert-s256": thumbprint,
+	"x-den-client-cert-s256": thumbprint,
 })
 
 test_mtls_allows_the_bound_certificate_of_the_application if {
@@ -418,8 +418,8 @@ test_mtls_allows_the_bound_certificate_of_the_application if {
 
 test_mtls_never_forwards_the_thumbprint if {
 	h := headers_for(mtls_call("thumb-a", "thumb-a"), mtls_bundle)
-	h["X-RID-Subscription"] == "sub-1"
-	not h["X-RID-Client-Cert-S256"]
+	h["X-DEN-Subscription"] == "sub-1"
+	not h["X-DEN-Client-Cert-S256"]
 }
 
 test_mtls_requires_a_verified_certificate if {
@@ -428,7 +428,7 @@ test_mtls_requires_a_verified_certificate if {
 }
 
 test_mtls_requires_a_bound_token if {
-	denied(with_headers({"x-rid-client-cert-s256": "thumb-a"}), mtls_bundle, "token_not_bound")
+	denied(with_headers({"x-den-client-cert-s256": "thumb-a"}), mtls_bundle, "token_not_bound")
 }
 
 test_mtls_denies_a_token_bound_to_another_certificate if {
@@ -436,25 +436,25 @@ test_mtls_denies_a_token_bound_to_another_certificate if {
 }
 
 test_mtls_denies_a_certificate_no_longer_valid_for_the_application if {
-	revoked := json.patch(mtls_bundle, [{"op": "replace", "path": "/clients/rid-app-a/certificates", "value": []}])
+	revoked := json.patch(mtls_bundle, [{"op": "replace", "path": "/clients/den-app-a/certificates", "value": []}])
 	denied(mtls_call("thumb-a", "thumb-a"), revoked, "certificate_revoked")
 }
 
 test_mtls_denies_the_certificate_of_another_application if {
-	other := json.patch(mtls_bundle, [{"op": "add", "path": "/clients/rid-app-b", "value": object.union(
-		bundle.clients["rid-app-a"],
+	other := json.patch(mtls_bundle, [{"op": "add", "path": "/clients/den-app-b", "value": object.union(
+		bundle.clients["den-app-a"],
 		{"applicationId": "b", "certificates": ["thumb-b"]},
 	)}])
 	denied(mtls_call("thumb-b", "thumb-b"), other, "certificate_revoked")
 }
 
 test_mtls_denies_a_repeated_thumbprint_header if {
-	inp := with_headers({"authorization": bound_token("thumb-a"), "x-rid-client-cert-s256": ["thumb-a", "thumb-a"]})
+	inp := with_headers({"authorization": bound_token("thumb-a"), "x-den-client-cert-s256": ["thumb-a", "thumb-a"]})
 	denied(inp, mtls_bundle, "client_certificate_required")
 }
 
 test_mtls_reports_a_suspended_application_first if {
-	suspended := object.union(mtls_bundle, {"clients": {"rid-app-a": {"status": "suspended"}}})
+	suspended := object.union(mtls_bundle, {"clients": {"den-app-a": {"status": "suspended"}}})
 	denied(with_headers({}), suspended, "app_suspended")
 }
 
@@ -491,46 +491,46 @@ test_mtls_deny_reason_has_a_problem_detail if {
 
 test_allow_passes_the_subscription_limit_for_limit_count if {
 	h := headers_for(request({}), bundle)
-	h["X-RID-Rate-Limit"] == "600"
-	h["X-RID-Subscription"] == "sub-1"
+	h["X-DEN-Rate-Limit"] == "600"
+	h["X-DEN-Subscription"] == "sub-1"
 }
 
 test_the_limit_is_shared_among_gateway_nodes_rounding_up if {
 	three_nodes := object.union(bundle, {"config": {"gatewayNodes": 3}})
 	h := headers_for(request({}), three_nodes)
-	h["X-RID-Rate-Limit"] == "200"
+	h["X-DEN-Rate-Limit"] == "200"
 	odd := object.union(with_subscription({"rateLimitPerMinute": 10}), {"config": {"gatewayNodes": 3}})
-	headers_for(request({}), odd)["X-RID-Rate-Limit"] == "4"
+	headers_for(request({}), odd)["X-DEN-Rate-Limit"] == "4"
 }
 
 test_a_client_cannot_choose_its_limit if {
-	h := headers_for(with_headers({"x-rid-rate-limit": "1000000"}), bundle)
-	h["X-RID-Rate-Limit"] == "600"
+	h := headers_for(with_headers({"x-den-rate-limit": "1000000"}), bundle)
+	h["X-DEN-Rate-Limit"] == "600"
 }
 
 test_a_denied_call_carries_no_limit if {
-	inp := with_headers({"x-rid-purpose": "other_purpose"})
+	inp := with_headers({"x-den-purpose": "other_purpose"})
 	h := headers_for(inp, bundle)
-	not h["X-RID-Rate-Limit"]
+	not h["X-DEN-Rate-Limit"]
 }
 
 test_without_gateway_nodes_one_node_is_assumed if {
 	no_nodes := json.patch(bundle, [{"op": "remove", "path": "/config/gatewayNodes"}])
-	headers_for(request({}), no_nodes)["X-RID-Rate-Limit"] == "600"
+	headers_for(request({}), no_nodes)["X-DEN-Rate-Limit"] == "600"
 }
 
 # --- Official behind the call (M3-06) ----------------------------------------------------------
 
 test_the_classification_requires_the_official_even_if_the_subscription_did_not if {
 	b := with_subscription({"endUserRequired": false})
-	denied(without_header("x-rid-end-user"), b, "end_user_required")
-	sensitive := json.patch(b, [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "sensitive"}])
-	denied(without_header("x-rid-end-user"), sensitive, "end_user_required")
+	denied(without_header("x-den-end-user"), b, "end_user_required")
+	sensitive := json.patch(b, [{"op": "replace", "path": "/routes/den-route-v1/classification", "value": "sensitive"}])
+	denied(without_header("x-den-end-user"), sensitive, "end_user_required")
 }
 
 test_an_internal_api_without_the_flag_needs_no_official if {
-	internal := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"}])
-	authz.allow with input as without_header("x-rid-end-user")
+	internal := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/den-route-v1/classification", "value": "internal"}])
+	authz.allow with input as without_header("x-den-end-user")
 		with data.routes as internal.routes
 		with data.clients as internal.clients
 		with data.config as internal.config
@@ -538,35 +538,35 @@ test_an_internal_api_without_the_flag_needs_no_official if {
 }
 
 test_an_official_that_is_not_an_identifier_is_refused if {
-	denied(with_headers({"x-rid-end-user": "Juan Pérez"}), bundle, "end_user_invalid")
-	denied(with_headers({"x-rid-end-user": concat("", [x | some _ in numbers.range(1, 129); x := "a"])}), bundle, "end_user_invalid")
-	denied(with_headers({"x-rid-end-user": "ab\tcd"}), bundle, "end_user_invalid")
+	denied(with_headers({"x-den-end-user": "Juan Pérez"}), bundle, "end_user_invalid")
+	denied(with_headers({"x-den-end-user": concat("", [x | some _ in numbers.range(1, 129); x := "a"])}), bundle, "end_user_invalid")
+	denied(with_headers({"x-den-end-user": "ab\tcd"}), bundle, "end_user_invalid")
 }
 
 test_an_invalid_official_is_refused_even_where_not_required if {
-	internal := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"}])
-	denied(with_headers({"x-rid-end-user": "dos palabras"}), internal, "end_user_invalid")
+	internal := json.patch(with_subscription({"endUserRequired": false}), [{"op": "replace", "path": "/routes/den-route-v1/classification", "value": "internal"}])
+	denied(with_headers({"x-den-end-user": "dos palabras"}), internal, "end_user_invalid")
 }
 
 test_the_official_is_hashed_with_the_deployment_salt_and_never_forwarded if {
-	h := headers_for(with_headers({"x-rid-end-user": "funcionario@entidad.example"}), bundle)
-	h["X-RID-End-User-Hash"] == crypto.hmac.sha256("funcionario@entidad.example", "test-salt")
+	h := headers_for(with_headers({"x-den-end-user": "funcionario@entidad.example"}), bundle)
+	h["X-DEN-End-User-Hash"] == crypto.hmac.sha256("funcionario@entidad.example", "test-salt")
 	other_salt := object.union(bundle, {"config": {"endUserHashSalt": "another-deployment-salt"}})
-	h2 := headers_for(with_headers({"x-rid-end-user": "funcionario@entidad.example"}), other_salt)
-	h2["X-RID-End-User-Hash"] != h["X-RID-End-User-Hash"]
-	not h["X-RID-End-User"]
-	not h2["X-RID-End-User"]
+	h2 := headers_for(with_headers({"x-den-end-user": "funcionario@entidad.example"}), other_salt)
+	h2["X-DEN-End-User-Hash"] != h["X-DEN-End-User-Hash"]
+	not h["X-DEN-End-User"]
+	not h2["X-DEN-End-User"]
 }
 
 test_the_longest_valid_official_is_accepted if {
 	long := concat("", [x | some _ in numbers.range(1, 128); x := "a"])
-	h := headers_for(with_headers({"x-rid-end-user": long}), bundle)
-	h["X-RID-End-User-Hash"] == crypto.hmac.sha256(long, "test-salt")
+	h := headers_for(with_headers({"x-den-end-user": long}), bundle)
+	h["X-DEN-End-User-Hash"] == crypto.hmac.sha256(long, "test-salt")
 }
 
 # --- X-Road routes (M4-05, SPIKE S-5) -----------------------------------------------------------
 
-xroad_bundle := json.patch(bundle, [{"op": "add", "path": "/routes/rid-route-v1/xroad", "value": true}])
+xroad_bundle := json.patch(bundle, [{"op": "add", "path": "/routes/den-route-v1/xroad", "value": true}])
 
 test_xroad_routes_carry_the_official_hash_and_the_subscription if {
 	h := authz.headers with input as request({})
@@ -575,21 +575,21 @@ test_xroad_routes_carry_the_official_hash_and_the_subscription if {
 		with data.config as xroad_bundle.config
 		with time.now_ns as june_2026
 	h["X-Road-UserId"] == crypto.hmac.sha256("funcionario-42", "test-salt")
-	h["X-Road-Issue"] == "rid:subscription:sub-1"
-	h["X-RID-Subscription"] == "sub-1"
+	h["X-Road-Issue"] == "den:subscription:sub-1"
+	h["X-DEN-Subscription"] == "sub-1"
 }
 
 test_xroad_without_an_official_carries_only_the_subscription if {
 	b := json.patch(xroad_bundle, [
-		{"op": "replace", "path": "/routes/rid-route-v1/classification", "value": "internal"},
-		{"op": "replace", "path": "/clients/rid-app-a/subscriptions/0/endUserRequired", "value": false},
+		{"op": "replace", "path": "/routes/den-route-v1/classification", "value": "internal"},
+		{"op": "replace", "path": "/clients/den-app-a/subscriptions/0/endUserRequired", "value": false},
 	])
-	h := authz.headers with input as without_header("x-rid-end-user")
+	h := authz.headers with input as without_header("x-den-end-user")
 		with data.routes as b.routes
 		with data.clients as b.clients
 		with data.config as b.config
 		with time.now_ns as june_2026
-	h["X-Road-Issue"] == "rid:subscription:sub-1"
+	h["X-Road-Issue"] == "den:subscription:sub-1"
 	not h["X-Road-UserId"]
 }
 
@@ -606,19 +606,19 @@ test_other_routes_never_carry_x_road_headers if {
 # --- Sandbox (M4-08) ----------------------------------------------------------------------------
 
 test_a_sandbox_app_never_reaches_a_production_route if {
-	b := json.patch(bundle, [{"op": "add", "path": "/clients/rid-app-a/environment", "value": "sandbox"}])
+	b := json.patch(bundle, [{"op": "add", "path": "/clients/den-app-a/environment", "value": "sandbox"}])
 	denied(request({}), b, "environment_mismatch")
 }
 
 test_a_production_app_never_reaches_a_sandbox_route if {
-	b := json.patch(bundle, [{"op": "add", "path": "/routes/rid-route-v1/sandbox", "value": true}])
+	b := json.patch(bundle, [{"op": "add", "path": "/routes/den-route-v1/sandbox", "value": true}])
 	denied(request({}), b, "environment_mismatch")
 }
 
 test_a_sandbox_app_reaches_its_sandbox_route if {
 	b := json.patch(bundle, [
-		{"op": "add", "path": "/clients/rid-app-a/environment", "value": "sandbox"},
-		{"op": "add", "path": "/routes/rid-route-v1/sandbox", "value": true},
+		{"op": "add", "path": "/clients/den-app-a/environment", "value": "sandbox"},
+		{"op": "add", "path": "/routes/den-route-v1/sandbox", "value": true},
 	])
 	authz.allow with input as request({})
 		with data.routes as b.routes
@@ -653,6 +653,6 @@ test_decision_is_what_the_gateway_reads_of_a_denied_call if {
 	d.allow == false
 	d.status_code == 403
 	d.reason.code == "no_subscription"
-	d.headers["X-RID-Deny-Reason"] == "no_subscription"
+	d.headers["X-DEN-Deny-Reason"] == "no_subscription"
 }
 

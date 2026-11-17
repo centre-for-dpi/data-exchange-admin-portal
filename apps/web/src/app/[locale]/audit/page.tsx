@@ -1,4 +1,4 @@
-import { auditEventPageSchema, chainCheckSchema } from '@rid/contracts';
+import { auditEventPageSchema, chainCheckSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

@@ -23,7 +23,7 @@ export type ApiVersionStatus = z.infer<typeof apiVersionStatusSchema>;
 const slug = z.string().regex(/^[a-z][a-z0-9-]{1,38}[a-z0-9]$/, ValidationMessage.api_slug_format);
 
 /**
- * Where the data subject of an operation is (OpenAPI extension `x-rid-data-subject`, ADR-0015,
+ * Where the data subject of an operation is (OpenAPI extension `x-den-data-subject`, ADR-0015,
  * ADR-0017): a path parameter, a JSON pointer into the request body (read by the gateway, never
  * asserted by the consumer), or none. The document type is fixed (`documentType`), read from
  * another path parameter or body field (`documentTypeParam`, `documentTypePointer`), or the
@@ -121,7 +121,7 @@ export const upstreamSchema = z.discriminatedUnion('type', [
     type: z.literal('node'),
     /**
      * Enrolled node of the instant-APIs kit (M4-04). Without it, a development stand-in serves
-     * the version (RID_DEV_NODES).
+     * the version (DEN_DEV_NODES).
      */
     nodeId: z.uuid().optional(),
     /** Path of the service on the node, e.g. /salud */

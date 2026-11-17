@@ -1,4 +1,4 @@
-import { type Timeline, timelineSchema } from '@rid/contracts';
+import { type Timeline, timelineSchema } from '@den/contracts';
 import { ApiError, apiGet } from './api';
 
 /**

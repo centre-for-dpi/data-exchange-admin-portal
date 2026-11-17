@@ -1,5 +1,5 @@
 {
-  "name": "@rid/mock-citizen-app",
+  "name": "@den/mock-citizen-app",
   "version": "0.0.0",
   "private": true,
   "description": "Reference citizen app (a Carpeta-like folder): who consulted my data, notices and receipt verification (MT-07)",
@@ -15,12 +15,12 @@
   "dependencies": {
     "@fastify/cookie": "11.1.5",
     "@fastify/formbody": "9.0.1",
-    "@rid/transparency-verifier": "workspace:*",
+    "@den/transparency-verifier": "workspace:*",
     "fastify": "^5.12.8",
     "jose": "^6.2.17",
     "nodemailer": "10.3.1",
     "standardwebhooks": "1.1.1",
-    "@rid/config": "workspace:*"
+    "@den/config": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

@@ -5,7 +5,7 @@ RUN npm install --global pnpm@11.15.0 && apk add --no-cache wget
 WORKDIR /repo
 COPY . .
 RUN pnpm install --frozen-lockfile \
- && pnpm exec turbo run build --filter=@rid/mock-citizen-app...
+ && pnpm exec turbo run build --filter=@den/mock-citizen-app...
 ENV NODE_ENV=production
 RUN mkdir -p /repo/infra/mock-citizen-app/data && chown node /repo/infra/mock-citizen-app/data
 USER node

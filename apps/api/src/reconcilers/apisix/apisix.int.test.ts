@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../../test/test-auth.js';
 import { AuditService } from '../../audit/audit.service.js';
@@ -25,13 +25,13 @@ const openapi = readFileSync(
   'utf8',
 );
 
-// A full pass reconciles every version of rid_test, which keeps those of every earlier run: it
+// A full pass reconciles every version of den_test, which keeps those of every earlier run: it
 // takes longer than one version's reconcile, and longer the more the suite has run.
 const FULL_PASS_TIMEOUT = 180_000;
 
 /**
  * Against the real APISIX Admin API (pnpm infra:up locally; etcd + apisix in CI). The reconciler
- * owns every `rid-` object: these tests create, break and repair them.
+ * owns every `den-` object: these tests create, break and repair them.
  */
 describe('APISIX reconciler (M1-08)', () => {
   const prisma = new PrismaService();
@@ -44,8 +44,8 @@ describe('APISIX reconciler (M1-08)', () => {
   });
   const settings: GatewaySettings = {
     keycloakDiscoveryUrl:
-      'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-    audience: 'rid-gateway',
+      'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+    audience: 'den-gateway',
     opaUrl: 'http://opa:8181',
     accessLogUrl: 'http://fluent-bit:9880/',
     transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
@@ -53,7 +53,7 @@ describe('APISIX reconciler (M1-08)', () => {
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     // A fake DNS the tests steer (an Error means the lookup fails).
     resolveHost: () => (dns instanceof Error ? Promise.reject(dns) : Promise.resolve(dns)),
-    tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
+    tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
   };
   let dns: string[] | Error = ['93.184.215.14'];
   const created: string[] = [];
@@ -80,7 +80,7 @@ describe('APISIX reconciler (M1-08)', () => {
       sector: 'salud',
       tags: [],
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -220,7 +220,7 @@ describe('APISIX reconciler (M1-08)', () => {
 
   it('a version the gateway cannot serve is recorded as an error and nothing is written', async () => {
     const versionId = await publish('socioeconomico', `gw-nonode-${run}`);
-    await expect(reconciler.reconcileVersion(versionId)).rejects.toThrow(/RID_DEV_NODES/);
+    await expect(reconciler.reconcileVersion(versionId)).rejects.toThrow(/DEN_DEV_NODES/);
     expect(await admin.get('routes', routeId(versionId))).toBeUndefined();
     expect(await admin.get('upstreams', upstreamId(versionId))).toBeUndefined();
     const state = await prisma.syncState.findUnique({
@@ -328,11 +328,11 @@ describe('APISIX reconciler (M1-08)', () => {
       expect(await admin.get('ssls', gatewayClientSslId(salud.id))).toMatchObject({
         type: 'client',
       });
-      // The certificate names the provider: CN=rid-gateway.salud.
+      // The certificate names the provider: CN=den-gateway.salud.
       const row = await prisma.gatewayCertificate.findFirstOrThrow({
-        where: { purpose: 'upstream_client', hosts: { equals: ['rid-gateway.salud'] } },
+        where: { purpose: 'upstream_client', hosts: { equals: ['den-gateway.salud'] } },
       });
-      expect(row.hosts).toEqual(['rid-gateway.salud']);
+      expect(row.hosts).toEqual(['den-gateway.salud']);
     });
 
     it('a node served over TLS gets mTLS and is verified against the network CA', async () => {

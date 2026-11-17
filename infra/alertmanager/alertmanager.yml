@@ -1,10 +1,10 @@
-# Alertmanager of the RID portal + gateway (M5-06). Groups the alerts of
-# infra/prometheus/rules/rid.rules.yml and sends them by e-mail to the operator. Development and
+# Alertmanager of the DEN portal + gateway (M5-06). Groups the alerts of
+# infra/prometheus/rules/den.rules.yml and sends them by e-mail to the operator. Development and
 # the pilot deliver to Mailpit; production mounts its own file with the operator's SMTP server and
 # address (DEPLOYMENT.md).
 global:
   smtp_smarthost: 'mailpit:1025'
-  smtp_from: 'alertas@rid.example'
+  smtp_from: 'alertas@den.example'
   smtp_require_tls: false
 
 route:
@@ -21,5 +21,5 @@ route:
 receivers:
   - name: operator
     email_configs:
-      - to: 'operaciones@rid.example'
+      - to: 'operaciones@den.example'
         send_resolved: true

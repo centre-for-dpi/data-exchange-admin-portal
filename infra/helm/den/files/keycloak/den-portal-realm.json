@@ -1,7 +1,7 @@
 {
-  "realm": "rid-portal",
+  "realm": "den-portal",
   "enabled": true,
-  "displayName": "Portal RID",
+  "displayName": "Portal DEN",
   "sslRequired": "external",
   "registrationAllowed": true,
   "verifyEmail": true,
@@ -24,7 +24,7 @@
     "host": "${KC_SMTP_HOST}",
     "port": "${KC_SMTP_PORT}",
     "from": "${KC_SMTP_FROM}",
-    "fromDisplayName": "Portal RID",
+    "fromDisplayName": "Portal DEN",
     "starttls": "${KC_SMTP_STARTTLS}",
     "ssl": "${KC_SMTP_SSL}",
     "auth": "true",
@@ -33,37 +33,37 @@
   },
   "clients": [
     {
-      "clientId": "rid-portal-web",
-      "name": "Portal RID (web)",
+      "clientId": "den-portal-web",
+      "name": "Portal DEN (web)",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${RID_PORTAL_WEB_CLIENT_SECRET}",
+      "secret": "${DEN_PORTAL_WEB_CLIENT_SECRET}",
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": true,
-      "rootUrl": "${RID_WEB_URL:http://localhost:3000}",
+      "rootUrl": "${DEN_WEB_URL:http://localhost:3000}",
       "redirectUris": [
-        "${RID_WEB_URL:http://localhost:3000}/api/auth/callback/keycloak"
+        "${DEN_WEB_URL:http://localhost:3000}/api/auth/callback/keycloak"
       ],
       "webOrigins": [
-        "${RID_WEB_URL:http://localhost:3000}"
+        "${DEN_WEB_URL:http://localhost:3000}"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${RID_WEB_URL:http://localhost:3000}/##${RID_WEB_URL:http://localhost:3000}/en"
+        "post.logout.redirect.uris": "${DEN_WEB_URL:http://localhost:3000}/##${DEN_WEB_URL:http://localhost:3000}/en"
       },
       "protocolMappers": [
         {
-          "name": "audience-rid-portal-api",
+          "name": "audience-den-portal-api",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.custom.audience": "rid-portal-api",
+            "included.custom.audience": "den-portal-api",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
@@ -81,10 +81,10 @@
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
   "otpPolicyLookAheadWindow": 1,
-  "browserFlow": "rid-browser",
+  "browserFlow": "den-browser",
   "authenticationFlows": [
     {
-      "alias": "rid-browser",
+      "alias": "den-browser",
       "description": "Browser login with step-up to a second factor (M3-08)",
       "providerId": "basic-flow",
       "topLevel": true,
@@ -98,7 +98,7 @@
           "userSetupAllowed": false
         },
         {
-          "flowAlias": "rid-browser-forms",
+          "flowAlias": "den-browser-forms",
           "requirement": "ALTERNATIVE",
           "priority": 20,
           "authenticatorFlow": true,
@@ -107,21 +107,21 @@
       ]
     },
     {
-      "alias": "rid-browser-forms",
+      "alias": "den-browser-forms",
       "description": "Password, then the second factor when the portal asks for acr=mfa",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
-          "flowAlias": "rid-browser-password",
+          "flowAlias": "den-browser-password",
           "requirement": "CONDITIONAL",
           "priority": 10,
           "authenticatorFlow": true,
           "userSetupAllowed": false
         },
         {
-          "flowAlias": "rid-browser-otp",
+          "flowAlias": "den-browser-otp",
           "requirement": "CONDITIONAL",
           "priority": 20,
           "authenticatorFlow": true,
@@ -130,7 +130,7 @@
       ]
     },
     {
-      "alias": "rid-browser-password",
+      "alias": "den-browser-password",
       "description": "Level 1: password",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -142,7 +142,7 @@
           "priority": 10,
           "authenticatorFlow": false,
           "userSetupAllowed": false,
-          "authenticatorConfig": "rid-loa-1"
+          "authenticatorConfig": "den-loa-1"
         },
         {
           "authenticator": "auth-username-password-form",
@@ -154,7 +154,7 @@
       ]
     },
     {
-      "alias": "rid-browser-otp",
+      "alias": "den-browser-otp",
       "description": "Level 2: one-time code (TOTP)",
       "providerId": "basic-flow",
       "topLevel": false,
@@ -166,7 +166,7 @@
           "priority": 10,
           "authenticatorFlow": false,
           "userSetupAllowed": false,
-          "authenticatorConfig": "rid-loa-2"
+          "authenticatorConfig": "den-loa-2"
         },
         {
           "authenticator": "auth-otp-form",
@@ -180,14 +180,14 @@
   ],
   "authenticatorConfig": [
     {
-      "alias": "rid-loa-1",
+      "alias": "den-loa-1",
       "config": {
         "loa-condition-level": "1",
         "loa-max-age": "36000"
       }
     },
     {
-      "alias": "rid-loa-2",
+      "alias": "den-loa-2",
       "config": {
         "loa-condition-level": "2",
         "loa-max-age": "36000"

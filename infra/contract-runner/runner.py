@@ -2,7 +2,7 @@
 """Contract test runner (M4-06): runs Schemathesis against an API version's sandbox, through the
 gateway, when the portal sends the version to review.
 
-Internal network only, bearer RID_CONTRACT_RUNNER_TOKEN:
+Internal network only, bearer DEN_CONTRACT_RUNNER_TOKEN:
   GET  /health      liveness, no token
   POST /v1/runs     {"openapi": {...}, "baseUrl": "...", "headers": {...},
                      "maxExamples": 20, "timeoutSeconds": 120}
@@ -26,9 +26,9 @@ import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.metadata import version
 
-TOKEN = os.environ.get("RID_CONTRACT_RUNNER_TOKEN", "")
-PORT = int(os.environ.get("RID_CONTRACT_RUNNER_PORT", "8096"))
-ST = os.environ.get("RID_SCHEMATHESIS_BIN", "st")
+TOKEN = os.environ.get("DEN_CONTRACT_RUNNER_TOKEN", "")
+PORT = int(os.environ.get("DEN_CONTRACT_RUNNER_PORT", "8096"))
+ST = os.environ.get("DEN_SCHEMATHESIS_BIN", "st")
 MAX_BODY = 4_000_000
 CODE = re.compile(r"\bST\d{3}\b")
 RECEIVED = re.compile(r"Received:\s*(\d{3})")
@@ -67,7 +67,7 @@ def parse_junit(path):
 
 
 def run(spec, base_url, headers, max_examples, timeout):
-    work = tempfile.mkdtemp(prefix="rid-contract-")
+    work = tempfile.mkdtemp(prefix="den-contract-")
     try:
         spec_path = os.path.join(work, "openapi.json")
         with open(spec_path, "w", encoding="utf-8") as f:
@@ -163,6 +163,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     if len(TOKEN) < 16:
-        sys.exit("RID_CONTRACT_RUNNER_TOKEN must be set (16+ characters)")
+        sys.exit("DEN_CONTRACT_RUNNER_TOKEN must be set (16+ characters)")
     log(f"contract runner on :{PORT}, schemathesis {version('schemathesis')}")
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

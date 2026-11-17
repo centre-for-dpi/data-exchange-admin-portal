@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>RID entity guide</title>
+<title>DEN entity guide</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -387,7 +387,7 @@ details.faq[open] summary { color: var(--gov); }
             <tr><td>Outbound internet</td><td class="wrap"><code>443/tcp</code> to the gateway name and the portal name.</td></tr>
             <tr><td>A place for secrets</td><td class="wrap">The certificate's private key and the application secret: never in code or in a repository.</td></tr>
             <tr><td><code>openssl</code></td><td class="wrap">To generate the private key and the certificate signing request (CSR). The private key <b>never leaves</b> the entity's server.</td></tr>
-            <tr><td>Official</td><td class="wrap">APIs with personal data require <code>X-RID-End-User</code>: the username or institutional email of the person making the request. It is only recorded as a hash.</td></tr>
+            <tr><td>Official</td><td class="wrap">APIs with personal data require <code>X-DEN-End-User</code>: the username or institutional email of the person making the request. It is only recorded as a hash.</td></tr>
           </tbody>
         </table>
       </div>
@@ -402,7 +402,7 @@ details.faq[open] summary { color: var(--gov); }
       </div>
       <div class="callout info">
         <b>The gateway's signed assertion</b>
-        <p>If the country has it enabled, every request arrives with <code>X-RID-Assertion</code>: an ES256 JWS from the gateway stating who is making the request, what for, under which subscription and which request it belongs to (the method, the hash of the path and, if there is one, of the body). The entity can keep it as proof. It is verified with the network's JWKS, <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, by checking the signature, <code>aud</code> (the entity), <code>iss</code> (the gateway), <code>exp</code>, the hashes of the request received (the body hash on every POST, PUT and PATCH, and on any other request that carries a body, a GET or a DELETE too, whatever its type; it is computed over the bytes exactly as they arrived, before parsing them) and that the <code>jti</code> is not repeated. The Node.js and Python examples are in <code>docs/guides/entities.md</code> (§3.2).</p>
+        <p>If the country has it enabled, every request arrives with <code>X-DEN-Assertion</code>: an ES256 JWS from the gateway stating who is making the request, what for, under which subscription and which request it belongs to (the method, the hash of the path and, if there is one, of the body). The entity can keep it as proof. It is verified with the network's JWKS, <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, by checking the signature, <code>aud</code> (the entity), <code>iss</code> (the gateway), <code>exp</code>, the hashes of the request received (the body hash on every POST, PUT and PATCH, and on any other request that carries a body, a GET or a DELETE too, whatever its type; it is computed over the bytes exactly as they arrived, before parsing them) and that the <code>jti</code> is not repeated. The Node.js and Python examples are in <code>docs/guides/entities.md</code> (§3.2).</p>
       </div>
     </section>
 
@@ -424,7 +424,7 @@ details.faq[open] summary { color: var(--gov); }
       <p>The operator hands out the platform's two names, the <b>portal</b>'s and the <b>gateway</b>'s, and the <code>entity-check.sh</code> script. It only needs <code>bash</code>, <code>curl</code> and <code>openssl</code>. Run it on the server that will send the requests, or on the node's server.</p>
       <div class="code"><button class="copy" type="button">Copy</button><pre><code>chmod +x entity-check.sh
 ./entity-check.sh check &lt;portal&gt; &lt;gateway&gt;</code></pre></div>
-      <p>It checks DNS, outbound HTTPS to the portal and to the gateway, and that the gateway's certificate verifies against the network's root. It saves the root to <code>./rid-network-ca.pem</code>.</p>
+      <p>It checks DNS, outbound HTTPS to the portal and to the gateway, and that the gateway's certificate verifies against the network's root. It saves the root to <code>./den-network-ca.pem</code>.</p>
     </section>
 
     <section id="alta">
@@ -488,7 +488,7 @@ details.faq[open] summary { color: var(--gov); }
             <line x1="105" y1="248" x2="328" y2="248" class="d-strong" marker-end="url(#s-ahd)"></line>
             <text x="217" y="241" text-anchor="middle" class="d-lab">GET /&lt;entity&gt;/&lt;api&gt;/v1/…</text>
             <text x="217" y="264" text-anchor="middle" class="d-ts">certificate + token</text>
-            <text x="217" y="279" text-anchor="middle" class="d-ts">X-RID-Purpose · X-RID-End-User</text>
+            <text x="217" y="279" text-anchor="middle" class="d-ts">X-DEN-Purpose · X-DEN-End-User</text>
             <line x1="330" y1="300" x2="698" y2="300" class="d-line" marker-end="url(#s-ah)"></line>
             <text x="515" y="293" text-anchor="middle" class="d-ts">allowed? (subscription, purpose, operation, certificate)</text>
             <line x1="700" y1="335" x2="332" y2="335" class="d-dash" marker-end="url(#s-ah)"></line>
@@ -510,14 +510,14 @@ details.faq[open] summary { color: var(--gov); }
         <li><span><b>Application certificate</b>, on the entity's server. Paste the CSR into the application's page → Client certificate (mTLS), download the certificate and save it as <code>&lt;client_id&gt;.crt</code> next to the private key.
           <div class="code" style="margin-top:8px"><button class="copy" type="button">Copy</button><pre><code>./entity-check.sh csr &lt;client_id&gt;   # creates &lt;client_id&gt;.key (600) and &lt;client_id&gt;.csr</code></pre></div></span></li>
         <li><span><b>Request access:</b> in the catalog, open the API → Request access. Choose the application, the purpose, the details, the legal basis, the operations, the validity period and the data exchange agreement. In production, the provider's <code>data_steward</code> approves it, and the regulator too if the data is sensitive.</span></li>
-        <li><span><b>Call.</b> The script requests the token, sends the request with <code>X-RID-Purpose</code> and <code>X-RID-End-User</code>, and explains the response. The exact URLs are on the API's page and on the subscription's page.
+        <li><span><b>Call.</b> The script requests the token, sends the request with <code>X-DEN-Purpose</code> and <code>X-DEN-End-User</code>, and explains the response. The exact URLs are on the API's page and on the subscription's page.
           <div class="code" style="margin-top:8px"><button class="copy" type="button">Copy</button><pre><code>CLIENT_SECRET=... ./entity-check.sh call &lt;portal&gt; &lt;gateway&gt; &lt;client_id&gt; \
   /sandbox/&lt;entity&gt;/&lt;api&gt;/v1/&lt;resource&gt; &lt;purpose&gt; &lt;official&gt;</code></pre></div></span></li>
         <li><span>With the <b>production</b> application, repeat steps 2 to 5 with the real path (without <code>/sandbox</code>), once the request is approved.</span></li>
       </ol>
       <div class="callout info">
         <b>Integration guide in the portal</b>
-        <p>Each application's page includes a complete program in curl, Python, Node.js, Java and C#: it requests the token with the certificate and calls with the network's headers. The secret is read from the <code>RID_CLIENT_SECRET</code> variable, never from the code.</p>
+        <p>Each application's page includes a complete program in curl, Python, Node.js, Java and C#: it requests the token with the certificate and calls with the network's headers. The secret is read from the <code>DEN_CLIENT_SECRET</code> variable, never from the code.</p>
       </div>
     </section>
 
@@ -530,9 +530,9 @@ details.faq[open] summary { color: var(--gov); }
           <thead><tr><th><code>code</code></th><th>What it means</th><th>What to do</th></tr></thead>
           <tbody>
             <tr><td><code>no_subscription</code></td><td class="wrap">The application has no active access to that version</td><td class="wrap">Request access, or wait for approval ("Approved (activating)" takes a few seconds)</td></tr>
-            <tr><td><code>purpose_not_allowed</code></td><td class="wrap"><code>X-RID-Purpose</code> is missing or is not the approved purpose</td><td class="wrap">Send the subscription's purpose code</td></tr>
+            <tr><td><code>purpose_not_allowed</code></td><td class="wrap"><code>X-DEN-Purpose</code> is missing or is not the approved purpose</td><td class="wrap">Send the subscription's purpose code</td></tr>
             <tr><td><code>operation_not_allowed</code></td><td class="wrap">The subscription does not cover that operation</td><td class="wrap">Request access to that operation</td></tr>
-            <tr><td><code>end_user_required</code><br><code>end_user_invalid</code></td><td class="wrap"><code>X-RID-End-User</code> is missing or invalid (1 to 128 visible characters, no spaces)</td><td class="wrap">Send the official's institutional username</td></tr>
+            <tr><td><code>end_user_required</code><br><code>end_user_invalid</code></td><td class="wrap"><code>X-DEN-End-User</code> is missing or invalid (1 to 128 visible characters, no spaces)</td><td class="wrap">Send the official's institutional username</td></tr>
             <tr><td><code>client_certificate_required</code><br><code>certificate_mismatch</code><br><code>certificate_revoked</code></td><td class="wrap">No certificate, another application's certificate, or a revoked one</td><td class="wrap">Use the current certificate of <b>that</b> application</td></tr>
             <tr><td><code>token_not_bound</code></td><td class="wrap">The token is not bound to the certificate</td><td class="wrap">Request the token from <code>https://&lt;gateway&gt;/oauth/token</code> with the certificate</td></tr>
             <tr><td><code>environment_mismatch</code></td><td class="wrap">A sandbox application on a real path, or the other way round</td><td class="wrap">Use the path that matches the application type</td></tr>
@@ -551,7 +551,7 @@ details.faq[open] summary { color: var(--gov); }
       <h2><span class="num">11</span>The entity's commitments</h2>
       <div class="guar">
         <div><b>A real purpose</b><span>Only send requests for the declared and approved purpose. Every request is recorded in the log, and the citizen sees it.</span></div>
-        <div><b>An identified official</b><span>Send in <code>X-RID-End-User</code> the person who is actually making the request.</span></div>
+        <div><b>An identified official</b><span>Send in <code>X-DEN-End-User</code> the person who is actually making the request.</span></div>
         <div><b>Protected credentials</b><span>The private key and the secret are not shared or pushed to repositories. If you suspect a leak, revoke them from the application's page.</span></div>
         <div><b>Certificates kept current</b><span>They last 90 days, with a warning at 15. Issue a new one before it expires: the previous one keeps working during the rotation window.</span></div>
         <div><b>Don't keep more than needed</b><span>Keep only what the purpose requires.</span></div>
@@ -577,8 +577,8 @@ details.faq[open] summary { color: var(--gov); }
   function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function setBig(on) { root.classList.toggle('big', on); big.setAttribute('aria-pressed', on ? 'true' : 'false'); }
-  setBig(load('rid-big') === '1');
-  big.addEventListener('click', function () { var on = !root.classList.contains('big'); setBig(on); store('rid-big', on ? '1' : '0'); });
+  setBig(load('den-big') === '1');
+  big.addEventListener('click', function () { var on = !root.classList.contains('big'); setBig(on); store('den-big', on ? '1' : '0'); });
 
   document.querySelectorAll('.copy').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -591,8 +591,8 @@ details.faq[open] summary { color: var(--gov); }
   });
 
   document.querySelectorAll('#pre input').forEach(function (box) {
-    box.checked = load('rid-' + box.id) === '1';
-    box.addEventListener('change', function () { store('rid-' + box.id, box.checked ? '1' : '0'); });
+    box.checked = load('den-' + box.id) === '1';
+    box.addEventListener('change', function () { store('den-' + box.id, box.checked ? '1' : '0'); });
   });
 
   var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));

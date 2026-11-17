@@ -5,15 +5,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 /**
  * The WireGuard hub (M4-03, ADR-0023) in disposable containers, apart from the development stack
  * (whose portal reconciles the real hub every minute): a hub on its own Docker network and a
- * peer playing a node. The image is the one `pnpm infra:up` builds (rid/wg-hub:dev).
+ * peer playing a node. The image is the one `pnpm infra:up` builds (den/wg-hub:dev).
  */
 const RUN = randomUUID().slice(0, 8);
-const NETWORK = `rid-test-wg-${RUN}`;
-const HUB = `rid-test-wg-hub-${RUN}`;
-const PEER = `rid-test-wg-peer-${RUN}`;
+const NETWORK = `den-test-wg-${RUN}`;
+const HUB = `den-test-wg-hub-${RUN}`;
+const PEER = `den-test-wg-peer-${RUN}`;
 const TOKEN = `hub-agent-token-${RUN}`;
 const NODE_ID = randomUUID();
-const NODE_NAME = `rid-node-${NODE_ID}`;
+const NODE_NAME = `den-node-${NODE_ID}`;
 const NODE_ADDRESS = '10.77.0.2';
 
 const docker = (...args: string[]) => execFileSync('docker', args, { encoding: 'utf8' }).trim();
@@ -66,14 +66,14 @@ describe('WireGuard hub: peers, SNI routing and isolation (M4-03)', () => {
       '--sysctl',
       'net.ipv4.ip_forward=0',
       '-e',
-      `RID_WG_HUB_PRIVATE_KEY=${hubKeys.privateKey}`,
+      `DEN_WG_HUB_PRIVATE_KEY=${hubKeys.privateKey}`,
       '-e',
-      `RID_WG_HUB_AGENT_TOKEN=${TOKEN}`,
+      `DEN_WG_HUB_AGENT_TOKEN=${TOKEN}`,
       '-e',
-      'RID_WG_SUBNET=10.77.0.0/16',
+      'DEN_WG_SUBNET=10.77.0.0/16',
       '-p',
       '127.0.0.1::8090',
-      'rid/wg-hub:dev',
+      'den/wg-hub:dev',
     );
     agent = `http://${docker('port', HUB, '8090/tcp').split('\n')[0]}`;
     for (let i = 0; i < 60; i += 1) {
@@ -100,7 +100,7 @@ describe('WireGuard hub: peers, SNI routing and isolation (M4-03)', () => {
       // The hub's image has the tools a node needs; not its agent.
       '--entrypoint',
       'sleep',
-      'rid/wg-hub:dev',
+      'den/wg-hub:dev',
       'infinity',
     );
   }, 120_000);
@@ -187,7 +187,7 @@ describe('WireGuard hub: peers, SNI routing and isolation (M4-03)', () => {
   it('an unknown name goes nowhere', () => {
     const res = inside(
       HUB,
-      `echo | timeout 5 openssl s_client -connect 127.0.0.1:8443 -servername rid-node-${randomUUID()} 2>&1`,
+      `echo | timeout 5 openssl s_client -connect 127.0.0.1:8443 -servername den-node-${randomUUID()} 2>&1`,
     );
     expect(res.out).not.toContain('subject=');
   });

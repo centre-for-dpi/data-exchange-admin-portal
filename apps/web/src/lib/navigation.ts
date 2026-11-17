@@ -1,4 +1,4 @@
-import { ENTITY_ROLES, type Role } from '@rid/contracts';
+import { ENTITY_ROLES, type Role } from '@den/contracts';
 
 /** Who can see a navigation entry. The API enforces access again; this only shapes the UI. */
 export type Audience = 'everyone' | 'authenticated' | readonly Role[];

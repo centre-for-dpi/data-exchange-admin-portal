@@ -1,8 +1,8 @@
 {{- $c := dict "root" . "component" "keycloak" }}
 {{- $kc := .Values.keycloak }}
-{{- $name := include "rid.name" "keycloak" }}
+{{- $name := include "den.name" "keycloak" }}
 {{- /*
-Keycloak in production mode (ASVS 13.4.2, M6-05): `start`, its own database (rid-keycloak-db),
+Keycloak in production mode (ASVS 13.4.2, M6-05): `start`, its own database (den-keycloak-db),
 TLS at the ingress, several replicas clustered through the database (JDBC_PING, Keycloak's default
 stack). The realms are imported once from the production realms of the chart (infra/keycloak
 without its demo users, `pnpm helm:sync`); later changes go through the admin API, as in
@@ -12,17 +12,17 @@ realms there.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "rid.name" "keycloak-realms" }}
+  name: {{ include "den.name" "keycloak-realms" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 data:
-  rid-portal-realm.json: |
-    {{- .Files.Get "files/keycloak/rid-portal-realm.json" | nindent 4 }}
-  rid-gateway-realm.json: |
-    {{- .Files.Get "files/keycloak/rid-gateway-realm.json" | nindent 4 }}
+  den-portal-realm.json: |
+    {{- .Files.Get "files/keycloak/den-portal-realm.json" | nindent 4 }}
+  den-gateway-realm.json: |
+    {{- .Files.Get "files/keycloak/den-gateway-realm.json" | nindent 4 }}
   {{- if $kc.citizensRealm }}
-  rid-citizens-realm.json: |
-    {{- .Files.Get "files/keycloak/rid-citizens-realm.json" | nindent 4 }}
+  den-citizens-realm.json: |
+    {{- .Files.Get "files/keycloak/den-citizens-realm.json" | nindent 4 }}
   {{- end }}
 ---
 apiVersion: apps/v1
@@ -30,18 +30,18 @@ kind: StatefulSet
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   serviceName: {{ $name }}
   replicas: {{ $kc.replicas }}
   podManagementPolicy: OrderedReady
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "rid.labels" $c | nindent 8 }}
+        {{- include "den.labels" $c | nindent 8 }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -54,7 +54,7 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              {{- include "rid.selector" $c | nindent 14 }}
+              {{- include "den.selector" $c | nindent 14 }}
       containers:
         - name: keycloak
           image: {{ $kc.image }}
@@ -73,11 +73,11 @@ spec:
           env:
             - { name: KC_DB, value: postgres }
             - name: KC_DB_URL
-              value: {{ printf "jdbc:postgresql://%s-rw:5432/keycloak?sslmode=verify-full&sslrootcert=/var/run/rid/db-ca/ca.crt" (include "rid.name" "keycloak-db") | quote }}
+              value: {{ printf "jdbc:postgresql://%s-rw:5432/keycloak?sslmode=verify-full&sslrootcert=/var/run/den/db-ca/ca.crt" (include "den.name" "keycloak-db") | quote }}
             - name: KC_DB_USERNAME
-              valueFrom: { secretKeyRef: { name: {{ include "rid.name" "keycloak-db" }}, key: username } }
+              valueFrom: { secretKeyRef: { name: {{ include "den.name" "keycloak-db" }}, key: username } }
             - name: KC_DB_PASSWORD
-              valueFrom: { secretKeyRef: { name: {{ include "rid.name" "keycloak-db" }}, key: password } }
+              valueFrom: { secretKeyRef: { name: {{ include "den.name" "keycloak-db" }}, key: password } }
             # Tokens carry the public issuer; APISIX and the API reach Keycloak by its service name.
             - { name: KC_HOSTNAME, value: {{ printf "%s/auth" .Values.publicUrl | quote }} }
             - { name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC, value: 'true' }
@@ -93,7 +93,7 @@ spec:
             - name: KC_BOOTSTRAP_ADMIN_PASSWORD
               valueFrom: { secretKeyRef: { name: {{ $name }}, key: KEYCLOAK_ADMIN_PASSWORD } }
             # Placeholders of the realms.
-            - { name: RID_WEB_URL, value: {{ .Values.publicUrl | quote }} }
+            - { name: DEN_WEB_URL, value: {{ .Values.publicUrl | quote }} }
             # The realm's mail (password resets, address verification, credential changes).
             - { name: KC_SMTP_HOST, value: {{ required "keycloak.smtp.host" $kc.smtp.host | quote }} }
             - { name: KC_SMTP_PORT, value: {{ $kc.smtp.port | quote }} }
@@ -104,14 +104,14 @@ spec:
               valueFrom: { secretKeyRef: { name: {{ $name }}, key: KEYCLOAK_SMTP_USER } }
             - name: KC_SMTP_PASSWORD
               valueFrom: { secretKeyRef: { name: {{ $name }}, key: KEYCLOAK_SMTP_PASSWORD } }
-            - name: RID_PORTAL_WEB_CLIENT_SECRET
-              valueFrom: { secretKeyRef: { name: {{ $name }}, key: RID_PORTAL_WEB_CLIENT_SECRET } }
-            - name: RID_GATEWAY_PROVISIONER_SECRET
-              valueFrom: { secretKeyRef: { name: {{ $name }}, key: RID_GATEWAY_PROVISIONER_SECRET } }
+            - name: DEN_PORTAL_WEB_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: DEN_PORTAL_WEB_CLIENT_SECRET } }
+            - name: DEN_GATEWAY_PROVISIONER_SECRET
+              valueFrom: { secretKeyRef: { name: {{ $name }}, key: DEN_GATEWAY_PROVISIONER_SECRET } }
             {{- if $kc.citizensRealm }}
-            - { name: RID_CARPETA_URL, value: {{ $kc.carpetaUrl | quote }} }
-            - name: RID_CARPETA_CLIENT_SECRET
-              valueFrom: { secretKeyRef: { name: {{ include "rid.name" "keycloak-citizens" }}, key: RID_CARPETA_CLIENT_SECRET } }
+            - { name: DEN_CITIZEN_APP_URL, value: {{ $kc.citizenAppUrl | quote }} }
+            - name: DEN_CITIZEN_APP_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ include "den.name" "keycloak-citizens" }}, key: DEN_CITIZEN_APP_CLIENT_SECRET } }
             {{- end }}
           ports:
             - { name: http, containerPort: 8080 }
@@ -134,13 +134,13 @@ spec:
             {{- toYaml $kc.resources | nindent 12 }}
           volumeMounts:
             - { name: realms, mountPath: /opt/keycloak/data/import, readOnly: true }
-            - { name: db-ca, mountPath: /var/run/rid/db-ca, readOnly: true }
+            - { name: db-ca, mountPath: /var/run/den/db-ca, readOnly: true }
       volumes:
         - name: realms
-          configMap: { name: {{ include "rid.name" "keycloak-realms" }} }
+          configMap: { name: {{ include "den.name" "keycloak-realms" }} }
         - name: db-ca
           secret:
-            secretName: {{ include "rid.name" "keycloak-db" }}-ca
+            secretName: {{ include "den.name" "keycloak-db" }}-ca
             items: [{ key: ca.crt, path: ca.crt }]
 ---
 apiVersion: v1
@@ -148,10 +148,10 @@ kind: Service
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    {{- include "rid.selector" $c | nindent 4 }}
+    {{- include "den.selector" $c | nindent 4 }}
   ports:
     - { name: http, port: 8080, targetPort: http }
 ---
@@ -160,9 +160,9 @@ kind: PodDisruptionBudget
 metadata:
   name: {{ $name }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      {{- include "rid.selector" $c | nindent 6 }}
+      {{- include "den.selector" $c | nindent 6 }}

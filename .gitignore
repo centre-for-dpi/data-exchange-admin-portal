@@ -38,7 +38,7 @@ Thumbs.db
 
 # Local infra data
 infra/**/data/
-# Uploaded documents in development (RID_DOCUMENTS_DIR)
+# Uploaded documents in development (DEN_DOCUMENTS_DIR)
 apps/api/data/
 infra/**/.volumes/
 next-env.d.ts
@@ -57,6 +57,7 @@ apps/api/src/generated/
 
 # Single-host installer (install.sh): generated proxy routes, the portal's own certificate, backups
 infra/edge/dynamic/
+infra/edge/den-external.yml
 infra/edge/certs/
 backups/
 

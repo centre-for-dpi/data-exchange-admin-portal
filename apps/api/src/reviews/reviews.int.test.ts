@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { apiVersionDetailSchema, reviewDetailSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { apiVersionDetailSchema, reviewDetailSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -67,7 +67,7 @@ describe('operator review and publication (M1-04)', () => {
       description: 'API de prueba con datos sintéticos.',
       sector: 'salud',
       classification,
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     expect(api.statusCode, api.body).toBe(201);
     const apiId = api.json<{ id: string }>().id;
@@ -204,7 +204,7 @@ describe('operator review and publication (M1-04)', () => {
       description: 'Prueba de transición.',
       sector: 'salud',
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const draft = await call(

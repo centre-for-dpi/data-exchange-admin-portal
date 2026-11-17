@@ -186,10 +186,10 @@ describe('leaf format', () => {
   });
 });
 
-describe('rid-verify-receipt CLI', () => {
+describe('den-verify-receipt CLI', () => {
   let dir = '';
   beforeAll(async () => {
-    dir = mkdtempSync(join(tmpdir(), 'rid-receipt-'));
+    dir = mkdtempSync(join(tmpdir(), 'den-receipt-'));
     writeFileSync(join(dir, 'receipt.json'), JSON.stringify(receiptFor(4)));
     writeFileSync(join(dir, 'jwks.json'), JSON.stringify(jwks));
     writeFileSync(join(dir, 'root.pem'), fixture.tsaRoot);

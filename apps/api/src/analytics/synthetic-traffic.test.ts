@@ -24,7 +24,7 @@ const subscription: TrafficSubscription = {
   subscriptionId: '0190d0c4-0000-7000-8000-00000000c101',
   versionId: '0190d0c4-0000-7000-8000-00000000c102',
   consumerEntity: 'programas-sociales',
-  consumerApp: 'rid-app-0190d0c4-0000-7000-8000-00000000c103',
+  consumerApp: 'den-app-0190d0c4-0000-7000-8000-00000000c103',
   purpose: 'eligibility_check',
   operations: [{ id: 'getAfiliado', method: 'GET' }],
   dailyCalls: 200,
@@ -52,7 +52,7 @@ describe('synthetic traffic (closing of M5)', () => {
       expect(doc.ts >= '2026-03-02T05:00:00.000Z' && doc.ts < '2026-03-09T05:00:00.000Z').toBe(
         true,
       );
-      expect(doc.route_id).toBe(`rid-route-${subscription.versionId}`);
+      expect(doc.route_id).toBe(`den-route-${subscription.versionId}`);
     }
   });
 

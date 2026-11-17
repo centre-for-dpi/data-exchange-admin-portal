@@ -4,13 +4,13 @@ import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   createdApplicationSchema,
   subjectAccessWebhookSchema,
   subjectAlertsSchema,
   subscriptionDetailSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createTestApp,
@@ -104,7 +104,7 @@ describe('citizen notices of new consultations (MT-06)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/internal/subject-access',
-      headers: { authorization: `Bearer ${process.env.RID_TRANSPARENCY_INGEST_TOKEN}` },
+      headers: { authorization: `Bearer ${process.env.DEN_TRANSPARENCY_INGEST_TOKEN}` },
       payload: records,
     });
     expect(res.statusCode).toBe(200);
@@ -140,7 +140,7 @@ describe('citizen notices of new consultations (MT-06)', () => {
       sector: 'salud',
       tags: [],
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -166,7 +166,7 @@ describe('citizen notices of new consultations (MT-06)', () => {
       name: `Avisos ${run}`,
       description: 'Verifica afiliación.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     const applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const requested = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {
@@ -196,8 +196,8 @@ describe('citizen notices of new consultations (MT-06)', () => {
     });
     await new Promise<void>((done) => carpeta.listen(0, '127.0.0.1', done));
     const { port } = carpeta.address() as AddressInfo;
-    process.env.RID_CITIZEN_APPS = JSON.stringify({
-      'carpeta-ciudadana': { webhookUrl: `http://127.0.0.1:${port}/hook`, webhookSecret: secret },
+    process.env.DEN_CITIZEN_APPS = JSON.stringify({
+      'citizen-app': { webhookUrl: `http://127.0.0.1:${port}/hook`, webhookSecret: secret },
     });
   });
 
@@ -251,7 +251,7 @@ describe('citizen notices of new consultations (MT-06)', () => {
       const event = await prisma.auditEvent.findFirstOrThrow({
         where: { action: 'subject_alert.updated', targetId: saved.alertId ?? '' },
       });
-      expect(event).toMatchObject({ actorType: 'application', actorId: 'carpeta-ciudadana' });
+      expect(event).toMatchObject({ actorType: 'application', actorId: 'citizen-app' });
       const stored = JSON.stringify(event, (_k, v: unknown) =>
         typeof v === 'bigint' ? v.toString() : v,
       );

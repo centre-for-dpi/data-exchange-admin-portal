@@ -9,6 +9,6 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     exclude: ['src/**/*.int.test.ts'],
     setupFiles: ['reflect-metadata'],
-    env: { RID_WORKER: 'off' },
+    env: { DEN_WORKER: 'off' },
   },
 });

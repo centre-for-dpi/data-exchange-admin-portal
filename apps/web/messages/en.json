@@ -371,11 +371,11 @@
       "created": "Created",
       "pendingNote": "We are creating the credentials in the identity server. This takes a few seconds.",
       "guide": "Integration guide",
-      "guideNote": "Set RID_CLIENT_SECRET to the secret you kept when you created the application. You need an approved access request for the gateway to accept the call.",
+      "guideNote": "Set DEN_CLIENT_SECRET to the secret you kept when you created the application. You need an approved access request for the gateway to accept the call.",
       "guideLimit": "Each subscription has a limit of requests per minute. Over it, the gateway answers 429 in application/problem+json (code rate_limited); the X-RateLimit-Limit, X-RateLimit-Remaining and X-RateLimit-Reset headers give the limit, what is left and in how many seconds it resets.",
-      "guideEndUser": "X-RID-End-User identifies the official making the request. It is required by APIs with personal or sensitive data: 1 to 128 visible characters, no spaces (for example, their user name or work e-mail). The gateway turns it into a hash with the network’s salt: neither the provider nor the logs see the value.",
+      "guideEndUser": "X-DEN-End-User identifies the official making the request. It is required by APIs with personal or sensitive data: 1 to 128 visible characters, no spaces (for example, their user name or work e-mail). The gateway turns it into a hash with the network’s salt: neither the provider nor the logs see the value.",
       "guideMtls": "The network requires mTLS: both calls present the application's certificate (Client certificate section) and its private key. The token is bound to that certificate and only works with it. The gateway's certificate is issued by the network's certificate authority:",
-      "guideCa": "download the network root (rid-network-ca.pem)"
+      "guideCa": "download the network root (den-network-ca.pem)"
     },
     "certificates": {
       "title": "Client certificate (mTLS)",
@@ -423,7 +423,7 @@
       "conflict": "The credential changed meanwhile or this operation is not possible. Reload the page."
     },
     "guide": {
-      "lead": "A complete program in each language: it gets the token and calls an API with the RID headers. The secret is read from the RID_CLIENT_SECRET environment variable, never from the code. Replace the path, the purpose and the official with those of your approved request.",
+      "lead": "A complete program in each language: it gets the token and calls an API with the DEN headers. The secret is read from the DEN_CLIENT_SECRET environment variable, never from the code. Replace the path, the purpose and the official with those of your approved request.",
       "languages": "Languages",
       "language": {
         "curl": "curl",
@@ -480,7 +480,7 @@
     "perMinute": "{limit} per minute",
     "defaultRateLimit": "The API default ({limit} per minute)",
     "endUser": "Official identification",
-    "endUserRequired": "Required: every call must send X-RID-End-User.",
+    "endUserRequired": "Required: every call must send X-DEN-End-User.",
     "endUserNotRequired": "Not required.",
     "regulatorNote": "This API handles sensitive data: after your approval the request goes to the regulator.",
     "activatingNote": "Approved. The gateway will apply it in a few seconds.",
@@ -1360,8 +1360,8 @@
       "operation_not_allowed": "Operation not allowed by the subscription",
       "purpose_not_allowed": "Purpose not approved for the subscription",
       "subscription_expired": "Subscription expired",
-      "end_user_required": "X-RID-End-User (the official) missing",
-      "end_user_invalid": "X-RID-End-User not valid",
+      "end_user_required": "X-DEN-End-User (the official) missing",
+      "end_user_invalid": "X-DEN-End-User not valid",
       "data_subject_required": "Data subject missing",
       "rate_limited": "Requests-per-minute limit exceeded"
     },

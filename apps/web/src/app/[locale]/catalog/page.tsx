@@ -1,5 +1,5 @@
-import { getCountryConfig } from '@rid/config';
-import { CLASSIFICATIONS, catalogEntitiesSchema, catalogPageSchema } from '@rid/contracts';
+import { getCountryConfig } from '@den/config';
+import { CLASSIFICATIONS, catalogEntitiesSchema, catalogPageSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Badge, classificationTone } from '../../../components/ui/badge';

@@ -36,7 +36,7 @@ const toJson = (value: unknown): Prisma.InputJsonValue | null => {
 };
 
 /** Key of the transaction-level advisory lock that serializes appends to the chain. */
-const CHAIN_LOCK = 0x7269645f61756469n; // "rid_audi"
+const CHAIN_LOCK = 0x7269645f61756469n; // "den_audi"
 
 /**
  * Records domain state changes (CLAUDE.md, rule 4). It takes the transaction client on purpose:

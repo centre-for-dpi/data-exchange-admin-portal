@@ -7,7 +7,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { isIP } from 'node:net';
-import { isPublicAddress, type Upstream, upstreamSchema } from '@rid/contracts';
+import { isPublicAddress, type Upstream, upstreamSchema } from '@den/contracts';
 import { ZodError } from 'zod';
 import { listOperations } from '../../apis/lint/openapi-lint.js';
 import { pathRegex } from '../../opa/bundle.js';
@@ -65,7 +65,7 @@ export type GatewayResult = 'created' | 'updated' | 'unchanged' | 'deleted' | 'a
 export const gatewaySyncTarget = (apiVersionId: string): string =>
   `apisix:route:${routeId(apiVersionId)}`;
 export const GATEWAY_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_SSL_ID}`;
-const ASSERTION_PLUGIN = 'rid-assertion';
+const ASSERTION_PLUGIN = 'den-assertion';
 export const ASSERTION_SYNC_TARGET = `apisix:plugin_metadata:${ASSERTION_PLUGIN}`;
 export const GATEWAY_TOKEN_SYNC_TARGET = `apisix:route:${TOKEN_ROUTE_ID}`;
 export const NODE_CONTROL_SYNC_TARGET = `apisix:route:${NODE_CONTROL_ROUTE_ID}`;
@@ -80,7 +80,7 @@ const hash = (value: unknown): string =>
  * (ARCHITECTURE.md §4, §4.1). Desired state comes from PostgreSQL only; the reconciler reads
  * APISIX, writes the difference with idempotent PUTs on deterministic ids and records the outcome
  * in sync_state. Runs from the outbox (gateway.sync) and as a full pass every 5 minutes, which
- * also removes `rid-` objects nothing in the database asks for. Objects without the prefix are
+ * also removes `den-` objects nothing in the database asks for. Objects without the prefix are
  * never touched.
  */
 @Injectable()
@@ -343,7 +343,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     await this.apply('routes', sandboxRouteId(version.id), {
       ...route,
       name: `sandbox ${typeof route.name === 'string' ? route.name : ''}`.slice(0, 100),
-      labels: { ...(route.labels as Record<string, string>), 'rid-sandbox': 'true' },
+      labels: { ...(route.labels as Record<string, string>), 'den-sandbox': 'true' },
       upstream: desired.upstream,
     });
   }
@@ -392,7 +392,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    */
   /**
    * The SSL object of the gateway's client certificate towards the operator's X-Road Security
-   * Server (M4-05, SPIKE S-5): one identity, CN=<RID_GATEWAY_CLIENT_NAME>.xroad, which the
+   * Server (M4-05, SPIKE S-5): one identity, CN=<DEN_GATEWAY_CLIENT_NAME>.xroad, which the
    * operator registers in the Security Server as the internal TLS certificate of its subsystem.
    */
   async reconcileXroadTls(now = new Date()): Promise<void> {
@@ -407,7 +407,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
         type: 'client',
         cert: certificate.certificatePem,
         key: certificate.keyPem,
-        labels: { 'rid-managed': 'true' },
+        labels: { 'den-managed': 'true' },
         status: 1,
       };
       desiredHash = hash({ ...desired, key: certificate.fingerprint });
@@ -438,7 +438,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
         type: 'client',
         cert: certificate.certificatePem,
         key: certificate.keyPem,
-        labels: { 'rid-managed': 'true' },
+        labels: { 'den-managed': 'true' },
         status: 1,
       };
       desiredHash = hash({ ...desired, key: certificate.fingerprint });
@@ -479,7 +479,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
   }
 
   /**
-   * The signing key of the gateway's assertions (ADR-0024, M6-10) in rid-assertion's metadata,
+   * The signing key of the gateway's assertions (ADR-0024, M6-10) in den-assertion's metadata,
    * shared by every route: the current one of GatewaySigningKeysService, which also rotates it.
    * APISIX keeps the private key encrypted in etcd (encrypt_fields) and never returns it in
    * clear, so the comparison is by issuer and kid. With the feature off, the metadata is removed:
@@ -515,7 +515,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
   }
 
   /**
-   * The gateway's route to the rid-gateway token endpoint (S-4, M3-10): applications get their
+   * The gateway's route to the den-gateway token endpoint (S-4, M3-10): applications get their
    * token over the TLS where APISIX verified their certificate, and Keycloak binds it to it.
    */
   async reconcileTokenRoute(): Promise<'created' | 'updated' | 'unchanged'> {
@@ -537,8 +537,8 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
   }
 
   /**
-   * The control channel of kit nodes (M4-02). Without RID_GATEWAY_PORTAL_API_URL and
-   * RID_NODE_CONTROL_TOKEN the route is removed: nodes cannot reach the portal.
+   * The control channel of kit nodes (M4-02). Without DEN_GATEWAY_PORTAL_API_URL and
+   * DEN_NODE_CONTROL_TOKEN the route is removed: nodes cannot reach the portal.
    */
   async reconcileNodeControlRoute(): Promise<GatewayResult> {
     const desired = desiredNodeControlRoute(this.settings);

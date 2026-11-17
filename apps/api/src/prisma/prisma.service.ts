@@ -6,7 +6,7 @@ import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 export type Tx = Prisma.TransactionClient;
 
 /**
- * Prisma client for the runtime role (DATABASE_URL = rid_app: no DDL, append-only audit).
+ * Prisma client for the runtime role (DATABASE_URL = den_app: no DDL, append-only audit).
  * Migrations use DATABASE_MIGRATION_URL through prisma.config.ts, never this client.
  * Connects lazily on the first query.
  */

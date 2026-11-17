@@ -1,7 +1,7 @@
-# promtool test rules (M5-06): each alert of rules/rid.rules.yml fires on the series it is for,
+# promtool test rules (M5-06): each alert of rules/den.rules.yml fires on the series it is for,
 # and not on the healthy ones. Run by tests/infra (prometheus image).
 rule_files:
-  - ../rules/rid.rules.yml
+  - ../rules/den.rules.yml
 
 evaluation_interval: 1m
 
@@ -15,7 +15,7 @@ tests:
         values: '0+3x20'
     alert_rule_test:
       - eval_time: 12m
-        alertname: RidGateway5xxRate
+        alertname: DenGateway5xxRate
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -32,7 +32,7 @@ tests:
         values: '0+1x20'
     alert_rule_test:
       - eval_time: 12m
-        alertname: RidGateway5xxRate
+        alertname: DenGateway5xxRate
         exp_alerts: []
 
   - name: gateway p95 over 200 ms
@@ -46,7 +46,7 @@ tests:
         values: '0+100x20'
     alert_rule_test:
       - eval_time: 12m
-        alertname: RidGatewayLatencyHigh
+        alertname: DenGatewayLatencyHigh
         exp_alerts:
           - exp_labels:
               severity: warning
@@ -63,7 +63,7 @@ tests:
         values: '1x10'
     alert_rule_test:
       - eval_time: 5m
-        alertname: RidTargetDown
+        alertname: DenTargetDown
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -76,14 +76,14 @@ tests:
   - name: OPA behind the current bundle
     interval: 1m
     input_series:
-      - series: 'rid_opa_bundle_lag_seconds{job="api"}'
+      - series: 'den_opa_bundle_lag_seconds{job="api"}'
         values: '0 0 300 300 300 300'
     alert_rule_test:
       - eval_time: 1m
-        alertname: RidOpaBundleBehind
+        alertname: DenOpaBundleBehind
         exp_alerts: []
       - eval_time: 4m
-        alertname: RidOpaBundleBehind
+        alertname: DenOpaBundleBehind
         exp_alerts:
           - exp_labels:
               severity: critical
@@ -95,16 +95,16 @@ tests:
   - name: OPA stopped fetching the bundle
     interval: 1m
     input_series:
-      - series: 'last_success_bundle_request{job="opa",name="rid"}'
+      - series: 'last_success_bundle_request{job="opa",name="den"}'
         values: '0x10'
     alert_rule_test:
       - eval_time: 5m
-        alertname: RidOpaBundleFetchFailing
+        alertname: DenOpaBundleFetchFailing
         exp_alerts:
           - exp_labels:
               severity: critical
               job: opa
-              name: rid
+              name: den
             exp_annotations:
               summary: 'OPA no descarga el bundle del portal hace más de 2 minutos'
               description: 'Última descarga exitosa hace 5m 0s.'
@@ -112,13 +112,13 @@ tests:
   - name: reconciliation failing
     interval: 1m
     input_series:
-      - series: 'rid_sync_targets{job="api",system="apisix",status="error"}'
+      - series: 'den_sync_targets{job="api",system="apisix",status="error"}'
         values: '2x15'
-      - series: 'rid_sync_targets{job="api",system="keycloak",status="in_sync"}'
+      - series: 'den_sync_targets{job="api",system="keycloak",status="in_sync"}'
         values: '5x15'
     alert_rule_test:
       - eval_time: 12m
-        alertname: RidReconcileFailing
+        alertname: DenReconcileFailing
         exp_alerts:
           - exp_labels:
               severity: warning
@@ -130,11 +130,11 @@ tests:
   - name: a node offline
     interval: 1m
     input_series:
-      - series: 'rid_nodes{job="api",status="offline"}'
+      - series: 'den_nodes{job="api",status="offline"}'
         values: '1x10'
     alert_rule_test:
       - eval_time: 6m
-        alertname: RidNodeOffline
+        alertname: DenNodeOffline
         exp_alerts:
           - exp_labels:
               severity: warning
@@ -147,13 +147,13 @@ tests:
   - name: the gateway certificate close to expiry; an application's is the entity's
     interval: 1m
     input_series:
-      - series: 'rid_certificate_soonest_expiry_seconds{job="api",kind="gateway"}'
+      - series: 'den_certificate_soonest_expiry_seconds{job="api",kind="gateway"}'
         values: '864000x70'
-      - series: 'rid_certificate_soonest_expiry_seconds{job="api",kind="application"}'
+      - series: 'den_certificate_soonest_expiry_seconds{job="api",kind="application"}'
         values: '1x70'
     alert_rule_test:
       - eval_time: 65m
-        alertname: RidCertificateExpiring
+        alertname: DenCertificateExpiring
         exp_alerts:
           - exp_labels:
               severity: warning
@@ -166,11 +166,11 @@ tests:
   - name: background queue piling up
     interval: 1m
     input_series:
-      - series: 'rid_queue_jobs{job="api",queue="apisix.sync",state="created"}'
+      - series: 'den_queue_jobs{job="api",queue="apisix.sync",state="created"}'
         values: '150x20'
     alert_rule_test:
       - eval_time: 17m
-        alertname: RidQueueBacklog
+        alertname: DenQueueBacklog
         exp_alerts:
           - exp_labels:
               severity: warning

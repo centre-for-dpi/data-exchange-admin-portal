@@ -9,7 +9,7 @@ import { listOperations } from '../../apis/lint/openapi-lint.js';
 
 type Json = Record<string, unknown>;
 const METHODS = ['get', 'put', 'post', 'delete', 'patch', 'head', 'options', 'trace'] as const;
-const DATA_SUBJECT = 'x-rid-data-subject';
+const DATA_SUBJECT = 'x-den-data-subject';
 
 const isObject = (v: unknown): v is Json =>
   typeof v === 'object' && v !== null && !Array.isArray(v);

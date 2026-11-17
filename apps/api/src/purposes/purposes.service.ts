@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { PurposeAdmin } from '@rid/contracts';
+import type { PurposeAdmin } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError } from '../common/errors.js';

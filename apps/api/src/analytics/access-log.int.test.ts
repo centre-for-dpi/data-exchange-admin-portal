@@ -15,11 +15,11 @@ import { HttpOpenSearch, openSearchUrl } from './opensearch.js';
 
 const GATEWAY = `http://127.0.0.1:${process.env.APISIX_HTTP_PORT ?? 9080}`;
 const OPA = `http://localhost:${process.env.OPA_PORT ?? 8181}`;
-// rid- so the access-log filter keeps it, test- so no reconciler manages it.
-const ROUTE = 'rid-test-m5-01-access-log';
-const PACKAGE = 'ridtestm501';
-const BASE = '/__rid_m5_01__/afiliacion/v1';
-const CLIENT = 'rid-app-m5-01';
+// den- so the access-log filter keeps it, test- so no reconciler manages it.
+const ROUTE = 'den-test-m5-01-access-log';
+const PACKAGE = 'dentestm501';
+const BASE = '/__den_m5_01__/afiliacion/v1';
+const CLIENT = 'den-app-m5-01';
 const SUBSCRIPTION = '0190d0c4-0000-7000-8000-00000000a501';
 const DOCUMENT = '1000000001';
 
@@ -71,14 +71,14 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
 
   const settings: GatewaySettings = {
     keycloakDiscoveryUrl:
-      'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-    audience: 'rid-gateway',
+      'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+    audience: 'den-gateway',
     opaUrl: 'http://opa:8181',
     accessLogUrl: 'http://fluent-bit:9880/',
     transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
     devNodes: parseDevNodes('salud=mock-salud:8000'),
     resolveHost: () => Promise.resolve([]),
-    tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'rid-gateway' },
+    tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
   };
 
   beforeAll(async () => {
@@ -93,7 +93,7 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
     for (const { path, source } of readPolicies()) {
       if (path.endsWith('_test.rego')) continue;
       const renamed = source
-        .replace(/^package rid\.authz/m, `package ${PACKAGE}.authz`)
+        .replace(/^package den\.authz/m, `package ${PACKAGE}.authz`)
         .replace(/data\.(routes|clients|config)\b/g, `data.${PACKAGE}.$1`);
       const res = await fetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
         method: 'PUT',
@@ -223,7 +223,7 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
     for (let attempt = 0; attempt < 60; attempt += 1) {
       const res = await openSearch.request<{ hits?: { hits: Array<{ _source: Doc }> } }>(
         'POST',
-        '/rid-access-*/_search',
+        '/den-access-*/_search',
         { size: 10, query: { terms: { request_id: ids } } },
       );
       const hits = res.body.hits?.hits ?? [];
@@ -238,11 +238,11 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
     const deniedId = `m5-01-denied-${run}`;
     expect(
       await call(allowedId, {
-        'x-rid-purpose': 'eligibility_check',
-        'x-rid-end-user': 'funcionario-42',
+        'x-den-purpose': 'eligibility_check',
+        'x-den-end-user': 'funcionario-42',
       }),
     ).toBe(200);
-    expect(await call(deniedId, { 'x-rid-purpose': 'benefit_targeting' })).toBe(403);
+    expect(await call(deniedId, { 'x-den-purpose': 'benefit_targeting' })).toBe(403);
 
     const docs = await indexed([allowedId, deniedId]);
     for (const doc of docs) {
@@ -278,12 +278,12 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
   it('no indexed document anywhere contains the identification number', async () => {
     const sneakyId = `m5-01-sneaky-${run}`;
     // A purpose with the number in it: free text where a code goes.
-    await call(sneakyId, { 'x-rid-purpose': `cedula ${DOCUMENT}` });
+    await call(sneakyId, { 'x-den-purpose': `cedula ${DOCUMENT}` });
     const [doc] = await indexed([sneakyId]);
     expect(doc).not.toHaveProperty('purpose');
     const res = await openSearch.request<{ hits: { total: { value: number } } }>(
       'POST',
-      '/rid-access-*/_search',
+      '/den-access-*/_search',
       {
         size: 0,
         query: { query_string: { query: `*${DOCUMENT}*`, default_field: '*', lenient: true } },

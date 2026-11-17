@@ -5,18 +5,18 @@
 The portal's public host: the web, the API under /api/v1 and Keycloak under /auth. The services'
 own routes stay off it (they already require their tokens: this is defense in depth): the
 transparency collector (/api/v1/internal), OPA's bundle (/api/v1/opa) and Keycloak's admin console
-(/auth/admin) go to rid-blocked, a Service with no endpoints, which answers 503. The gateway is not
+(/auth/admin) go to den-blocked, a Service with no endpoints, which answers 503. The gateway is not
 here: applications reach it on its own name, with their certificate (gateway.yaml).
 */}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "rid.name" "portal" }}
+  name: {{ include "den.name" "portal" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
   annotations:
     {{- if eq .Values.ingress.className "traefik" }}
-    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s@kubernetescrd" .Release.Namespace (include "rid.name" "no-client-cert-headers") }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s@kubernetescrd" .Release.Namespace (include "den.name" "no-client-cert-headers") }}
     {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
@@ -36,38 +36,38 @@ spec:
           - path: {{ . }}
             pathType: Prefix
             backend:
-              service: { name: {{ include "rid.name" "blocked" }}, port: { number: 80 } }
+              service: { name: {{ include "den.name" "blocked" }}, port: { number: 80 } }
           {{- end }}
           {{- if .Values.grafana.enabled }}
           # The operator's dashboard, with Grafana's own login.
           - path: /grafana
             pathType: Prefix
             backend:
-              service: { name: {{ include "rid.name" "grafana" }}, port: { number: 80 } }
+              service: { name: {{ include "den.name" "grafana" }}, port: { number: 80 } }
           {{- end }}
           - path: /api/v1
             pathType: Prefix
             backend:
-              service: { name: {{ include "rid.name" "api" }}, port: { number: {{ .Values.api.port }} } }
+              service: { name: {{ include "den.name" "api" }}, port: { number: {{ .Values.api.port }} } }
           - path: /auth
             pathType: Prefix
             backend:
-              service: { name: {{ include "rid.name" "keycloak" }}, port: { number: 8080 } }
+              service: { name: {{ include "den.name" "keycloak" }}, port: { number: 8080 } }
           - path: /
             pathType: Prefix
             backend:
-              service: { name: {{ include "rid.name" "web" }}, port: { number: {{ .Values.web.port }} } }
+              service: { name: {{ include "den.name" "web" }}, port: { number: {{ .Values.web.port }} } }
 ---
 # No pods match it: whatever the ingress sends here gets 503.
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "rid.name" "blocked" }}
+  name: {{ include "den.name" "blocked" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selector:
-    app.kubernetes.io/name: rid-nothing-runs-here
+    app.kubernetes.io/name: den-nothing-runs-here
   ports:
     - { name: http, port: 80 }
 {{- if eq .Values.ingress.className "traefik" }}
@@ -77,9 +77,9 @@ spec:
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
-  name: {{ include "rid.name" "no-client-cert-headers" }}
+  name: {{ include "den.name" "no-client-cert-headers" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   headers:
     customRequestHeaders:

@@ -6,7 +6,7 @@ import { assertionVerifier } from './assertion.js';
 import { buildServer } from './server.js';
 
 const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-const KID = 'rid-gw-test';
+const KID = 'den-gw-test';
 const JWKS = {
   keys: [{ ...publicKey.export({ format: 'jwk' }), kid: KID, use: 'sig', alg: 'ES256' }],
 };
@@ -14,19 +14,19 @@ const fetchJwks = (() => Promise.resolve(new Response(JSON.stringify(JWKS)))) as
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const b64url = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
-/** An assertion as the gateway's rid-assertion plugin signs it. */
+/** An assertion as the gateway's den-assertion plugin signs it. */
 function assertion(
   req: { method: string; uri: string; body?: string },
   overrides: Record<string, unknown> = {},
 ): string {
   const now = Math.floor(Date.now() / 1000);
   const claims = {
-    iss: 'https://gateway.rid.example',
+    iss: 'https://gateway.den.example',
     aud: 'salud',
     iat: now,
     exp: now + 60,
     jti: randomUUID(),
-    rid: { consumer_entity: 'programas-sociales', purpose: 'eligibility_check' },
+    den: { consumer_entity: 'programas-sociales', purpose: 'eligibility_check' },
     req: {
       method: req.method,
       uri_sha256: sha256(req.uri),
@@ -55,7 +55,7 @@ function server(required = false) {
     assertion: {
       jwksUrl: 'http://portal/jwks',
       audience: 'salud',
-      issuer: 'https://gateway.rid.example',
+      issuer: 'https://gateway.den.example',
       required,
       fetchFn: fetchJwks,
     },
@@ -77,7 +77,7 @@ describe("the gateway's signed assertion (M6-10)", () => {
     const ok = await app.inject({
       method: 'GET',
       url: URI,
-      headers: { 'x-rid-assertion': assertion({ method: 'GET', uri: URI }) },
+      headers: { 'x-den-assertion': assertion({ method: 'GET', uri: URI }) },
     });
     expect(ok.statusCode).toBe(200);
     expect(results()).toEqual(['verified']);
@@ -98,7 +98,7 @@ describe("the gateway's signed assertion (M6-10)", () => {
       ['not-a-jws', 'invalid: not a compact JWS'],
     ];
     for (const [header] of cases) {
-      await app.inject({ method: 'GET', url: URI, headers: { 'x-rid-assertion': header } });
+      await app.inject({ method: 'GET', url: URI, headers: { 'x-den-assertion': header } });
     }
     await app.inject({ method: 'GET', url: URI });
     expect(results()).toEqual([...cases.map(([, result]) => result), 'absent']);
@@ -114,7 +114,7 @@ describe("the gateway's signed assertion (M6-10)", () => {
       payload: BODY,
       headers: {
         ...headers,
-        'x-rid-assertion': assertion({ method: 'POST', uri: url, body: BODY }),
+        'x-den-assertion': assertion({ method: 'POST', uri: url, body: BODY }),
       },
     });
     const otherBody = JSON.stringify({ numeroIdentificacion: String(FIRST_ID + 1) });
@@ -124,7 +124,7 @@ describe("the gateway's signed assertion (M6-10)", () => {
       payload: otherBody,
       headers: {
         ...headers,
-        'x-rid-assertion': assertion({ method: 'POST', uri: url, body: BODY }),
+        'x-den-assertion': assertion({ method: 'POST', uri: url, body: BODY }),
       },
     });
     expect(results()).toEqual(['verified', 'invalid: body']);
@@ -138,7 +138,7 @@ describe("the gateway's signed assertion (M6-10)", () => {
     const allowed = await app.inject({
       method: 'GET',
       url: URI,
-      headers: { 'x-rid-assertion': assertion({ method: 'GET', uri: URI }) },
+      headers: { 'x-den-assertion': assertion({ method: 'GET', uri: URI }) },
     });
     expect(allowed.statusCode).toBe(200);
   });
@@ -148,7 +148,7 @@ describe("the gateway's signed assertion (M6-10)", () => {
       assertionVerifier({
         jwksUrl: 'http://portal/jwks',
         audience: 'salud',
-        issuer: 'https://gateway.rid.example',
+        issuer: 'https://gateway.den.example',
         fetchFn: fetchJwks,
       });
 

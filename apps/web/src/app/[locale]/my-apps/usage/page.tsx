@@ -1,4 +1,4 @@
-import { applicationPageSchema, consumedUsageSchema } from '@rid/contracts';
+import { applicationPageSchema, consumedUsageSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { inputClass } from '../../../../components/form/field';

@@ -1,4 +1,4 @@
-import { API_VERSION_STATUSES } from '@rid/contracts';
+import { API_VERSION_STATUSES } from '@den/contracts';
 import { describe, expect, it } from 'vitest';
 import { InvalidTransitionError } from '../../common/errors.js';
 import { assertTransition, canTransition, isEditable } from './state-machine.js';

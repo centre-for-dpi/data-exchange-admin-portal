@@ -1,5 +1,5 @@
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { nodeDnsName } from '@rid/contracts';
+import { nodeDnsName } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { QueueService } from '../../queue/queue.service.js';

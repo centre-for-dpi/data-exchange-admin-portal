@@ -1,12 +1,12 @@
 --
--- rid-data-subject: reads the data subject of a call from its JSON body (ADR-0017).
+-- den-data-subject: reads the data subject of a call from its JSON body (ADR-0017).
 --
--- For operations whose OpenAPI declares x-rid-data-subject { in: body, pointer }, this plugin
+-- For operations whose OpenAPI declares x-den-data-subject { in: body, pointer }, this plugin
 -- reads the request body (in memory, bounded), resolves the JSON pointer and passes the value to
--- OPA in X-RID-Body-Subject ("TYPE:NUMBER" or "NUMBER"). OPA turns it into X-RID-Subject-Ref and
--- never returns X-RID-Body-Subject, so the value is removed before the upstream (SPIKE S-1).
+-- OPA in X-DEN-Body-Subject ("TYPE:NUMBER" or "NUMBER"). OPA turns it into X-DEN-Subject-Ref and
+-- never returns X-DEN-Body-Subject, so the value is removed before the upstream (SPIKE S-1).
 --
--- A client cannot assert the subject: any X-RID-Body-Subject it sends is removed first. The gateway
+-- A client cannot assert the subject: any X-DEN-Body-Subject it sends is removed first. The gateway
 -- and the provider must read the same person, so the plugin gives no subject (OPA then denies) when
 -- the body is not declared as JSON, repeats a member name (I-JSON, RFC 7493) or the value has a
 -- colon. The body
@@ -18,7 +18,7 @@ local core = require("apisix.core")
 local cjson = require("cjson.safe")
 local ngx_re = require("ngx.re")
 
-local HEADER = "X-RID-Body-Subject"
+local HEADER = "X-DEN-Body-Subject"
 
 local schema = {
     type = "object",
@@ -49,7 +49,7 @@ local schema = {
 local _M = {
     version = 0.1,
     priority = 1020,
-    name = "rid-data-subject",
+    name = "den-data-subject",
     schema = schema,
 }
 

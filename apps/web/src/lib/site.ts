@@ -1,4 +1,4 @@
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { readableForeground } from './branding';
 
 /** Country branding and authorities for the UI (server only: reads config/country/*.yaml). */

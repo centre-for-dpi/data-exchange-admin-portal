@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { EntityRole, PlatformRole } from '@rid/contracts';
+import type { EntityRole, PlatformRole } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import { ConflictError, ForbiddenError } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -115,7 +115,7 @@ export class PrincipalService {
         tx,
         this.audit,
         { userId: created.id, email, emailVerified: identity.emailVerified },
-        process.env.RID_BOOTSTRAP_ADMIN_EMAIL,
+        process.env.DEN_BOOTSTRAP_ADMIN_EMAIL,
         requestId,
       );
     });

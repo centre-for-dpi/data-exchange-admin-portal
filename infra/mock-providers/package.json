@@ -1,5 +1,5 @@
 {
-  "name": "@rid/mock-providers",
+  "name": "@den/mock-providers",
   "version": "0.0.0",
   "private": true,
   "description": "Fictitious provider services with synthetic data for local development (ADR-0009)",

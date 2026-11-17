@@ -29,17 +29,17 @@ test.describe('reference citizen folder (MT-07)', () => {
     );
     await expectNoAccessibilityViolations(citizen);
     await citizen.getByRole('link', { name: 'Ingresar con tu identidad digital' }).click();
-    await citizen.waitForURL(/\/realms\/rid-citizens\//);
+    await citizen.waitForURL(/\/realms\/den-citizens\//);
     await citizen.locator('#username').fill('ciudadana.demo');
     await citizen
       .locator('#password')
-      .fill(process.env.RID_DEMO_USER_PASSWORD ?? 'rid-demo-password');
+      .fill(process.env.DEN_DEMO_USER_PASSWORD ?? 'den-demo-password');
     await citizen.locator('#kc-login').click();
     await citizen.waitForURL(`${carpeta}/consultas`);
 
     // She asks to be told about consultations of her personal data; the email stays in the
     // folder, the portal only gets the choice.
-    const email = `valentina+${slug}@ciudadana.demo.rid.example`;
+    const email = `valentina+${slug}@ciudadana.demo.den.example`;
     await citizen.getByLabel('Datos personales', { exact: true }).check();
     await citizen.getByLabel('Correo para los avisos').fill(email);
     await citizen.getByRole('button', { name: 'Guardar avisos' }).click();
@@ -49,8 +49,8 @@ test.describe('reference citizen folder (MT-07)', () => {
     const res = await gatewayFetch(`${gateway}/salud/${slug}/v1/afiliados/1000000001`, {
       headers: {
         authorization: `Bearer ${await gatewayToken(clientId, clientSecret)}`,
-        'x-rid-purpose': 'eligibility_check',
-        'x-rid-end-user': 'funcionario-42',
+        'x-den-purpose': 'eligibility_check',
+        'x-den-end-user': 'funcionario-42',
       },
     });
     expect(res.status).toBe(200);

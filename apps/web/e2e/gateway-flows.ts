@@ -7,13 +7,13 @@ import { createApplication, openRequestForm, publishNewApi, signIn } from './flo
 import { country } from './helpers';
 
 /** Calls through the real gateway (M1-09 onwards): over TLS with mTLS since M3-10. */
-export const gateway = process.env.RID_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443';
+export const gateway = process.env.DEN_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443';
 /**
  * The gateway's plain-HTTP listener (local stack and CI only). Probes that only ask whether a
  * route exists, or which headers it adds, use it: they have no client certificate to present.
  */
-const gatewayHttp = process.env.RID_GATEWAY_HTTP_URL ?? 'http://localhost:9080';
-const apiUrl = process.env.RID_API_URL ?? 'http://localhost:4000';
+const gatewayHttp = process.env.DEN_GATEWAY_HTTP_URL ?? 'http://localhost:9080';
+const apiUrl = process.env.DEN_API_URL ?? 'http://localhost:4000';
 
 const mtlsRequired = () => country().features.mtls.required;
 
@@ -126,15 +126,15 @@ export async function issueCertificate(page: Page, clientId: string): Promise<vo
   certificates.set(clientId, { cert: chain, key: keyPem });
 }
 
-/** Headers the salud mock logged for a request (it logs X-RID-* and X-Request-Id only). */
+/** Headers the salud mock logged for a request (it logs X-DEN-* and X-Request-Id only). */
 export function providerSaw(requestId: string, since: string): Record<string, string> | undefined {
-  const logs = spawnSync('docker', ['logs', '--since', since, 'rid-mock-salud-1'], {
+  const logs = spawnSync('docker', ['logs', '--since', since, 'den-mock-salud-1'], {
     encoding: 'utf8',
   });
   for (const line of `${logs.stdout}${logs.stderr}`.split('\n')) {
     if (!line.includes(requestId)) continue;
-    const entry = JSON.parse(line) as { rid?: Record<string, string> };
-    if (entry.rid?.['x-request-id'] === requestId) return entry.rid;
+    const entry = JSON.parse(line) as { den?: Record<string, string> };
+    if (entry.den?.['x-request-id'] === requestId) return entry.den;
   }
   return undefined;
 }
@@ -176,9 +176,9 @@ export async function untilCertificateKnown(url: string, token: string): Promise
     .poll(
       async () => {
         const res = await gatewayFetch(url, {
-          headers: { authorization: `Bearer ${token}`, 'x-rid-purpose': 'eligibility_check' },
+          headers: { authorization: `Bearer ${token}`, 'x-den-purpose': 'eligibility_check' },
         });
-        reason = res.headers.get('x-rid-deny-reason');
+        reason = res.headers.get('x-den-deny-reason');
         return reason;
       },
       { timeout: 60_000, intervals: [1_000] },
@@ -247,12 +247,12 @@ export function registeredCalls(subscriptionId: string): Array<{
   if (!/^[0-9a-f-]{36}$/.test(subscriptionId)) throw new Error('Not a subscription id');
   const res = docker(
     'exec',
-    'rid-postgres-1',
+    'den-postgres-1',
     'psql',
     '-U',
-    process.env.POSTGRES_USER ?? 'rid',
+    process.env.POSTGRES_USER ?? 'den',
     '-d',
-    process.env.POSTGRES_DB ?? 'rid',
+    process.env.POSTGRES_DB ?? 'den',
     '-At',
     '-F',
     '|',
@@ -278,13 +278,13 @@ export function registeredCalls(subscriptionId: string): Array<{
 export function placesHolding(value: string): string[] {
   const found: string[] = [];
   const has = (output: string | null) => (output ?? '').includes(value);
-  const apisix = docker('logs', 'rid-apisix-1');
+  const apisix = docker('logs', 'den-apisix-1');
   if (has(apisix.stdout) || has(apisix.stderr)) found.push('apisix logs');
   // Regular files only: the image links access.log and error.log to the container's stdout and
   // stderr (already read above), and reading those links would block.
   const logFiles = docker(
     'exec',
-    'rid-apisix-1',
+    'den-apisix-1',
     'find',
     '/usr/local/apisix/logs',
     '-type',
@@ -296,11 +296,11 @@ export function placesHolding(value: string): string[] {
   );
   if (logFiles.status !== 0) throw new Error(logFiles.stderr || String(logFiles.error));
   if (has(logFiles.stdout)) found.push('apisix log files');
-  const shipper = docker('logs', 'rid-fluent-bit-transparency-1');
+  const shipper = docker('logs', 'den-fluent-bit-transparency-1');
   if (has(shipper.stdout) || has(shipper.stderr)) found.push('transparency pipeline logs');
   const buffer = docker(
     'exec',
-    'rid-fluent-bit-transparency-1',
+    'den-fluent-bit-transparency-1',
     'grep',
     '-r',
     '-l',
@@ -312,12 +312,12 @@ export function placesHolding(value: string): string[] {
   else if (buffer.status !== 1) throw new Error(buffer.stderr || String(buffer.error));
   const dump = docker(
     'exec',
-    'rid-postgres-1',
+    'den-postgres-1',
     'pg_dump',
     '-U',
-    process.env.POSTGRES_USER ?? 'rid',
+    process.env.POSTGRES_USER ?? 'den',
     '--data-only',
-    process.env.POSTGRES_DB ?? 'rid',
+    process.env.POSTGRES_DB ?? 'den',
   );
   if (dump.status !== 0) throw new Error(dump.stderr);
   if (has(dump.stdout)) found.push('portal database');

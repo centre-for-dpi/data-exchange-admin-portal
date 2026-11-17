@@ -1,4 +1,4 @@
-import { entityRequestListSchema, reviewQueueSchema } from '@rid/contracts';
+import { entityRequestListSchema, reviewQueueSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

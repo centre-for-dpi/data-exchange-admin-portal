@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // `pnpm example:country [--keep]`: the portal brought up as a country it has never seen (M6-09).
 // config/country/example.yaml, the template for a new country, becomes country XX; a stack of its
-// own (Compose project `ridxx`, every port shifted by 10000, its own volumes) runs the portal
+// own (Compose project `denxx`, every port shifted by 10000, its own volumes) runs the portal
 // with it, and the demo of docs/DEMO.md goes through end to end: publication, review, catalogue,
 // application, access request, calls through the gateway with the country's purposes and person
 // document type, revocation, audit and the citizen's view. The web answers in both languages
@@ -26,9 +26,9 @@ import { parseArgs } from 'node:util';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { values: args } = parseArgs({ options: { keep: { type: 'boolean', default: false } } });
-const PROJECT = 'ridxx';
+const PROJECT = 'denxx';
 const SHIFT = 10_000;
-const work = join(tmpdir(), 'rid-example-country');
+const work = join(tmpdir(), 'den-example-country');
 const log = (text) => console.log(text);
 const ok = (text) => log(`   ✓ ${text}`);
 class Failure extends Error {}
@@ -50,7 +50,7 @@ const PORT_VARS = {
   PROMETHEUS_PORT: 9090,
   ALERTMANAGER_PORT: 9093,
   GRAFANA_PORT: 3001,
-  RID_TSA_PORT: 3004,
+  DEN_TSA_PORT: 3004,
   CLAMAV_PORT: 3310,
   MAILPIT_UI_PORT: 8025,
   MAILPIT_SMTP_PORT: 1025,
@@ -92,14 +92,14 @@ function countryEnv(configDir) {
   return {
     ...env,
     COMPOSE_PROJECT_NAME: PROJECT,
-    RID_COUNTRY: 'XX',
-    RID_CONFIG_DIR: configDir,
+    DEN_COUNTRY: 'XX',
+    DEN_CONFIG_DIR: configDir,
     API_PORT: String(4000 + SHIFT),
-    RID_TRANSPARENCY_COLLECTOR_PORT: String(4000 + SHIFT),
-    RID_GATEWAY_HTTP_URL: `http://localhost:${9080 + SHIFT}`,
+    DEN_TRANSPARENCY_COLLECTOR_PORT: String(4000 + SHIFT),
+    DEN_GATEWAY_HTTP_URL: `http://localhost:${9080 + SHIFT}`,
     // The provider mock checks the gateway's assertion with this portal's keys (M6-10).
     MOCK_GATEWAY_JWKS_URL: `http://host.docker.internal:${4000 + SHIFT}/api/v1/gateway/jwks`,
-    RID_DOCUMENTS_DIR: join(work, 'documents'),
+    DEN_DOCUMENTS_DIR: join(work, 'documents'),
     NODE_ENV: 'development',
   };
 }
@@ -162,12 +162,12 @@ async function citizenDocumentType(env, documentType) {
     'content-type': 'application/json',
   };
   const users = await (
-    await fetch(`${keycloak}/admin/realms/rid-citizens/users?username=ciudadana.demo&exact=true`, {
+    await fetch(`${keycloak}/admin/realms/den-citizens/users?username=ciudadana.demo&exact=true`, {
       headers,
     })
   ).json();
-  const user = users[0] ?? fail('ciudadana.demo is not in the rid-citizens realm');
-  const res = await fetch(`${keycloak}/admin/realms/rid-citizens/users/${user.id}`, {
+  const user = users[0] ?? fail('ciudadana.demo is not in the den-citizens realm');
+  const res = await fetch(`${keycloak}/admin/realms/den-citizens/users/${user.id}`, {
     method: 'PUT',
     headers,
     body: JSON.stringify({
@@ -224,26 +224,26 @@ async function main() {
   ok(SERVICES.join(', '));
 
   log('3. The portal for XX: build, migrate, seed, start');
-  run('pnpm', ['exec', 'turbo', 'run', 'build', '--filter=@rid/api', '--filter=@rid/web...'], {
+  run('pnpm', ['exec', 'turbo', 'run', 'build', '--filter=@den/api', '--filter=@den/web...'], {
     env,
   });
-  run('pnpm', ['--filter', '@rid/api', 'db:deploy'], { env });
-  run('pnpm', ['--filter', '@rid/api', 'db:seed'], { env });
+  run('pnpm', ['--filter', '@den/api', 'db:deploy'], { env });
+  run('pnpm', ['--filter', '@den/api', 'db:seed'], { env });
   start('api', 'node', ['--enable-source-maps', 'dist/main.js'], {
     cwd: join(root, 'apps/api'),
     env,
   });
-  await waitFor(`${env.RID_API_URL}/api/v1/health`, 'the portal API');
+  await waitFor(`${env.DEN_API_URL}/api/v1/health`, 'the portal API');
   start('web', 'pnpm', ['exec', 'next', 'start', '--port', String(3000 + SHIFT)], {
     cwd: join(root, 'apps/web'),
     env,
   });
-  await waitFor(`${env.RID_WEB_URL}/api/auth/providers`, 'the web');
-  ok(`API ${env.RID_API_URL}, web ${env.RID_WEB_URL}`);
+  await waitFor(`${env.DEN_WEB_URL}/api/auth/providers`, 'the web');
+  ok(`API ${env.DEN_API_URL}, web ${env.DEN_WEB_URL}`);
 
   log('4. The web in both languages, with the country’s branding');
   for (const path of ['/', '/en']) {
-    const html = await (await fetch(`${env.RID_WEB_URL}${path}`)).text();
+    const html = await (await fetch(`${env.DEN_WEB_URL}${path}`)).text();
     if (!html.includes(country.branding.productName)) {
       fail(`${path} does not show the product name "${country.branding.productName}"`);
     }
@@ -251,7 +251,7 @@ async function main() {
     if (lang !== (path === '/en' ? 'en' : 'es')) fail(`${path} is served as lang="${lang}"`);
     ok(`${path}: lang="${lang}", "${country.branding.productName}"`);
   }
-  const logo = await fetch(`${env.RID_WEB_URL}/branding/logo`);
+  const logo = await fetch(`${env.DEN_WEB_URL}/branding/logo`);
   if (!logo.ok) fail(`the country's logo: ${logo.status}`);
   ok('the country’s logo');
 
@@ -259,7 +259,7 @@ async function main() {
   await citizenDocumentType(env, country.identifiers.person[0]);
   const verifier = join(root, 'packages/transparency-verifier/dist/index.js');
   if (!existsSync(verifier))
-    run('pnpm', ['--filter', '@rid/transparency-verifier', 'build'], { env });
+    run('pnpm', ['--filter', '@den/transparency-verifier', 'build'], { env });
   const demo = spawnSync(process.execPath, [join(root, 'scripts/demo.mjs')], {
     cwd: root,
     env,

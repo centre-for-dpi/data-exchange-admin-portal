@@ -27,14 +27,14 @@ Además:
 - El aviso de fin de sesión: aparece a tiempo, toma el foco, pasa axe y mantiene la sesión.
 - Las páginas de ingreso y registro de Keycloak, solo con axe: son su tema, no el nuestro.
 
-Para auditar sin fallar en el primer hallazgo: `RID_A11Y_REPORT=1 pnpm --filter @rid/web exec playwright test e2e/accessibility.spec.ts`.
+Para auditar sin fallar en el primer hallazgo: `DEN_A11Y_REPORT=1 pnpm --filter @den/web exec playwright test e2e/accessibility.spec.ts`.
 
 ## Hallazgos y correcciones
 
 | # | Hallazgo | Criterio | Corrección |
 | :-- | :-- | :-- | :-- |
 | 1 | Los errores de validación del API llegaban en inglés a páginas en español ("at most 6 months for this classification", los mensajes de zod, el `detail` de 409 y 403) | 3.1.2, 3.3.1, 3.3.3 | Cada error del API lleva `key` y `params`, y la web los muestra en el idioma del usuario. Los de zod se redactan con el locale de zod. ADR-0025 |
-| 2 | La sesión terminaba a los 30 minutos sin actividad sin aviso, y se perdía lo escrito | 2.2.1 | Diálogo dos minutos antes con "Seguir conectado", que renueva la sesión con Keycloak (`components/session-timeout.tsx`, `RID_SESSION_IDLE_SECONDS`) |
+| 2 | La sesión terminaba a los 30 minutos sin actividad sin aviso, y se perdía lo escrito | 2.2.1 | Diálogo dos minutos antes con "Seguir conectado", que renueva la sesión con Keycloak (`components/session-timeout.tsx`, `DEN_SESSION_IDLE_SECONDS`) |
 | 3 | Con más de una entidad, el selector del encabezado desbordaba a 320 px | 1.4.10 | El selector se acomoda en varias líneas |
 | 4 | Las tablas de la ficha de servicio desbordaban la página a 320 px | 1.4.10 | Desplazamiento dentro de su propio contenedor, como las demás tablas |
 | 5 | La documentación de Scalar agregaba un segundo `h1` a la página de la API | 1.3.1 | Sus encabezados bajan un nivel (`aria-level`) |

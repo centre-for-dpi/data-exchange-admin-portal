@@ -2,7 +2,7 @@ import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { env } from './env.js';
 
 export const keycloakUrl = (): string => env('KEYCLOAK_URL', 'http://localhost:8080');
-export const webUrl = (): string => env('RID_WEB_URL', 'http://localhost:3000');
+export const webUrl = (): string => env('DEN_WEB_URL', 'http://localhost:3000');
 
 export type JwtClaims = Record<string, unknown> & {
   iss: string;
@@ -58,7 +58,7 @@ export class CookieJar {
   }
 }
 
-/** RFC 6238 TOTP like the rid-portal OTP policy: 6 digits, 30 s, HMAC-SHA1, UTF-8 key (M3-08). */
+/** RFC 6238 TOTP like the den-portal OTP policy: 6 digits, 30 s, HMAC-SHA1, UTF-8 key (M3-08). */
 export function totp(secret: string, at = Date.now()): string {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
@@ -67,7 +67,7 @@ export function totp(secret: string, at = Date.now()): string {
   return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, '0');
 }
 
-export const demoTotpSecret = (): string => env('RID_DEMO_TOTP_SECRET', 'rid-demo-totp-secret');
+export const demoTotpSecret = (): string => env('DEN_DEMO_TOTP_SECRET', 'den-demo-totp-secret');
 
 export interface AuthorizationCodeResult {
   /** Final redirect back to the web app, or undefined if Keycloak did not redirect. */
@@ -80,7 +80,7 @@ export interface AuthorizationCodeResult {
 }
 
 /**
- * Runs the browser login of apps/web (Authorization Code + PKCE S256) against realm rid-portal,
+ * Runs the browser login of apps/web (Authorization Code + PKCE S256) against realm den-portal,
  * submitting Keycloak's login form like a user would.
  */
 export interface LoginClient {
@@ -90,20 +90,20 @@ export interface LoginClient {
   redirectUri: string;
 }
 
-/** apps/web in realm rid-portal. */
+/** apps/web in realm den-portal. */
 export const portalWebClient = (): LoginClient => ({
-  realm: 'rid-portal',
-  clientId: env('RID_PORTAL_WEB_CLIENT_ID', 'rid-portal-web'),
-  clientSecret: env('RID_PORTAL_WEB_CLIENT_SECRET'),
+  realm: 'den-portal',
+  clientId: env('DEN_PORTAL_WEB_CLIENT_ID', 'den-portal-web'),
+  clientSecret: env('DEN_PORTAL_WEB_CLIENT_SECRET'),
   redirectUri: `${webUrl()}/api/auth/callback/keycloak`,
 });
 
-/** The reference Carpeta Ciudadana in realm rid-citizens (MT-05, MT-07). */
-export const carpetaClient = (): LoginClient => ({
-  realm: 'rid-citizens',
-  clientId: 'carpeta-ciudadana',
-  clientSecret: env('RID_CARPETA_CLIENT_SECRET'),
-  redirectUri: `${env('RID_CARPETA_URL', 'http://localhost:3100')}/auth/callback`,
+/** The reference Carpeta Ciudadana in realm den-citizens (MT-05, MT-07). */
+export const citizenAppClient = (): LoginClient => ({
+  realm: 'den-citizens',
+  clientId: 'citizen-app',
+  clientSecret: env('DEN_CITIZEN_APP_CLIENT_SECRET'),
+  redirectUri: `${env('DEN_CITIZEN_APP_URL', 'http://localhost:3100')}/auth/callback`,
 });
 
 export async function loginWithAuthorizationCode(

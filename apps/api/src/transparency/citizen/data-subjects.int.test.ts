@@ -2,14 +2,14 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
+import { loadCountryConfig } from '@den/config';
 import {
   createdApplicationSchema,
   subjectAccessPageSchema,
   subscriptionDetailSchema,
   transparencyReceiptSchema,
-} from '@rid/contracts';
-import { verifyReceipt } from '@rid/transparency-verifier';
+} from '@den/contracts';
+import { verifyReceipt } from '@den/transparency-verifier';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   createTestApp,
@@ -90,7 +90,7 @@ describe('citizen API: who consulted my data (MT-05)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/internal/subject-access',
-      headers: { authorization: `Bearer ${process.env.RID_TRANSPARENCY_INGEST_TOKEN}` },
+      headers: { authorization: `Bearer ${process.env.DEN_TRANSPARENCY_INGEST_TOKEN}` },
       payload: records,
     });
     expect(res.json()).toMatchObject({ accepted: operations.length });
@@ -120,7 +120,7 @@ describe('citizen API: who consulted my data (MT-05)', () => {
       sector: 'salud',
       tags: [],
       classification: 'personal',
-      ownerContact: 'apis@salud.demo.rid.example',
+      ownerContact: 'apis@salud.demo.den.example',
     });
     const apiId = api.json<{ id: string }>().id;
     const version = await call(
@@ -146,7 +146,7 @@ describe('citizen API: who consulted my data (MT-05)', () => {
       name: `Subsidios ${run}`,
       description: 'Verifica afiliación.',
       environment: 'production',
-      technicalContact: 'dev@programas.demo.rid.example',
+      technicalContact: 'dev@programas.demo.den.example',
     });
     const applicationId = createdApplicationSchema.parse(created.json()).application.id;
     const requested = await call('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {
@@ -188,7 +188,7 @@ describe('citizen API: who consulted my data (MT-05)', () => {
         citizens.token(valentina.sub, { documentNumber: valentina.number, azp: 'other-app' }),
         citizens.token(valentina.sub, {
           documentNumber: valentina.number,
-          audience: 'rid-portal-api',
+          audience: 'den-portal-api',
         }),
         citizens.token(valentina.sub, { documentNumber: valentina.number, expiresIn: '-1m' }),
         citizens.token(valentina.sub, { documentNumber: null }),

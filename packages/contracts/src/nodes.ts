@@ -126,12 +126,12 @@ export const NODE_CONTRACT_VERSION = '1';
 
 /**
  * Common name of every node CSR. The kit does not know its node id before enrolling: the CA adds
- * the node's own name (`rid-node-<nodeId>`) as the certificate's only DNS name.
+ * the node's own name (`den-node-<nodeId>`) as the certificate's only DNS name.
  */
-export const NODE_CSR_COMMON_NAME = 'rid-node';
+export const NODE_CSR_COMMON_NAME = 'den-node';
 
 /** DNS name on a node's certificate: what the gateway verifies when it calls the node. */
-export const nodeDnsName = (nodeId: string): string => `rid-node-${nodeId}`;
+export const nodeDnsName = (nodeId: string): string => `den-node-${nodeId}`;
 
 /** A WireGuard public key: 32 bytes, base64 (44 characters). */
 export const wireguardKeySchema = z
@@ -148,7 +148,7 @@ const servicePortSchema = z.number().int().min(1).max(65_535);
 /** POST /nodes/enroll: the kit enrolls once with its token (SPEC.md §4.6 step 2). */
 export const enrollNodeSchema = z.strictObject({
   token: z.string().min(20).max(200),
-  /** PKCS#10, PEM, with CN=rid-node and no other names. The private key never leaves the node. */
+  /** PKCS#10, PEM, with CN=den-node and no other names. The private key never leaves the node. */
   csr: z.string().min(100).max(10_000),
   wireguardPublicKey: wireguardKeySchema,
   kitVersion: kitVersionSchema,

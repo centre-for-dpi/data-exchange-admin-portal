@@ -1,8 +1,8 @@
 import swc from 'unplugin-swc';
 import { defineConfig } from 'vitest/config';
 
-// Integration tests against PostgreSQL (database rid_test, see infra/postgres/init).
-// The global setup applies all migrations as the owner; tests connect as rid_app.
+// Integration tests against PostgreSQL (database den_test, see infra/postgres/init).
+// The global setup applies all migrations as the owner; tests connect as den_app.
 export default defineConfig({
   plugins: [swc.vite({ module: { type: 'es6' } })],
   test: {

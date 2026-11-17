@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { applicationDetailSchema, createdApplicationSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { applicationDetailSchema, createdApplicationSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -58,7 +58,7 @@ describe('applications and OAuth2 credentials (M1-06)', () => {
     name,
     description: 'Valida requisitos al asignar subsidios.',
     environment: 'sandbox',
-    technicalContact: 'dev@programas.demo.rid.example',
+    technicalContact: 'dev@programas.demo.den.example',
   });
 
   const create = async () => {
@@ -75,7 +75,7 @@ describe('applications and OAuth2 credentials (M1-06)', () => {
   it('creates the application and returns the client secret once, uncacheable', async () => {
     const { res, created } = await create();
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(created.application.clientId).toBe(`rid-app-${created.application.id}`);
+    expect(created.application.clientId).toBe(`den-app-${created.application.id}`);
     expect(created.application.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7/);
     expect(created.application.provisioning).toBe('pending');
     // The gateway's token route (M3-10), not Keycloak itself.
@@ -134,7 +134,7 @@ describe('applications and OAuth2 credentials (M1-06)', () => {
       standardFlowEnabled: false,
       directAccessGrantsEnabled: false,
       secret: created.clientSecret,
-      attributes: { 'rid.application': id, 'rid.entity': programas, 'rid.environment': 'sandbox' },
+      attributes: { 'den.application': id, 'den.entity': programas, 'den.environment': 'sandbox' },
     });
     const credential = await prisma.credential.findFirstOrThrow({ where: { applicationId: id } });
     expect(credential.sealedSecret).toBeNull();

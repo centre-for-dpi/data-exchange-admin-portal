@@ -7,7 +7,7 @@ import {
   type SubjectAccessesQuery,
   subjectAccessPageSchema,
   transparencyReceiptSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import { ApiOperation } from '../../openapi/api-operation.decorator.js';
@@ -56,7 +56,7 @@ export class DataSubjectsController {
     operationId: 'getMyDataAccessReceipt',
     summary: 'Verifiable receipt of one consultation of my data',
     description:
-      'Check it offline with rid-verify-receipt, the operator JWKS and the TSA certificate. ' +
+      'Check it offline with den-verify-receipt, the operator JWKS and the TSA certificate. ' +
       '404 for a consultation that is not about the caller; 409 while it is not sealed yet.',
     tags: ['data-subjects'],
     authenticated: 'citizen',

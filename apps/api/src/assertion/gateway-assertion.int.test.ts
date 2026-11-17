@@ -2,8 +2,8 @@ import { createHash, createPublicKey, verify } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { gatewayJwksSchema, gatewaySigningKeyRotatedSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { gatewayJwksSchema, gatewaySigningKeyRotatedSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -16,13 +16,13 @@ import { GatewaySigningKeysService } from './gateway-signing-keys.service.js';
 
 const GATEWAY = `http://127.0.0.1:${process.env.APISIX_HTTP_PORT ?? 9080}`;
 const ROUTE = 'test-m6-10-assertion';
-const BASE = '/__rid_m6_10__/afiliacion/v1';
-const ISSUER = process.env.RID_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443';
+const BASE = '/__den_m6_10__/afiliacion/v1';
+const ISSUER = process.env.DEN_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443';
 const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 
 type Jwks = ReturnType<typeof gatewayJwksSchema.parse>;
 
-/** What a provider does with X-RID-Assertion (docs/guides/entities.md): verify, then read. */
+/** What a provider does with X-DEN-Assertion (docs/guides/entities.md): verify, then read. */
 function verifyAssertion(token: string, jwks: Jwks) {
   const [h = '', c = '', s = ''] = token.split('.');
   const header = JSON.parse(Buffer.from(h, 'base64url').toString()) as { kid: string; alg: string };
@@ -49,9 +49,9 @@ function verifyAssertion(token: string, jwks: Jwks) {
 
 /**
  * The gateway's signed assertion (ADR-0024, M6-10) against the real APISIX of the stack: the
- * portal's key in rid-assertion's metadata through the reconciler, a route that signs for the
+ * portal's key in den-assertion's metadata through the reconciler, a route that signs for the
  * provider, a provider on the host that verifies with the portal's JWKS, and the operator's
- * rotation. The route is the test's own (outside the reconciler's rid- prefix); the plugin's
+ * rotation. The route is the test's own (outside the reconciler's den- prefix); the plugin's
  * metadata is shared by the gateway, so a development portal pushes its own key back on its next
  * pass.
  */
@@ -102,7 +102,7 @@ describe("the gateway's signed assertion to providers (M6-10)", () => {
           method: req.method ?? '',
           url: req.url ?? '',
           body: Buffer.concat(chunks).toString(),
-          assertion: req.headers['x-rid-assertion'] as string | undefined,
+          assertion: req.headers['x-den-assertion'] as string | undefined,
         });
         res.setHeader('content-type', 'application/json');
         res.end('{"ok":true}');
@@ -123,9 +123,9 @@ describe("the gateway's signed assertion to providers (M6-10)", () => {
       methods: ['GET', 'POST', 'DELETE'],
       plugins: {
         'request-id': { header_name: 'X-Request-Id', include_in_response: true },
-        'rid-header-guard': {},
+        'den-header-guard': {},
         'proxy-rewrite': { regex_uri: [`^${BASE}/(.*)$`, '/salud/$1'] },
-        'rid-assertion': { audience: 'salud' },
+        'den-assertion': { audience: 'salud' },
       },
       upstream: { type: 'roundrobin', nodes: { [`host.docker.internal:${port}`]: 1 } },
     });
@@ -167,8 +167,8 @@ describe("the gateway's signed assertion to providers (M6-10)", () => {
     ).not.toContain('1000000001');
     expect((claims?.exp ?? 0) - (claims?.iat ?? 0)).toBe(60);
 
-    // A client's own X-RID-Assertion never reaches the provider.
-    await call('/afiliados/1000000001', { headers: { 'X-RID-Assertion': 'forged' } });
+    // A client's own X-DEN-Assertion never reaches the provider.
+    await call('/afiliados/1000000001', { headers: { 'X-DEN-Assertion': 'forged' } });
     expect(received.at(-1)?.assertion).not.toBe('forged');
   });
 
@@ -261,7 +261,7 @@ describe("the gateway's signed assertion to providers (M6-10)", () => {
   });
 
   it('fails closed without a key in the gateway', async () => {
-    await admin.delete('plugin_metadata', 'rid-assertion');
+    await admin.delete('plugin_metadata', 'den-assertion');
     let status = 0;
     for (let i = 0; i < 20 && status !== 503; i += 1) {
       status = (await call('/afiliados/1000000001')).status;

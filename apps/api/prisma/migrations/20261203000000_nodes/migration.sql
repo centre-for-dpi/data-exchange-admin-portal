@@ -74,4 +74,4 @@ ALTER TABLE "node_enrollment_token" ADD CONSTRAINT "node_enrollment_token_node_i
 
 
 -- "Nada se borra en el dominio" (SPEC.md §5): nodes are decommissioned, tokens revoked.
-REVOKE DELETE, TRUNCATE ON "node", "node_enrollment_token" FROM rid_app;
+REVOKE DELETE, TRUNCATE ON "node", "node_enrollment_token" FROM den_app;

@@ -1,8 +1,8 @@
-import type { DataSubject } from '@rid/contracts';
+import type { DataSubject } from '@den/contracts';
 
 type Translate = (key: string, values?: Record<string, string>) => string;
 
-/** Where an operation's data subject is, in words (x-rid-data-subject, ADR-0015). */
+/** Where an operation's data subject is, in words (x-den-data-subject, ADR-0015). */
 export function dataSubjectLabel(t: Translate, subject: DataSubject | null): string {
   if (!subject) return t('dataSubject.undeclared');
   if (subject.in === 'none') return t('dataSubject.none');

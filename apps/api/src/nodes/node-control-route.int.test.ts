@@ -2,7 +2,7 @@ import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { request as httpsRequest } from 'node:https';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { issuedEnrollmentTokenSchema, nodeEnrollmentSchema } from '@rid/contracts';
+import { issuedEnrollmentTokenSchema, nodeEnrollmentSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeKeyAndCsr } from '../../test/csr.js';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
@@ -53,22 +53,22 @@ describe('node control route of the gateway (M4-02)', () => {
 
   const settings = (portalUrl: string): GatewaySettings => ({
     keycloakDiscoveryUrl:
-      'http://keycloak:8080/realms/rid-gateway/.well-known/openid-configuration',
-    audience: 'rid-gateway',
+      'http://keycloak:8080/realms/den-gateway/.well-known/openid-configuration',
+    audience: 'den-gateway',
     opaUrl: 'http://opa:8181',
     accessLogUrl: 'http://fluent-bit:9880/',
     transparencyLog: { host: 'fluent-bit-transparency', port: 5170 },
     devNodes: parseDevNodes(''),
     resolveHost: () => Promise.resolve([]),
-    tls: { hosts: ['localhost'], mtlsRequired: true, clientName: 'rid-gateway' },
+    tls: { hosts: ['localhost'], mtlsRequired: true, clientName: 'den-gateway' },
     nodeControl: { portalUrl, token: CONTROL_TOKEN },
   });
 
   beforeAll(async () => {
     for (const [k, v] of Object.entries({
-      RID_WG_HUB_PUBLIC_KEY: wireguardKey(),
-      RID_WG_HUB_ENDPOINT: 'wg-hub:51820',
-      RID_NODE_CONTROL_TOKEN: CONTROL_TOKEN,
+      DEN_WG_HUB_PUBLIC_KEY: wireguardKey(),
+      DEN_WG_HUB_ENDPOINT: 'wg-hub:51820',
+      DEN_NODE_CONTROL_TOKEN: CONTROL_TOKEN,
     })) {
       saved[k] = process.env[k];
       process.env[k] = v;
@@ -129,7 +129,7 @@ describe('node control route of the gateway (M4-02)', () => {
         })
       ).json(),
     );
-    const { csr, keyPem } = await makeKeyAndCsr('rid-node');
+    const { csr, keyPem } = await makeKeyAndCsr('den-node');
     const enrolled = await app.inject({
       method: 'POST',
       url: '/api/v1/nodes/enroll',
@@ -224,19 +224,19 @@ describe('node control route of the gateway (M4-02)', () => {
   it('forged control headers sent by the node change nothing', async () => {
     const res = await overTls(`/api/v1/nodes/${node.id}/config`, node, {
       headers: {
-        'X-RID-Node-Control': 'token-falso',
-        'X-RID-Client-Cert-S256': 'huella-falsa',
-        X_RID_Client_Cert_S256: 'huella-falsa',
+        'X-DEN-Node-Control': 'token-falso',
+        'X-DEN-Client-Cert-S256': 'huella-falsa',
+        X_DEN_Client_Cert_S256: 'huella-falsa',
       },
     });
     expect(res.status).toBe(200);
   });
 
   it('another certificate of the network does not open the node', async () => {
-    const { csr, keyPem } = await makeKeyAndCsr('rid-app-intruso');
+    const { csr, keyPem } = await makeKeyAndCsr('den-app-intruso');
     const cert = await new StepCaClient().sign({
       csrPem: csr,
-      commonName: 'rid-app-intruso',
+      commonName: 'den-app-intruso',
       validityHours: 1,
     });
     const res = await overTls(`/api/v1/nodes/${node.id}/config`, { cert, key: keyPem });
@@ -245,7 +245,7 @@ describe('node control route of the gateway (M4-02)', () => {
 
   it('without TLS nobody can claim a certificate, not even with the right headers', async () => {
     const res = await fetch(`http://127.0.0.1:${HTTP_PORT}/api/v1/nodes/${node.id}/config`, {
-      headers: { 'X-RID-Node-Control': CONTROL_TOKEN, 'X-RID-Client-Cert-S256': 'x' },
+      headers: { 'X-DEN-Node-Control': CONTROL_TOKEN, 'X-DEN-Client-Cert-S256': 'x' },
     });
     expect(res.status).toBe(401);
   });

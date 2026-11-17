@@ -1,4 +1,4 @@
-import { SYNC_STATUSES, SYNC_SYSTEMS, syncPageSchema } from '@rid/contracts';
+import { SYNC_STATUSES, SYNC_SYSTEMS, syncPageSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';

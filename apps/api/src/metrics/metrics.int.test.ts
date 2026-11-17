@@ -12,14 +12,14 @@ describe("the API's metrics endpoint (M5-06)", () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    previous = process.env.RID_METRICS_TOKEN;
-    process.env.RID_METRICS_TOKEN = token;
+    previous = process.env.DEN_METRICS_TOKEN;
+    process.env.DEN_METRICS_TOKEN = token;
     app = await createTestApp(await createTestIssuer());
   });
   afterAll(async () => {
     await app.close();
-    if (previous === undefined) delete process.env.RID_METRICS_TOKEN;
-    else process.env.RID_METRICS_TOKEN = previous;
+    if (previous === undefined) delete process.env.DEN_METRICS_TOKEN;
+    else process.env.DEN_METRICS_TOKEN = previous;
   });
 
   it('is not there without the token, nor with another one', async () => {
@@ -49,21 +49,21 @@ describe("the API's metrics endpoint (M5-06)", () => {
     expect(res.headers['content-type']).toContain('text/plain');
     const text = res.body;
     expect(text).toMatch(
-      /rid_api_http_request_duration_seconds_count\{[^}]*route="\/api\/v1\/health"/,
+      /den_api_http_request_duration_seconds_count\{[^}]*route="\/api\/v1\/health"/,
     );
     // The template, never the id in the path.
     expect(text).toContain('route="/api/v1/catalog/apis/:apiId"');
     expect(text).not.toContain('0190d0c4-0000-7000-8000-000000000000');
     for (const gauge of [
-      'rid_queue_jobs',
-      'rid_sync_targets',
-      'rid_opa_bundle_lag_seconds',
-      'rid_nodes',
-      'rid_certificate_soonest_expiry_seconds',
-      'rid_api_process_cpu_seconds_total',
+      'den_queue_jobs',
+      'den_sync_targets',
+      'den_opa_bundle_lag_seconds',
+      'den_nodes',
+      'den_certificate_soonest_expiry_seconds',
+      'den_api_process_cpu_seconds_total',
     ]) {
       expect(text, gauge).toContain(`# TYPE ${gauge}`);
     }
-    expect(text).toMatch(/rid_sync_targets\{system="apisix",status="[a-z_]+"\} \d+/);
+    expect(text).toMatch(/den_sync_targets\{system="apisix",status="[a-z_]+"\} \d+/);
   });
 });

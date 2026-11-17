@@ -1,11 +1,11 @@
 {{- $c := dict "root" . "component" "internal-pki" }}
-{{- $etcd := include "rid.name" "etcd" }}
+{{- $etcd := include "den.name" "etcd" }}
 {{- /*
-The namespace's internal PKI (cert-manager, installed by rid-platform): TLS and mutual
+The namespace's internal PKI (cert-manager, installed by den-platform): TLS and mutual
 authentication between the platform's own components (ASVS 12.3, M6-05), separate from the
 network's CA (step-ca), which issues the applications' and the nodes' certificates. A CA of its own
-(self-signed root, kept by cert-manager in rid-internal-ca) signs OpenSearch's nodes and its
-administrator. etcd has a CA of its own (rid-etcd-ca), which signs only its members and the
+(self-signed root, kept by cert-manager in den-internal-ca) signs OpenSearch's nodes and its
+administrator. etcd has a CA of its own (den-etcd-ca), which signs only its members and the
 gateway's client certificate: etcd trusts that CA alone, so no other certificate of the namespace
 (OpenSearch's, say) is a client of etcd, and through it of APISIX's configuration.
 cert-manager renews them before they expire; the pods read them from their Secrets.
@@ -13,71 +13,71 @@ cert-manager renews them before they expire; the pods read them from their Secre
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ include "rid.name" "selfsigned" }}
+  name: {{ include "den.name" "selfsigned" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   selfSigned: {}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "rid.name" "internal-ca" }}
+  name: {{ include "den.name" "internal-ca" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   isCA: true
-  commonName: RID internal CA ({{ .Release.Namespace }})
-  secretName: {{ include "rid.name" "internal-ca" }}
+  commonName: DEN internal CA ({{ .Release.Namespace }})
+  secretName: {{ include "den.name" "internal-ca" }}
   duration: 87600h # 10 years
   privateKey: { algorithm: ECDSA, size: 256 }
-  issuerRef: { name: {{ include "rid.name" "selfsigned" }}, kind: Issuer }
+  issuerRef: { name: {{ include "den.name" "selfsigned" }}, kind: Issuer }
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ include "rid.name" "internal" }}
+  name: {{ include "den.name" "internal" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   ca:
-    secretName: {{ include "rid.name" "internal-ca" }}
+    secretName: {{ include "den.name" "internal-ca" }}
 ---
 # etcd's own CA: only its members and the gateway hold certificates from it.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "rid.name" "etcd-ca" }}
+  name: {{ include "den.name" "etcd-ca" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   isCA: true
-  commonName: RID etcd CA ({{ .Release.Namespace }})
-  secretName: {{ include "rid.name" "etcd-ca" }}
+  commonName: DEN etcd CA ({{ .Release.Namespace }})
+  secretName: {{ include "den.name" "etcd-ca" }}
   duration: 87600h
   privateKey: { algorithm: ECDSA, size: 256 }
-  issuerRef: { name: {{ include "rid.name" "selfsigned" }}, kind: Issuer }
+  issuerRef: { name: {{ include "den.name" "selfsigned" }}, kind: Issuer }
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ include "rid.name" "etcd" }}
+  name: {{ include "den.name" "etcd" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
   ca:
-    secretName: {{ include "rid.name" "etcd-ca" }}
+    secretName: {{ include "den.name" "etcd-ca" }}
 ---
 # etcd's members: the same certificate as server (clients) and peer (the other members, which
 # present it as a client too).
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "rid.name" "etcd-tls" }}
+  name: {{ include "den.name" "etcd-tls" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
-  secretName: {{ include "rid.name" "etcd-tls" }}
+  secretName: {{ include "den.name" "etcd-tls" }}
   duration: 2160h
   renewBefore: 720h
   privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
@@ -86,20 +86,20 @@ spec:
     - {{ $etcd }}
     - '*.{{ $etcd }}'
     - '*.{{ $etcd }}.{{ .Release.Namespace }}.svc'
-  issuerRef: { name: {{ include "rid.name" "etcd" }}, kind: Issuer }
+  issuerRef: { name: {{ include "den.name" "etcd" }}, kind: Issuer }
 ---
 # The gateway's client certificate for etcd: without it, etcd refuses the connection.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "rid.name" "etcd-client" }}
+  name: {{ include "den.name" "etcd-client" }}
   labels:
-    {{- include "rid.labels" $c | nindent 4 }}
+    {{- include "den.labels" $c | nindent 4 }}
 spec:
-  secretName: {{ include "rid.name" "etcd-client" }}
+  secretName: {{ include "den.name" "etcd-client" }}
   duration: 2160h
   renewBefore: 720h
   privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
   usages: [client auth]
-  commonName: rid-gateway
-  issuerRef: { name: {{ include "rid.name" "etcd" }}, kind: Issuer }
+  commonName: den-gateway
+  issuerRef: { name: {{ include "den.name" "etcd" }}, kind: Issuer }

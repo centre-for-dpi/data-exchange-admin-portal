@@ -118,11 +118,11 @@ test.describe('M2 governance end to end', () => {
       const res = await gatewayFetch(url, {
         headers: {
           authorization: `Bearer ${await gatewayToken(clientId, clientSecret)}`,
-          'x-rid-purpose': 'eligibility_check',
-          'x-rid-end-user': 'funcionario-7',
+          'x-den-purpose': 'eligibility_check',
+          'x-den-end-user': 'funcionario-7',
         },
       });
-      return { status: res.status, reason: res.headers.get('x-rid-deny-reason') };
+      return { status: res.status, reason: res.headers.get('x-den-deny-reason') };
     };
     await expect.poll(call, { timeout: 60_000 }).toEqual({ status: 200, reason: null });
 
@@ -157,10 +157,10 @@ test.describe('M2 governance end to end', () => {
     );
     expect(res.status()).toBe(200);
     const body = await res.body();
-    expect(res.headers()['x-rid-export-sha256']).toBe(
+    expect(res.headers()['x-den-export-sha256']).toBe(
       createHash('sha256').update(body).digest('hex'),
     );
-    expect(res.headers()['x-rid-export-signature']).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/);
+    expect(res.headers()['x-den-export-signature']).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/);
     const csv = body.toString('utf8');
     for (const action of [
       'subscription.requested',

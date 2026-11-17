@@ -27,9 +27,9 @@ interface LayoutProps {
   params: Promise<{ locale: string }>;
 }
 
-/** Keycloak's ssoSessionIdleTimeout of the realm rid-portal (30 minutes by default). */
+/** Keycloak's ssoSessionIdleTimeout of the realm den-portal (30 minutes by default). */
 const sessionIdleSeconds = (): number => {
-  const value = Number(process.env.RID_SESSION_IDLE_SECONDS);
+  const value = Number(process.env.DEN_SESSION_IDLE_SECONDS);
   return Number.isInteger(value) && value > 180 ? value : 1800;
 };
 
@@ -66,7 +66,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
             {children}
           </main>
           <SiteFooter />
-          {/* WCAG 2.2.1 (M6-02): the realm's idle timeout, RID_SESSION_IDLE_SECONDS. */}
+          {/* WCAG 2.2.1 (M6-02): the realm's idle timeout, DEN_SESSION_IDLE_SECONDS. */}
           {(await getViewer()).authenticated ? (
             <SessionTimeout idleSeconds={sessionIdleSeconds()} />
           ) : null}

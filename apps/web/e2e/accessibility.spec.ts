@@ -443,8 +443,8 @@ test.describe('accessibility audit of every screen (M6-02)', () => {
         }
       }
       await page.context().close();
-      // RID_A11Y_REPORT=1 lists every finding without failing (to audit, not to gate).
-      if (process.env.RID_A11Y_REPORT) console.warn([`${user}:`, ...report].join('\n'));
+      // DEN_A11Y_REPORT=1 lists every finding without failing (to audit, not to gate).
+      if (process.env.DEN_A11Y_REPORT) console.warn([`${user}:`, ...report].join('\n'));
       else expect(report).toEqual([]);
     });
   }
@@ -492,12 +492,12 @@ test.describe('accessibility of the session and of Keycloak (M6-02)', () => {
     };
     await page.goto('/');
     await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
-    await page.waitForURL(/\/realms\/rid-portal\//);
+    await page.waitForURL(/\/realms\/den-portal\//);
     await audit('sign-in');
     await page.locator('a[href*="/login-actions/registration"]').click();
     await page.locator('#kc-register-form').waitFor();
     await audit('registration');
-    if (process.env.RID_A11Y_REPORT) console.warn(['keycloak:', ...report].join('\n'));
+    if (process.env.DEN_A11Y_REPORT) console.warn(['keycloak:', ...report].join('\n'));
     else expect(report).toEqual([]);
   });
 });

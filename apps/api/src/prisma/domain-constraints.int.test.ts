@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from './prisma.service.js';
 import { scopedRepo } from './scoped-repo.js';
 
-/** Database-level guarantees of the domain model (M1-01) against PostgreSQL, as rid_app. */
+/** Database-level guarantees of the domain model (M1-01) against PostgreSQL, as den_app. */
 describe('domain model constraints (M1-01)', () => {
   const prisma = new PrismaService();
   const run = randomUUID().slice(0, 8);
@@ -42,7 +42,7 @@ describe('domain model constraints (M1-01)', () => {
         name,
         description: 'test',
         environment: 'sandbox',
-        keycloakClientId: `rid-app-${id}`,
+        keycloakClientId: `den-app-${id}`,
         technicalContact: 'dev@example.org',
         createdBy: 'system:test',
       },

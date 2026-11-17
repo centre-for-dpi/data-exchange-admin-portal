@@ -6,7 +6,7 @@ import {
   issueCertificateSchema,
   issuedCertificateSchema,
   PEM_CHAIN_MEDIA_TYPE,
-} from '@rid/contracts';
+} from '@den/contracts';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {

@@ -383,4 +383,4 @@ ALTER TABLE "subscription_decision" ADD CONSTRAINT "subscription_decision_subscr
 REVOKE DELETE, TRUNCATE ON
   "entity", "app_user", "user_platform_role", "membership", "purpose", "api", "api_version",
   "api_version_purpose", "application", "credential", "subscription", "subscription_decision"
-FROM rid_app;
+FROM den_app;

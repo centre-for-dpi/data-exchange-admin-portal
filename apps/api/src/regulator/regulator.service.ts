@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { RegulatorQueue, ReviewDetail, SubscriptionDetail } from '@rid/contracts';
+import type { RegulatorQueue, ReviewDetail, SubscriptionDetail } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../common/errors.js';

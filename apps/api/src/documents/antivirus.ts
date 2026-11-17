@@ -6,7 +6,7 @@ import { connect } from 'node:net';
  * TCP: `zINSTREAM\0`, the bytes in chunks each preceded by its length (4 bytes, big-endian), a
  * zero-length chunk to end, and one reply line: `stream: OK` or `stream: <signature> FOUND`.
  *
- * RID_CLAMAV_URL (tcp://clamav:3310) turns it on. While it is on, a document is stored only after
+ * DEN_CLAMAV_URL (tcp://clamav:3310) turns it on. While it is on, a document is stored only after
  * clamd says it is clean: an unreachable or erroring clamd fails the upload (503), never lets the
  * document through.
  */
@@ -29,11 +29,11 @@ export class ClamdScanner {
 
   /** tcp://host:port, or undefined when the variable is empty. Throws on anything else. */
   static fromEnv(env: NodeJS.ProcessEnv = process.env): ClamdScanner | undefined {
-    const raw = env.RID_CLAMAV_URL?.trim();
+    const raw = env.DEN_CLAMAV_URL?.trim();
     if (!raw) return undefined;
     const url = new URL(raw);
     if (url.protocol !== 'tcp:' || !url.hostname) {
-      throw new Error(`RID_CLAMAV_URL must be tcp://host:port, got "${raw}"`);
+      throw new Error(`DEN_CLAMAV_URL must be tcp://host:port, got "${raw}"`);
     }
     return new ClamdScanner(url.hostname, Number(url.port || 3310));
   }

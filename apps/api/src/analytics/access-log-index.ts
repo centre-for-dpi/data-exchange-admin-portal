@@ -7,16 +7,16 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { QueueService } from '../queue/queue.service.js';
 import { recordSyncError, recordSyncSuccess } from '../reconcilers/sync-state.js';
 import { ACCESS_LOG_INDICES, OPENSEARCH, type OpenSearch } from './opensearch.js';
 
-export const ACCESS_LOG_TEMPLATE = 'rid-access';
+export const ACCESS_LOG_TEMPLATE = 'den-access';
 /** Outbox topic of a reconcile on demand (the operator's sync console, M5-07). */
 export const OPENSEARCH_SYNC_TOPIC = 'opensearch.sync';
-export const ACCESS_LOG_POLICY = 'rid-access-retention';
+export const ACCESS_LOG_POLICY = 'den-access-retention';
 export const templateTarget = `opensearch:index-template:${ACCESS_LOG_TEMPLATE}`;
 export const policyTarget = `opensearch:ism-policy:${ACCESS_LOG_POLICY}`;
 const FULL_RECONCILE_MS = 60 * 60 * 1000;
@@ -64,7 +64,7 @@ export function desiredIndexTemplate() {
     },
   };
   const hash = digest(template);
-  return { hash, body: { ...template, _meta: { rid_hash: hash } } };
+  return { hash, body: { ...template, _meta: { den_hash: hash } } };
 }
 
 /**
@@ -93,7 +93,7 @@ export function desiredRetentionPolicy(months: number) {
     body: {
       policy: {
         // OpenSearch adds defaults to what it returns; the hash in the description is compared.
-        description: `RID access logs: kept ${months} months (rid_hash ${hash})`,
+        description: `DEN access logs: kept ${months} months (den_hash ${hash})`,
         ...policy,
       },
     },
@@ -105,7 +105,7 @@ function digest(value: unknown): string {
 }
 
 interface TemplateResponse {
-  index_templates?: Array<{ index_template?: { _meta?: { rid_hash?: string } } }>;
+  index_templates?: Array<{ index_template?: { _meta?: { den_hash?: string } } }>;
 }
 
 interface PolicyResponse {
@@ -164,7 +164,7 @@ export class AccessLogIndexReconciler implements OnApplicationBootstrap, OnAppli
         'GET',
         `/_index_template/${ACCESS_LOG_TEMPLATE}`,
       );
-      const applied = current.body?.index_templates?.[0]?.index_template?._meta?.rid_hash;
+      const applied = current.body?.index_templates?.[0]?.index_template?._meta?.den_hash;
       if (current.status === 200 && applied === hash) {
         await recordSyncSuccess(this.prisma, 'opensearch', templateTarget, hash);
         return 'unchanged';
@@ -198,7 +198,7 @@ export class AccessLogIndexReconciler implements OnApplicationBootstrap, OnAppli
         result = 'created';
       } else if (current.status !== 200) {
         throw new Error(`GET ISM policy: ${current.status}`);
-      } else if (!current.body?.policy?.description?.includes(`rid_hash ${hash}`)) {
+      } else if (!current.body?.policy?.description?.includes(`den_hash ${hash}`)) {
         const put = await this.openSearch.request(
           'PUT',
           `${path}?if_seq_no=${current.body._seq_no}&if_primary_term=${current.body._primary_term}`,

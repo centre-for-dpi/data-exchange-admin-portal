@@ -10,7 +10,7 @@ import {
   nodeHeartbeatSchema,
   renewedNodeCertificateSchema,
   renewNodeCertificateSchema,
-} from '@rid/contracts';
+} from '@den/contracts';
 import { type AuthenticatedRequest, Public } from '../auth/decorators.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
@@ -33,8 +33,8 @@ export class NodeControlController {
     operationId: 'enrollNode',
     summary: 'Enroll a kit node with its single-use token',
     description:
-      'The kit sends its token, a CSR (CN=rid-node, no other names) and its WireGuard public ' +
-      'key. It receives its certificate (DNS name rid-node-<nodeId>), the network root, its ' +
+      'The kit sends its token, a CSR (CN=den-node, no other names) and its WireGuard public ' +
+      'key. It receives its certificate (DNS name den-node-<nodeId>), the network root, its ' +
       'tunnel configuration and where the control channel is. The token stops working.',
     tags: ['node contract'],
     body: enrollNodeSchema,

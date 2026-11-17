@@ -1,8 +1,8 @@
 {
-  "name": "@rid/transparency-verifier",
+  "name": "@den/transparency-verifier",
   "version": "0.0.0",
   "private": true,
-  "description": "Verifies transparency receipts of the RID network without trusting the portal (ADR-0016)",
+  "description": "Verifies transparency receipts of the DEN network without trusting the portal (ADR-0016)",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -12,7 +12,7 @@
     }
   },
   "bin": {
-    "rid-verify-receipt": "./dist/cli.js"
+    "den-verify-receipt": "./dist/cli.js"
   },
   "files": [
     "dist"

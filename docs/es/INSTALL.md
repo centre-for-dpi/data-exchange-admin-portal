@@ -1,4 +1,4 @@
-# Instalación en un servidor — Portal RID (portal + gateway)
+# Instalación en un servidor — Portal DEN (portal + gateway)
 
 > English version (official): [docs/INSTALL.md](../INSTALL.md)
 
@@ -31,7 +31,7 @@ De dónde salen los números (medido en el piloto de demo, noviembre 2026):
 | Qué | Detalle |
 | :-- | :-- |
 | **IP pública fija** | El servidor debe ser alcanzable desde internet (las entidades y sus sistemas llegan a él) |
-| **Dos nombres DNS** (registro A) hacia esa IP | **Portal**, p. ej. `rid.and.gov.co`: personas, portal web, API del portal e inicio de sesión. **Gateway**, p. ej. `gw.rid.and.gov.co`: tráfico entre sistemas, con mTLS |
+| **Dos nombres DNS** (registro A) hacia esa IP | **Portal**, p. ej. `portal.den.example`: personas, portal web, API del portal e inicio de sesión. **Gateway**, p. ej. `gw.den.example`: tráfico entre sistemas, con mTLS |
 | **Entrada** | `443/tcp`: portal y gateway, con un solo puerto, separados por nombre (SNI). `80/tcp`: solo para Let's Encrypt y la redirección a HTTPS. `51820/udp`: túneles WireGuard de los nodos del kit |
 | **Salida durante la instalación** | HTTPS a Docker Hub, quay.io, ghcr.io, el registro de npm y PyPI (imágenes y dependencias de la compilación) |
 | **Certificado del portal** | Let's Encrypt automático, o un certificado propio de la entidad (PEM con la cadena completa y la llave) |
@@ -57,7 +57,7 @@ El instalador lo comprueba todo, y si falta Docker ofrece instalarlo con el scri
 ## 2. Instalación
 
 ```bash
-git clone <url-del-repositorio> rid && cd rid
+git clone <url-del-repositorio> den && cd den
 sudo ./install.sh
 ```
 
@@ -69,9 +69,9 @@ El script hace las preguntas una por una, muestra un resumen y pide confirmació
 | :-- | :-- | :-- |
 | 1 | — | Verificación del servidor: sistema, CPU, RAM, disco, Docker, `/dev/net/tun`. Se detiene si falta algo imprescindible |
 | 2 | **País** | El código de `config/country/<código>.yaml`. Para Colombia, `co` |
-| 3 | **Nombre del portal** | Solo el nombre, sin `https://` (p. ej. `rid.and.gov.co`) |
+| 3 | **Nombre del portal** | Solo el nombre, sin `https://` (p. ej. `portal.den.example`) |
 | 3 | **Nombre del gateway** | Por defecto `gw.<portal>`. Debe ser distinto del portal |
-| 4 | **Proxy de entrada** | `1` Incluido (recomendado): el instalador pone Traefik en 80/443. `2` Ya tengo Traefik: se une a su red de Docker y las rutas las configuras tú, como en `DEPLOYMENT.md §5.2` |
+| 4 | **Proxy de entrada** | `1` Incluido (recomendado): el instalador pone Traefik en 80/443. `2` Ya tengo Traefik: se une a su red de Docker y le escribe las rutas del portal y del gateway (proveedor de archivos). Pregunta el entryPoint HTTPS (`websecure`), el certResolver del certificado del portal (`-`: tu Traefik ya lo tiene) y la carpeta dinámica de Traefik en este servidor (`-`: solo escribe `infra/edge/den-external.yml`, para que lo copies) |
 | 4 | **Certificado del portal** | `1` Let's Encrypt (correo de contacto opcional; el puerto 80 debe ser alcanzable). `2` Propio: rutas al certificado (cadena completa) y a la llave, en PEM. Debe ser de una CA pública reconocida: el API y la web también llaman al portal por su nombre y verifican el certificado |
 | 5 | **Observabilidad** (OpenSearch, Prometheus, Alertmanager, Grafana) | Sí, si el servidor tiene 16 GB: da los indicadores de uso, las alertas por correo y el tablero del operador en `/grafana`. Se puede prescindir: no afecta al tráfico, a la auditoría ni a la transparencia |
 | 5 | **Antivirus de documentos** (ClamAV) | Sí, si el servidor tiene 8 GB: revisa cada documento subido antes de guardarlo. Suma ~1,2 GB de RAM y descarga sus firmas de internet |
@@ -101,7 +101,7 @@ Luego, sin más preguntas:
 | `https://<gateway>` | **Gateway**: tráfico entre entidades con mTLS, tokens en `/oauth/token`, canal de control de los nodos | Sistemas de las entidades |
 | `<gateway>:51820/udp` | Hub WireGuard: túneles de los nodos del kit | Nodos |
 | `https://<portal>/mail` | Correo de pruebas (Mailpit): todo el correo del piloto llega aquí, con usuario y contraseña | Operador |
-| `https://<portal>/carpeta` | Carpeta ciudadana de referencia (demo de transparencia) | Demos |
+| `https://<portal>/citizen-app` | Carpeta ciudadana de referencia (demo de transparencia) | Demos |
 | `https://<portal>/grafana/` | Tablero del operador (con la observabilidad activada), con su propio usuario `admin` | Operador |
 
 Los demás servicios (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, el runner de contratos, los proveedores de prueba) no se publican. La explicación de cada uno está en [`guides/operator.md`](guides/operator.md).
@@ -132,7 +132,7 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 | `sudo ./install.sh credentials` | Usuarios de demo, administrador de Keycloak, usuario del correo de pruebas y de Grafana |
 | `sudo ./install.sh otp` | Código vigente de segundo factor de los usuarios de demo con rol crítico |
 | `sudo ./install.sh logs [servicio]` | Logs (p. ej. `logs api`) |
-| `sudo ./install.sh backup` | Respaldo completo de pgBackRest y copia en `backups/<fecha>/`: volcados de `rid` y `keycloak`, el repositorio de respaldos (cifrado), los volúmenes de la CA, la TSA, documentos y carpeta, y `.env`. Los respaldos diarios ya corren solos (`OPERATIONS.md §6`) |
+| `sudo ./install.sh backup` | Respaldo completo de pgBackRest y copia en `backups/<fecha>/`: volcados de `den` y `keycloak`, el repositorio de respaldos (cifrado), los volúmenes de la CA, la TSA, documentos y carpeta, y `.env`. Los respaldos diarios ya corren solos (`OPERATIONS.md §6`) |
 | `sudo ./install.sh restore [instante]` | Restaura la base al último estado archivado, o al instante dado (`"2026-11-20 14:30:00-05"`). Detiene y arranca todo |
 | `sudo ./install.sh update` | Respaldo, `git pull --ff-only`, recompilación y reinicio |
 | `sudo ./install.sh stop` / `start` | Detiene o arranca todo, sin perder datos |
@@ -146,7 +146,7 @@ alias dc='docker compose -f infra/compose/docker-compose.yml -f infra/compose/do
 
 Sin observabilidad, quita `--profile observability`; con el antivirus, agrega `--profile antivirus`; con un Traefik propio, quita `-f infra/compose/docker-compose.edge.yml`.
 
-Un `.env` escrito a mano o por `make-deploy-env.mjs` (como el del piloto de demo) no tiene las respuestas del instalador. Agrégale `RID_PORTAL_HOST`, `RID_GATEWAY_HOST`, `RID_INSTALL_PROXY` (`bundled` o `external`), `RID_INSTALL_TLS`, `RID_INSTALL_OBSERVABILITY` y `RID_INSTALL_ANTIVIRUS` (`true` o `false`; con el antivirus, también `RID_CLAMAV_URL=tcp://clamav:3310`), o sigue usando Compose directamente.
+Un `.env` escrito a mano o por `make-deploy-env.mjs` (como el del piloto de demo) no tiene las respuestas del instalador. Agrégale `DEN_PORTAL_HOST`, `DEN_GATEWAY_HOST`, `DEN_INSTALL_PROXY` (`bundled` o `external`), `DEN_INSTALL_TLS`, `DEN_INSTALL_OBSERVABILITY` y `DEN_INSTALL_ANTIVIRUS` (`true` o `false`; con el antivirus, también `DEN_CLAMAV_URL=tcp://clamav:3310`), o sigue usando Compose directamente.
 
 ## 8. Problemas frecuentes de la instalación
 
@@ -156,9 +156,9 @@ Un `.env` escrito a mano o por `make-deploy-env.mjs` (como el del piloto de demo
 | El portal muestra un certificado inválido | Let's Encrypt no pudo validar: el DNS del portal no apunta aquí o el puerto 80 está cerrado. Corrige y espera, porque Traefik reintenta solo. `sudo ./install.sh logs edge` |
 | Un servicio no queda sano y la instalación se detiene | `sudo ./install.sh logs <servicio>`. Keycloak puede tardar hasta 5 minutos en una máquina chica. Vuelve a ejecutar `sudo ./install.sh` |
 | OpenSearch se reinicia | Falta memoria o `vm.max_map_count`. Reinstala sin analítica o amplía la RAM |
-| Inicio de sesión en bucle | El nombre del portal no coincide con el del `.env` (`RID_PUBLIC_URL`). `OPERATIONS.md §7` |
-| Los nodos no conectan | 51820/udp cerrado en el firewall de la nube, o el DNS del gateway no apunta aquí (`RID_WG_HUB_ENDPOINT`) |
-| Se perdió `.env` | Sin copia, no hay recuperación: se reinstala desde cero, borrando los volúmenes `rid_*` |
+| Inicio de sesión en bucle | El nombre del portal no coincide con el del `.env` (`DEN_PUBLIC_URL`). `OPERATIONS.md §7` |
+| Los nodos no conectan | 51820/udp cerrado en el firewall de la nube, o el DNS del gateway no apunta aquí (`DEN_WG_HUB_ENDPOINT`) |
+| Se perdió `.env` | Sin copia, no hay recuperación: se reinstala desde cero, borrando los volúmenes `den_*` |
 
 Más diagnóstico en `OPERATIONS.md §4` y §7.
 
@@ -169,5 +169,5 @@ sudo ./install.sh stop
 # Borra contenedores Y DATOS (bases de datos, CA, bitácora). Irreversible: respalda antes.
 docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
   -f infra/compose/docker-compose.edge.yml --env-file .env --profile observability down --volumes
-docker network rm rid-edge
+docker network rm den-edge
 ```

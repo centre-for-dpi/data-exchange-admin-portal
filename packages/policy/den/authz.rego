@@ -1,14 +1,14 @@
 # Traffic authorization policy evaluated by APISIX's opa plugin (ARCHITECTURE.md §4.2).
 #
-# APISIX queries data.rid.authz and reads `allow`, `headers`, `status_code` and `reason`:
+# APISIX queries data.den.authz and reads `allow`, `headers`, `status_code` and `reason`:
 # - allow: `headers` go to the upstream. Every header listed in the plugin's
 #   send_headers_upstream that this policy does NOT return is removed, so client values never
-#   pass through unchecked (SPIKE S-1). X-RID-End-User is never returned: only its salted hash.
-# - deny: `headers` are response headers (problem+json and X-RID-Deny-Reason for the access log)
+#   pass through unchecked (SPIKE S-1). X-DEN-End-User is never returned: only its salted hash.
+# - deny: `headers` are response headers (problem+json and X-DEN-Deny-Reason for the access log)
 #   and `reason` is the problem+json body.
 #
 # The data comes from the portal's bundle: data.routes, data.clients and data.config.
-package rid.authz
+package den.authz
 
 import rego.v1
 
@@ -42,9 +42,9 @@ route_id := input.route.id
 
 route := data.routes[route_id]
 
-purpose := header("x-rid-purpose")
+purpose := header("x-den-purpose")
 
-end_user := header("x-rid-end-user")
+end_user := header("x-den-end-user")
 
 # Rule 3: the operation is found by method and by pathRegex on the full public path.
 operation := op if {
@@ -57,13 +57,13 @@ now := time.now_ns()
 
 # --- Client certificate (SPIKE S-3, M3-02) -----------------------------------------------------
 #
-# The gateway's rid-client-cert plugin puts in X-RID-Client-Cert-S256 the RFC 8705 thumbprint of
+# The gateway's den-client-cert plugin puts in X-DEN-Client-Cert-S256 the RFC 8705 thumbprint of
 # the certificate verified in the TLS handshake, after removing any value the client sent. The
 # token binds to a certificate with cnf["x5t#S256"]. A certificate is valid for the application
 # while its thumbprint is in the bundle (data.clients[id].certificates): revoking it, or its
 # expiry, takes it out of the list.
 
-client_thumbprint := header("x-rid-client-cert-s256")
+client_thumbprint := header("x-den-client-cert-s256")
 
 bound_thumbprint := claims.cnf["x5t#S256"]
 
@@ -137,7 +137,7 @@ end_user_invalid if {
 
 # --- Data subject (ADR-0015) ----------------------------------------------------------------
 #
-# The operation says where its data subject is (bundle `subject`, from x-rid-data-subject). The
+# The operation says where its data subject is (bundle `subject`, from x-den-data-subject). The
 # policy turns it into a keyed pseudonym; the document number itself never leaves the request.
 
 declares_subject if operation.subject.in in {"path", "body"}
@@ -167,10 +167,10 @@ subject_type := upper(path_match[operation.subject.typeGroup]) if {
 
 subject_number := normalized(path_match[operation.subject.numberGroup])
 
-# Body subjects: the gateway plugin rid-data-subject read them from the JSON body (ADR-0017) and
+# Body subjects: the gateway plugin den-data-subject read them from the JSON body (ADR-0017) and
 # passes "TYPE:NUMBER", or just "NUMBER" with the operation's (or the country's) type. Any value
 # the client sent in that header was removed before; the consumer cannot assert the subject.
-header_parts := split(header("x-rid-body-subject"), ":") if operation.subject.in == "body"
+header_parts := split(header("x-den-body-subject"), ":") if operation.subject.in == "body"
 
 subject_type := upper(trim_space(header_parts[0])) if count(header_parts) == 2
 
@@ -248,20 +248,20 @@ end_user_hash := crypto.hmac.sha256(end_user, data.config.endUserHashSalt) if en
 rate_limit := ceil(subscription_data.rateLimitPerMinute / object.get(data.config, "gatewayNodes", 1))
 
 base_headers := {
-	"X-RID-Consumer-Entity": client.entitySlug,
-	"X-RID-Consumer-App": client_id,
-	"X-RID-Subscription": subscription,
-	"X-RID-Purpose": purpose,
-	"X-RID-Operation": operation.id,
-	"X-RID-Rate-Limit": format_int(rate_limit, 10),
+	"X-DEN-Consumer-Entity": client.entitySlug,
+	"X-DEN-Consumer-App": client_id,
+	"X-DEN-Subscription": subscription,
+	"X-DEN-Purpose": purpose,
+	"X-DEN-Operation": operation.id,
+	"X-DEN-Rate-Limit": format_int(rate_limit, 10),
 	"X-Request-Id": object.get(input.request.headers, "x-request-id", ""),
 }
 
-end_user_header := {"X-RID-End-User-Hash": end_user_hash} if end_user_hash
+end_user_header := {"X-DEN-End-User-Hash": end_user_hash} if end_user_hash
 
 else := {}
 
-subject_header := {"X-RID-Subject-Ref": subject_ref} if subject_ref
+subject_header := {"X-DEN-Subject-Ref": subject_ref} if subject_ref
 
 else := {}
 
@@ -269,18 +269,18 @@ else := {}
 # subsystem, so the call carries the official (its hash) and the subscription in the X-Road headers
 # for that. Whatever the consumer sent under those names is replaced or removed.
 xroad_headers := object.union(
-	{"X-Road-Issue": sprintf("rid:subscription:%s", [subscription])},
+	{"X-Road-Issue": sprintf("den:subscription:%s", [subscription])},
 	{"X-Road-UserId": end_user_hash},
 ) if {
 	route.xroad
 	end_user_hash
 }
 
-else := {"X-Road-Issue": sprintf("rid:subscription:%s", [subscription])} if route.xroad
+else := {"X-Road-Issue": sprintf("den:subscription:%s", [subscription])} if route.xroad
 
 else := {}
 
-# X-RID-End-User, X-RID-Body-Subject and X-RID-Client-Cert-S256 are never returned: the opa
+# X-DEN-End-User, X-DEN-Body-Subject and X-DEN-Client-Cert-S256 are never returned: the opa
 # plugin then removes them before the upstream (SPIKE S-1).
 headers := object.union_n([base_headers, end_user_header, subject_header, xroad_headers]) if allow
 
@@ -290,14 +290,14 @@ headers := object.union_n([base_headers, end_user_header, subject_header, xroad_
 headers := object.union(
 	{
 		"Content-Type": "application/problem+json",
-		"X-RID-Deny-Reason": deny_reason,
+		"X-DEN-Deny-Reason": deny_reason,
 	},
 	deny_consumer_headers,
 ) if not allow
 
 deny_consumer_headers := {
-	"X-RID-Consumer-App": client_id,
-	"X-RID-Consumer-Entity": client.entitySlug,
+	"X-DEN-Consumer-App": client_id,
+	"X-DEN-Consumer-Entity": client.entitySlug,
 } if {
 	client
 } else := {}
@@ -305,7 +305,7 @@ deny_consumer_headers := {
 status_code := 403 if not allow
 
 reason := {
-	"type": sprintf("https://rid.example/errors/%s", [deny_reason]),
+	"type": sprintf("https://den.example/errors/%s", [deny_reason]),
 	"title": "Access denied by the data exchange network",
 	"status": 403,
 	"code": deny_reason,
@@ -316,10 +316,10 @@ details := {
 	"no_subscription": "The application has no subscription to this API version.",
 	"app_suspended": "The application is suspended.",
 	"operation_not_allowed": "The subscription does not cover this operation.",
-	"purpose_not_allowed": "Send X-RID-Purpose with a purpose approved for this subscription.",
+	"purpose_not_allowed": "Send X-DEN-Purpose with a purpose approved for this subscription.",
 	"subscription_expired": "The subscription is not valid at this time.",
-	"end_user_required": "This API requires X-RID-End-User with the official making the request.",
-	"end_user_invalid": "X-RID-End-User must identify the official: 1 to 128 visible ASCII characters, no spaces.",
+	"end_user_required": "This API requires X-DEN-End-User with the official making the request.",
+	"end_user_invalid": "X-DEN-End-User must identify the official: 1 to 128 visible ASCII characters, no spaces.",
 	"data_subject_required": "The request does not say whose data it asks for, in the path or in the body as the API documents.",
 	"client_certificate_required": "Call the gateway over TLS with the application's client certificate.",
 	"token_not_bound": "Get the access token with the client certificate: it must be bound to it (cnf x5t#S256).",
@@ -327,7 +327,7 @@ details := {
 	"certificate_revoked": "The client certificate is not valid for this application (revoked, expired or another application's).",
 }
 
-# What the gateway reads (M6-03): the opa plugin queries rid/authz/decision, so OPA evaluates and
+# What the gateway reads (M6-03): the opa plugin queries den/authz/decision, so OPA evaluates and
 # returns only these four, not every rule of the package (the client with its subscriptions and
 # certificates, the route with its operations...). Querying the whole package cost more CPU than
 # the decision itself, in OPA and in APISIX parsing the answer, and saturated OPA at 500 req/s.

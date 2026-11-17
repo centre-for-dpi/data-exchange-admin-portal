@@ -1,6 +1,6 @@
 'use server';
 
-import { adminEntitySchema } from '@rid/contracts';
+import { adminEntitySchema } from '@den/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';

@@ -7,14 +7,14 @@ import { dirname, join, resolve } from 'node:path';
  * talks to the portal only through the citizen API and the public evidence endpoints.
  */
 export interface CitizenAppConfig {
-  /** Public base URL, possibly with a path (https://host/carpeta). Routes live under its path. */
+  /** Public base URL, possibly with a path (https://host/citizen-app). Routes live under its path. */
   publicUrl: string;
   basePath: string;
   port: number;
   /** Shown in the header; the app is a reference, not the real folder of any country. */
   name: { es: string; en: string };
   oidc: {
-    /** Public issuer of the national identity (rid-citizens in development). */
+    /** Public issuer of the national identity (den-citizens in development). */
     issuer: string;
     /** Where this server reaches the issuer (in containers, by service name); default issuer. */
     internalUrl: string;
@@ -31,7 +31,7 @@ export interface CitizenAppConfig {
     jwksUrl: string;
     tsaRootUrl: string;
   };
-  /** Standard Webhooks secret shared with the portal (RID_CITIZEN_APPS). */
+  /** Standard Webhooks secret shared with the portal (DEN_CITIZEN_APPS). */
   webhookSecret: string;
   smtp: { host: string; port: number; from: string };
   /** Where the app keeps which alert id belongs to which of its users. */
@@ -60,14 +60,14 @@ const required = (name: string): string => {
 };
 
 export function configFromEnv(): CitizenAppConfig {
-  const publicUrl = (process.env.RID_CARPETA_URL ?? 'http://localhost:3100').replace(/\/+$/, '');
-  const issuer = process.env.RID_CITIZEN_ISSUER ?? 'http://localhost:8080/realms/rid-citizens';
+  const publicUrl = (process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100').replace(/\/+$/, '');
+  const issuer = process.env.DEN_CITIZEN_ISSUER ?? 'http://localhost:8080/realms/den-citizens';
   const apiUrl = (
     process.env.CITIZEN_APP_PORTAL_API_URL ??
-    process.env.RID_API_URL ??
+    process.env.DEN_API_URL ??
     'http://localhost:4000'
   ).replace(/\/+$/, '');
-  const tsaUrl = (process.env.RID_TSA_URL ?? 'http://localhost:3004').replace(/\/+$/, '');
+  const tsaUrl = (process.env.DEN_TSA_URL ?? 'http://localhost:3004').replace(/\/+$/, '');
   return {
     publicUrl,
     basePath: new URL(publicUrl).pathname.replace(/\/+$/, ''),
@@ -79,8 +79,8 @@ export function configFromEnv(): CitizenAppConfig {
     oidc: {
       issuer,
       internalUrl: process.env.CITIZEN_APP_ISSUER_INTERNAL_URL ?? issuer,
-      clientId: process.env.CITIZEN_APP_CLIENT_ID ?? 'carpeta-ciudadana',
-      clientSecret: required('RID_CARPETA_CLIENT_SECRET'),
+      clientId: process.env.CITIZEN_APP_CLIENT_ID ?? 'citizen-app',
+      clientSecret: required('DEN_CITIZEN_APP_CLIENT_SECRET'),
     },
     portal: {
       apiUrl,
@@ -91,7 +91,7 @@ export function configFromEnv(): CitizenAppConfig {
     smtp: {
       host: process.env.CITIZEN_APP_SMTP_HOST ?? 'localhost',
       port: Number(process.env.CITIZEN_APP_SMTP_PORT ?? process.env.MAILPIT_SMTP_PORT ?? 1025),
-      from: process.env.CITIZEN_APP_MAIL_FROM ?? 'avisos@carpeta.demo.rid.example',
+      from: process.env.CITIZEN_APP_MAIL_FROM ?? 'avisos@citizen-app.demo.den.example',
     },
     dataFile: process.env.CITIZEN_APP_DATA_FILE ?? resolve('data/alerts.json'),
   };

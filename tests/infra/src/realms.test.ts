@@ -56,8 +56,8 @@ const DEMO_USERS = [
   'marta.regulador',
 ];
 
-describe('realm rid-portal', () => {
-  const realm = readRealm('rid-portal');
+describe('realm den-portal', () => {
+  const realm = readRealm('den-portal');
 
   it('has every user of docs/DEMO.md with a fixed id', () => {
     const users = realm.users ?? [];
@@ -84,8 +84,8 @@ describe('realm rid-portal', () => {
     }
   });
 
-  it('defines rid-portal-web as a confidential client with PKCE and no password grant', () => {
-    const web = realm.clients?.find((c) => c.clientId === 'rid-portal-web');
+  it('defines den-portal-web as a confidential client with PKCE and no password grant', () => {
+    const web = realm.clients?.find((c) => c.clientId === 'den-portal-web');
     expect(web).toMatchObject({ publicClient: false, directAccessGrantsEnabled: false });
     expect(web?.attributes?.['pkce.code.challenge.method']).toBe('S256');
   });
@@ -96,22 +96,22 @@ describe('realm rid-portal', () => {
   });
 });
 
-describe('realm rid-gateway', () => {
-  const realm = readRealm('rid-gateway');
+describe('realm den-gateway', () => {
+  const realm = readRealm('den-gateway');
 
   it('contains no application clients, only the portal provisioner', () => {
-    expect((realm.clients ?? []).map((c) => c.clientId)).toEqual(['rid-portal-provisioner']);
+    expect((realm.clients ?? []).map((c) => c.clientId)).toEqual(['den-portal-provisioner']);
   });
 
   it('grants the provisioner manage-clients and nothing else', () => {
     const serviceAccount = realm.users?.find(
-      (u) => u.username === 'service-account-rid-portal-provisioner',
+      (u) => u.username === 'service-account-den-portal-provisioner',
     );
     expect(serviceAccount?.clientRoles).toEqual({ 'realm-management': ['manage-clients'] });
   });
 
-  it('adds the rid-gateway audience to every new client and uses 5-minute tokens', () => {
-    expect(realm.defaultDefaultClientScopes).toContain('rid-gateway-audience');
+  it('adds the den-gateway audience to every new client and uses 5-minute tokens', () => {
+    expect(realm.defaultDefaultClientScopes).toContain('den-gateway-audience');
     expect(realm.accessTokenLifespan).toBe(300);
   });
 
@@ -121,12 +121,12 @@ describe('realm rid-gateway', () => {
   });
 });
 
-describe('realm rid-citizens (MT-05)', () => {
-  const realm = readRealm('rid-citizens') as RealmFile & {
+describe('realm den-citizens (MT-05)', () => {
+  const realm = readRealm('den-citizens') as RealmFile & {
     components?: Record<string, Array<{ config: Record<string, string[]> }>>;
     users: Array<{ attributes?: Record<string, string[]> }>;
   };
-  const carpeta = realm.clients?.find((c) => c.clientId === 'carpeta-ciudadana');
+  const carpeta = realm.clients?.find((c) => c.clientId === 'citizen-app');
 
   it('has one citizen app: confidential, code + PKCE, no password grant', () => {
     expect(realm.clients).toHaveLength(1);
@@ -134,7 +134,7 @@ describe('realm rid-citizens (MT-05)', () => {
       publicClient: false,
       directAccessGrantsEnabled: false,
       serviceAccountsEnabled: false,
-      secret: '${RID_CARPETA_CLIENT_SECRET}',
+      secret: '${DEN_CITIZEN_APP_CLIENT_SECRET}',
     });
     expect(carpeta?.attributes?.['pkce.code.challenge.method']).toBe('S256');
     expect(realm.registrationAllowed).toBe(false);
@@ -161,8 +161,8 @@ describe('realm rid-citizens (MT-05)', () => {
   });
 });
 
-describe('realm rid-portal: second factor (M3-08, ADR-0021)', () => {
-  const realm = readRealm('rid-portal');
+describe('realm den-portal: second factor (M3-08, ADR-0021)', () => {
+  const realm = readRealm('den-portal');
   const flow = (alias: string) => realm.authenticationFlows?.find((f) => f.alias === alias);
   const config = (alias?: string) => realm.authenticatorConfig?.find((c) => c.alias === alias);
 
@@ -171,12 +171,12 @@ describe('realm rid-portal: second factor (M3-08, ADR-0021)', () => {
   });
 
   it('logs in with the password, and asks for the one-time code only at level 2', () => {
-    expect(realm.browserFlow).toBe('rid-browser');
-    expect(flow('rid-browser')?.authenticationExecutions).toEqual([
+    expect(realm.browserFlow).toBe('den-browser');
+    expect(flow('den-browser')?.authenticationExecutions).toEqual([
       expect.objectContaining({ authenticator: 'auth-cookie', requirement: 'ALTERNATIVE' }),
-      expect.objectContaining({ flowAlias: 'rid-browser-forms', requirement: 'ALTERNATIVE' }),
+      expect.objectContaining({ flowAlias: 'den-browser-forms', requirement: 'ALTERNATIVE' }),
     ]);
-    const levels = flow('rid-browser-forms')?.authenticationExecutions.map((e) => {
+    const levels = flow('den-browser-forms')?.authenticationExecutions.map((e) => {
       const steps = flow(e.flowAlias ?? '')?.authenticationExecutions ?? [];
       return {
         requirement: e.requirement,

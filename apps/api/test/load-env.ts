@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-/** Points the API at the integration-test database (rid_test) using the repo-root .env. */
+/** Points the API at the integration-test database (den_test) using the repo-root .env. */
 export function useTestDatabase(): void {
   const rootEnv = resolve(import.meta.dirname, '../../../.env');
   if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
@@ -12,5 +12,5 @@ export function useTestDatabase(): void {
   }
   process.env.DATABASE_URL = app;
   process.env.DATABASE_MIGRATION_URL = owner;
-  process.env.RID_WORKER = 'off';
+  process.env.DEN_WORKER = 'off';
 }

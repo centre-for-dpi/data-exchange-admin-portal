@@ -1,19 +1,19 @@
-# Values of the rid chart on the kind test cluster (scripts/helm-kind.mjs). Small, one node, our
+# Values of the den chart on the kind test cluster (scripts/helm-kind.mjs). Small, one node, our
 # images built locally; the rest is the production chart as it is.
-publicUrl: http://rid.127.0.0.1.nip.io:18080
+publicUrl: http://den.127.0.0.1.nip.io:18080
 gatewayHost: gw.127.0.0.1.nip.io
 gatewayPublicUrl: https://gw.127.0.0.1.nip.io:19443
 
 images:
-  api: { repository: rid/portal-api, tag: kind }
-  web: { repository: rid/portal-web, tag: kind }
-  wgHub: { repository: rid/wg-hub, tag: kind }
-  contractRunner: { repository: rid/contract-runner, tag: kind }
+  api: { repository: den/portal-api, tag: kind }
+  web: { repository: den/portal-web, tag: kind }
+  wgHub: { repository: den/wg-hub, tag: kind }
+  contractRunner: { repository: den/contract-runner, tag: kind }
 
 secrets:
   externalSecrets:
     # A fake store of External Secrets with random values (the script): the same path as OpenBao.
-    secretStoreRef: { name: rid-kind, kind: ClusterSecretStore }
+    secretStoreRef: { name: den-kind, kind: ClusterSecretStore }
     refreshInterval: 1m
 
 api:
@@ -67,7 +67,7 @@ accessLogs: { enabled: false }
 
 networkPolicy:
   ingressControllerNamespace: traefik
-  platformNamespace: rid-platform
+  platformNamespace: den-platform
 
 # One clamd is enough to try the uploads (M6-08).
 antivirus:

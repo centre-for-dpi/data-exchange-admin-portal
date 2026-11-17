@@ -243,7 +243,7 @@
   }
 
   /* Markdown written by providers (rendered without raw HTML). */
-  .prose-rid {
+  .prose-den {
     max-width: 48rem;
     line-height: 1.7;
     & > * + * {

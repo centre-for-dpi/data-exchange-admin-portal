@@ -1,8 +1,8 @@
-# A single-node kind cluster to install the RID charts end to end (M6-05, scripts/helm-kind.mjs).
+# A single-node kind cluster to install the DEN charts end to end (M6-05, scripts/helm-kind.mjs).
 # Test only: production has nodes in several zones (ARCHITECTURE §11).
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-name: rid
+name: den
 nodes:
   - role: control-plane
     image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed

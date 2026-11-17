@@ -46,7 +46,7 @@ CREATE INDEX "outbox_pending_idx" ON "outbox"("created_at");
 
 -- Append-only audit log (CLAUDE.md rule 4, ARCHITECTURE.md §7).
 -- 1) The runtime role can only INSERT and SELECT (default privileges granted it DML on creation).
-REVOKE UPDATE, DELETE, TRUNCATE ON "audit_event" FROM rid_app;
+REVOKE UPDATE, DELETE, TRUNCATE ON "audit_event" FROM den_app;
 
 -- 2) Defense in depth: nobody, including the owner, can modify or delete audit rows through
 --    normal statements. Retention purges (SPEC.md §11) will need an explicit, audited procedure.

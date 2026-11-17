@@ -1,15 +1,15 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 /**
- * Values the portal keeps sealed (AES-256-GCM with RID_SECRETS_KEY): the client secret of an
+ * Values the portal keeps sealed (AES-256-GCM with DEN_SECRETS_KEY): the client secret of an
  * application until the Keycloak reconciler has set it on the client (SPEC.md §4.3), the private
  * keys of the gateway's certificates and of its assertion keys.
  *
  * The key can be rotated (M6, ASVS 11.1): each sealed value names the key that sealed it
  * (`v2.<kid>.<iv>.<tag>.<ciphertext>`, kid = the first 8 hex digits of the key's SHA-256). The
- * keys in RID_SECRETS_KEYS_PREVIOUS (comma-separated) still open what they sealed, including the
+ * keys in DEN_SECRETS_KEYS_PREVIOUS (comma-separated) still open what they sealed, including the
  * older `v1` values that name no key, until `secrets:reseal` has sealed everything again with the
- * current key (OPERATIONS.md §5.6). New values are always sealed with RID_SECRETS_KEY.
+ * current key (OPERATIONS.md §5.6). New values are always sealed with DEN_SECRETS_KEY.
  */
 const CURRENT_VERSION = 'v2';
 
@@ -32,14 +32,14 @@ function parseKey(raw: string, name: string): Key {
 
 /** The current key, then the previous ones. Read on every call: rotation needs no restart. */
 function keyring(): { current: Key; previous: Key[] } {
-  const raw = process.env.RID_SECRETS_KEY;
-  if (!raw) throw new Error('RID_SECRETS_KEY is not set (see .env.example)');
-  const current = parseKey(raw, 'RID_SECRETS_KEY');
-  const previous = (process.env.RID_SECRETS_KEYS_PREVIOUS ?? '')
+  const raw = process.env.DEN_SECRETS_KEY;
+  if (!raw) throw new Error('DEN_SECRETS_KEY is not set (see .env.example)');
+  const current = parseKey(raw, 'DEN_SECRETS_KEY');
+  const previous = (process.env.DEN_SECRETS_KEYS_PREVIOUS ?? '')
     .split(',')
     .map((k) => k.trim())
     .filter(Boolean)
-    .map((k) => parseKey(k, 'RID_SECRETS_KEYS_PREVIOUS'));
+    .map((k) => parseKey(k, 'DEN_SECRETS_KEYS_PREVIOUS'));
   return { current, previous };
 }
 
@@ -80,7 +80,7 @@ export function open(sealed: string, context: string): string {
     const key = [current, ...previous].find((k) => k.id === kid);
     if (!key) {
       throw new Error(
-        `Sealed with key ${kid}, which is neither RID_SECRETS_KEY nor a previous one`,
+        `Sealed with key ${kid}, which is neither DEN_SECRETS_KEY nor a previous one`,
       );
     }
     return decrypt(key, iv, tag, ciphertext, context);

@@ -38,7 +38,7 @@ const records = Array.from({ length: 5 }, (_, i) => ({
 const leaves = records.map((r) => v.recordLeafHash(r, 2));
 const payload = {
   v: 2,
-  log: 'rid-transparency-test',
+  log: 'den-transparency-test',
   seq: 1,
   treeSize: records.length,
   root: v.toHex(v.treeRoot(leaves)),

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
-import { getCountryConfig } from '@rid/config';
+import { getCountryConfig } from '@den/config';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.md': 'text/markdown; charset=utf-8',

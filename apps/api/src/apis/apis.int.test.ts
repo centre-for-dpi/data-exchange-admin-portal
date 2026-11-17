@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { loadCountryConfig } from '@rid/config';
-import { apiDetailSchema, apiVersionDetailSchema } from '@rid/contracts';
+import { loadCountryConfig } from '@den/config';
+import { apiDetailSchema, apiVersionDetailSchema } from '@den/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/test-auth.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -63,7 +63,7 @@ describe('API registration (M1-03)', () => {
     sector: 'salud',
     tags: ['afiliacion'],
     classification: 'personal',
-    ownerContact: 'apis@salud.demo.rid.example',
+    ownerContact: 'apis@salud.demo.den.example',
   });
 
   const versionBody = (openapi = saludOpenapi, version = '1.0') => ({
@@ -287,12 +287,12 @@ describe('API registration (M1-03)', () => {
     });
 
     it('requires personal-data APIs to say whose data each operation handles (ADR-0015)', async () => {
-      // The salud document without its x-rid-data-subject declarations.
+      // The salud document without its x-den-data-subject declarations.
       const undeclared = saludOpenapi.replace(
-        /^ {6}(#.*\n {6})?x-rid-data-subject:\n( {8}.*\n)+/gm,
+        /^ {6}(#.*\n {6})?x-den-data-subject:\n( {8}.*\n)+/gm,
         '',
       );
-      expect(undeclared).not.toContain('x-rid-data-subject');
+      expect(undeclared).not.toContain('x-den-data-subject');
 
       const api = await createApi();
       const res = await request(
@@ -304,7 +304,7 @@ describe('API registration (M1-03)', () => {
       const version = apiVersionDetailSchema.parse(res.json());
       expect(version.lintReport.valid).toBe(false);
       expect(
-        version.lintReport.issues.filter((i) => i.code === 'rid-data-subject-required'),
+        version.lintReport.issues.filter((i) => i.code === 'den-data-subject-required'),
       ).toHaveLength(2);
       expect(version.operations.map((o) => o.dataSubject)).toEqual([null, null]);
       const submit = await request(
@@ -335,7 +335,7 @@ describe('API registration (M1-03)', () => {
 
     it('does not require the declaration on APIs without personal data', async () => {
       const undeclared = saludOpenapi.replace(
-        /^ {6}(#.*\n {6})?x-rid-data-subject:\n( {8}.*\n)+/gm,
+        /^ {6}(#.*\n {6})?x-den-data-subject:\n( {8}.*\n)+/gm,
         '',
       );
       const created = await request('POST', `/api/v1/entities/${salud}/apis`, 'pedro.publicador', {

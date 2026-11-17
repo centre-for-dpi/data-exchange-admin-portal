@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { type MeResponse, meResponseSchema } from '@rid/contracts';
+import { type MeResponse, meResponseSchema } from '@den/contracts';
 import { CurrentPrincipal, SignedIn } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';

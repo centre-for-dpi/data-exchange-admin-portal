@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { ConsumedUsage, ConsumedUsageQuery, ProviderUsage, UsageQuery } from '@rid/contracts';
+import type { ConsumedUsage, ConsumedUsageQuery, ProviderUsage, UsageQuery } from '@den/contracts';
 import { NotFoundError } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';

@@ -1,6 +1,6 @@
 'use client';
 
-import type { NotificationKind } from '@rid/contracts';
+import type { NotificationKind } from '@den/contracts';
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import { initialFormState } from '../../lib/forms';

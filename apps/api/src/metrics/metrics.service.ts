@@ -9,11 +9,11 @@ import { PGBOSS_SCHEMA } from '../queue/queue.service.js';
 export const METRICS_PATH = '/metrics';
 
 /**
- * Bearer token Prometheus presents (RID_METRICS_TOKEN). Without it the endpoint answers 404:
+ * Bearer token Prometheus presents (DEN_METRICS_TOKEN). Without it the endpoint answers 404:
  * metrics are internal operating data, never public.
  */
 export function metricsTokenMatches(authorization: string | undefined): boolean {
-  const token = process.env.RID_METRICS_TOKEN;
+  const token = process.env.DEN_METRICS_TOKEN;
   if (!token || !authorization?.startsWith('Bearer ')) return false;
   const digest = (v: string) => createHash('sha256').update(v).digest();
   return timingSafeEqual(digest(authorization.slice('Bearer '.length)), digest(token));
@@ -33,9 +33,9 @@ export class MetricsService {
 
   constructor(private readonly prisma: PrismaService) {
     const registers = [this.registry];
-    collectDefaultMetrics({ register: this.registry, prefix: 'rid_api_' });
+    collectDefaultMetrics({ register: this.registry, prefix: 'den_api_' });
     this.http = new Histogram({
-      name: 'rid_api_http_request_duration_seconds',
+      name: 'den_api_http_request_duration_seconds',
       help: 'Duration of the API requests, by method, route template and status.',
       labelNames: ['method', 'route', 'status'],
       buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
@@ -50,11 +50,11 @@ export class MetricsService {
     };
 
     const queue = new Gauge({
-      name: 'rid_queue_jobs',
+      name: 'den_queue_jobs',
       help: 'Background jobs (pg-boss) waiting, retrying, running or failed, by queue.',
       labelNames: ['queue', 'state'],
       registers,
-      collect: safely('rid_queue_jobs', async () => {
+      collect: safely('den_queue_jobs', async () => {
         const rows = await this.prisma.$queryRawUnsafe<
           Array<{ name: string; state: string; count: bigint }>
         >(
@@ -67,11 +67,11 @@ export class MetricsService {
     });
 
     const sync = new Gauge({
-      name: 'rid_sync_targets',
+      name: 'den_sync_targets',
       help: 'Objects the reconcilers keep (sync_state), by system and status.',
       labelNames: ['system', 'status'],
       registers,
-      collect: safely('rid_sync_targets', async () => {
+      collect: safely('den_sync_targets', async () => {
         const rows = await this.prisma.syncState.groupBy({
           by: ['system', 'status'],
           _count: { _all: true },
@@ -82,10 +82,10 @@ export class MetricsService {
     });
 
     const lag = new Gauge({
-      name: 'rid_opa_bundle_lag_seconds',
+      name: 'den_opa_bundle_lag_seconds',
       help: 'Seconds since the bundle OPA should run was built, while OPA still runs an older one; 0 when it is current.',
       registers,
-      collect: safely('rid_opa_bundle_lag_seconds', async () => {
+      collect: safely('den_opa_bundle_lag_seconds', async () => {
         const state = await this.prisma.syncState.findUnique({
           where: { target: OPA_SYNC_TARGET },
         });
@@ -102,11 +102,11 @@ export class MetricsService {
     });
 
     const nodes = new Gauge({
-      name: 'rid_nodes',
+      name: 'den_nodes',
       help: 'Nodes of the kit, by status.',
       labelNames: ['status'],
       registers,
-      collect: safely('rid_nodes', async () => {
+      collect: safely('den_nodes', async () => {
         const rows = await this.prisma.node.groupBy({ by: ['status'], _count: { _all: true } });
         nodes.reset();
         for (const r of rows) nodes.set({ status: r.status }, r._count._all);
@@ -114,11 +114,11 @@ export class MetricsService {
     });
 
     const expiry = new Gauge({
-      name: 'rid_certificate_soonest_expiry_seconds',
+      name: 'den_certificate_soonest_expiry_seconds',
       help: 'Seconds until the soonest certificate in use expires, by kind (gateway, node, application).',
       labelNames: ['kind'],
       registers,
-      collect: safely('rid_certificate_soonest_expiry_seconds', async () => {
+      collect: safely('den_certificate_soonest_expiry_seconds', async () => {
         const now = Date.now();
         const [gateway, node, application] = await Promise.all([
           // The gateway's current certificate of each purpose: the newest one.

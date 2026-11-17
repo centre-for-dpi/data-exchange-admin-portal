@@ -1,4 +1,4 @@
-import { apiPageSchema } from '@rid/contracts';
+import { apiPageSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Badge, StatusBadge, classificationTone } from '../../../components/ui/badge';

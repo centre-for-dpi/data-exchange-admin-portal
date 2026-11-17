@@ -2,7 +2,7 @@
 
 import { getToken } from 'next-auth/jwt';
 import { headers } from 'next/headers';
-import { MFA_ACR } from '@rid/contracts';
+import { MFA_ACR } from '@den/contracts';
 import { redirect } from 'next/navigation';
 import { keycloakIssuer, signIn, signOut } from '../auth';
 import { routing, type AppLocale } from '../i18n/routing';
@@ -37,10 +37,10 @@ export async function signOutAction(locale: string): Promise<void> {
   });
   await signOut({ redirect: false });
 
-  const webUrl = process.env.RID_WEB_URL ?? 'http://localhost:3000';
+  const webUrl = process.env.DEN_WEB_URL ?? 'http://localhost:3000';
   const params = new URLSearchParams({
     post_logout_redirect_uri: `${webUrl}${homePath(asLocale(locale))}`,
-    client_id: process.env.RID_PORTAL_WEB_CLIENT_ID ?? 'rid-portal-web',
+    client_id: process.env.DEN_PORTAL_WEB_CLIENT_ID ?? 'den-portal-web',
   });
   if (typeof token?.idToken === 'string') params.set('id_token_hint', token.idToken);
   redirect(`${keycloakIssuer()}/protocol/openid-connect/logout?${params.toString()}`);
