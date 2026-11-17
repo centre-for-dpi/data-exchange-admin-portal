@@ -812,8 +812,8 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - imágenes de producción del API y la web (816 MB y 1,33 GB, antes 2,9 y 3,2 GB), sin dependencias de desarrollo ni gestor de paquetes; `images.yml` las construye con SBOM, las escanea con Trivy y las publica con una etiqueta. Las cuatro pasan el escaneo en local;
       - logs del API enmascarados y en JSON para el colector del clúster (ASVS 16.4.3).
     - **Falta:**
-      - instalarlo: kind con `pnpm helm:kind`, y luego el entorno del operador, con una restauración de Barman Cloud desde su almacenamiento (M6-06);
-      - publicar la primera versión de las imágenes (etiqueta `v0.1.0`).
+      - instalarlo: kind con `pnpm helm:kind`, y luego el entorno del operador, con una restauración de Barman Cloud desde su almacenamiento (M6-06).
+    - **Imágenes publicadas (2026-11-17):** `v0.1.0` en ghcr.io (API, web, hub y runner), escaneadas y con SBOM; el CI vuelve a estar en verde.
     - **Para M6-06:** CloudNativePG respalda con Barman, no con pgBackRest. El operador de pgBackRest (Crunchy) distribuye sus imágenes con términos no OSI, así que hace falta un ADR.
 - [x] **M6-06 — Respaldos y recuperación**: pgBackRest, procedimiento de restauración probado.
   - _Hecho (2026-11-16):_ ADR-0026, con dos herramientas, una por topología:

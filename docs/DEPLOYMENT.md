@@ -630,12 +630,13 @@ Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
 - **Publicación.** Con una etiqueta `vX.Y.Z` publica en `ghcr.io/centre-for-dpi/<imagen>:X.Y.Z` (el `appVersion` del chart), con las atestaciones de SBOM y de procedencia de BuildKit. A mano (`workflow_dispatch`) solo construye y escanea, salvo que se marque `publish`.
 - **Acciones fijadas.** Las acciones de terceros están fijadas por commit.
 
+**v0.1.0 (2026-11-17).** Primera publicación: `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, también como `latest`, escaneadas sin hallazgos altos ni críticos, con su SBOM y procedencia. El paquete hereda la visibilidad del repositorio (privado): el clúster necesita un `imagePullSecrets` con acceso a ghcr.io hasta que se publiquen como públicas.
+
 Las imágenes del API y de la web son de varias etapas. La de ejecución lleva solo las dependencias de producción (`pnpm deploy --prod`) y los archivos del repositorio que lee el proceso: la configuración del país y, en el API, las políticas de OPA y el realm del seed del piloto. No lleva gestor de paquetes. El contenedor de migraciones corre `node_modules/.bin/prisma migrate deploy`.
 
 ### 9.7 Pendiente en M6-05
 
 - **Instalar** en kind (`pnpm helm:kind`) y luego en el entorno tipo producción del operador. El chart nunca se ha instalado.
-- **Publicar la primera versión** de las imágenes (una etiqueta `v0.1.0`), cuando se decida.
 
 ## 10. Un país nuevo (M6-09)
 
