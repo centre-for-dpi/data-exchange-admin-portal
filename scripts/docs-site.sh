@@ -17,7 +17,7 @@ wrap() { # wrap <lang> <source> <target>
 
 for f in docs/guides/*.html; do wrap en "$f" "$out/guides/$(basename "$f")"; done
 for f in docs/es/guides/*.html; do wrap es "$f" "$out/es/guides/$(basename "$f")"; done
-cp docs/site/index.html "$out/index.html"
+cp -R docs/site/. "$out/"
 touch "$out/.nojekyll"
 
 find "$out" -type f | sort

@@ -2,6 +2,8 @@
 
 > Versión en español: [docs/es/README.md](docs/es/README.md)
 
+Documentation site: https://centre-for-dpi.github.io/data-exchange-admin-portal/
+
 Developer portal and governance console for a national data exchange network between public entities, built 100% with open source software.
 
 - Entities publish their APIs (existing ones, or ones created with the instant API kit).
@@ -50,7 +52,7 @@ Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) before openin
 - [docs/BACKLOG.md](docs/BACKLOG.md) — milestones and stories
 - [docs/DEMO.md](docs/DEMO.md) — demo script
 - [docs/INSTALL.md](docs/INSTALL.md) — **installing on a server** with `sudo ./install.sh`, and VPS requirements
-- [docs/guides/operator.md](docs/guides/operator.md) — the platform explained for the operator and the regulator (presentation version: `operator.html`, also on the [guides site](https://centre-for-dpi.github.io/data-exchange-admin-portal/))
+- [docs/guides/operator.md](docs/guides/operator.md) — the platform explained for the operator and the regulator (presentation version: `operator.html`)
 - [docs/guides/entities.md](docs/guides/entities.md) — what each participating entity designates, provides and does (presentation version: `entities.html`). The guide for providers (node, installation and publication) is in the kit repository: `docs/guides/providers.md`
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deployment of each component (development and pilot)
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — go-live, operating routine, backups and common problems

@@ -2,6 +2,8 @@
 
 > English version (official): [README.md](../../README.md)
 
+Sitio de documentación: https://centre-for-dpi.github.io/data-exchange-admin-portal/es/
+
 Portal de desarrolladores y consola de gobierno para una red nacional de intercambio de datos entre entidades públicas, construido 100 % con software open source.
 
 - Las entidades publican sus APIs (existentes o creadas con el kit de APIs instantáneas).
@@ -50,7 +52,7 @@ Las contribuciones son bienvenidas: lee [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - [docs/BACKLOG.md](../BACKLOG.md) — hitos e historias
 - [docs/es/DEMO.md](DEMO.md) — guion de demo
 - [docs/es/INSTALL.md](INSTALL.md) — **instalación en un servidor** con `sudo ./install.sh` y requisitos del VPS
-- [docs/es/guides/operator.md](guides/operator.md) — la plataforma explicada para el operador y el regulador (versión para proyectar: `operator.html`, también en el [sitio de las guías](https://centre-for-dpi.github.io/data-exchange-admin-portal/))
+- [docs/es/guides/operator.md](guides/operator.md) — la plataforma explicada para el operador y el regulador (versión para proyectar: `operator.html`)
 - [docs/es/guides/entities.md](guides/entities.md) — qué designa, dispone y hace cada entidad participante (versión para proyectar: `entities.html`). La guía de las proveedoras (nodo, instalación y publicación) está en el repositorio del kit: `docs/es/guides/providers.md`
 - [docs/es/DEPLOYMENT.md](DEPLOYMENT.md) — despliegue de cada componente (desarrollo y piloto)
 - [docs/es/OPERATIONS.md](OPERATIONS.md) — puesta en marcha, rutina de operación, respaldos y problemas frecuentes

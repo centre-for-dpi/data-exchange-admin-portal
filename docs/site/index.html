@@ -16,6 +16,8 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main a:not(.card):focus-visible { outline: 3px solid var(--gov); outline-offset: 2px; }
+main p a { color: var(--gov); }
 main { max-width: 860px; margin: 0 auto; padding: 48px 16px 64px; }
 h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
 .lede { color: var(--muted); margin: 0 0 32px; max-width: 60ch; }
@@ -34,23 +36,17 @@ footer a { color: var(--gov); }
 <body>
 <main>
   <h1>Data Exchange Network · guides</h1>
-  <p class="lede">How the platform works and how it is installed, for the network's operator and regulator, and what each participating entity provides. English is the official version; the Spanish one is kept in step.</p>
+  <p class="lede">How the platform works and how it is installed, for the network's operator and regulator, and what each participating entity provides.</p>
 
   <section aria-labelledby="en">
-    <h2 id="en">English</h2>
+    <h2 id="en">Guides</h2>
     <div class="cards">
       <a class="card" href="guides/operator.html"><b>Operator guide</b><span>Architecture, every component, installation with <code>install.sh</code>, day-to-day operation.</span></a>
       <a class="card data" href="guides/entities.html"><b>Entity guide</b><span>What a consumer or provider entity designates, provides and does.</span></a>
     </div>
   </section>
 
-  <section aria-labelledby="es" lang="es">
-    <h2 id="es">Español</h2>
-    <div class="cards">
-      <a class="card" href="es/guides/operator.html" hreflang="es"><b>Guía del operador</b><span>Arquitectura, cada componente, instalación con <code>install.sh</code>, operación del día a día.</span></a>
-      <a class="card data" href="es/guides/entities.html" hreflang="es"><b>Guía de entidades</b><span>Qué designa, dispone y hace una entidad consumidora o proveedora.</span></a>
-    </div>
-  </section>
+  <p><a href="es/" hreflang="es" lang="es">Versión en español</a></p>
 
   <footer>
     <p>Source, full technical documentation and the installer: <a href="https://github.com/centre-for-dpi/data-exchange-admin-portal">github.com/centre-for-dpi/data-exchange-admin-portal</a>.</p>

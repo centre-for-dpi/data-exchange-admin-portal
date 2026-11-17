@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guías DEN</title>
+<meta name="description" content="Guías para el operador, el regulador y las entidades participantes de una red de intercambio de datos (DEN).">
+<style>
+:root {
+  --bg: #f5f7fa; --surface: #ffffff; --ink: #15202b; --muted: #536170; --line: #d8dee6;
+  --gov: #3a4cc0; --data: #0a7569;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1319; --surface: #151c24; --ink: #e5eaf0; --muted: #9ba8b6; --line: #2a3541; --gov: #95a3f7; --data: #52cfbd; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main a:not(.card):focus-visible { outline: 3px solid var(--gov); outline-offset: 2px; }
+main p a { color: var(--gov); }
+main { max-width: 860px; margin: 0 auto; padding: 48px 16px 64px; }
+h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
+.lede { color: var(--muted); margin: 0 0 32px; max-width: 60ch; }
+h2 { font-size: 1.05rem; margin: 32px 0 12px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+a.card { display: block; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--gov); border-radius: 8px; padding: 16px; color: inherit; text-decoration: none; }
+a.card.data { border-left-color: var(--data); }
+a.card:hover b, a.card:focus-visible b { text-decoration: underline; }
+a.card:focus-visible, footer a:focus-visible { outline: 3px solid var(--gov); outline-offset: 2px; }
+a.card b { display: block; font-size: 1.05rem; margin-bottom: 4px; }
+a.card span { color: var(--muted); font-size: 0.93rem; }
+footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
+footer a { color: var(--gov); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Red de intercambio de datos · guías</h1>
+  <p class="lede">Cómo funciona la plataforma y cómo se instala, para el operador y el regulador de la red, y qué dispone cada entidad participante. La versión oficial está en inglés; esta se mantiene al día con ella.</p>
+
+  <section aria-labelledby="es">
+    <h2 id="es">Guías</h2>
+    <div class="cards">
+      <a class="card" href="guides/operator.html"><b>Guía del operador</b><span>Arquitectura, cada componente, instalación con <code>install.sh</code>, operación del día a día.</span></a>
+      <a class="card data" href="guides/entities.html"><b>Guía de entidades</b><span>Qué designa, dispone y hace una entidad consumidora o proveedora.</span></a>
+    </div>
+  </section>
+
+  <p><a href="../" hreflang="en" lang="en">English version (official)</a></p>
+
+  <footer>
+    <p>Código, documentación técnica completa e instalador: <a href="https://github.com/centre-for-dpi/data-exchange-admin-portal">github.com/centre-for-dpi/data-exchange-admin-portal</a>.</p>
+  </footer>
+</main>
+</body>
+</html>
