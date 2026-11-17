@@ -52,7 +52,8 @@ if (
   process.exit(2);
 }
 // The realm's password policy (M6-01) refuses shorter ones, and Keycloak would not import it.
-const demoPassword = values['demo-password'] || process.env.DEN_DEPLOY_DEMO_PASSWORD;
+// An empty value (install.sh's "Enter = random") counts as absent.
+const demoPassword = values['demo-password'] || process.env.DEN_DEPLOY_DEMO_PASSWORD || undefined;
 if (demoPassword !== undefined && demoPassword.length < 12) {
   console.error('--demo-password: at least 12 characters (the realm password policy)');
   process.exit(1);
