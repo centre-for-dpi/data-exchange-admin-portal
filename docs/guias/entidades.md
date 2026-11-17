@@ -39,7 +39,7 @@ Cada persona necesita un **correo institucional propio**: la cuenta se verifica 
 
 ### 3.2 Como proveedora
 
-Toda proveedora se conecta por medio del **nodo**, que se instala dentro de su red y abre un túnel cifrado **hacia afuera** (salida `UDP 51820` y `443/tcp`; ningún puerto de entrada). Detrás del nodo va la API propia de la entidad (modo canal) o, en una versión posterior del kit, APIs instantáneas sobre vistas de su base de datos (modo completo). Las entidades que ya publican en X-Road llegan por el Security Server del operador.
+Toda proveedora se conecta por medio del **nodo**, que se instala dentro de su red y abre un túnel cifrado **hacia afuera** (salida `UDP 51820` y `443/tcp`; ningún puerto de entrada). Detrás del nodo va la API propia de la entidad (modo canal) o APIs instantáneas sobre vistas de su base de datos (modo completo: SQL Server, PostgreSQL, MySQL u Oracle). Las entidades que ya publican en X-Road llegan por el Security Server del operador.
 
 Los requisitos del servidor y de la red, la instalación y la publicación están en la **guía de proveedoras** del repositorio del kit.
 
