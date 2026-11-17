@@ -46,7 +46,11 @@ const networksOf = (compose: Compose, service: string) =>
  * nothing of the platform's internals (database, CA, analytics store, mail).
  */
 describe('network segmentation of the stack (M6-01)', () => {
-  const deployEnv = { RID_PUBLIC_URL: 'https://portal.test', MAILPIT_UI_AUTH: 'a:b' };
+  const deployEnv = {
+    DEN_PUBLIC_URL: 'https://portal.test',
+    MAILPIT_UI_AUTH: 'a:b',
+    PGBACKREST_REPO1_CIPHER_PASS: 'test-cipher-pass',
+  };
   const stacks = [
     ['development', config(['docker-compose.yml'])],
     ['pilot', config(['docker-compose.yml', 'docker-compose.deploy.yml'], deployEnv)],
@@ -100,7 +104,11 @@ describe('OPA keeps its last bundle (M6-04)', () => {
   });
 
   it('mounts that directory on a volume, in development and in the pilot', () => {
-    const deployEnv = { RID_PUBLIC_URL: 'https://portal.test', MAILPIT_UI_AUTH: 'a:b' };
+    const deployEnv = {
+    DEN_PUBLIC_URL: 'https://portal.test',
+    MAILPIT_UI_AUTH: 'a:b',
+    PGBACKREST_REPO1_CIPHER_PASS: 'test-cipher-pass',
+  };
     for (const compose of [
       config(['docker-compose.yml']),
       config(['docker-compose.yml', 'docker-compose.deploy.yml'], deployEnv),
