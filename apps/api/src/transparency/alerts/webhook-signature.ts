@@ -46,7 +46,7 @@ export function webhookHeaders(
   };
 }
 
-/** For receivers (the reference Carpeta, tests): true if one of the v1 signatures matches. */
+/** For receivers (the reference citizen app, tests): true if one of the v1 signatures matches. */
 export function verifyWebhook(
   secret: string,
   headers: Partial<Record<keyof WebhookHeaders, string | undefined>>,

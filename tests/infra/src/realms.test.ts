@@ -126,17 +126,17 @@ describe('realm den-citizens (MT-05)', () => {
     components?: Record<string, Array<{ config: Record<string, string[]> }>>;
     users: Array<{ attributes?: Record<string, string[]> }>;
   };
-  const carpeta = realm.clients?.find((c) => c.clientId === 'citizen-app');
+  const citizenApp = realm.clients?.find((c) => c.clientId === 'citizen-app');
 
   it('has one citizen app: confidential, code + PKCE, no password grant', () => {
     expect(realm.clients).toHaveLength(1);
-    expect(carpeta).toMatchObject({
+    expect(citizenApp).toMatchObject({
       publicClient: false,
       directAccessGrantsEnabled: false,
       serviceAccountsEnabled: false,
       secret: '${DEN_CITIZEN_APP_CLIENT_SECRET}',
     });
-    expect(carpeta?.attributes?.['pkce.code.challenge.method']).toBe('S256');
+    expect(citizenApp?.attributes?.['pkce.code.challenge.method']).toBe('S256');
     expect(realm.registrationAllowed).toBe(false);
   });
 

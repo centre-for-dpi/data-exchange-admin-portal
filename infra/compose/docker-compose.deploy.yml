@@ -14,7 +14,7 @@
 #       /auth        -> den-keycloak:8080     (Keycloak, relative path /auth)
 #       /gw          -> den-apisix:9080       (gateway, prefix stripped by the proxy)
 #       /mail        -> den-mailpit:8025      (Mailpit, demo mail, behind MAILPIT_UI_AUTH)
-#       /citizen-app     -> den-citizen-app:3100      (reference citizen folder, MT-07)
+#       /citizen-app -> den-citizen-app:3100  (reference citizen app, MT-07)
 #       /tsa/api/v1/timestamp/certchain -> den-tsa:3004 (the TSA certificates, for verifiers)
 #       /grafana     -> den-grafana:3000      (operator dashboard, M5-06; Grafana's own login)
 #   - the API and the web app run in containers (apps/*/Dockerfile); the API applies migrations
@@ -247,7 +247,7 @@ services:
       edge:
         aliases: [den-portal-web]
 
-  carpeta:
+  citizen-app:
     build:
       context: ../..
       dockerfile: infra/mock-citizen-app/Dockerfile

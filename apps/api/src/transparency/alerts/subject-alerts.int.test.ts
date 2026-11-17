@@ -62,8 +62,8 @@ describe('citizen notices of new consultations (MT-06)', () => {
   let alerts: SubjectAlertsService;
   let versionId = '';
   let subscriptionId = '';
-  /** Plays the Carpeta: records what it receives and answers with `status`. */
-  let carpeta: Server;
+  /** Plays the citizen app: records what it receives and answers with `status`. */
+  let citizenApp: Server;
   let received: Received[] = [];
   let status = 200;
 
@@ -186,7 +186,7 @@ describe('citizen notices of new consultations (MT-06)', () => {
     );
     expect(approved.statusCode, approved.body).toBe(200);
 
-    carpeta = createServer((req, res) => {
+    citizenApp = createServer((req, res) => {
       let body = '';
       req.on('data', (chunk: Buffer) => (body += chunk.toString()));
       req.on('end', () => {
@@ -194,8 +194,8 @@ describe('citizen notices of new consultations (MT-06)', () => {
         res.writeHead(status).end();
       });
     });
-    await new Promise<void>((done) => carpeta.listen(0, '127.0.0.1', done));
-    const { port } = carpeta.address() as AddressInfo;
+    await new Promise<void>((done) => citizenApp.listen(0, '127.0.0.1', done));
+    const { port } = citizenApp.address() as AddressInfo;
     process.env.DEN_CITIZEN_APPS = JSON.stringify({
       'citizen-app': { webhookUrl: `http://127.0.0.1:${port}/hook`, webhookSecret: secret },
     });
@@ -207,7 +207,7 @@ describe('citizen notices of new consultations (MT-06)', () => {
   });
 
   afterAll(async () => {
-    await new Promise((done) => carpeta.close(done));
+    await new Promise((done) => citizenApp.close(done));
     await app.close();
     await prisma.$disconnect();
   });
@@ -278,7 +278,7 @@ describe('citizen notices of new consultations (MT-06)', () => {
       expect((await queuedFor(alertId ?? '')).length).toBe(before + 2);
     });
 
-    it('reach the Carpeta signed, with the opaque id and nothing about the person', async () => {
+    it('reach the citizen app signed, with the opaque id and nothing about the person', async () => {
       const { alertId } = subjectAlertsSchema.parse(
         (await asCitizen('PUT', valentina, { classifications: ['personal'] })).json(),
       );
@@ -307,12 +307,12 @@ describe('citizen notices of new consultations (MT-06)', () => {
       expect(body.data).toMatchObject({ alertId, classification: 'personal' });
       expect(got?.body).not.toContain(valentina.number);
       expect(got?.body).not.toContain(refOf(valentina.number));
-      // Same message id on a retry, so the Carpeta can drop duplicates.
+      // Same message id on a retry, so the citizen app can drop duplicates.
       await alerts.deliver(job);
       expect(received[1]?.headers['webhook-id']).toBe(got?.headers['webhook-id']);
     });
 
-    it('are retried while the Carpeta fails, and dropped once the citizen turns them off', async () => {
+    it('are retried while the citizen app fails, and dropped once the citizen turns them off', async () => {
       const { alertId } = subjectAlertsSchema.parse(
         (await asCitizen('PUT', valentina, { classifications: ['personal'] })).json(),
       );

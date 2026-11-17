@@ -4,9 +4,9 @@ const keycloak = process.env.KEYCLOAK_URL ?? 'http://localhost:8080';
 const api = process.env.DEN_API_URL ?? 'http://localhost:4000';
 
 /**
- * Logs a citizen in to the reference Carpeta (realm den-citizens, client citizen-app) with
+ * Logs a citizen in to the reference citizen app (realm den-citizens, client citizen-app) with
  * Authorization Code + PKCE, submitting Keycloak's login form as a browser would, and returns the
- * access token. The Carpeta itself (MT-07) does not need to run: the code is taken from the
+ * access token. The citizen app itself (MT-07) does not need to run: the code is taken from the
  * redirect.
  */
 export async function citizenToken(username: string): Promise<string> {
@@ -94,8 +94,8 @@ export async function myAccesses(token: string): Promise<CitizenAccess[]> {
   return items;
 }
 
-/** The reference citizen folder (infra/mock-citizen-app, MT-07). */
-export const carpeta = process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100';
+/** The reference citizen app (infra/mock-citizen-app, MT-07). */
+export const citizenApp = process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100';
 const mailpit = `http://localhost:${process.env.MAILPIT_UI_PORT ?? '8025'}/api/v1`;
 
 /** Messages Mailpit received for an address. */

@@ -98,7 +98,7 @@ export const portalWebClient = (): LoginClient => ({
   redirectUri: `${webUrl()}/api/auth/callback/keycloak`,
 });
 
-/** The reference Carpeta Ciudadana in realm den-citizens (MT-05, MT-07). */
+/** The reference citizen app in realm den-citizens (MT-05, MT-07). */
 export const citizenAppClient = (): LoginClient => ({
   realm: 'den-citizens',
   clientId: 'citizen-app',

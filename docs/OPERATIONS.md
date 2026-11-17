@@ -28,14 +28,14 @@ dc exec api wget -qO- http://opa:8181/health
 postgres ──▶ keycloak ─────────────┐
 etcd ──────▶ apisix ───────────────┤
 step-ca ───────────────────────────┼──▶ api ──▶ web
-tsa-init ──▶ tsa ──────────────────┘      └───▶ carpeta
+tsa-init ──▶ tsa ──────────────────┘      └───▶ citizen-app
 opa ················ downloads the bundle from api (retries on its own)
 fluent-bit-transparency ··· sends records to api (disk buffer while api does not respond)
 opensearch ──▶ fluent-bit ··· receives analytics logs from apisix
-mailpit ··· receives email from api, keycloak and carpeta
+mailpit ··· receives email from api, keycloak and citizen-app
 ```
 
-Compose follows this order with `depends_on` and health checks: `api` waits for `postgres`, `step-ca`, `keycloak` and `apisix` to be healthy and for `tsa` to have started; `web` and `carpeta` wait for `api` to be healthy. OPA and the Fluent Bits do not depend on the API: they retry until it responds.
+Compose follows this order with `depends_on` and health checks: `api` waits for `postgres`, `step-ca`, `keycloak` and `apisix` to be healthy and for `tsa` to have started; `web` and `citizen-app` wait for `api` to be healthy. OPA and the Fluent Bits do not depend on the API: they retry until it responds.
 
 **Data plane vs. governance plane.** If `api`, `web` or `keycloak` go down, the gateway keeps serving with the last etcd configuration and the last OPA bundle. Without Keycloak no new tokens are issued, and validating the current ones depends on APISIX having the realm's keys (JWKS) cached; this is not tested yet (M6-04). If `apisix`, `etcd` or `opa` go down, traffic stops.
 
@@ -57,7 +57,7 @@ Compose follows this order with `depends_on` and health checks: `api` waits for 
 | `mailpit` | — | Save the `MAILPIT_UI_AUTH` user | Open `$DEN_PUBLIC_URL/mail` |
 | `api` | Migrations (`prisma migrate deploy`), idempotent seed (`DEN_ALLOW_SEED=true`), start of the background jobs and an **immediate full reconciliation** of APISIX and Keycloak | Review the log of the first start | `dc logs api` shows `Portal API listening on 4000 (country <code>)`; `curl -fsS $DEN_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
 | `web` | — | Nothing | Open `$DEN_PUBLIC_URL` and sign in |
-| `carpeta` | — | Nothing | Open `$DEN_PUBLIC_URL/citizen-app` |
+| `citizen-app` | — | Nothing | Open `$DEN_PUBLIC_URL/citizen-app` |
 | Reverse proxy | — | Configure the routes from DEPLOYMENT §5.2 **without** `/api/v1/internal` or `/api/v1/opa` | `curl -i $DEN_PUBLIC_URL/api/v1/opa/bundle.tar.gz` must **not** reach the API (404 from the proxy or the web) |
 
 Overall status at a glance: `dc ps` (all `running`, and `healthy` those that have a health check; `tsa-init` in `exited (0)`).
@@ -308,7 +308,7 @@ Rotating and revoking the applications' secrets and certificates is done by thei
 | :-- | :-- |
 | `APISIX_ADMIN_KEY`, `OPA_BUNDLE_TOKEN`, `DEN_TRANSPARENCY_INGEST_TOKEN` | Change it in `.env` and recreate the services that use it at the same time (`apisix` + `api`; `opa` + `api`; `fluent-bit-transparency` + `api`) |
 | `AUTH_SECRET` | Change it and recreate `web`: all sessions are closed |
-| Keycloak client secrets (`DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_GATEWAY_PROVISIONER_SECRET`, `DEN_CITIZEN_APP_CLIENT_SECRET`) | Change the client secret in Keycloak (console or `kcadm`) **and** in `.env`, and recreate `web`, `api` or `carpeta` |
+| Keycloak client secrets (`DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_GATEWAY_PROVISIONER_SECRET`, `DEN_CITIZEN_APP_CLIENT_SECRET`) | Change the client secret in Keycloak (console or `kcadm`) **and** in `.env`, and recreate `web`, `api` or `citizen-app` |
 | PostgreSQL passwords | `ALTER ROLE ... PASSWORD` **and** `.env` (with its URLs), and recreate the services |
 | `DEN_TRANSPARENCY_SIGNING_JWK` | New key with a different `kid`; the old public key goes to `DEN_TRANSPARENCY_RETIRED_JWKS`. Full procedure for production still pending |
 | Gateway certificates (server, and clients towards providers) | The APISIX reconciler renews them on its own; to force it, restart the API after deleting the matching `gateway_certificate` row |

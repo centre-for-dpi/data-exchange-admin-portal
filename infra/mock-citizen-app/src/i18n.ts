@@ -9,7 +9,8 @@ const es = {
   landingTitle: '¿Quién consultó mis datos?',
   landingLead:
     'Mira qué entidades públicas consultaron tus datos, cuándo y para qué, y verifica cada consulta con un comprobante que nadie puede alterar.',
-  landingNote: 'Esta es una carpeta de referencia para la demostración: los datos son sintéticos.',
+  landingNote:
+    'Esta es una aplicación de referencia para la demostración: los datos son sintéticos.',
   accessesTitle: '¿Quién consultó mis datos?',
   accessesLead:
     'Consultas que pasaron por la red de intercambio. Solo se registra quién consultó, qué dato y para qué; nunca el contenido.',
@@ -31,7 +32,7 @@ const es = {
   sealing: 'En sellado',
   alertsTitle: 'Avisos',
   alertsLead:
-    'Te avisamos por correo cuando una entidad consulte tus datos. El portal de la red no conoce tu correo: solo esta carpeta.',
+    'Te avisamos por correo cuando una entidad consulte tus datos. El portal de la red no conoce tu correo: solo esta aplicación.',
   alertsPersonal: 'Datos personales',
   alertsSensitive: 'Datos sensibles (salud y otras categorías especiales)',
   alertsEmail: 'Correo para los avisos',
@@ -44,7 +45,7 @@ const es = {
   receiptInvalid: 'El comprobante no se pudo verificar',
   receiptPending: 'La consulta todavía no tiene sello de tiempo',
   receiptLead:
-    'Esta carpeta verificó el comprobante por su cuenta, sin confiar en el portal: usó la clave pública del operador y el certificado de la autoridad de sellado de tiempo.',
+    'Esta aplicación verificó el comprobante por su cuenta, sin confiar en el portal: usó la clave pública del operador y el certificado de la autoridad de sellado de tiempo.',
   checkSignature: 'Firma del operador',
   checkInclusion: 'La consulta está en el lote sellado',
   checkTimestamp: 'Sello de tiempo independiente',
@@ -58,7 +59,7 @@ const es = {
   sessionExpired: 'Tu sesión terminó. Ingresa de nuevo.',
   mailSubject: 'Una entidad consultó tus datos',
   mailBody:
-    'Hola:\n\nEl {date} una entidad pública consultó tus datos ({classification}) a través de la red de intercambio.\n\nIngresa a tu carpeta para ver quién fue, para qué y el comprobante: {link}\n\nEste aviso no incluye tus datos ni los de la consulta.',
+    'Hola:\n\nEl {date} una entidad pública consultó tus datos ({classification}) a través de la red de intercambio.\n\nIngresa a la aplicación para ver quién fue, para qué y el comprobante: {link}\n\nEste aviso no incluye tus datos ni los de la consulta.',
   classPersonal: 'datos personales',
   classSensitive: 'datos sensibles',
 } as const;
@@ -73,7 +74,7 @@ const en: Messages = {
   landingTitle: 'Who consulted my data?',
   landingLead:
     'See which public bodies consulted your data, when and for what, and check each consultation with a receipt nobody can alter.',
-  landingNote: 'This is a reference folder for the demo: the data is synthetic.',
+  landingNote: 'This is a reference app for the demo: the data is synthetic.',
   accessesTitle: 'Who consulted my data?',
   accessesLead:
     'Consultations that went through the exchange network. Only who consulted, which data and why are recorded; never the content.',
@@ -95,7 +96,7 @@ const en: Messages = {
   sealing: 'Being sealed',
   alertsTitle: 'Notices',
   alertsLead:
-    'We email you when a body consults your data. The network portal does not know your email: only this folder does.',
+    'We email you when a body consults your data. The network portal does not know your email: only this app does.',
   alertsPersonal: 'Personal data',
   alertsSensitive: 'Sensitive data (health and other special categories)',
   alertsEmail: 'Email for notices',
@@ -108,7 +109,7 @@ const en: Messages = {
   receiptInvalid: 'The receipt could not be verified',
   receiptPending: 'The consultation has no time-stamp yet',
   receiptLead:
-    'This folder checked the receipt on its own, without trusting the portal: it used the operator public key and the certificate of the time-stamping authority.',
+    'This app checked the receipt on its own, without trusting the portal: it used the operator public key and the certificate of the time-stamping authority.',
   checkSignature: 'Operator signature',
   checkInclusion: 'The consultation is in the sealed batch',
   checkTimestamp: 'Independent time-stamp',
@@ -122,7 +123,7 @@ const en: Messages = {
   sessionExpired: 'Your session ended. Sign in again.',
   mailSubject: 'A public body consulted your data',
   mailBody:
-    'Hello,\n\nOn {date} a public body consulted your data ({classification}) through the exchange network.\n\nSign in to your folder to see who, why and the receipt: {link}\n\nThis notice includes neither your data nor the consultation details.',
+    'Hello,\n\nOn {date} a public body consulted your data ({classification}) through the exchange network.\n\nSign in to the app to see who, why and the receipt: {link}\n\nThis notice includes neither your data nor the consultation details.',
   classPersonal: 'personal data',
   classSensitive: 'sensitive data',
 };

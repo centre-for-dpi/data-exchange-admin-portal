@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 /**
- * Configuration of the reference citizen app. It plays the country's citizen folder: it has its
+ * Configuration of the reference citizen app. It plays the country's citizen app: it has its
  * own users (through the national identity), its own contact data and its own notices, and it
  * talks to the portal only through the citizen API and the public evidence endpoints.
  */
@@ -11,7 +11,7 @@ export interface CitizenAppConfig {
   publicUrl: string;
   basePath: string;
   port: number;
-  /** Shown in the header; the app is a reference, not the real folder of any country. */
+  /** Shown in the header; the app is a reference, not the real citizen app of any country. */
   name: { es: string; en: string };
   oidc: {
     /** Public issuer of the national identity (den-citizens in development). */
@@ -76,8 +76,8 @@ export function configFromEnv(): CitizenAppConfig {
     basePath: new URL(publicUrl).pathname.replace(/\/+$/, ''),
     port: Number(process.env.CITIZEN_APP_PORT ?? 3100),
     name: {
-      es: process.env.CITIZEN_APP_NAME_ES ?? 'Carpeta ciudadana (referencia)',
-      en: process.env.CITIZEN_APP_NAME_EN ?? 'Citizen folder (reference)',
+      es: process.env.CITIZEN_APP_NAME_ES ?? 'Aplicación ciudadana (referencia)',
+      en: process.env.CITIZEN_APP_NAME_EN ?? 'Citizen app (reference)',
     },
     oidc: {
       issuer,

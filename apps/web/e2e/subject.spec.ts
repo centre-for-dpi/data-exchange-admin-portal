@@ -179,7 +179,7 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
     // portal database (ADR-0015, golden rule 2).
     expect(placesHolding(unseen)).toEqual([]);
 
-    // MT-05: the citizen behind 1000000001 logs in to the Carpeta with the (simulated) national
+    // MT-05: the citizen behind 1000000001 logs in to the citizen app with the (simulated) national
     // identity and sees exactly these calls: the portal derived the same pseudonym from the
     // verified document in the token as the gateway did from the request.
     const mine = (await myAccesses(await citizenToken('ciudadana.demo'))).filter(

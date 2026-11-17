@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { carpeta, mailsTo, mailText } from './citizen';
+import { citizenApp, mailsTo, mailText } from './citizen';
 import {
   activeAffiliationSubscription,
   gateway,
@@ -8,22 +8,22 @@ import {
 } from './gateway-flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
-// MT-07, closing the transparency milestone: the demo citizen sees in the reference folder the
+// MT-07, closing the transparency milestone: the demo citizen sees in the reference citizen app the
 // consultation carlos's app made, gets the notice by email and verifies the receipt without
 // trusting the portal.
-test.describe('reference citizen folder (MT-07)', () => {
+test.describe('reference citizen app (MT-07)', () => {
   test('who consulted my data, the notice and the receipt', async ({ browser, page }) => {
     test.setTimeout(300_000);
-    const slug = `carpeta-${Date.now().toString(36)}`;
+    const slug = `citizenApp-${Date.now().toString(36)}`;
     const { apiName, clientId, clientSecret } = await activeAffiliationSubscription(
       browser,
       page,
       slug,
     );
 
-    // Valentina (CC 1000000001) signs in to her folder with the national identity.
+    // Valentina (CC 1000000001) signs in to the citizen app with the national identity.
     const citizen = await (await browser.newContext()).newPage();
-    await citizen.goto(`${carpeta}/`);
+    await citizen.goto(`${citizenApp}/`);
     await expect(citizen.getByRole('heading', { level: 1 })).toHaveText(
       '¿Quién consultó mis datos?',
     );
@@ -35,10 +35,10 @@ test.describe('reference citizen folder (MT-07)', () => {
       .locator('#password')
       .fill(process.env.DEN_DEMO_USER_PASSWORD ?? 'den-demo-password');
     await citizen.locator('#kc-login').click();
-    await citizen.waitForURL(`${carpeta}/consultas`);
+    await citizen.waitForURL(`${citizenApp}/consultas`);
 
     // She asks to be told about consultations of her personal data; the email stays in the
-    // folder, the portal only gets the choice.
+    // citizen app, the portal only gets the choice.
     const email = `valentina+${slug}@ciudadana.demo.den.example`;
     await citizen.getByLabel('Datos personales', { exact: true }).check();
     await citizen.getByLabel('Correo para los avisos').fill(email);
@@ -55,12 +55,12 @@ test.describe('reference citizen folder (MT-07)', () => {
     });
     expect(res.status).toBe(200);
 
-    // The notice: a signed webhook to the folder, an email from the folder. No data in it.
+    // The notice: a signed webhook to the citizen app, an email from the citizen app. No data in it.
     await expect.poll(async () => (await mailsTo(email)).length, { timeout: 60_000 }).toBe(1);
     const [mail] = await mailsTo(email);
     expect(mail?.Subject).toBe('Una entidad consultó tus datos');
     const text = await mailText(mail?.ID ?? '');
-    expect(text).toContain(`${carpeta}/consultas`);
+    expect(text).toContain(`${citizenApp}/consultas`);
     expect(text).not.toContain('1000000001');
     expect(text).not.toContain(apiName);
 

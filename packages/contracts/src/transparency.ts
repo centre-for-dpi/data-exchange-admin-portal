@@ -130,7 +130,7 @@ export type TransparencyVerification = z.infer<typeof transparencyVerificationSc
 const localizedSchema = z.union([z.string(), z.record(z.string(), z.string())]);
 
 /**
- * One consultation of the citizen's data, as the citizen sees it in the Carpeta (ADR-0015, SPEC
+ * One consultation of the citizen's data, as the citizen sees it in a citizen app (ADR-0015, SPEC
  * §2.4): who consulted, when, which data, for what purpose and with which official (as an opaque
  * reference). Never the document number.
  */

@@ -56,12 +56,12 @@ const PUBLIC_MATERIAL_TTL_MS = 5 * 60 * 1000;
 class SessionExpired extends Error {}
 
 /**
- * The reference citizen folder (MT-07). Server-rendered and dependency-light on purpose: it
+ * The reference citizen app (MT-07). Server-rendered and dependency-light on purpose: it
  * shows what any citizen app needs to do with the portal, nothing more.
  *  - Signs the citizen in with the national identity (code + PKCE, confidential client) and
  *    keeps the tokens server side.
  *  - Lists the consultations of the citizen's data through the citizen API.
- *  - Lets the citizen turn on notices: the folder keeps the email and maps the portal's opaque
+ *  - Lets the citizen turn on notices: the citizen app keeps the email and maps the portal's opaque
  *    alert id to its user; signed webhooks (Standard Webhooks, verified with the reference
  *    library) become emails (Mailpit in development).
  *  - Verifies each receipt by itself with public material: the operator's JWKS and the TSA's

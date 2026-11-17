@@ -2,7 +2,7 @@
   "name": "@den/mock-citizen-app",
   "version": "0.0.0",
   "private": true,
-  "description": "Reference citizen app (a Carpeta-like folder): who consulted my data, notices and receipt verification (MT-07)",
+  "description": "Reference citizen app: who consulted my data, notices and receipt verification (MT-07)",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

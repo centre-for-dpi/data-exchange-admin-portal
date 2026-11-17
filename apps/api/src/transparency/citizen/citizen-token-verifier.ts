@@ -14,7 +14,7 @@ export interface CitizenIdentity {
   sub: string;
   /** Keyed pseudonym of the citizen as data subject: what the gateway registered (ADR-0015). */
   ref: string;
-  /** Citizen app the token was issued to (the Carpeta). */
+  /** Citizen app the token was issued to (for example, the reference citizen app). */
   clientId: string;
 }
 

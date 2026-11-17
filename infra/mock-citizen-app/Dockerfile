@@ -1,4 +1,4 @@
-# Reference citizen folder (MT-07). Built from the repository root:
+# Reference citizen app (MT-07). Built from the repository root:
 #   docker build -f infra/mock-citizen-app/Dockerfile .
 FROM node:24.22.1-alpine3.24
 RUN npm install --global pnpm@11.15.0 && apk add --no-cache wget

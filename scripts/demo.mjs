@@ -429,7 +429,7 @@ async function main() {
   ok(
     `Comprobante válido: firma del operador, inclusión en el lote ${result.checkpoint.seq} y sello de tiempo (${result.stampedAt})`,
   );
-  info(`  Carpeta de referencia: ${env('DEN_CITIZEN_APP_URL', 'http://localhost:3100')}`);
+  info(`  App ciudadana de referencia: ${env('DEN_CITIZEN_APP_URL', 'http://localhost:3100')}`);
 
   console.log(
     `\n${green(bold('Demo completa en verde'))} ${dim(`(${((Date.now() - started) / 1000).toFixed(0)} s)`)}`,

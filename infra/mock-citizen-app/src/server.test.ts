@@ -8,10 +8,10 @@ import { AlertStore } from './store.js';
 
 const secret = `whsec_${randomBytes(32).toString('base64')}`;
 const config: CitizenAppConfig = {
-  publicUrl: 'https://folder.test/citizen-app',
+  publicUrl: 'https://citizen-app.test/citizen-app',
   basePath: '/citizen-app',
   port: 0,
-  name: { es: 'Carpeta de prueba', en: 'Test folder' },
+  name: { es: 'Aplicación de prueba', en: 'Test app' },
   oidc: {
     issuer: 'https://identity.test/realms/den-citizens',
     internalUrl: 'https://identity.test/realms/den-citizens',
@@ -24,11 +24,11 @@ const config: CitizenAppConfig = {
     tsaRootUrl: 'https://tsa.test/api/v1/timestamp/certchain',
   },
   webhookSecret: secret,
-  smtp: { host: 'localhost', port: 1025, from: 'avisos@folder.test' },
+  smtp: { host: 'localhost', port: 1025, from: 'avisos@citizen-app.test' },
   dataFile: '',
 };
 
-describe('reference citizen folder (MT-07)', () => {
+describe('reference citizen app (MT-07)', () => {
   const sent: Array<{ to: string; subject: string; text: string }> = [];
   const mailer: Mailer = {
     send: (m) => {
@@ -80,7 +80,7 @@ describe('reference citizen folder (MT-07)', () => {
     expect((await notice({ id })).statusCode).toBe(204); // retry of the same message
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ to: 'valentina@example.test' });
-    expect(sent[0]?.text).toContain('https://folder.test/citizen-app/consultas');
+    expect(sent[0]?.text).toContain('https://citizen-app.test/citizen-app/consultas');
     expect(sent[0]?.text).toContain('datos sensibles');
     expect(sent[0]?.text).not.toContain(alertId);
   });
@@ -110,7 +110,7 @@ describe('reference citizen folder (MT-07)', () => {
     );
     expect(target.searchParams.get('code_challenge_method')).toBe('S256');
     expect(target.searchParams.get('redirect_uri')).toBe(
-      'https://folder.test/citizen-app/auth/callback',
+      'https://citizen-app.test/citizen-app/auth/callback',
     );
   });
 

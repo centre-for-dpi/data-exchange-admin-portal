@@ -28,14 +28,14 @@ dc exec api wget -qO- http://opa:8181/health
 postgres ──▶ keycloak ─────────────┐
 etcd ──────▶ apisix ───────────────┤
 step-ca ───────────────────────────┼──▶ api ──▶ web
-tsa-init ──▶ tsa ──────────────────┘      └───▶ carpeta
+tsa-init ──▶ tsa ──────────────────┘      └───▶ citizen-app
 opa ················ descarga el bundle de api (reintenta solo)
 fluent-bit-transparency ··· envía registros a api (búfer en disco mientras api no responde)
 opensearch ──▶ fluent-bit ··· recibe logs de analítica de apisix
-mailpit ··· recibe el correo de api, keycloak y carpeta
+mailpit ··· recibe el correo de api, keycloak y citizen-app
 ```
 
-Compose respeta este orden con `depends_on` y health checks: `api` espera a `postgres`, `step-ca`, `keycloak` y `apisix` sanos y a que `tsa` haya arrancado; `web` y `carpeta` esperan a `api` sano. OPA y los Fluent Bit no dependen del API: reintentan hasta que responde.
+Compose respeta este orden con `depends_on` y health checks: `api` espera a `postgres`, `step-ca`, `keycloak` y `apisix` sanos y a que `tsa` haya arrancado; `web` y `citizen-app` esperan a `api` sano. OPA y los Fluent Bit no dependen del API: reintentan hasta que responde.
 
 **Plano de datos vs. plano de gobierno.** Si `api`, `web` o `keycloak` caen, el gateway sigue atendiendo con la última configuración de etcd y el último bundle de OPA. Sin Keycloak no se emiten tokens nuevos, y la validación de los vigentes depende de que APISIX tenga en caché las claves (JWKS) del realm; no está probado todavía (M6-04). Si cae `apisix`, `etcd` u `opa`, se corta el tráfico.
 
@@ -57,7 +57,7 @@ Compose respeta este orden con `depends_on` y health checks: `api` espera a `pos
 | `mailpit` | — | Guardar el usuario de `MAILPIT_UI_AUTH` | Abrir `$DEN_PUBLIC_URL/mail` |
 | `api` | Migraciones (`prisma migrate deploy`), seed idempotente (`DEN_ALLOW_SEED=true`), arranque de los trabajos en segundo plano y **reconciliación completa inmediata** de APISIX y Keycloak | Revisar el log del primer arranque | `dc logs api` muestra `Portal API listening on 4000 (country <código>)`; `curl -fsS $DEN_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
 | `web` | — | Nada | Abrir `$DEN_PUBLIC_URL` e iniciar sesión |
-| `carpeta` | — | Nada | Abrir `$DEN_PUBLIC_URL/citizen-app` |
+| `citizen-app` | — | Nada | Abrir `$DEN_PUBLIC_URL/citizen-app` |
 | Proxy inverso | — | Configurar las rutas de DEPLOYMENT §5.2 **sin** `/api/v1/internal` ni `/api/v1/opa` | `curl -i $DEN_PUBLIC_URL/api/v1/opa/bundle.tar.gz` **no** debe llegar al API (404 del proxy o de la web) |
 
 Estado general de un vistazo: `dc ps` (todos `running`, y `healthy` los que tienen health check; `tsa-init` en `exited (0)`).
@@ -308,7 +308,7 @@ La rotación y la revocación de los secretos y certificados de las aplicaciones
 | :-- | :-- |
 | `APISIX_ADMIN_KEY`, `OPA_BUNDLE_TOKEN`, `DEN_TRANSPARENCY_INGEST_TOKEN` | Cambiar en `.env` y recrear a la vez los servicios que lo usan (`apisix` + `api`; `opa` + `api`; `fluent-bit-transparency` + `api`) |
 | `AUTH_SECRET` | Cambiar y recrear `web`: todas las sesiones se cierran |
-| Secretos de clientes de Keycloak (`DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_GATEWAY_PROVISIONER_SECRET`, `DEN_CITIZEN_APP_CLIENT_SECRET`) | Cambiar el secreto del cliente en Keycloak (consola o `kcadm`) **y** en `.env`, y recrear `web`, `api` o `carpeta` |
+| Secretos de clientes de Keycloak (`DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_GATEWAY_PROVISIONER_SECRET`, `DEN_CITIZEN_APP_CLIENT_SECRET`) | Cambiar el secreto del cliente en Keycloak (consola o `kcadm`) **y** en `.env`, y recrear `web`, `api` o `citizen-app` |
 | Contraseñas de PostgreSQL | `ALTER ROLE ... PASSWORD` **y** `.env` (con sus URLs), y recrear los servicios |
 | `DEN_TRANSPARENCY_SIGNING_JWK` | Clave nueva con otro `kid`; la pública anterior va a `DEN_TRANSPARENCY_RETIRED_JWKS`. Procedimiento completo pendiente para producción |
 | Certificados del gateway (servidor y clientes hacia proveedores) | Los renueva solo el reconciliador de APISIX; para forzarlo, reiniciar el API tras borrar la fila de `gateway_certificate` correspondiente |

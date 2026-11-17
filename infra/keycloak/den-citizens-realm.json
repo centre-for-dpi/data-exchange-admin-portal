@@ -116,7 +116,7 @@
   "clients": [
     {
       "clientId": "citizen-app",
-      "name": "Carpeta Ciudadana (referencia)",
+      "name": "Citizen app (reference)",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,

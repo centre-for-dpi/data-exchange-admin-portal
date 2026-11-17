@@ -484,7 +484,7 @@ summary() {
     "Gateway (sistemas, mTLS):" "https://$GATEWAY_HOST" \
     "Consola de Keycloak:" "https://$PORTAL_HOST/auth/admin/" \
     "Correo de pruebas:" "https://$PORTAL_HOST/mail" \
-    "Carpeta ciudadana demo:" "https://$PORTAL_HOST/citizen-app"
+    "App ciudadana demo:" "https://$PORTAL_HOST/citizen-app"
   [[ $OBSERVABILITY == true ]] && printf '  %-26s %s\n' "Tablero del operador:" "https://$PORTAL_HOST/grafana/"
   echo
   info "Usuarios y contraseñas:   sudo ./install.sh credentials"
@@ -536,7 +536,7 @@ cmd_credentials() {
     "  responsable de datos (salud):" "lucia.datos (segundo factor)" \
     "  administradora de entidad:" "elena.admin" \
     "  desarrollador (consumidor):" "carlos.dev" \
-    "  ciudadana (carpeta):" "ciudadana.demo" \
+    "  ciudadana (app):" "ciudadana.demo" \
     "Keycloak (realm master):" "$(env_get KEYCLOAK_ADMIN_USER) / $(env_get KEYCLOAK_ADMIN_PASSWORD)" \
     "Correo de pruebas (/mail):" "$(env_get MAILPIT_UI_AUTH | sed 's/:/ \/ /')"
   [[ $(env_get DEN_INSTALL_OBSERVABILITY) == true ]] &&

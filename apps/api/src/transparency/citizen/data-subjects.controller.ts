@@ -19,7 +19,7 @@ import { DataSubjectsService } from './data-subjects.service.js';
 const accessParamsSchema = z.strictObject({ id: z.uuid() });
 
 /**
- * "Who consulted my data?" (ADR-0015, MT-05), for citizen apps such as the Carpeta Ciudadana.
+ * "Who consulted my data?" (ADR-0015, MT-05), for citizen apps (the country's citizen portal or folder).
  * Only with the citizen's own token: the portal derives who they are from the verified document
  * in the token and never takes a document number as input.
  */

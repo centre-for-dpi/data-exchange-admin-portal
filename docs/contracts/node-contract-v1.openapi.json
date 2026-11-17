@@ -681,7 +681,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Access token of the national digital identity, issued to an authorized citizen app (the Carpeta Ciudadana). Development: realm den-citizens."
+        "description": "Access token of the national digital identity, issued to an authorized citizen app. Development: realm den-citizens."
       },
       "nodeMutualTls": {
         "type": "mutualTLS",

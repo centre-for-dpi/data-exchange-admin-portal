@@ -6,7 +6,7 @@ Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en cu
 
 Este documento describe **cómo se despliega cada componente** del portal y del gateway: imagen, configuración, puertos, volúmenes, secretos y dependencias. Cómo dejarlo operativo y cómo operarlo día a día está en [`OPERATIONS.md`](OPERATIONS.md). La arquitectura de referencia está en [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-> **Alcance (ADR-0011).** Aquí solo se despliega el portal + el gateway. El kit de APIs instantáneas que se instala en las entidades es otro producto, con su propio repositorio. `mock-salud`, `mock-socioeconomico` y la carpeta ciudadana (`carpeta`) son utilería de pruebas y demostración.
+> **Alcance (ADR-0011).** Aquí solo se despliega el portal + el gateway. El kit de APIs instantáneas que se instala en las entidades es otro producto, con su propio repositorio. `mock-salud`, `mock-socioeconomico` y la app ciudadana (`citizen-app`) son utilería de pruebas y demostración.
 
 ## 1. Topologías
 
@@ -74,7 +74,7 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `grafana` | `grafana/grafana:13.3.0` (AGPL, contenedor propio) | 3000 | `GRAFANA_PORT` 3001 en `127.0.0.1` | `grafana-data` | `observability` | `GET /api/health` |
 | `api` | `den/portal-api:deploy` (`apps/api/Dockerfile`) | 4000 | — (en dev corre en el host) | `api-documents`, `step-ca-data` (solo `certs/`, lectura) | solo piloto | `GET /api/v1/health` |
 | `web` | `den/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (en dev corre en el host) | — | solo piloto | `GET /api/auth/providers` |
-| `carpeta` | `den/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (en dev corre en el host) | `citizen-app-data` | solo piloto | — |
+| `citizen-app` | `den/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (en dev corre en el host) | `citizen-app-data` | solo piloto | — |
 
 Prometheus, Alertmanager y Grafana **no** están en el Compose todavía (M5-06).
 
@@ -105,7 +105,7 @@ Lo que hay en APISIX, OPA y en los clientes de Keycloak se calcula desde aquí, 
 
 - **`den-portal`**, para las personas que usan el portal: inicio de sesión OIDC de la web, autorregistro, verificación de correo y recuperación de contraseña.
 - **`den-gateway`**, para las aplicaciones consumidoras. Emite los tokens `client_credentials` (5 min, `aud = den-gateway`) que APISIX valida en cada llamada. Sus clientes `den-app-<uuid>` los crea y mantiene el reconciliador del API, nunca una persona.
-- **`den-citizens`**, que simula la identidad digital del país para la carpeta ciudadana. En producción se reemplaza por el emisor del país (`DEN_CITIZEN_ISSUER`).
+- **`den-citizens`**, que simula la identidad digital del país para la app ciudadana. En producción se reemplaza por el emisor del país (`DEN_CITIZEN_ISSUER`).
 
 Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen tokens nuevos.
 
@@ -190,7 +190,7 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 
 **Función de `tsa-init` en el despliegue.** Es una tarea que corre una sola vez: genera la cadena de certificados de la TSA de desarrollo y termina.
 
-**Función de `tsa` en el despliegue.** Es la autoridad de sellado de tiempo (RFC 3161), independiente de la clave del operador. Sella dos cosas: los puntos de control del registro de transparencia y el anclaje diario de la bitácora de auditoría. Con el sello cualquiera puede probar que esos datos existían en ese momento y que no se reescribieron después (ADR-0016). Su cadena pública permite que terceros (la carpeta, `den-verify-receipt`) verifiquen los sellos sin confiar en el portal.
+**Función de `tsa` en el despliegue.** Es la autoridad de sellado de tiempo (RFC 3161), independiente de la clave del operador. Sella dos cosas: los puntos de control del registro de transparencia y el anclaje diario de la bitácora de auditoría. Con el sello cualquiera puede probar que esos datos existían en ese momento y que no se reescribieron después (ADR-0016). Su cadena pública permite que terceros (la app ciudadana, `den-verify-receipt`) verifiquen los sellos sin confiar en el portal.
 
 - `fluent-bit-transparency` (`infra/fluent-bit/transparency.yaml`): entrada TCP 5170 en JSON, filtro Lua `transparency.lua`, salida HTTP a `${DEN_TRANSPARENCY_COLLECTOR_HOST}:${DEN_TRANSPARENCY_COLLECTOR_PORT}/api/v1/internal/subject-access` con `Bearer ${DEN_TRANSPARENCY_INGEST_TOKEN}`. Búfer en disco (`transparency-buffer`, hasta 1 GB) y reintentos sin límite: si el API cae, los registros esperan.
 - `tsa-init` crea una sola vez la cadena de la TSA de desarrollo en `tsa-data` (`infra/tsa/init.sh`). `tsa` es sigstore timestamp-server con esa clave. En producción se usa la TSA acreditada del país (`DEN_TSA_URL`).
@@ -223,9 +223,9 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 
 ### 3.9 Mailpit
 
-**Función en el despliegue.** Hace de servidor de correo de pruebas: captura todo el correo saliente sin entregarlo a nadie y lo muestra en una bandeja web. Eso incluye las invitaciones, las notificaciones del portal, los anclajes enviados a los reguladores, los correos de verificación y recuperación de Keycloak y los avisos de la carpeta ciudadana. Ocupa el lugar del SMTP real del operador.
+**Función en el despliegue.** Hace de servidor de correo de pruebas: captura todo el correo saliente sin entregarlo a nadie y lo muestra en una bandeja web. Eso incluye las invitaciones, las notificaciones del portal, los anclajes enviados a los reguladores, los correos de verificación y recuperación de Keycloak y los avisos de la app ciudadana. Ocupa el lugar del SMTP real del operador.
 
-- Recibe todo el correo de desarrollo y del piloto (SMTP 1025): el del API (`DEN_SMTP_URL`), el de Keycloak (verificación y recuperación) y el de la carpeta.
+- Recibe todo el correo de desarrollo y del piloto (SMTP 1025): el del API (`DEN_SMTP_URL`), el de Keycloak (verificación y recuperación) y el de la app ciudadana.
 - En el piloto se sirve en `/mail` (`MP_WEBROOT`) detrás de usuario y contraseña (`MP_UI_AUTH=${MAILPIT_UI_AUTH}`): Keycloak envía allí los enlaces de recuperación de contraseña, así que una bandeja abierta permitiría tomar cualquier cuenta.
 - En producción se reemplaza por el SMTP real del operador (`DEN_SMTP_URL`, `DEN_MAIL_FROM`).
 
@@ -247,7 +247,7 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 - **REST (`/api/v1`).** Atiende a la web y a los sistemas. Aplica los flujos de publicación, solicitud y aprobación. Verifica rol y pertenencia a la entidad en cada endpoint y registra cada cambio en la bitácora.
 - **Trabajos en segundo plano.** Traducen el estado de PostgreSQL a configuración: rutas, upstreams y objetos SSL de APISIX, clientes de Keycloak (con la rotación de secretos) y bundle de OPA. También firman certificados con step-ca, reciben y sellan el registro de transparencia (firma del operador más sello de la TSA), envían correos y webhooks, y vencen suscripciones, versiones, certificados y ventanas de rotación de credenciales.
 
-Además sirve la API del titular que consume la carpeta ciudadana.
+Además sirve la API del titular que consume la app ciudadana.
 
 - Imagen: `apps/api/Dockerfile`, construida desde la raíz del repo (`COPY . .`). **La configuración del país (`config/country/*.yaml`) queda dentro de la imagen**: un cambio en el YAML exige reconstruir.
 - Al arrancar: `prisma migrate deploy` (migraciones como dueño) → el seed (`dist/seed/main.js`) si `DEN_ALLOW_SEED=true` → `node dist/main.js` en `API_PORT` (4000). Si la configuración del país es inválida o falta `DEN_COUNTRY`, termina con código 1.
@@ -266,7 +266,7 @@ Además sirve la API del titular que consume la carpeta ciudadana.
   - HSTS va siempre, con `includeSubDomains`: publica la web en un nombre cuyos subdominios también se sirvan por HTTPS.
   - Si Keycloak está en otro origen, `KEYCLOAK_URL` lo autoriza en `form-action`.
 
-### 3.12 Carpeta ciudadana de referencia (`infra/mock-citizen-app`)
+### 3.12 App ciudadana de referencia (`infra/mock-citizen-app`)
 
 **Función en el despliegue.** En las demos hace el papel de la aplicación ciudadana del país. El ciudadano:
 
@@ -275,7 +275,7 @@ Además sirve la API del titular que consume la carpeta ciudadana.
 - recibe avisos por correo cuando lo consultan (webhooks firmados del portal);
 - verifica cada comprobante por su cuenta, sin confiar en el portal.
 
-Muestra lo que debe implementar una carpeta real; no es un producto.
+Muestra lo que debe implementar una app ciudadana real; no es un producto.
 
 - Utilería de demostración (MT-07). Su URL pública (`DEN_CITIZEN_APP_URL`) fija la ruta base: en el piloto, `/citizen-app`.
 - Variables principales: `DEN_CITIZEN_APP_URL`, `DEN_CITIZEN_ISSUER`, `DEN_CITIZEN_APP_CLIENT_SECRET`, `CITIZEN_APP_WEBHOOK_SECRET` (obligatoria), `CITIZEN_APP_PORTAL_API_URL`, `CITIZEN_APP_JWKS_URL`, `CITIZEN_APP_TSA_ROOT_URL`, `CITIZEN_APP_SMTP_HOST/PORT`, `CITIZEN_APP_DATA_FILE`.
@@ -302,7 +302,7 @@ Muestra lo que debe implementar una carpeta real; no es un producto.
 
 ## 4. Variables de entorno
 
-La referencia completa, comentada, es `.env.example`. Todos los servicios leen el mismo `.env` de la raíz (Compose con `--env-file .env`; en el piloto también `env_file` para `api`, `web` y `carpeta`).
+La referencia completa, comentada, es `.env.example`. Todos los servicios leen el mismo `.env` de la raíz (Compose con `--env-file .env`; en el piloto también `env_file` para `api`, `web` y `citizen-app`).
 
 ### 4.1 Secretos que no se pueden cambiar a la ligera
 
@@ -389,6 +389,8 @@ Otras variables del gateway (M3): `DEN_GATEWAY_NODES` (cuántos nodos de APISIX 
 
 El API usa `KEYCLOAK_URL` para validar los tokens y para el Admin API de `den-gateway`: en el piloto llega a Keycloak por la URL pública, a través del proxy.
 
+**Actualizar una instalación existente: la app ciudadana de referencia cambió de nombre.** Usaba un nombre propio de un país. En un `.env` existente, renombra `DEN_CARPETA_URL` a `DEN_CITIZEN_APP_URL` (su ruta pasa de `/carpeta` a `/citizen-app`) y `DEN_CARPETA_CLIENT_SECRET` a `DEN_CITIZEN_APP_CLIENT_SECRET`, y reemplaza el client id `carpeta-ciudadana` por `citizen-app` en `DEN_CITIZEN_CLIENTS` y `DEN_CITIZEN_APPS`, cuya URL de webhook pasa a `http://citizen-app:3100/citizen-app/api/den/alerts`. Keycloak importa un realm solo si no existe: en un realm `den-citizens` existente, renombra el cliente a mano en la consola de administración (Client ID y URIs de redirección). En Compose, el servicio, su alias y su volumen ahora son `citizen-app`, `den-citizen-app` y `citizen-app-data`: copia `alerts.json` del volumen anterior `carpeta-data` si importan las suscripciones a avisos de la demo. `sudo ./install.sh update` vuelve a generar las rutas del proxy.
+
 ## 5. Piloto en una máquina
 
 La forma recomendada de instalar el piloto es `sudo ./install.sh` ([`INSTALL.md`](INSTALL.md)): hace las preguntas, escribe `.env` con `make-deploy-env.mjs`, pone el proxy y arranca todo. Esta sección describe lo que hay debajo, para quien lo hace a mano o tiene su propio proxy.
@@ -398,7 +400,7 @@ La forma recomendada de instalar el piloto es `sudo ./install.sh` ([`INSTALL.md`
 ### 5.1 Qué hace el override `docker-compose.deploy.yml`
 
 - Quita todos los puertos publicados (`ports: !reset []`) y pone `restart: unless-stopped`.
-- Agrega `api`, `web` y `carpeta` como contenedores. El API aplica migraciones y el seed al arrancar (`DEN_ALLOW_SEED=true`) y envía correo a `smtp://mailpit:1025`.
+- Agrega `api`, `web` y `citizen-app` como contenedores. El API aplica migraciones y el seed al arrancar (`DEN_ALLOW_SEED=true`) y envía correo a `smtp://mailpit:1025`.
 - Une al proxy, por la red externa `${TRAEFIK_NETWORK}` (por defecto `lab-router_default`), solo los servicios que se publican, con alias fijos: `den-portal-web`, `den-portal-api`, `den-keycloak`, `den-apisix`, `den-mailpit`, `den-citizen-app`, `den-tsa`.
 - Keycloak con `start_period` de 300 s: en una máquina compartida tarda minutos en arrancar.
 
@@ -492,7 +494,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 git pull --ff-only
 # 3. Reconstruir y reiniciar (todo, o solo los servicios que cambiaron)
 docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
-  --env-file .env --profile observability up -d --build [api web carpeta]
+  --env-file .env --profile observability up -d --build [api web citizen-app]
 ```
 
 - Las migraciones se aplican solas al arrancar el API.
@@ -519,7 +521,7 @@ cp .env.example .env
 pnpm install
 pnpm infra:up            # o infra:up:core (sin OpenSearch ni el Fluent Bit de analítica)
 pnpm db:migrate && pnpm db:seed
-pnpm dev                 # web 3000 + api 4000 + carpeta ciudadana 3100
+pnpm dev                 # web 3000 + api 4000 + app ciudadana 3100
 ```
 
 | Comando | Qué hace |

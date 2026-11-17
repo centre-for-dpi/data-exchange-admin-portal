@@ -6,7 +6,7 @@ Version 0.2 · November 2026 · code state as of M3-01 to M3-04 (M3 in progress)
 
 This document describes **how each component** of the portal and the gateway **is deployed**: image, configuration, ports, volumes, secrets and dependencies. How to bring it into service and how to run it day to day is in [`OPERATIONS.md`](OPERATIONS.md). The reference architecture is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-> **Scope (ADR-0011).** Only the portal + the gateway are deployed here. The instant API kit that is installed at the entities is a separate product, with its own repository. `mock-salud`, `mock-socioeconomico` and the citizen folder (`carpeta`) are test and demo props.
+> **Scope (ADR-0011).** Only the portal + the gateway are deployed here. The instant API kit that is installed at the entities is a separate product, with its own repository. `mock-salud`, `mock-socioeconomico` and the citizen app (`citizen-app`) are test and demo props.
 
 ## 1. Topologies
 
@@ -74,7 +74,7 @@ Each subsection starts with the component's **role** in the deployment and conti
 | `grafana` | `grafana/grafana:13.3.0` (AGPL, its own container) | 3000 | `GRAFANA_PORT` 3001 on `127.0.0.1` | `grafana-data` | `observability` | `GET /api/health` |
 | `api` | `den/portal-api:deploy` (`apps/api/Dockerfile`) | 4000 | — (runs on the host in dev) | `api-documents`, `step-ca-data` (only `certs/`, read-only) | pilot only | `GET /api/v1/health` |
 | `web` | `den/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (runs on the host in dev) | — | pilot only | `GET /api/auth/providers` |
-| `carpeta` | `den/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (runs on the host in dev) | `citizen-app-data` | pilot only | — |
+| `citizen-app` | `den/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (runs on the host in dev) | `citizen-app-data` | pilot only | — |
 
 Prometheus, Alertmanager and Grafana are **not** in the Compose file yet (M5-06).
 
@@ -105,7 +105,7 @@ What is in APISIX, OPA and the Keycloak clients is computed from here, so it can
 
 - **`den-portal`**, for the people who use the portal: the web's OIDC sign-in, self-registration, email verification and password recovery.
 - **`den-gateway`**, for consumer applications. It issues the `client_credentials` tokens (5 min, `aud = den-gateway`) that APISIX validates on every call. Its `den-app-<uuid>` clients are created and maintained by the API's reconciler, never by a person.
-- **`den-citizens`**, which simulates the country's digital identity for the citizen folder. In production it is replaced by the country's issuer (`DEN_CITIZEN_ISSUER`).
+- **`den-citizens`**, which simulates the country's digital identity for the citizen app. In production it is replaced by the country's issuer (`DEN_CITIZEN_ISSUER`).
 
 If Keycloak goes down, nobody can sign in and applications cannot get new tokens.
 
@@ -190,7 +190,7 @@ It also signs the kit nodes' certificates when they enroll and when they renew (
 
 **Role of `tsa-init` in the deployment.** It is a task that runs only once: it generates the certificate chain of the development TSA and exits.
 
-**Role of `tsa` in the deployment.** It is the time-stamping authority (RFC 3161), independent of the operator's key. It stamps two things: the checkpoints of the transparency log and the daily anchor of the audit log. With the stamp anyone can prove that the data existed at that moment and was not rewritten afterwards (ADR-0016). Its public chain lets third parties (the citizen folder, `den-verify-receipt`) verify the stamps without trusting the portal.
+**Role of `tsa` in the deployment.** It is the time-stamping authority (RFC 3161), independent of the operator's key. It stamps two things: the checkpoints of the transparency log and the daily anchor of the audit log. With the stamp anyone can prove that the data existed at that moment and was not rewritten afterwards (ADR-0016). Its public chain lets third parties (the citizen app, `den-verify-receipt`) verify the stamps without trusting the portal.
 
 - `fluent-bit-transparency` (`infra/fluent-bit/transparency.yaml`): TCP input 5170 in JSON, Lua filter `transparency.lua`, HTTP output to `${DEN_TRANSPARENCY_COLLECTOR_HOST}:${DEN_TRANSPARENCY_COLLECTOR_PORT}/api/v1/internal/subject-access` with `Bearer ${DEN_TRANSPARENCY_INGEST_TOKEN}`. Disk buffer (`transparency-buffer`, up to 1 GB) and unlimited retries: if the API goes down, the records wait.
 - `tsa-init` creates the development TSA's chain once, in `tsa-data` (`infra/tsa/init.sh`). `tsa` is sigstore timestamp-server with that key. In production the country's accredited TSA is used (`DEN_TSA_URL`).
@@ -223,9 +223,9 @@ It also signs the kit nodes' certificates when they enroll and when they renew (
 
 ### 3.9 Mailpit
 
-**Role in the deployment.** It acts as a test mail server: it captures all outgoing mail without delivering it to anyone and shows it in a web inbox. That includes invitations, portal notifications, the anchors sent to regulators, Keycloak's verification and recovery emails, and the citizen folder's alerts. It stands in for the operator's real SMTP.
+**Role in the deployment.** It acts as a test mail server: it captures all outgoing mail without delivering it to anyone and shows it in a web inbox. That includes invitations, portal notifications, the anchors sent to regulators, Keycloak's verification and recovery emails, and the citizen app's alerts. It stands in for the operator's real SMTP.
 
-- It receives all mail in development and in the pilot (SMTP 1025): the API's (`DEN_SMTP_URL`), Keycloak's (verification and recovery) and the citizen folder's.
+- It receives all mail in development and in the pilot (SMTP 1025): the API's (`DEN_SMTP_URL`), Keycloak's (verification and recovery) and the citizen app's.
 - In the pilot it is served at `/mail` (`MP_WEBROOT`) behind a username and password (`MP_UI_AUTH=${MAILPIT_UI_AUTH}`): Keycloak sends password recovery links there, so an open inbox would allow taking over any account.
 - In production it is replaced by the operator's real SMTP (`DEN_SMTP_URL`, `DEN_MAIL_FROM`).
 
@@ -247,7 +247,7 @@ It also signs the kit nodes' certificates when they enroll and when they renew (
 - **REST (`/api/v1`).** It serves the web and other systems. It applies the publication, request and approval flows. It checks the role and the entity membership on every endpoint and records every change in the audit log.
 - **Background jobs.** They translate the PostgreSQL state into configuration: APISIX routes, upstreams and SSL objects, Keycloak clients (with secret rotation) and the OPA bundle. They also sign certificates with step-ca, receive and seal the transparency log (operator signature plus TSA stamp), send emails and webhooks, and expire subscriptions, versions, certificates and credential rotation windows.
 
-It also serves the data subject API that the citizen folder consumes.
+It also serves the data subject API that the citizen app consumes.
 
 - Image: `apps/api/Dockerfile`, built from the repo root (`COPY . .`). **The country configuration (`config/country/*.yaml`) is baked into the image**: a change in the YAML requires a rebuild.
 - On startup: `prisma migrate deploy` (migrations as owner) → the seed (`dist/seed/main.js`) if `DEN_ALLOW_SEED=true` → `node dist/main.js` on `API_PORT` (4000). If the country configuration is invalid or `DEN_COUNTRY` is missing, it exits with code 1.
@@ -266,7 +266,7 @@ It also serves the data subject API that the citizen folder consumes.
   - HSTS is always sent, with `includeSubDomains`: publish the web on a name whose subdomains are also served over HTTPS.
   - If Keycloak is on another origin, `KEYCLOAK_URL` authorizes it in `form-action`.
 
-### 3.12 Reference citizen folder (`infra/mock-citizen-app`)
+### 3.12 Reference citizen app (`infra/mock-citizen-app`)
 
 **Role in the deployment.** In demos it plays the part of the country's citizen application. The citizen:
 
@@ -275,7 +275,7 @@ It also serves the data subject API that the citizen folder consumes.
 - gets email alerts when they are queried (signed webhooks from the portal);
 - verifies each receipt independently, without trusting the portal.
 
-It shows what a real citizen folder must implement; it is not a product.
+It shows what a real citizen app must implement; it is not a product.
 
 - Demo prop (MT-07). Its public URL (`DEN_CITIZEN_APP_URL`) sets the base path: in the pilot, `/citizen-app`.
 - Main variables: `DEN_CITIZEN_APP_URL`, `DEN_CITIZEN_ISSUER`, `DEN_CITIZEN_APP_CLIENT_SECRET`, `CITIZEN_APP_WEBHOOK_SECRET` (required), `CITIZEN_APP_PORTAL_API_URL`, `CITIZEN_APP_JWKS_URL`, `CITIZEN_APP_TSA_ROOT_URL`, `CITIZEN_APP_SMTP_HOST/PORT`, `CITIZEN_APP_DATA_FILE`.
@@ -302,7 +302,7 @@ It shows what a real citizen folder must implement; it is not a product.
 
 ## 4. Environment variables
 
-The complete, commented reference is `.env.example`. All services read the same `.env` at the root (Compose with `--env-file .env`; in the pilot also `env_file` for `api`, `web` and `carpeta`).
+The complete, commented reference is `.env.example`. All services read the same `.env` at the root (Compose with `--env-file .env`; in the pilot also `env_file` for `api`, `web` and `citizen-app`).
 
 ### 4.1 Secrets you cannot change lightly
 
@@ -389,6 +389,8 @@ Other gateway variables (M3): `DEN_GATEWAY_NODES` (how many APISIX nodes serve t
 
 The API uses `KEYCLOAK_URL` to validate tokens and for the `den-gateway` Admin API: in the pilot it reaches Keycloak through the public URL, via the proxy.
 
+**Upgrading an existing installation: the reference citizen app was renamed.** It used a country-specific name. In an existing `.env`, rename `DEN_CARPETA_URL` to `DEN_CITIZEN_APP_URL` (its path changes from `/carpeta` to `/citizen-app`) and `DEN_CARPETA_CLIENT_SECRET` to `DEN_CITIZEN_APP_CLIENT_SECRET`, and replace the client id `carpeta-ciudadana` with `citizen-app` in `DEN_CITIZEN_CLIENTS` and `DEN_CITIZEN_APPS`, whose webhook URL becomes `http://citizen-app:3100/citizen-app/api/den/alerts`. Keycloak imports a realm only when it does not exist: in an existing `den-citizens` realm, rename the client by hand in the administration console (Client ID and redirect URIs). In Compose, the service, its alias and its volume are now `citizen-app`, `den-citizen-app` and `citizen-app-data`: copy `alerts.json` from the old `carpeta-data` volume if the demo's alert subscriptions matter. `sudo ./install.sh update` regenerates the proxy routes.
+
 ## 5. Single-machine pilot
 
 The recommended way to install the pilot is `sudo ./install.sh` ([`INSTALL.md`](INSTALL.md)): it asks the questions, writes `.env` with `make-deploy-env.mjs`, sets up the proxy and starts everything. This section describes what lies underneath, for anyone who does it by hand or has their own proxy.
@@ -398,7 +400,7 @@ The recommended way to install the pilot is `sudo ./install.sh` ([`INSTALL.md`](
 ### 5.1 What the `docker-compose.deploy.yml` override does
 
 - It removes all published ports (`ports: !reset []`) and sets `restart: unless-stopped`.
-- It adds `api`, `web` and `carpeta` as containers. The API applies migrations and the seed on startup (`DEN_ALLOW_SEED=true`) and sends mail to `smtp://mailpit:1025`.
+- It adds `api`, `web` and `citizen-app` as containers. The API applies migrations and the seed on startup (`DEN_ALLOW_SEED=true`) and sends mail to `smtp://mailpit:1025`.
 - It attaches to the proxy, through the external network `${TRAEFIK_NETWORK}` (`lab-router_default` by default), only the services that are published, with fixed aliases: `den-portal-web`, `den-portal-api`, `den-keycloak`, `den-apisix`, `den-mailpit`, `den-citizen-app`, `den-tsa`.
 - Keycloak with a `start_period` of 300 s: on a shared machine it takes minutes to start.
 
@@ -491,7 +493,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 git pull --ff-only
 # 3. Rebuild and restart (everything, or only the services that changed)
 docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
-  --env-file .env --profile observability up -d --build [api web carpeta]
+  --env-file .env --profile observability up -d --build [api web citizen-app]
 ```
 
 - Migrations are applied automatically when the API starts.
@@ -518,7 +520,7 @@ cp .env.example .env
 pnpm install
 pnpm infra:up            # or infra:up:core (without OpenSearch or the analytics Fluent Bit)
 pnpm db:migrate && pnpm db:seed
-pnpm dev                 # web 3000 + api 4000 + citizen folder 3100
+pnpm dev                 # web 3000 + api 4000 + citizen app 3100
 ```
 
 | Command | What it does |

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-/** What the folder knows about a subscribed user. The portal knows none of it. */
+/** What the citizen app knows about a subscribed user. The portal knows none of it. */
 export interface AlertOwner {
   /** The citizen's subject at the identity provider. */
   sub: string;
@@ -9,8 +9,8 @@ export interface AlertOwner {
 }
 
 /**
- * The folder's own mapping from the portal's opaque alert id to its user and their email, kept
- * in a small JSON file (a reference app; a real folder has its own database). Also remembers the
+ * The citizen app's own mapping from the portal's opaque alert id to its user and their email, kept
+ * in a small JSON file (a reference app; a real citizen app has its own database). Also remembers the
  * webhook ids already handled, so a retried notice sends one email.
  */
 export class AlertStore {

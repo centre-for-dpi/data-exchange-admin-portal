@@ -123,8 +123,8 @@ export function buildOpenApiDocument(routes: RouteDoc[], info: { title: string; 
           scheme: 'bearer',
           bearerFormat: 'JWT',
           description:
-            'Access token of the national digital identity, issued to an authorized citizen app ' +
-            '(the Carpeta Ciudadana). Development: realm den-citizens.',
+            'Access token of the national digital identity, issued to an authorized citizen app. ' +
+            'Development: realm den-citizens.',
         },
         nodeMutualTls: {
           type: 'mutualTLS',

@@ -382,7 +382,7 @@ describe('realm den-citizens (MT-05)', () => {
   const password = env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
 
   it.each(citizens)(
-    '$username logs in to the Carpeta and its token carries the verified document only',
+    '$username logs in to the citizen app and its token carries the verified document only',
     async (citizen) => {
       const result = await loginWithAuthorizationCode(citizen.username, password, {
         client: citizenAppClient(),
@@ -402,7 +402,7 @@ describe('realm den-citizens (MT-05)', () => {
     },
   );
 
-  it('does not allow the password grant on the Carpeta client', async () => {
+  it('does not allow the password grant on the citizen app client', async () => {
     const client = citizenAppClient();
     const res = await fetch(`${keycloakUrl()}/realms/den-citizens/protocol/openid-connect/token`, {
       method: 'POST',
@@ -418,7 +418,7 @@ describe('realm den-citizens (MT-05)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('refuses redirect URIs outside the Carpeta', async () => {
+  it('refuses redirect URIs outside the citizen app', async () => {
     const result = await loginWithAuthorizationCode('ciudadana.demo', password, {
       client: citizenAppClient(),
       redirectUri: 'https://attacker.example/callback',
