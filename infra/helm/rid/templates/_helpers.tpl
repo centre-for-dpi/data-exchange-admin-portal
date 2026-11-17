@@ -156,6 +156,10 @@ Bit run in every gateway pod, on 127.0.0.1).
 - { name: RID_GATEWAY_WG_HUB, value: {{ printf "%s:8443" (include "rid.name" "wg-hub") | quote }} }
 - { name: RID_WG_HUB_AGENT_URL, value: {{ printf "http://%s:8090" (include "rid.name" "wg-hub") | quote }} }
 - { name: RID_CONTRACT_RUNNER_URL, value: {{ printf "http://%s:8096" (include "rid.name" "contract-runner") | quote }} }
+{{- if .Values.antivirus.enabled }}
+# Every uploaded document is scanned before it is stored (M6-08).
+- { name: RID_CLAMAV_URL, value: {{ printf "tcp://%s:3310" (include "rid.name" "clamav") | quote }} }
+{{- end }}
 - { name: RID_OPENSEARCH_URL, value: {{ printf "%s://%s:%v" (ternary "https" "http" .Values.accessLogs.opensearch.tls) .Values.accessLogs.opensearch.host .Values.accessLogs.opensearch.port | quote }} }
 - { name: RID_TRUST_PROXY, value: {{ .Values.api.trustProxy | quote }} }
 {{- if .Values.opensearch.enabled }}

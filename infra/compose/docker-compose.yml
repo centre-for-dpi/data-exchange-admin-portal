@@ -403,6 +403,24 @@ services:
       - 127.0.0.1:${RID_TSA_PORT:-3004}:3004
     # Distroless image, nothing to run a health check with: the API retries while it is down.
 
+  # Antivirus of uploaded documents (M6-08): clamd, GPL-2.0 in its own container (CLAUDE.md rule
+  # 1). Optional: profile `antivirus`, and RID_CLAMAV_URL=tcp://localhost:3310 (development) or
+  # tcp://clamav:3310 (pilot) for the API. freshclam inside updates the signatures from the
+  # internet; the first start takes a few minutes and about 1.2 GB of memory.
+  clamav:
+    image: clamav/clamav:1.5.4
+    profiles: [antivirus]
+    networks: [default]
+    volumes:
+      - clamav-data:/var/lib/clamav
+    ports:
+      - 127.0.0.1:${CLAMAV_PORT:-3310}:3310
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'clamdcheck.sh']
+      interval: 30s
+      start_period: 600s
+
   mailpit:
     image: axllent/mailpit:v1.32.0
     networks: [default]
@@ -517,6 +535,7 @@ networks:
 
 volumes:
   pg-data:
+  clamav-data:
   etcd-data:
   opa-data:
   step-ca-data:

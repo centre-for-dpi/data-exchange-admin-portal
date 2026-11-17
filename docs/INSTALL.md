@@ -72,6 +72,7 @@ El script hace las preguntas una por una, muestra un resumen y pide confirmació
 | 4 | **Proxy de entrada** | `1` Incluido (recomendado): el instalador pone Traefik en 80/443. `2` Ya tengo Traefik: se une a su red de Docker y las rutas las configuras tú, como en `DEPLOYMENT.md §5.2` |
 | 4 | **Certificado del portal** | `1` Let's Encrypt (correo de contacto opcional; el puerto 80 debe ser alcanzable). `2` Propio: rutas al certificado (cadena completa) y a la llave, en PEM. Debe ser de una CA pública reconocida: el API y la web también llaman al portal por su nombre y verifican el certificado |
 | 5 | **Observabilidad** (OpenSearch, Prometheus, Alertmanager, Grafana) | Sí, si el servidor tiene 16 GB: da los indicadores de uso, las alertas por correo y el tablero del operador en `/grafana`. Se puede prescindir: no afecta al tráfico, a la auditoría ni a la transparencia |
+| 5 | **Antivirus de documentos** (ClamAV) | Sí, si el servidor tiene 8 GB: revisa cada documento subido antes de guardarlo. Suma ~1,2 GB de RAM y descarga sus firmas de internet |
 | 6 | **Contraseña de los usuarios de demo** | Enter genera una aleatoria. Elige una si la vas a compartir en el bootcamp |
 
 Luego, sin más preguntas:
@@ -141,9 +142,9 @@ alias dc='docker compose -f infra/compose/docker-compose.yml -f infra/compose/do
   -f infra/compose/docker-compose.edge.yml --env-file .env --profile observability'
 ```
 
-Sin observabilidad, quita `--profile observability`; con un Traefik propio, quita `-f infra/compose/docker-compose.edge.yml`.
+Sin observabilidad, quita `--profile observability`; con el antivirus, agrega `--profile antivirus`; con un Traefik propio, quita `-f infra/compose/docker-compose.edge.yml`.
 
-Un `.env` escrito a mano o por `make-deploy-env.mjs` (como el del piloto de demo) no tiene las respuestas del instalador. Agrégale `RID_PORTAL_HOST`, `RID_GATEWAY_HOST`, `RID_INSTALL_PROXY` (`bundled` o `external`), `RID_INSTALL_TLS` y `RID_INSTALL_OBSERVABILITY` (`true` o `false`), o sigue usando Compose directamente.
+Un `.env` escrito a mano o por `make-deploy-env.mjs` (como el del piloto de demo) no tiene las respuestas del instalador. Agrégale `RID_PORTAL_HOST`, `RID_GATEWAY_HOST`, `RID_INSTALL_PROXY` (`bundled` o `external`), `RID_INSTALL_TLS`, `RID_INSTALL_OBSERVABILITY` y `RID_INSTALL_ANTIVIRUS` (`true` o `false`; con el antivirus, también `RID_CLAMAV_URL=tcp://clamav:3310`), o sigue usando Compose directamente.
 
 ## 8. Problemas frecuentes de la instalación
 

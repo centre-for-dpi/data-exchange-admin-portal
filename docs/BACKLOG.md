@@ -828,7 +828,14 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - **Revocación masiva (herramienta nueva):** `platform_admin` con segundo factor, en Consola → Revocación masiva de certificados y por API. Filtra por entidad, por fecha de emisión y por intermedia, con vista previa. Revoca solo si el conjunto no cambió desde la vista previa (`expectedCount`, 409 si no). Audita cada certificado y la revocación entera, avisa a los desarrolladores (aviso de seguridad) y hace una sola sincronización de OPA. Pruebas de integración con step-ca real (autorización, filtros, conteo desactualizado, auditoría, OPA, avisos) y axe en la pantalla.
     - De paso, el chart fija `RID_GATEWAY_NODES` desde `gateway.replicas`: con dos réplicas, cada nodo permitía el límite completo de la suscripción (ADR-0020).
     - Interpretación: "emitido" es cuando el portal emitió el certificado (`createdAt`), no su `notBefore`, que step-ca adelanta un minuto.
-- [ ] **M6-08 — Antivirus de documentos** (ClamAV) y catálogo público opcional.
+- [x] **M6-08 — Antivirus de documentos** (ClamAV) y catálogo público opcional.
+  - _Hecho (2026-11-16):_
+    - **Antivirus.** Con `RID_CLAMAV_URL`, el API manda cada documento a `clamd` por el protocolo INSTREAM, después de comprobar que es un PDF y antes de guardarlo, sin dependencias nuevas.
+      - Uno infectado se rechaza como error del campo (`document_infected`, traducido); el log guarda la firma y el SHA-256, nunca el nombre ni el contenido.
+      - Si ClamAV no responde, la subida falla con 503 (falla cerrada).
+      - Compose: perfil `antivirus` (`clamav/clamav:1.5.4`), que `install.sh` pregunta. Helm: activado con dos réplicas, sin root y con el sistema de archivos de solo lectura (probado con Docker), y NetworkPolicy: solo el API entra; sale solo a HTTPS público (firmas).
+      - Pruebas: el cliente contra un clamd falso (limpio, infectado, error, puerto cerrado, sin respuesta) y la subida con transacción real (sin fila ni archivo si está infectado; 503 sin antivirus). Verificado contra un clamd real: PDF limpios pasan y EICAR se detecta. Un clamd real solo marca EICAR al inicio del archivo, y la comprobación de PDF lo rechaza antes.
+    - **Catálogo público.** Ya existía detrás de `features.publicCatalog` (solo APIs `public` para anónimos). Ahora el anónimo no ve el contacto del responsable ni el estado de los nodos. Probado con el flag activado (una copia de `co.yaml`): lista, detalle, OpenAPI y token inválido.
 - [ ] **M6-09 — Inglés completo** y plantilla `example.yaml` probada levantando un "país de ejemplo".
 - [ ] **M6-10 — Aserción firmada del gateway (ADR-0024)**. Clave generada y rotada por el portal y empujada por el reconciliador a la metadata de `rid-assertion`. JWKS público. Activación por configuración del país. `body_sha256` en operaciones con cuerpo. Verificación en los mocks y guía del proveedor.
 

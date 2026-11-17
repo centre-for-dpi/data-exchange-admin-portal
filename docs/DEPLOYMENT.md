@@ -60,6 +60,7 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `tsa-init` | `smallstep/step-ca:0.30.2` | — (tarea única) | — | `tsa-data` | base | termina con código 0 |
 | `tsa` | `ghcr.io/sigstore/timestamp-server:v2.1.4` | 3004 | `RID_TSA_PORT` 3004 | `tsa-data` (lectura) | base | ninguno (imagen distroless) |
 | `mailpit` | `axllent/mailpit:v1.32.0` | 8025 (UI), 1025 (SMTP) | 8025, 1025 | — | base | `mailpit readyz` |
+| `clamav` | `clamav/clamav:1.5.4` | 3310 (clamd) | `CLAMAV_PORT` 3310 | `clamav-data` (firmas) | `antivirus` (M6-08) | `clamdcheck.sh` |
 | `mock-salud`, `mock-socioeconomico` | `rid/mock-providers:dev` (build local) | 8000 | 8101, 8102 | — | base | `GET /health` |
 | `wg-hub` | `rid/wg-hub:dev` (build local, `infra/wg-hub`) | 51820/udp (túnel), 8443 (enrutador SNI), 8090 (agente) | 51820/udp y 8095 (agente) en `127.0.0.1` | `wg-hub-data` | base | `GET /health` en 8090 |
 | `contract-runner` | `rid/contract-runner:dev` (build local, `infra/contract-runner`) | 8096 | `CONTRACT_RUNNER_PORT` 8096 en `127.0.0.1` | — | base | `GET /health` |
@@ -225,6 +226,17 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 - Recibe todo el correo de desarrollo y del piloto (SMTP 1025): el del API (`RID_SMTP_URL`), el de Keycloak (verificación y recuperación) y el de la carpeta.
 - En el piloto se sirve en `/mail` (`MP_WEBROOT`) detrás de usuario y contraseña (`MP_UI_AUTH=${MAILPIT_UI_AUTH}`): Keycloak envía allí los enlaces de recuperación de contraseña, así que una bandeja abierta permitiría tomar cualquier cuenta.
 - En producción se reemplaza por el SMTP real del operador (`RID_SMTP_URL`, `RID_MAIL_FROM`).
+
+### 3.9.1 Antivirus: ClamAV (perfil `antivirus`, M6-08)
+
+**Función en el despliegue.** Revisa cada documento que se sube (designaciones, acuerdos, anexos) antes de guardarlo (ASVS 5.4.3). Es `clamd` en su propio contenedor (GPL-2.0, nunca enlazado: regla 1). Su `freshclam` actualiza las firmas desde internet.
+
+- Se activa con el perfil `antivirus` y `RID_CLAMAV_URL` en el API (`tcp://clamav:3310` en el piloto; `install.sh` lo pregunta).
+- El API le manda el documento por el protocolo INSTREAM de clamd, después de comprobar que es un PDF y antes de escribirlo:
+  - si clamd encuentra algo, el documento no se guarda y el usuario ve un error en el campo; el log del API registra la firma y el SHA-256 del archivo, nunca el nombre ni el contenido;
+  - si clamd no responde, la subida falla (503) y el documento no se guarda (falla cerrada).
+- El primer arranque descarga las firmas (unos minutos) y usa ~1,2 GB de memoria.
+- Sin `RID_CLAMAV_URL` no hay revisión: los documentos solo se comprueban como PDF.
 
 ### 3.10 API del portal (`apps/api`)
 
@@ -605,6 +617,7 @@ Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
 - `stepCa.rootFingerprint` y `stepCa.pkiSecret` (§9.3);
 - `postgres.backup.destinationPath` (`s3://<bucket>/<ruta>`) y, con un almacenamiento propio del operador, `endpointURL` y `endpointCASecret`. Sin `destinationPath` el chart no se instala; los respaldos solo se desactivan a propósito (`postgres.backup.enabled=false`, como en kind);
 - `keycloak.smtp` (servidor y remitente del realm) y `prometheus.alertmanager.config` (servidor, remitente y destinatarios de las alertas);
+- `antivirus.replicas` (2 por omisión: con el antivirus activado, una subida falla si ClamAV no responde) y sus recursos;
 - `grafana."grafana.ini".server.root_url`: `<publicUrl>/grafana/`. Sin él, Grafana redirige a `localhost`;
 - `networkPolicy`: el namespace del ingress (`ingressControllerNamespace`), y las redes privadas que el gateway (`gatewayExtraEgressCidrs`: proveedores dentro de la red del operador, un Security Server de X-Road) o el API y Keycloak (`servicesEgressCidrs`: el correo, la TSA) deban alcanzar. Por omisión solo salen a direcciones públicas.
 

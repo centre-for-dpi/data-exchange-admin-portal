@@ -93,6 +93,7 @@ compose_args() {
   [[ $(env_get RID_INSTALL_PROXY) == bundled ]] && COMPOSE+=(-f infra/compose/docker-compose.edge.yml)
   COMPOSE+=(--env-file "$ENV_FILE")
   [[ $(env_get RID_INSTALL_OBSERVABILITY) == true ]] && COMPOSE+=(--profile observability)
+  [[ $(env_get RID_INSTALL_ANTIVIRUS) == true ]] && COMPOSE+=(--profile antivirus)
   return 0
 }
 dc() { compose_args; "${COMPOSE[@]}" "$@"; }
@@ -267,6 +268,11 @@ questions() {
   local def=n
   ((MEM_GB >= 15)) && def=s
   if yes_no "¿Activar la observabilidad?" "$def"; then OBSERVABILITY=true; else OBSERVABILITY=false; fi
+  info "El antivirus (ClamAV) revisa cada documento que se sube (designaciones, acuerdos) antes de"
+  info "guardarlo. Suma ~1,2 GB de RAM y descarga sus firmas de internet."
+  def=n
+  ((MEM_GB >= 8)) && def=s
+  if yes_no "¿Activar el antivirus de documentos?" "$def"; then ANTIVIRUS=true; else ANTIVIRUS=false; fi
 
   step "Paso 6 · Usuarios de demostración"
   info "El piloto carga entidades ficticias y usuarios de demo (operador, regulador, publicador…)."
@@ -279,7 +285,7 @@ questions() {
     "Gateway (mTLS):" "https://$GATEWAY_HOST" \
     "Proxy:" "$([[ $PROXY == bundled ]] && echo "incluido (Traefik en 80/443)" || echo "existente (red $EDGE_NET)")" \
     "Certificado del portal:" "$(case $TLS in letsencrypt) echo "Let's Encrypt";; files) echo "propio ($CERT_FILE)";; *) echo "lo gestiona tu proxy";; esac)" \
-    "Observabilidad:" "$([[ $OBSERVABILITY == true ]] && echo sí || echo no)" \
+    "Observabilidad:" "$([[ $OBSERVABILITY == true ]] && echo sí || echo no)"     "Antivirus:" "$([[ $ANTIVIRUS == true ]] && echo sí || echo no)" \
     "Contraseña de demo:" "$([[ -n $DEMO_PASSWORD ]] && echo "la indicada" || echo "aleatoria")"
   yes_no "¿Continuar con la instalación?" s || fail "Instalación cancelada; no se cambió nada."
 }
@@ -299,7 +305,9 @@ RID_INSTALL_PROXY=$PROXY
 RID_INSTALL_TLS=$TLS
 RID_ACME_EMAIL=${ACME_EMAIL-}
 RID_INSTALL_OBSERVABILITY=$OBSERVABILITY
+RID_INSTALL_ANTIVIRUS=$ANTIVIRUS
 EOF
+  [[ $ANTIVIRUS == true ]] && env_set RID_CLAMAV_URL tcp://clamav:3310
   chmod 600 "$ENV_FILE"
   ok ".env escrito (permisos 600). Contiene todas las llaves de la instalación."
   warn "Guarda una copia cifrada de .env FUERA de este servidor: sin ella no se pueden recuperar los datos."
@@ -311,6 +319,7 @@ load_env_settings() {
   PROXY=$(env_get RID_INSTALL_PROXY)
   TLS=$(env_get RID_INSTALL_TLS)
   OBSERVABILITY=$(env_get RID_INSTALL_OBSERVABILITY)
+  ANTIVIRUS=$(env_get RID_INSTALL_ANTIVIRUS)
   EDGE_NET=$(env_get TRAEFIK_NETWORK)
   [[ -n $PORTAL_HOST && -n $PROXY ]] ||
     fail ".env existe pero no lo escribió este instalador (faltan RID_PORTAL_HOST / RID_INSTALL_PROXY). Ver docs/INSTALL.md §7."

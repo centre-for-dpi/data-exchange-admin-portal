@@ -89,6 +89,8 @@ export const FieldErrorKey = {
   ExportTooLarge: 'export_too_large',
   ManualStepsUseCaseOnly: 'manual_steps_use_case_only',
   EmptyDocument: 'empty_document',
+  /** The antivirus found something in an uploaded document (M6-08). */
+  DocumentInfected: 'document_infected',
   TooManyOpenRequests: 'too_many_open_requests',
 } as const;
 

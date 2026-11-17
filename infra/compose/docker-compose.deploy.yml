@@ -148,6 +148,10 @@ services:
       edge:
         aliases: [rid-tsa]
 
+  clamav:
+    <<: *no-ports
+    restart: unless-stopped
+
   mailpit:
     <<: *no-ports
     restart: unless-stopped

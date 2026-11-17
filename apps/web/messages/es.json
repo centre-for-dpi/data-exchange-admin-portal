@@ -1505,6 +1505,7 @@
       "export_too_large": "Coinciden {count} eventos: acota los filtros a como máximo {max}.",
       "manual_steps_use_case_only": "Solo el caso de uso cuenta pasos manuales.",
       "empty_document": "El documento está vacío.",
+      "document_infected": "El antivirus encontró contenido malicioso en el documento: no se guardó. Revisa el archivo y vuelve a generarlo.",
       "api_slug_format": "Letras minúsculas, dígitos y guiones (3 a 40).",
       "not_only_dots": "No puede ser solo puntos.",
       "https_url": "Debe ser una URL https://.",

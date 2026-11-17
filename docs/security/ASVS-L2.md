@@ -10,7 +10,7 @@ El núcleo cumple: autorización en el backend con aislamiento por entidad, vali
 
 M6-01 corrigió lo que podía corregirse sin cambiar la topología: límites de peticiones, cabeceras del API, eventos de seguridad, política de contraseñas, URIs exactas de OIDC, segmentación de red, keyring propio de APISIX, lista mínima de plugins, escaneo de dependencias y la cola paginada del operador.
 
-Lo que exigía otra topología (TLS y autenticación entre componentes internos, Keycloak en modo producción, bóveda de secretos), el SBOM y los logs del API en el pipeline central quedaron en el chart de Helm de M6-05 (correcciones 14 a 19), que falta instalar. El antivirus de documentos queda en M6-08.
+Lo que exigía otra topología (TLS y autenticación entre componentes internos, Keycloak en modo producción, bóveda de secretos), el SBOM y los logs del API en el pipeline central quedaron en el chart de Helm de M6-05 (correcciones 14 a 19), que falta instalar. El antivirus de documentos se agregó en M6-08 (corrección 20).
 
 ## Correcciones de M6-01
 
@@ -30,9 +30,9 @@ Lo que exigía otra topología (TLS y autenticación entre componentes internos,
 | 12 | Etiqueta GCM truncada aceptada (por confirmar) | `authTagLength: 16` al abrir secretos sellados | `common/secrets.test.ts` |
 | 13 | La cola de altas del operador mostraba solo las 200 más antiguas | Paginación por cursor en API y consola | `entities/entity-requests.int.test.ts` |
 
-## Correcciones de M6-05 (chart de Helm)
+## Correcciones de M6-05 (chart de Helm) y M6-08
 
-Están en `infra/helm/rid` y se validaron solo de forma estática (`helm template` y kubeconform). El chart no se ha instalado en ningún clúster (`DEPLOYMENT.md §9`).
+Las de M6-05 (14 a 19) están en `infra/helm/rid` y se validaron solo de forma estática (`helm template` y kubeconform). El chart no se ha instalado en ningún clúster (`DEPLOYMENT.md §9`). La 20 (M6-08) corre también en el piloto.
 
 | # | Pendiente | Corrección | Prueba |
 | :-- | :-- | :-- | :-- |
@@ -42,6 +42,7 @@ Están en `infra/helm/rid` y se validaron solo de forma estática (`helm templat
 | 17 | Salida de red sin límite | NetworkPolicies de entrada y de salida por componente. Hacia fuera, solo direcciones públicas en los puertos que usa cada uno | `helm template` + kubeconform |
 | 18 | Sin SBOM ni escaneo de imágenes (15.1.2, 15.2.1) | SBOM CycloneDX y Trivy en CI: una vulnerabilidad alta o crítica con arreglo detiene la publicación. Imágenes del API y la web sin dependencias de desarrollo ni gestor de paquetes | `.github/workflows/images.yml` |
 | 19 | Logs del API fuera del pipeline central, sin enmascarar (16.4.3, 14.x) | Cada línea enmascarada (queries, números de 6 dígitos o más, correos, credenciales en URL). En el chart, JSON para el colector de logs del clúster | `common/logger.test.ts` |
+| 20 | Documentos sin antivirus (5.4.3) | ClamAV (`clamd`, M6-08) revisa cada documento antes de guardarlo; uno infectado se rechaza y, si no responde, la subida falla. Activado en el chart; opcional en el piloto (`--profile antivirus`) | `documents/antivirus.test.ts`, `documents/antivirus.int.test.ts` |
 
 ## Estado por capítulo
 
@@ -51,7 +52,7 @@ Están en `infra/helm/rid` y se validaron solo de forma estática (`helm templat
 | V2 Validación y lógica | Cumple · Corregido | zod con objetos estrictos en todo `@Body`/`@Query`; transiciones condicionadas. **Corregido:** anti-automatización (1, 2). **Parcial:** las re-subidas del documento de designación se guardan todas (límite de tasa sí; tope por solicitud pendiente) |
 | V3 Frontend web | Cumple · Corregido | CSP con nonce y `strict-dynamic`, HSTS, cookies `__Host-`/`__Secure-` HttpOnly SameSite, CSRF (API solo bearer). **Corregido:** cabeceras del API (3). **Parcial (baja):** abrir una notificación por GET la marca leída |
 | V4 API | Cumple | Solo JSON y PDF, límites de cuerpo, cabeceras `X-RID-*` imposibles de fijar por el cliente, errores RFC 9457 |
-| V5 Archivos | Cumple · Pendiente | Tamaño, bytes mágicos, nombres aleatorios fuera del web root, descarga con `attachment`. **Pendiente: antivirus (M6-08)** |
+| V5 Archivos | Cumple · Corregido | Tamaño, bytes mágicos, nombres aleatorios fuera del web root, descarga con `attachment`. **Corregido:** antivirus con ClamAV antes de guardar, falla cerrada (20) |
 | V6 Autenticación | Corregido · **Decisión** | **Corregido:** política de contraseñas (6). Fuerza bruta de Keycloak, TOTP, aviso de cambios de credencial. **Decisión pendiente (6.3.3):** hoy el segundo factor se exige a los roles de plataforma y a `data_steward`. L2 lo pide para todo acceso; extenderlo a `entity_admin` y `api_publisher` cambia el ingreso de las entidades y de los usuarios de demostración |
 | V7 Sesiones | Cumple | Roles y estado desde la base en cada petición, expiración por inactividad y absoluta, cierre RP-initiated. Por confirmar: consola de cuenta de Keycloak para cerrar otras sesiones |
 | V8 Autorización | Cumple | Política central, falla cerrada sin declaración de acceso, aislamiento por entidad (404 fuera), roles con efecto inmediato. El tráfico lo autoriza OPA y falla cerrado |
@@ -71,7 +72,6 @@ Están en `infra/helm/rid` y se validaron solo de forma estática (`helm templat
 | Segundo factor para `entity_admin` y `api_publisher` | 6.3.3 | Decisión del operador. Si se adopta, es configuración y una guía para las entidades |
 | Comprobar en un clúster lo corregido en el chart (14 a 19): no se ha instalado | 12.3.x, 13.x, 16.4.3 | M6-05 (instalación) |
 | Identificador de clave y rotación de `RID_SECRETS_KEY` | 11.1.x | Pendiente: hoy una sola clave, en la bóveda en el chart |
-| Antivirus de documentos | 5.4.3 | M6-08 |
 | Tope de re-subidas del documento de designación | 2.3.2 | Mejora menor (hoy limitado por tasa) |
 | Retirar la clave de fábrica del keyring de APISIX | 11.x | Operación: después de la primera renovación de certificados del despliegue |
 

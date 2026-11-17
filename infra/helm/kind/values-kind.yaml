@@ -68,3 +68,7 @@ accessLogs: { enabled: false }
 networkPolicy:
   ingressControllerNamespace: traefik
   platformNamespace: rid-platform
+
+# One clamd is enough to try the uploads (M6-08).
+antivirus:
+  replicas: 1

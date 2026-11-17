@@ -1,6 +1,6 @@
 import { FieldErrorKey } from '@rid/contracts';
 import { createHash } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import {
@@ -8,11 +8,13 @@ import {
   GoneError,
   NotFoundError,
   PayloadTooLargeError,
+  ServiceUnavailableError,
   UnsupportedMediaTypeError,
   ValidationError,
 } from '../common/errors.js';
 import type { DocumentKind } from '../generated/prisma/client.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
+import { AntivirusUnavailableError, ClamdScanner } from './antivirus.js';
 import { StorageService } from './storage.service.js';
 
 export const PDF_MIME = 'application/pdf';
@@ -39,6 +41,10 @@ export interface StoredDocument {
  */
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger('Documents');
+  /** ClamAV, when RID_CLAMAV_URL is set (M6-08): every document is scanned before it is stored. */
+  private readonly antivirus = ClamdScanner.fromEnv();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -72,6 +78,7 @@ export class DocumentsService {
       throw new UnsupportedMediaTypeError('Only PDF documents are accepted');
     }
     const sha256 = createHash('sha256').update(bytes).digest('hex');
+    await this.scan(bytes, sha256, input.kind);
     const storageKey = await this.storage.put(bytes);
     return tx.document.create({
       data: {
@@ -93,6 +100,35 @@ export class DocumentsService {
         createdAt: true,
       },
     });
+  }
+
+  /**
+   * The antivirus check, before anything is stored (ASVS 5.4.3). An infected document is refused
+   * as a field error; an unreachable antivirus fails the upload (fail closed).
+   */
+  private async scan(bytes: Buffer, sha256: string, kind: DocumentKind): Promise<void> {
+    if (!this.antivirus) return;
+    let result;
+    try {
+      result = await this.antivirus.scan(bytes);
+    } catch (error) {
+      if (!(error instanceof AntivirusUnavailableError)) throw error;
+      this.logger.error(`Antivirus unavailable, upload refused: ${error.message}`);
+      throw new ServiceUnavailableError('The antivirus did not answer: try again in a moment');
+    }
+    if (!result.clean) {
+      // The hash identifies the file for the incident; the name or the bytes never reach a log.
+      this.logger.warn(
+        `Document refused by the antivirus: ${result.signature ?? 'unknown'} (${kind}, sha256 ${sha256})`,
+      );
+      throw new ValidationError([
+        {
+          path: 'body',
+          message: 'The antivirus found malicious content in the document',
+          key: FieldErrorKey.DocumentInfected,
+        },
+      ]);
+    }
   }
 
   /** Reads a document's bytes; fails if they no longer match the stored hash. */

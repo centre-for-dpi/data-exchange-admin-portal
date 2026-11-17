@@ -1505,6 +1505,7 @@
       "export_too_large": "{count} events match: narrow the filters to at most {max}.",
       "manual_steps_use_case_only": "Only the use case counts manual steps.",
       "empty_document": "The document is empty.",
+      "document_infected": "The antivirus found malicious content in the document: it was not stored. Check the file and generate it again.",
       "api_slug_format": "Lower-case letters, digits and hyphens (3-40).",
       "not_only_dots": "Cannot be only dots.",
       "https_url": "Must be an https:// URL.",
