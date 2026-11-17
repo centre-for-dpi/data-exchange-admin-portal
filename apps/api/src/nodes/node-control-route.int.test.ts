@@ -9,6 +9,7 @@ import { createTestApp, createTestIssuer, type TestIssuer } from '../../test/tes
 import { MAIL_TRANSPORT } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HttpApisixAdmin } from '../reconcilers/apisix/apisix-admin.js';
+import { ApisixReconciler } from '../reconcilers/apisix/apisix.reconciler.js';
 import {
   desiredNodeControlRoute,
   type GatewaySettings,
@@ -79,6 +80,10 @@ describe('node control route of the gateway (M4-02)', () => {
     await app.listen(0, '0.0.0.0');
     const port = (app.getHttpServer().address() as AddressInfo).port;
     root = await new StepCaClient().rootCertificate();
+
+    // The gateway's SSL object as the country wants it (co.yaml: network-wide mTLS), whatever an
+    // earlier test file left in the shared APISIX.
+    await app.get(ApisixReconciler).reconcileTls();
 
     const route = desiredNodeControlRoute(settings(`http://host.docker.internal:${port}`));
     await admin.put('routes', ROUTE, { ...route, priority: 10, name: 'M4-02 test' });
@@ -246,6 +251,15 @@ describe('node control route of the gateway (M4-02)', () => {
   });
 
   it('without a client certificate there is no TLS session (network-wide mTLS)', async () => {
-    await expect(overTls(`/api/v1/nodes/${node.id}/config`, undefined)).rejects.toThrow();
+    // APISIX applies the SSL object of beforeAll within a moment.
+    let refused = false;
+    for (let i = 0; i < 20 && !refused; i += 1) {
+      refused = await overTls(`/api/v1/nodes/${node.id}/config`, undefined).then(
+        () => false,
+        () => true,
+      );
+      if (!refused) await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(refused).toBe(true);
   });
 });

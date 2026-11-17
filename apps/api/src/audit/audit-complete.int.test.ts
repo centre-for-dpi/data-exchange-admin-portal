@@ -159,10 +159,14 @@ describe('complete audit (M2-09)', () => {
   });
 
   describe('daily anchors', () => {
+    // Two days ahead: today's events are a finished day too, so the anchors do not depend on a
+    // database that already holds events of earlier days (a fresh one in CI has only today's).
+    const later = () => new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+
     it('anchors finished days with a time-stamp, once, and e-mails the regulators', async () => {
       const service = app.get(AuditAnchorService);
-      await service.anchorDue();
-      expect(await service.anchorDue()).toEqual([]);
+      await service.anchorDue(later());
+      expect(await service.anchorDue(later())).toEqual([]);
       const latest = await prisma.auditAnchor.findFirstOrThrow({ orderBy: { day: 'desc' } });
       const event = await prisma.auditEvent.findUniqueOrThrow({ where: { seq: latest.lastSeq } });
       expect(event.hash).toBe(latest.lastHash);
@@ -181,7 +185,7 @@ describe('complete audit (M2-09)', () => {
     });
 
     it('verification reports an anchor whose event is gone (the tail was cut)', async () => {
-      await app.get(AuditAnchorService).anchorDue();
+      await app.get(AuditAnchorService).anchorDue(later());
       const ok = chainCheckSchema.parse((await get('/audit/verify', 'sofia.auditora')).json());
       expect(ok.anchors.checked).toBeGreaterThan(0);
       expect(ok.anchors.problems).toEqual([]);
@@ -203,7 +207,7 @@ describe('complete audit (M2-09)', () => {
     });
 
     it('anchors cannot be changed or deleted, not even by the schema owner', async () => {
-      await app.get(AuditAnchorService).anchorDue();
+      await app.get(AuditAnchorService).anchorDue(later());
       const latest = await prisma.auditAnchor.findFirstOrThrow({ orderBy: { day: 'desc' } });
       await expect(
         prisma.auditAnchor.update({ where: { day: latest.day }, data: { lastHash: 'x' } }),
