@@ -1,6 +1,13 @@
-import { randomBytes } from 'node:crypto';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { generateClientSecret, hashSecret, open, seal } from './secrets.js';
+import { createCipheriv, randomBytes } from 'node:crypto';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import {
+  currentSecretsKeyId,
+  generateClientSecret,
+  hashSecret,
+  needsReseal,
+  open,
+  seal,
+} from './secrets.js';
 
 describe('client secrets', () => {
   beforeAll(() => {
@@ -50,5 +57,64 @@ describe('client secrets', () => {
     delete process.env.RID_SECRETS_KEY;
     expect(() => seal('x', 'c')).toThrow(/not set/);
     process.env.RID_SECRETS_KEY = saved;
+  });
+});
+
+describe('rotation of RID_SECRETS_KEY (ASVS 11.1)', () => {
+  const newKey = () => randomBytes(32).toString('base64');
+  /** A v1 value as the portal sealed it before keys had ids. */
+  const sealV1 = (plaintext: string, context: string, key: string) => {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', Buffer.from(key, 'base64'), iv);
+    cipher.setAAD(Buffer.from(context));
+    const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    return ['v1', iv, cipher.getAuthTag(), ct]
+      .map((p) => (typeof p === 'string' ? p : p.toString('base64url')))
+      .join('.');
+  };
+  afterEach(() => {
+    delete process.env.RID_SECRETS_KEYS_PREVIOUS;
+  });
+
+  it('names the key that sealed a value', () => {
+    process.env.RID_SECRETS_KEY = newKey();
+    const sealed = seal('x', 'c');
+    expect(sealed.split('.')).toHaveLength(5);
+    expect(sealed.split('.')[0]).toBe('v2');
+    expect(sealed.split('.')[1]).toBe(currentSecretsKeyId());
+    expect(needsReseal(sealed)).toBe(false);
+  });
+
+  it('opens with a previous key what it sealed, and marks it for resealing', () => {
+    const oldKey = newKey();
+    process.env.RID_SECRETS_KEY = oldKey;
+    const sealed = seal('privada', 'gateway-cert-1');
+    process.env.RID_SECRETS_KEY = newKey();
+    expect(() => open(sealed, 'gateway-cert-1')).toThrow(/neither RID_SECRETS_KEY/);
+    process.env.RID_SECRETS_KEYS_PREVIOUS = `${newKey()}, ${oldKey}`;
+    expect(open(sealed, 'gateway-cert-1')).toBe('privada');
+    expect(needsReseal(sealed)).toBe(true);
+    const resealed = seal(open(sealed, 'gateway-cert-1'), 'gateway-cert-1');
+    delete process.env.RID_SECRETS_KEYS_PREVIOUS;
+    expect(open(resealed, 'gateway-cert-1')).toBe('privada');
+  });
+
+  it('opens the older v1 values with the current or a previous key', () => {
+    const oldKey = newKey();
+    const v1 = sealV1('secreto', 'cred-1', oldKey);
+    process.env.RID_SECRETS_KEY = oldKey;
+    expect(open(v1, 'cred-1')).toBe('secreto');
+    expect(needsReseal(v1)).toBe(true);
+    process.env.RID_SECRETS_KEY = newKey();
+    expect(() => open(v1, 'cred-1')).toThrow(/no configured key/);
+    process.env.RID_SECRETS_KEYS_PREVIOUS = oldKey;
+    expect(open(v1, 'cred-1')).toBe('secreto');
+    expect(() => open(v1, 'cred-2')).toThrow();
+  });
+
+  it('refuses a malformed previous key', () => {
+    process.env.RID_SECRETS_KEY = newKey();
+    process.env.RID_SECRETS_KEYS_PREVIOUS = 'corta';
+    expect(() => seal('x', 'c')).toThrow(/RID_SECRETS_KEYS_PREVIOUS must be 32 bytes/);
   });
 });

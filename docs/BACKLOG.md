@@ -876,6 +876,13 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - En Documentos, el filtro de entidad se acota con una búsqueda y avisa si la lista está cortada.
       - En Revocación masiva, el selector ofrece las entidades con certificados vigentes.
     - **Pruebas:** paginación sin repetir elementos, búsqueda por identificador y la cola recorrida por páginas.
+- [x] **M6-12 — Rotación de `RID_SECRETS_KEY`** (ASVS 11.1, el último pendiente de la revisión de M6-01).
+  - _Hecho (2026-11-17):_
+    - **Formato:** cada valor sellado nombra la clave que lo selló (`v2.<kid>…`, `kid` derivado de la clave).
+    - **Claves anteriores:** `RID_SECRETS_KEYS_PREVIOUS` (separadas por comas) sigue abriendo lo que sellaron, incluidos los valores `v1` sin identificador.
+    - **Resellado:** `secrets:reseal` (`node dist/secrets/main.js` en la imagen) sella de nuevo con la actual los secretos de cliente pendientes, las claves de los certificados del gateway y las de las aserciones. Es idempotente, no toca lo que cambió mientras corría, se detiene sin perder nada si una clave falta y deja `secrets.resealed` en la bitácora.
+    - **Procedimiento:** en `OPERATIONS.md §5.6`.
+    - **Pruebas:** unitarias del formato y de las claves, y de integración del resellado completo con la clave anterior retirada después.
 
 **Cierre M6:** despliegue en un entorno tipo producción del operador con las pruebas de M6-03 y M6-04 en verde.
   - _Estado (2026-11-17):_ M6-01, M6-02, M6-04 y M6-06 a M6-10 hechas. M6-11 también. Quedan abiertas M6-03 (la prueba de carga, en el entorno tipo producción) y M6-05 (instalar el chart), que dependen de ese entorno.

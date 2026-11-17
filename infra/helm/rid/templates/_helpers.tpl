@@ -49,6 +49,8 @@ api:
     - RID_WG_HUB_AGENT_TOKEN
     - RID_STEP_CA_PROVISIONER_PASSWORD
     - RID_SECRETS_KEY
+    # The previous keys while rotating (OPERATIONS.md §5.6); an empty property otherwise.
+    - RID_SECRETS_KEYS_PREVIOUS
     - RID_GATEWAY_PROVISIONER_SECRET
     - KEYCLOAK_ADMIN_PASSWORD
     - RID_CITIZEN_APPS

@@ -66,6 +66,8 @@ export const AUDIT_ACTIONS = [
   'certificate_revocation.executed',
   // Signing keys of the gateway's assertions to providers (M6-10)
   'gateway_signing_key.created',
+  // Rotation of RID_SECRETS_KEY: everything sealed again with the new key
+  'secrets.resealed',
   // Certificates of the gateway itself (M3-02)
   'gateway_certificate.issued',
   // Subscriptions (M1, M2-04, M2-06, M2-07)

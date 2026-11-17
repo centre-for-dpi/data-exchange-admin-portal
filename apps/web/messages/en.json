@@ -737,6 +737,9 @@
       },
       "gateway_signing_key": {
         "created": "Gateway signing key created"
+      },
+      "secrets": {
+        "resealed": "Sealed values sealed again with the current key"
       }
     },
     "filters": {

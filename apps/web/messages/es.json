@@ -737,6 +737,9 @@
       },
       "gateway_signing_key": {
         "created": "Clave de firma del gateway creada"
+      },
+      "secrets": {
+        "resealed": "Valores sellados de nuevo con la clave actual"
       }
     },
     "filters": {

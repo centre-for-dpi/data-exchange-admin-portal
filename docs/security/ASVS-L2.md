@@ -43,6 +43,7 @@ Las de M6-05 (14 a 19) están en `infra/helm/rid` y se validaron solo de forma e
 | 18 | Sin SBOM ni escaneo de imágenes (15.1.2, 15.2.1) | SBOM CycloneDX y Trivy en CI: una vulnerabilidad alta o crítica con arreglo detiene la publicación. Imágenes del API y la web sin dependencias de desarrollo ni gestor de paquetes | `.github/workflows/images.yml` |
 | 19 | Logs del API fuera del pipeline central, sin enmascarar (16.4.3, 14.x) | Cada línea enmascarada (queries, números de 6 dígitos o más, correos, credenciales en URL). En el chart, JSON para el colector de logs del clúster | `common/logger.test.ts` |
 | 20 | Documentos sin antivirus (5.4.3) | ClamAV (`clamd`, M6-08) revisa cada documento antes de guardarlo; uno infectado se rechaza y, si no responde, la subida falla. Activado en el chart; opcional en el piloto (`--profile antivirus`) | `documents/antivirus.test.ts`, `documents/antivirus.int.test.ts` |
+| 21 | Una sola `RID_SECRETS_KEY`, sin identificador ni rotación (11.1) | Cada valor sellado nombra su clave (`v2.<kid>`); `RID_SECRETS_KEYS_PREVIOUS` abre lo anterior (también el formato `v1`) y `secrets:reseal` lo sella de nuevo con la actual, de forma idempotente y auditada | `common/secrets.test.ts`, `secrets/reseal.int.test.ts` |
 
 ## Estado por capítulo
 
@@ -58,7 +59,7 @@ Las de M6-05 (14 a 19) están en `infra/helm/rid` y se validaron solo de forma e
 | V8 Autorización | Cumple | Política central, falla cerrada sin declaración de acceso, aislamiento por entidad (404 fuera), roles con efecto inmediato. El tráfico lo autoriza OPA y falla cerrado |
 | V9 Tokens autocontenidos | Cumple | RS256 contra el JWKS del emisor, `exp`/`iss`/`aud`; el gateway valida antes de OPA |
 | V10 OAuth/OIDC | Cumple · Corregido | Código con PKCE S256, sin implícito ni password grant, clientes confidenciales con token ligado al certificado. **Corregido:** URIs exactas (7) |
-| V11 Criptografía | Cumple · Parcial | AES-256-GCM con IV aleatorio y AAD, aleatoriedad del sistema, comparaciones en tiempo constante. **Corregido:** etiqueta GCM (12). **Parcial:** una sola `RID_SECRETS_KEY` sin identificador de clave ni rotación (M6-05) |
+| V11 Criptografía | Cumple · Corregido | AES-256-GCM con IV aleatorio y AAD, aleatoriedad del sistema, comparaciones en tiempo constante. **Corregido:** etiqueta GCM (12). **Corregido:** identificador de clave y rotación de `RID_SECRETS_KEY` (21) |
 | V12 Comunicaciones | Cumple · Corregido en el chart | TLS externo, verificación de certificados hacia proveedores, mTLS de aplicaciones y nodos. **Corregido en el chart de Helm (M6-05, 14):** etcd con mTLS y CA propia, OpenSearch con TLS, Postgres con `verify-full`, OPA solo en el loopback del pod. El piloto con Compose sigue con la red interna como única barrera |
 | V13 Configuración | Corregido · Corregido en el chart | **Corregido:** segmentación (8), keyring (9), plugins (10). Rol de base de datos de mínimo privilegio. **Corregido en el chart (14 a 17):**<br>• etcd con mTLS y OpenSearch con su plugin de seguridad;<br>• Keycloak en `start` (modo producción) con realms sin usuarios de prueba;<br>• imagen de Fluent Bit sin `-debug`;<br>• secretos desde OpenBao con External Secrets;<br>• NetworkPolicies de entrada y de salida por componente |
 | V14 Protección de datos | Cumple · Corregido | Sin datos sensibles en URLs ni logs; sin cuerpos; lista blanca de campos; seudónimos con clave. **Corregido:** la clave de seudónimos en los datos de OPA ya no es alcanzable desde los upstreams (8). En el chart, la API de OPA solo escucha en el loopback del pod del gateway (14) |
@@ -71,7 +72,6 @@ Las de M6-05 (14 a 19) están en `infra/helm/rid` y se validaron solo de forma e
 | :-- | :-- | :-- |
 | Segundo factor para `entity_admin` y `api_publisher` | 6.3.3 | Decisión del operador. Si se adopta, es configuración y una guía para las entidades |
 | Comprobar en un clúster lo corregido en el chart (14 a 19): no se ha instalado | 12.3.x, 13.x, 16.4.3 | M6-05 (instalación) |
-| Identificador de clave y rotación de `RID_SECRETS_KEY` | 11.1.x | Pendiente: hoy una sola clave, en la bóveda en el chart |
 | Tope de re-subidas del documento de designación | 2.3.2 | Mejora menor (hoy limitado por tasa) |
 | Retirar la clave de fábrica del keyring de APISIX | 11.x | Operación: después de la primera renovación de certificados del despliegue |
 

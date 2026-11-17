@@ -309,7 +309,7 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 | `RID_SUBJECT_REF_KEY` (≥ 32 caracteres) | Cambia el seudónimo de cada titular: se pierde el vínculo entre un ciudadano y sus registros anteriores |
 | `RID_END_USER_HASH_SALT` (≥ 16 caracteres) | Cambian todos los hashes de funcionario |
 | `RID_TRANSPARENCY_SIGNING_JWK` | Los comprobantes anteriores solo verifican si la clave pública vieja pasa a `RID_TRANSPARENCY_RETIRED_JWKS` |
-| `RID_SECRETS_KEY` (32 bytes base64) | No se pueden abrir los secretos de cliente sellados que el reconciliador de Keycloak aún no aplicó, ni las claves de los certificados del gateway (`gateway_certificate`): el reconciliador de APISIX falla hasta que se emitan certificados nuevos |
+| `RID_SECRETS_KEY` (32 bytes base64). Se rota con `RID_SECRETS_KEYS_PREVIOUS` y `secrets:reseal` (`OPERATIONS.md §5.6`), nunca reemplazándola sin más | Si se reemplaza sin rotar, no se pueden abrir los secretos de cliente sellados que el reconciliador de Keycloak aún no aplicó, ni las claves de los certificados del gateway (`gateway_certificate`): el reconciliador de APISIX falla hasta que se emitan certificados nuevos |
 | `POSTGRES_PASSWORD`, `RID_APP_DB_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Solo se aplican al crear el volumen (§3.2) |
 | `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET` | Solo se aplican al importar el realm (§3.3) |
 | `STEP_CA_PASSWORD` | Cifra las claves de la CA y de los provisioners `rid-portal` y `rid-gateway-tls` ya creadas |
@@ -585,6 +585,7 @@ Cada componente tiene su Secret `rid-<componente>`, solo con las claves que usa.
 - `KEYCLOAK_SMTP_USER` y `KEYCLOAK_SMTP_PASSWORD`, para el correo del realm;
 - `ALERTMANAGER_SMTP_PASSWORD`, la del servidor de correo de las alertas (`prometheus.alertmanager.config.global`);
 - `DB_BACKUP_ACCESS_KEY_ID` y `DB_BACKUP_SECRET_ACCESS_KEY`, la clave de acceso al almacenamiento de los respaldos;
+- `RID_SECRETS_KEYS_PREVIOUS`, vacía salvo mientras se rota `RID_SECRETS_KEY` (`OPERATIONS.md §5.6`);
 - `OPENSEARCH_INTERNAL_USERS_YML`, el `internal_users.yml` del plugin de seguridad de OpenSearch con tres usuarios: `admin`, `rid-logs` (Fluent Bit: `OPENSEARCH_USER` y `OPENSEARCH_PASSWORD`) y `rid-api` (el portal: `RID_OPENSEARCH_AUTH`, `usuario:contraseña`). Lleva solo los hashes bcrypt, hechos con `plugins/opensearch-security/tools/hash.sh` de la imagen de OpenSearch. El índice de seguridad se crea desde él en el primer arranque; cambios posteriores van con `securityadmin.sh` y el certificado `rid-opensearch-admin`.
 
 `GRAFANA_ADMIN_PASSWORD` es la de `.env.example`; el usuario es `admin`.
