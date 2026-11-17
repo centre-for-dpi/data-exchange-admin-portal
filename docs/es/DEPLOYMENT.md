@@ -2,7 +2,7 @@
 
 > English version (official): [docs/DEPLOYMENT.md](../DEPLOYMENT.md)
 
-Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en curso)
+Versión 0.3 · noviembre 2026 · estado del código con M6: todo salvo la prueba de carga (M6-03) y la instalación en un clúster (M6-05), que necesitan el entorno tipo producción del operador
 
 Este documento describe **cómo se despliega cada componente** del portal y del gateway: imagen, configuración, puertos, volúmenes, secretos y dependencias. Cómo dejarlo operativo y cómo operarlo día a día está en [`OPERATIONS.md`](OPERATIONS.md). La arquitectura de referencia está en [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -14,7 +14,7 @@ Este documento describe **cómo se despliega cada componente** del portal y del 
 | :-- | :-- | :-- | :-- |
 | **Desarrollo local** | `infra/compose/docker-compose.yml`; web y API en el host con `pnpm dev` | Disponible | Programar y probar |
 | **Piloto en una máquina** | `docker-compose.yml` + `docker-compose.deploy.yml`, detrás de un proxy inverso existente o del incluido (`docker-compose.edge.yml`) | Disponible; **instalador interactivo `install.sh`** ([`INSTALL.md`](INSTALL.md)) | Demos, pilotos y bootcamp |
-| **Producción** | Helm charts (`infra/helm/`) con la topología de `ARCHITECTURE.md §11` | **No existe todavía** (M6-05) | Operador nacional |
+| **Producción** | Helm charts (`infra/helm/`) con la topología de `ARCHITECTURE.md §11` | Escritos y validados de forma estática; **todavía sin instalar en un clúster** (M6-05, §9) | Operador nacional |
 
 El piloto no es un despliegue de producción. Sus límites conocidos están en la §8.
 
@@ -543,11 +543,13 @@ En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.d
 | Integración del API | `docker compose up -d --wait postgres etcd apisix tsa step-ca` y `pnpm --filter @den/api test:integration`; luego `test:dist` sobre el build |
 | Políticas OPA | `opa check --strict`, `opa test`, cobertura ≥ 90 % |
 
+`.github/workflows/pages.yml` publica las guías HTML en GitHub Pages (https://centre-for-dpi.github.io/data-exchange-admin-portal/) cuando cambian. `scripts/docs-site.sh` arma el sitio: envuelve cada guía en un documento completo con su idioma y agrega la portada `docs/site/index.html`. En la configuración del repositorio, Pages debe estar puesto para desplegar desde GitHub Actions.
+
 ## 8. Límites del piloto frente a producción
 
 | Tema | Piloto (hoy) | Producción (objetivo, `ARCHITECTURE.md §11`) |
 | :-- | :-- | :-- |
-| Datos iniciales | Siempre carga el seed: entidades ficticias y usuarios de demo, incluidos administradores de plataforma | Sin datos de demo. **Falta** un mecanismo para dar el primer `platform_admin` sin el seed (los roles de plataforma hoy solo los da el seed) |
+| Datos iniciales | Siempre carga el seed: entidades ficticias y usuarios de demo, incluidos administradores de plataforma | Sin datos de demo. El primer `platform_admin` sale de `DEN_BOOTSTRAP_ADMIN_EMAIL` (§9.3) |
 | Keycloak | `start-dev`, misma instancia de PostgreSQL | Clúster en modo producción, base propia |
 | CA | CA de desarrollo en un volumen | Raíz fuera de línea, intermedia en HSM |
 | TSA | sigstore con clave en archivo | TSA acreditada del país |
@@ -556,9 +558,9 @@ En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.d
 | Correo | Mailpit | SMTP del operador |
 | Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
 | Alta disponibilidad | Ninguna | ≥ 2 nodos de APISIX con OPA local, ≥ 2 réplicas de web y API, PostgreSQL con réplica |
-| Métricas y alertas | No hay Prometheus; APISIX expone métricas en 9091 sin que nadie las lea | Prometheus + Alertmanager (M5-06) |
+| Métricas y alertas | Prometheus, Alertmanager y Grafana con el perfil `observability` (§3.8.1); las alertas van a Mailpit | Los mismos como subcharts de `den-platform`, con el SMTP del operador |
 | Respaldos | pgBackRest: WAL continuo y respaldos diarios en un repositorio cifrado del mismo servidor; la copia fuera de él es manual (`install.sh backup`) | Barman Cloud al almacenamiento de objetos del operador (M6-06) |
-| mTLS de aplicaciones | Desactivado (`features.mtls.required: false`, ADR-0010) | Obligatorio desde M3-10 |
+| mTLS de aplicaciones | Obligatorio, como en producción (`features.mtls.required: true` en `co.yaml` desde M3-10) | Obligatorio |
 
 ## 9. Kubernetes: charts de Helm (M6-05, en curso)
 
@@ -635,7 +637,7 @@ Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
 - **Publicación.** Con una etiqueta `vX.Y.Z` publica en `ghcr.io/centre-for-dpi/<imagen>:X.Y.Z` (el `appVersion` del chart), con las atestaciones de SBOM y de procedencia de BuildKit. A mano (`workflow_dispatch`) solo construye y escanea, salvo que se marque `publish`.
 - **Acciones fijadas.** Las acciones de terceros están fijadas por commit.
 
-**v0.1.0 (2026-11-17).** Primera publicación: `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.1.0`, también como `latest`, escaneadas sin hallazgos altos ni críticos, con su SBOM y procedencia. El paquete hereda la visibilidad del repositorio (privado): el clúster necesita un `imagePullSecrets` con acceso a ghcr.io hasta que se publiquen como públicas.
+**v0.1.0 (2026-11-17).** Primera publicación: `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.1.0`, también como `latest`, escaneadas sin hallazgos altos ni críticos, con su SBOM y procedencia. El repositorio es público, pero los paquetes se crearon cuando era privado y siguen privados: hasta que un dueño de la organización haga público cada uno (configuración del paquete → Change visibility), el clúster necesita un `imagePullSecrets` con acceso a ghcr.io.
 
 Las imágenes del API y de la web son de varias etapas. La de ejecución lleva solo las dependencias de producción (`pnpm deploy --prod`) y los archivos del repositorio que lee el proceso: la configuración del país y, en el API, las políticas de OPA y el realm del seed del piloto. No lleva gestor de paquetes. El contenedor de migraciones corre `node_modules/.bin/prisma migrate deploy`.
 

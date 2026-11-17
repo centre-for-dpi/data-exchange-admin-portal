@@ -222,7 +222,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 1. **Requirements:** a Linux VPS with 4–8 vCPUs, 16 GB of RAM and a 100 GB SSD; a public IP; **two DNS names** (portal and gateway); ports 443/tcp, 80/tcp and 51820/udp open.
 2. **Install:**
    ```bash
-   git clone <repository-url> den && cd den
+   git clone https://github.com/centre-for-dpi/data-exchange-admin-portal.git den && cd den
    sudo ./install.sh
    ```
    The script asks for the country, the two names, the proxy and the certificate, whether to enable observability and the document antivirus, and the demo password (12 characters or more). It then generates all the secrets, builds, starts and checks everything.

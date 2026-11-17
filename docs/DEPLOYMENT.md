@@ -2,7 +2,7 @@
 
 > Versión en español: [docs/es/DEPLOYMENT.md](es/DEPLOYMENT.md)
 
-Version 0.2 · November 2026 · code state as of M3-01 to M3-04 (M3 in progress)
+Version 0.3 · November 2026 · code as of M6: all of it except the load test (M6-03) and the cluster installation (M6-05), which need the operator's production-like environment
 
 This document describes **how each component** of the portal and the gateway **is deployed**: image, configuration, ports, volumes, secrets and dependencies. How to bring it into service and how to run it day to day is in [`OPERATIONS.md`](OPERATIONS.md). The reference architecture is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -14,7 +14,7 @@ This document describes **how each component** of the portal and the gateway **i
 | :-- | :-- | :-- | :-- |
 | **Local development** | `infra/compose/docker-compose.yml`; web and API on the host with `pnpm dev` | Available | Coding and testing |
 | **Single-machine pilot** | `docker-compose.yml` + `docker-compose.deploy.yml`, behind an existing reverse proxy or the bundled one (`docker-compose.edge.yml`) | Available; **interactive installer `install.sh`** ([`INSTALL.md`](INSTALL.md)) | Demos, pilots and bootcamp |
-| **Production** | Helm charts (`infra/helm/`) with the topology of `ARCHITECTURE.md §11` | **Does not exist yet** (M6-05) | National operator |
+| **Production** | Helm charts (`infra/helm/`) with the topology of `ARCHITECTURE.md §11` | Written and statically validated; **not installed in a cluster yet** (M6-05, §9) | National operator |
 
 The pilot is not a production deployment. Its known limits are in §8.
 
@@ -542,11 +542,13 @@ In development OPA and `fluent-bit-transparency` reach the API on the host throu
 | API integration | `docker compose up -d --wait postgres etcd apisix tsa step-ca` and `pnpm --filter @den/api test:integration`; then `test:dist` on the build |
 | OPA policies | `opa check --strict`, `opa test`, coverage ≥ 90 % |
 
+`.github/workflows/pages.yml` publishes the HTML guides to GitHub Pages (https://centre-for-dpi.github.io/data-exchange-admin-portal/) when they change. `scripts/docs-site.sh` builds the site: it wraps each guide in a full document with its language and adds the landing page `docs/site/index.html`. Pages must be set to deploy from GitHub Actions in the repository's settings.
+
 ## 8. Pilot limits compared with production
 
 | Topic | Pilot (today) | Production (target, `ARCHITECTURE.md §11`) |
 | :-- | :-- | :-- |
-| Initial data | Always loads the seed: fictitious entities and demo users, including platform administrators | No demo data. **Missing:** a mechanism to grant the first `platform_admin` without the seed (today platform roles are only granted by the seed) |
+| Initial data | Always loads the seed: fictitious entities and demo users, including platform administrators | No demo data. The first `platform_admin` comes from `DEN_BOOTSTRAP_ADMIN_EMAIL` (§9.3) |
 | Keycloak | `start-dev`, same PostgreSQL instance | Cluster in production mode, its own database |
 | CA | Development CA in a volume | Offline root, intermediate in an HSM |
 | TSA | sigstore with a key in a file | The country's accredited TSA |
@@ -555,9 +557,9 @@ In development OPA and `fluent-bit-transparency` reach the API on the host throu
 | Mail | Mailpit | The operator's SMTP |
 | Secrets | `.env` on disk | Secrets manager (OpenBao) |
 | High availability | None | ≥ 2 APISIX nodes with local OPA, ≥ 2 web and API replicas, PostgreSQL with a replica |
-| Metrics and alerts | No Prometheus; APISIX exposes metrics on 9091 that nobody reads | Prometheus + Alertmanager (M5-06) |
+| Metrics and alerts | Prometheus, Alertmanager and Grafana with the `observability` profile (§3.8.1); alerts go to Mailpit | The same as subcharts of `den-platform`, with the operator's SMTP |
 | Backups | pgBackRest: continuous WAL and daily backups in an encrypted repository on the same server; the off-server copy is manual (`install.sh backup`) | Barman Cloud to the operator's object storage (M6-06) |
-| Application mTLS | Disabled (`features.mtls.required: false`, ADR-0010) | Mandatory from M3-10 |
+| Application mTLS | Required, as in production (`features.mtls.required: true` in `co.yaml` since M3-10) | Required |
 
 ## 9. Kubernetes: Helm charts (M6-05, in progress)
 
@@ -634,7 +636,7 @@ Besides `country`, `publicUrl`, `gatewayHost` and `gatewayPublicUrl`:
 - **Publishing.** With a `vX.Y.Z` tag it publishes to `ghcr.io/centre-for-dpi/<image>:X.Y.Z` (the chart's `appVersion`), with BuildKit's SBOM and provenance attestations. Run by hand (`workflow_dispatch`) it only builds and scans, unless `publish` is checked.
 - **Pinned actions.** Third-party actions are pinned by commit.
 
-**v0.1.0 (2026-11-17).** First release: `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.1.0`, also as `latest`, scanned with no high or critical findings, with their SBOM and provenance. The package inherits the repository's visibility (private): the cluster needs an `imagePullSecrets` with access to ghcr.io until they are published as public.
+**v0.1.0 (2026-11-17).** First release: `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.1.0`, also as `latest`, scanned with no high or critical findings, with their SBOM and provenance. The repository is public, but the packages were created while it was private and are still private: until an organization owner makes each one public (the package's settings → Change visibility), the cluster needs an `imagePullSecrets` with access to ghcr.io.
 
 The API and web images are multi-stage. The runtime stage carries only the production dependencies (`pnpm deploy --prod`) and the repository files that the process reads: the country configuration and, in the API, the OPA policies and the pilot's seed realm. It has no package manager. The migrations container runs `node_modules/.bin/prisma migrate deploy`.
 

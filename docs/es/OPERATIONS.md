@@ -2,7 +2,7 @@
 
 > English version (official): [docs/OPERATIONS.md](../OPERATIONS.md)
 
-Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en curso)
+Versión 0.3 · noviembre 2026 · estado del código con M6: todo salvo la prueba de carga (M6-03) y la instalación en un clúster (M6-05), que necesitan el entorno tipo producción del operador
 
 Qué hace cada componente al arrancar, qué tiene que hacer o correr el operador para dejarlo operativo, cómo comprobar que funciona y qué revisar en el día a día. Cómo se despliega cada pieza está en [`DEPLOYMENT.md`](DEPLOYMENT.md). El alta de entidades, la respuesta a incidentes, la rotación de la CA intermedia y la revocación masiva de certificados están en el runbook del operador ([`RUNBOOK.md`](RUNBOOK.md)).
 

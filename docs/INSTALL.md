@@ -2,7 +2,7 @@
 
 > Versión en español: [docs/es/INSTALL.md](es/INSTALL.md)
 
-Version 1.1 · November 2026 · code as of M5 closed and M6 in progress
+Version 1.2 · November 2026 · code as of M6: all of it except the load test (M6-03) and the cluster installation (M6-05), which need the operator's production-like environment
 
 This guide installs **the whole central platform** (portal, gateway, identity, CA, timestamping, logs) on **a single Linux server** with an interactive script: `sudo ./install.sh`. This is the **pilot** topology (`DEPLOYMENT.md §1`). It is meant for the go-live with the operator, the entity bootcamp and demos. Production, with high availability, is a separate exercise: that is the Helm charts of M6-05.
 
@@ -57,7 +57,7 @@ The installer checks everything, and if Docker is missing it offers to install i
 ## 2. Installation
 
 ```bash
-git clone <repository-url> den && cd den
+git clone https://github.com/centre-for-dpi/data-exchange-admin-portal.git den && cd den
 sudo ./install.sh
 ```
 

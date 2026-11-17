@@ -2,7 +2,7 @@
 
 > Versión en español: [docs/es/OPERATIONS.md](es/OPERATIONS.md)
 
-Version 0.2 · November 2026 · code as of M3-01 to M3-04 (M3 in progress)
+Version 0.3 · November 2026 · code as of M6: all of it except the load test (M6-03) and the cluster installation (M6-05), which need the operator's production-like environment
 
 What each component does at startup, what the operator has to do or run to make it operational, how to check that it works and what to review day to day. How each piece is deployed is in [`DEPLOYMENT.md`](DEPLOYMENT.md). Entity onboarding, incident response, intermediate CA rotation and mass certificate revocation are in the operator runbook ([`RUNBOOK.md`](RUNBOOK.md)).
 
