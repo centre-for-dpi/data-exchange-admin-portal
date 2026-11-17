@@ -8,7 +8,7 @@ Developer portal and governance console for a national data exchange network bet
 - Other entities consume them under control: a declared purpose, approval from the data owner, their own credentials and traceability of every query.
 - Traffic goes through a central API gateway (Apache APISIX) run by the national operator; the data stays at each entity.
 
-First deployment: **Colombia** (operator: AND · governance: MinTIC). Designed to be reused in any country through `config/country/<code>.yaml`.
+Designed to be reused in any country: authorities, document types, sectors, legal framework and agreement texts live in `config/country/<code>.yaml`, never in the code. The repository ships `example.yaml`, a template for a new country, and `co.yaml`, the configuration of the first deployment (Colombia), as a complete reference.
 
 ## Getting started
 
@@ -22,7 +22,7 @@ pnpm db:migrate && pnpm db:seed
 pnpm dev
 ```
 
-Open http://localhost:3000. Test users are listed in `docs/DEMO.md`. The reference citizen folder ("Who accessed my data?", MT-07) runs at http://localhost:3100, with `ciudadana.demo`.
+Open http://localhost:3000. Test users are listed in `docs/DEMO.md`. The reference citizen app ("Who accessed my data?", MT-07) runs at http://localhost:3100, with `ciudadana.demo`.
 
 For the e2e tests (`pnpm test:e2e`, with the stack up), install the browser once: `pnpm --filter @den/web exec playwright install chromium`.
 
@@ -38,18 +38,13 @@ For the e2e tests (`pnpm test:e2e`, with the stack up), install the browser once
 
 All ports are published on `127.0.0.1` only. If one is already in use on your machine, change it in `.env` with the matching `*_PORT` variable (see `.env.example`).
 
-## Starting with Claude Code
+## Contributing
 
-1. Create the repository, copy these files and make the first commit.
-2. Open Claude Code at the root and use this as the first message:
-
-   > Read CLAUDE.md and all the documents in docs/. Then implement milestone M0 of docs/BACKLOG.md story by story, following the definition of done. When you close each story, mark it in the backlog and commit.
-
-3. When M0 is closed, continue with: "Continue with milestone M1, starting with SPIKE S-1."
+Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. To report a vulnerability, do not open a public issue; follow [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-- [CLAUDE.md](CLAUDE.md) — context and rules for development with Claude Code
+- [CLAUDE.md](CLAUDE.md) — rules of the project, as context for AI coding agents (Claude Code); they apply to any contribution
 - [docs/SPEC.md](docs/SPEC.md) — functional specification
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — technical architecture
 - [docs/BACKLOG.md](docs/BACKLOG.md) — milestones and stories

@@ -8,7 +8,7 @@ Portal de desarrolladores y consola de gobierno para una red nacional de interca
 - Otras entidades las consumen con control: finalidad declarada, aprobación del dueño del dato, credenciales propias y trazabilidad de cada consulta.
 - El tráfico pasa por un API gateway central (Apache APISIX) operado por el operador nacional; los datos se quedan en cada entidad.
 
-Primer despliegue: **Colombia** (operador: AND · gobierno: MinTIC). Diseñado para reutilizarse en cualquier país mediante `config/country/<código>.yaml`.
+Diseñado para reutilizarse en cualquier país: autoridades, tipos de documento, sectores, marco legal y textos de acuerdos viven en `config/country/<código>.yaml`, nunca en el código. El repositorio incluye `example.yaml`, una plantilla para un país nuevo, y `co.yaml`, la configuración del primer despliegue (Colombia), como referencia completa.
 
 ## Empezar
 
@@ -22,7 +22,7 @@ pnpm db:migrate && pnpm db:seed
 pnpm dev
 ```
 
-Abre http://localhost:3000. Usuarios de prueba en `docs/es/DEMO.md`. La carpeta ciudadana de referencia ("¿Quién consultó mis datos?", MT-07) queda en http://localhost:3100 con `ciudadana.demo`.
+Abre http://localhost:3000. Usuarios de prueba en `docs/es/DEMO.md`. La app ciudadana de referencia ("¿Quién consultó mis datos?", MT-07) queda en http://localhost:3100 con `ciudadana.demo`.
 
 Para las pruebas e2e (`pnpm test:e2e`, con el stack arriba) instala una vez el navegador: `pnpm --filter @den/web exec playwright install chromium`.
 
@@ -38,18 +38,13 @@ Para las pruebas e2e (`pnpm test:e2e`, con el stack arriba) instala una vez el n
 
 Todos los puertos se publican solo en `127.0.0.1`. Si alguno ya está ocupado en tu máquina, cámbialo en `.env` con la variable `*_PORT` correspondiente (ver `.env.example`).
 
-## Arrancar con Claude Code
+## Contribuir
 
-1. Crea el repositorio, copia estos archivos y haz el primer commit.
-2. Abre Claude Code en la raíz y usa como primer mensaje:
-
-   > Lee CLAUDE.md y todos los documentos de docs/. Luego implementa el hito M0 de docs/BACKLOG.md historia por historia, siguiendo la definición de terminado. Al cerrar cada historia, márcala en el backlog y haz commit.
-
-3. Al cerrar M0, sigue con: "Continúa con el hito M1, empezando por el SPIKE S-1."
+Las contribuciones son bienvenidas: lee [CONTRIBUTING.md](../../CONTRIBUTING.md) antes de abrir un pull request. Para reportar una vulnerabilidad no abras un issue público; sigue [SECURITY.md](../../SECURITY.md).
 
 ## Documentación
 
-- [CLAUDE.md](../../CLAUDE.md) — contexto y reglas para desarrollo con Claude Code
+- [CLAUDE.md](../../CLAUDE.md) — reglas del proyecto, como contexto para agentes de programación (Claude Code); aplican a cualquier contribución
 - [docs/es/SPEC.md](SPEC.md) — especificación funcional
 - [docs/es/ARCHITECTURE.md](ARCHITECTURE.md) — arquitectura técnica
 - [docs/BACKLOG.md](../BACKLOG.md) — hitos e historias
