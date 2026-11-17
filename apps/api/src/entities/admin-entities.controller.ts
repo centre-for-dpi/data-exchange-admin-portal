@@ -4,7 +4,7 @@ import {
   adminEntityQuerySchema,
   adminEntitySchema,
   createEntitySchema,
-  type EntityStatus,
+  type AdminEntityQuery,
   adminEntityParamsSchema,
   offboardEntitySchema,
   reactivateEntitySchema,
@@ -60,8 +60,8 @@ export class AdminEntitiesController {
     responses: { 200: { description: 'The entities', schema: adminEntityListSchema } },
     errors: [400, 401, 403],
   })
-  list(@Query(new ZodValidationPipe(adminEntityQuerySchema)) query: { status?: EntityStatus }) {
-    return this.entities.list(query.status);
+  list(@Query(new ZodValidationPipe(adminEntityQuerySchema)) query: AdminEntityQuery) {
+    return this.entities.list(query);
   }
 
   @Post(':id/suspend')
@@ -76,7 +76,7 @@ export class AdminEntitiesController {
     tags: ['entities'],
     params: adminEntityParamsSchema,
     body: suspendEntitySchema,
-    responses: { 200: { description: 'The entities', schema: adminEntityListSchema } },
+    responses: { 200: { description: 'The entity', schema: adminEntitySchema } },
     errors: [400, 401, 403, 404, 409],
   })
   suspend(
@@ -122,7 +122,7 @@ export class AdminEntitiesController {
     tags: ['entities'],
     params: adminEntityParamsSchema,
     body: reactivateEntitySchema,
-    responses: { 200: { description: 'The entities', schema: adminEntityListSchema } },
+    responses: { 200: { description: 'The entity', schema: adminEntitySchema } },
     errors: [400, 401, 403, 404, 409],
   })
   reactivate(
@@ -146,7 +146,7 @@ export class AdminEntitiesController {
     tags: ['entities'],
     params: adminEntityParamsSchema,
     body: offboardEntitySchema,
-    responses: { 200: { description: 'The entities', schema: adminEntityListSchema } },
+    responses: { 200: { description: 'The entity', schema: adminEntitySchema } },
     errors: [400, 401, 403, 404, 409],
   })
   offboard(

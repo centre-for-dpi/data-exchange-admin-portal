@@ -275,7 +275,8 @@
     },
     "entitiesTitle": "Entity onboarding to review",
     "entitiesEmpty": "There are no onboarding requests to review.",
-    "entitiesNext": "See the next requests"
+    "entitiesNext": "See the next requests",
+    "queueNext": "See the next versions"
   },
   "catalog": {
     "lead": "APIs published by the network entities. Each one shows the personal data it exposes and the purposes for which access can be requested.",
@@ -1086,7 +1087,12 @@
       "hint": "With both empty, the entity is out of X-Road.",
       "save": "Save X-Road member",
       "saved": "X-Road member saved."
-    }
+    },
+    "search": "Search by name or identifier",
+    "searchButton": "Search",
+    "searchClear": "Clear the search",
+    "noMatch": "No entity matches “{q}”.",
+    "next": "See the next entities"
   },
   "documentsAdmin": {
     "title": "Attached documents",
@@ -1098,7 +1104,9 @@
       "state": "Status",
       "any": "All",
       "apply": "Apply filters",
-      "clear": "Clear"
+      "clear": "Clear",
+      "ownerSearch": "Search entity",
+      "ownerTruncated": "Showing the first {count}: search to narrow the list."
     },
     "kinds": {
       "designation": "Designation",

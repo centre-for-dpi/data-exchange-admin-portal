@@ -32,8 +32,15 @@ export class ReviewsController {
     responses: { 200: { description: 'The queue', schema: reviewQueueSchema } },
     errors: [400, 401, 403],
   })
-  queue(@Query(new ZodValidationPipe(reviewQueueQuerySchema)) query: { status: ApiVersionStatus }) {
-    return this.reviews.queue(query.status);
+  queue(
+    @Query(new ZodValidationPipe(reviewQueueQuerySchema))
+    query: {
+      status: ApiVersionStatus;
+      limit: number;
+      cursor?: string;
+    },
+  ) {
+    return this.reviews.queue(query.status, query.limit, query.cursor);
   }
 
   @Get(':versionId')

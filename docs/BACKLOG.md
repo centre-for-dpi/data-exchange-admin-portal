@@ -864,8 +864,18 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - del verificador del mock: URI, cuerpo, `aud`, vencimiento, método y firma alterados;
       - unitarias del reconciliador y del estado deseado.
 
-- [ ] **M6-11 — Listas del operador sin tope oculto.** La cola de revisión de versiones (`GET /review/api-versions`, 200 más antiguas) y la lista de entidades de la consola (`GET /admin/entities`, 500 por nombre) se cortan sin avisar. Una red nacional puede pasar las 500 entidades. Paginación por cursor, como la cola de altas (M6-01, ASVS corrección 13).
+- [x] **M6-11 — Listas del operador sin tope oculto.** La cola de revisión de versiones (`GET /review/api-versions`, 200 más antiguas) y la lista de entidades de la consola (`GET /admin/entities`, 500 por nombre) se cortan sin avisar. Una red nacional puede pasar las 500 entidades. Paginación por cursor, como la cola de altas (M6-01, ASVS corrección 13).
   - _Origen (2026-11-17):_ la base de pruebas acumulada hizo fallar dos pruebas de integración que buscaban un elemento nuevo en esas listas.
+  - _Hecho (2026-11-17):_
+    - **API.**
+      - La cola de revisión pagina por cursor, de la más antigua a la más nueva (`limit` 50, máximo 200).
+      - La lista de entidades pagina por nombre (`limit` 100, máximo 500) y busca con `q` en el nombre corto, la razón social y el identificador.
+      - Suspender, reactivar y dar de baja responden con la entidad, no con la lista entera.
+    - **Consola.**
+      - "Ver las siguientes" en la cola de revisión, y búsqueda con páginas en Entidades.
+      - En Documentos, el filtro de entidad se acota con una búsqueda y avisa si la lista está cortada.
+      - En Revocación masiva, el selector ofrece las entidades con certificados vigentes.
+    - **Pruebas:** paginación sin repetir elementos, búsqueda por identificador y la cola recorrida por páginas.
 
 **Cierre M6:** despliegue en un entorno tipo producción del operador con las pruebas de M6-03 y M6-04 en verde.
-  - _Estado (2026-11-17):_ M6-01, M6-02, M6-04 y M6-06 a M6-10 hechas. Quedan abiertas M6-03 (la prueba de carga, en el entorno tipo producción) y M6-05 (instalar el chart), que dependen de ese entorno, y M6-11.
+  - _Estado (2026-11-17):_ M6-01, M6-02, M6-04 y M6-06 a M6-10 hechas. M6-11 también. Quedan abiertas M6-03 (la prueba de carga, en el entorno tipo producción) y M6-05 (instalar el chart), que dependen de ese entorno.

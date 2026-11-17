@@ -29,15 +29,19 @@ export class ReviewsService {
     private readonly apis: ApisService,
   ) {}
 
-  async queue(status: ApiVersionStatus) {
+  /** Oldest first, by pages (M6-11): `cursor` is the last version of the previous page. */
+  async queue(status: ApiVersionStatus, limit = 50, cursor?: string) {
     const rows = await this.prisma.apiVersion.findMany({
       where: { status },
       orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
-      take: 200,
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: { api: { include: { entity: true } } },
     });
+    const page = rows.slice(0, limit);
     return {
-      items: rows.map((v) => ({
+      nextCursor: rows.length > limit ? (page.at(-1)?.id ?? null) : null,
+      items: page.map((v) => ({
         versionId: v.id,
         version: v.version,
         status: v.status,

@@ -5,6 +5,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { loadCountryConfig } from '@rid/config';
 import {
   adminEntityListSchema,
+  adminEntitySchema,
   createdApplicationSchema,
   type EntityRole,
   subscriptionDetailSchema,
@@ -193,9 +194,12 @@ describe('suspension and offboarding of entities (M2-11)', () => {
       comment: 'Incumplimiento del acuerdo marco.',
     });
     expect(res.statusCode, res.body).toBe(200);
-    expect(
-      adminEntityListSchema.parse(res.json()).items.find((e) => e.id === consumer.id),
-    ).toMatchObject({ status: 'suspended', providerSuspended: false });
+    // The decision answers with the entity (M6-11), not the whole list.
+    expect(adminEntitySchema.parse(res.json())).toMatchObject({
+      id: consumer.id,
+      status: 'suspended',
+      providerSuspended: false,
+    });
     expect((await clientOf())?.status).toBe('suspended');
     const again = await call('POST', `/entities/${consumer.id}/subscriptions`, consumer.developer, {
       applicationId,
@@ -319,6 +323,24 @@ describe('suspension and offboarding of entities (M2-11)', () => {
       200,
     );
     expect((await call('GET', '/admin/entities', 'lucia.datos')).statusCode).toBe(403);
+    // By pages, with a search (M6-11): the entity is found by its identifier however many there are.
+    const { slug } = await prisma.entity.findUniqueOrThrow({ where: { id: target.id } });
+    const found = adminEntityListSchema.parse(
+      (await call('GET', `/admin/entities?q=${slug}&limit=5`, 'marta.regulador')).json(),
+    );
+    expect(found.items.map((e) => e.id)).toContain(target.id);
+    const first = adminEntityListSchema.parse(
+      (await call('GET', '/admin/entities?limit=2', 'marta.regulador')).json(),
+    );
+    expect(first.items).toHaveLength(2);
+    expect(first.nextCursor).toBe(first.items[1]?.id);
+    const second = adminEntityListSchema.parse(
+      (
+        await call('GET', `/admin/entities?limit=2&cursor=${first.nextCursor}`, 'marta.regulador')
+      ).json(),
+    );
+    expect(second.items.map((e) => e.id)).not.toContain(first.items[0]?.id);
+    expect(second.items.map((e) => e.id)).not.toContain(first.items[1]?.id);
   });
 
   it('the platform admin registers an entity directly: active, its admin and designees invited', async () => {

@@ -1,6 +1,6 @@
 'use server';
 
-import { adminEntityListSchema, adminEntitySchema } from '@rid/contracts';
+import { adminEntitySchema } from '@rid/contracts';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { apiSend } from './api';
@@ -30,7 +30,7 @@ export async function decideEntityStatusAction(
     'POST',
     `/admin/entities/${entityId}/${decision}`,
     body,
-    adminEntityListSchema,
+    adminEntitySchema,
   );
   if (!result.ok)
     return await formStateFromProblem(

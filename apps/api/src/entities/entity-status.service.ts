@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { EntityStatus, SubscriptionStatus } from '@rid/contracts';
+import type { AdminEntityQuery, EntityStatus, SubscriptionStatus } from '@rid/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ConflictError, NotFoundError } from '../common/errors.js';
@@ -30,14 +30,30 @@ export class EntityStatusService {
     private readonly apis: ApisService,
   ) {}
 
-  async list(status?: EntityStatus, id?: string) {
-    const rows = await this.prisma.entity.findMany({
+  /**
+   * The network's entities by name, by pages (M6-11): `q` searches the short and legal names and
+   * the identifier; `cursor` is the last entity of the previous page.
+   */
+  async list(query: Partial<AdminEntityQuery> & { id?: string } = {}) {
+    const limit = query.limit ?? 100;
+    const q = query.q?.trim();
+    const found = await this.prisma.entity.findMany({
       where: {
-        status: status ? status : { in: ['active', 'suspended', 'offboarded'] },
-        ...(id ? { id } : {}),
+        status: query.status ? query.status : { in: ['active', 'suspended', 'offboarded'] },
+        ...(query.id ? { id: query.id } : {}),
+        ...(q
+          ? {
+              OR: [
+                { shortName: { contains: q, mode: 'insensitive' as const } },
+                { legalName: { contains: q, mode: 'insensitive' as const } },
+                { slug: { contains: q, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
       },
-      orderBy: { shortName: 'asc' },
-      take: 500,
+      orderBy: [{ shortName: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: {
         _count: {
           select: {
@@ -47,9 +63,14 @@ export class EntityStatusService {
         },
       },
     });
+    const rows = found.slice(0, limit);
+    // Live subscriptions of this page's entities only.
     const live = await this.prisma.subscription.groupBy({
       by: ['applicationId'],
-      where: { status: { in: [...LIVE_STATUSES] } },
+      where: {
+        status: { in: [...LIVE_STATUSES] },
+        application: { entityId: { in: rows.map((e) => e.id) } },
+      },
       _count: { _all: true },
     });
     const apps = await this.prisma.application.findMany({
@@ -62,6 +83,7 @@ export class EntityStatusService {
       if (entityId) perEntity.set(entityId, (perEntity.get(entityId) ?? 0) + l._count._all);
     }
     return {
+      nextCursor: found.length > limit ? (rows.at(-1)?.id ?? null) : null,
       items: rows.map((e) => ({
         id: e.id,
         slug: e.slug,
@@ -141,7 +163,7 @@ export class EntityStatusService {
   }
 
   async one(entityId: string) {
-    const item = (await this.list(undefined, entityId)).items[0];
+    const item = (await this.list({ id: entityId })).items[0];
     if (!item) throw new NotFoundError('Network entity');
     return item;
   }
@@ -216,7 +238,7 @@ export class EntityStatusService {
         requestId,
       ),
     );
-    return this.list();
+    return this.one(entityId);
   }
 
   async reactivate(entityId: string, principal: Principal, comment?: string, requestId?: string) {
@@ -236,7 +258,7 @@ export class EntityStatusService {
         requestId,
       ),
     );
-    return this.list();
+    return this.one(entityId);
   }
 
   async offboard(entityId: string, principal: Principal, comment: string, requestId?: string) {
@@ -364,6 +386,6 @@ export class EntityStatusService {
       },
       { timeout: 60_000, maxWait: 60_000 },
     );
-    return this.list();
+    return this.one(entityId);
   }
 }

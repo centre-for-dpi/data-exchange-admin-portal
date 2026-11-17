@@ -275,7 +275,8 @@
     },
     "entitiesTitle": "Altas de entidades por revisar",
     "entitiesEmpty": "No hay solicitudes de alta por revisar.",
-    "entitiesNext": "Ver las siguientes solicitudes"
+    "entitiesNext": "Ver las siguientes solicitudes",
+    "queueNext": "Ver las siguientes versiones"
   },
   "catalog": {
     "lead": "APIs publicadas por las entidades de la red. Cada una indica qué datos personales expone y con qué finalidades se puede solicitar acceso.",
@@ -1086,7 +1087,12 @@
       "hint": "Vacíos los dos, la entidad queda fuera de X-Road.",
       "save": "Guardar miembro X-Road",
       "saved": "Miembro X-Road guardado."
-    }
+    },
+    "search": "Buscar por nombre o identificador",
+    "searchButton": "Buscar",
+    "searchClear": "Quitar la búsqueda",
+    "noMatch": "Ninguna entidad coincide con «{q}».",
+    "next": "Ver las siguientes entidades"
   },
   "documentsAdmin": {
     "title": "Documentos adjuntos",
@@ -1098,7 +1104,9 @@
       "state": "Estado",
       "any": "Todos",
       "apply": "Aplicar filtros",
-      "clear": "Limpiar"
+      "clear": "Limpiar",
+      "ownerSearch": "Buscar entidad",
+      "ownerTruncated": "Se muestran las primeras {count}: busca para acotar la lista."
     },
     "kinds": {
       "designation": "Acto de designación",

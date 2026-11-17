@@ -1,4 +1,4 @@
-import { adminEntityListSchema, certificateRevocationPreviewSchema } from '@rid/contracts';
+import { certificateRevocationPreviewSchema } from '@rid/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -65,8 +65,11 @@ export default async function CertificateRevocationsPage({ params, searchParams 
     return `/operator/certificates?${next.toString()}`;
   };
 
+  // The entities to choose from: those with live certificates (M6-11), whatever their number.
   const [entities, preview] = await Promise.all([
-    apiGet('/admin/entities', adminEntityListSchema),
+    apiGet('/admin/certificate-revocations/preview', certificateRevocationPreviewSchema).then(
+      (all) => ({ items: all.entities }),
+    ),
     apiGet(
       `/admin/certificate-revocations/preview?${new URLSearchParams(filters).toString()}`,
       certificateRevocationPreviewSchema,

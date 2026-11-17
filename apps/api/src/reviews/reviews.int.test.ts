@@ -98,11 +98,23 @@ describe('operator review and publication (M1-04)', () => {
 
   it('lists submitted versions in the review queue', async () => {
     const { versionId } = await submitted();
-    const res = await call('GET', '/api/v1/review/api-versions', 'ana.operadora');
-    expect(res.statusCode).toBe(200);
-    expect(
-      res.json<{ items: Array<{ versionId: string }> }>().items.map((i) => i.versionId),
-    ).toContain(versionId);
+    // Oldest first, by pages (M6-11): walk them until the new version shows up.
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const res = await call(
+        'GET',
+        `/api/v1/review/api-versions?limit=100${cursor ? `&cursor=${cursor}` : ''}`,
+        'ana.operadora',
+      );
+      expect(res.statusCode).toBe(200);
+      const page = res.json<{ items: Array<{ versionId: string }>; nextCursor: string | null }>();
+      expect(page.items.length).toBeLessThanOrEqual(100);
+      seen.push(...page.items.map((i) => i.versionId));
+      cursor = page.nextCursor;
+    } while (cursor && !seen.includes(versionId));
+    expect(seen).toContain(versionId);
+    expect(new Set(seen).size).toBe(seen.length);
   });
 
   it('approving publishes the version, marks the API published, audits and enqueues the gateway sync', async () => {

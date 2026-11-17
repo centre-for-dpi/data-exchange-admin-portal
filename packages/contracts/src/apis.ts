@@ -342,9 +342,15 @@ export const reviewQueueItemSchema = z.object({
   api: z.object({ id: z.uuid(), name: z.string(), classification: classificationSchema }),
   entity: z.object({ id: z.uuid(), slug: z.string(), shortName: z.string() }),
 });
-export const reviewQueueSchema = z.object({ items: z.array(reviewQueueItemSchema) });
+/** The review queue by pages, oldest first (M6-11): `nextCursor` while there are more. */
+export const reviewQueueSchema = z.object({
+  items: z.array(reviewQueueItemSchema),
+  nextCursor: z.uuid().nullable(),
+});
 export const reviewQueueQuerySchema = z.strictObject({
   status: apiVersionStatusSchema.default('in_review'),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
 export const reviewDetailSchema = z.object({

@@ -47,11 +47,17 @@ export default async function DocumentsAdminPage({ params, searchParams }: PageP
   if (filters.get('ownerEntityId')) shown.set('owner', text('owner'));
   if (kind) shown.set('kind', kind);
   if (purged) shown.set('purged', purged);
+  // The owner list narrowed by a search (M6-11): the first 500 by name otherwise.
+  const ownerq = text('ownerq').slice(0, 100);
+  if (ownerq) shown.set('ownerq', ownerq);
   const kept = shown.toString();
   if (UUID.test(text('cursor'))) filters.set('cursor', text('cursor'));
 
   const [entities, documents] = await Promise.all([
-    apiGet('/admin/entities', adminEntityListSchema),
+    apiGet(
+      `/admin/entities?limit=500${ownerq ? `&q=${encodeURIComponent(ownerq)}` : ''}`,
+      adminEntityListSchema,
+    ),
     apiGet(`/documents?limit=50&${filters.toString()}`, documentPageSchema),
   ]);
 
@@ -62,9 +68,24 @@ export default async function DocumentsAdminPage({ params, searchParams }: PageP
       <Section title={t('filters.title')}>
         <form
           method="get"
-          className="card grid gap-4 p-6 md:grid-cols-4"
+          className="card grid gap-4 p-6 md:grid-cols-3"
           aria-label={t('filters.title')}
         >
+          <label className="block text-sm font-medium text-foreground-strong">
+            {t('filters.ownerSearch')}
+            <input
+              type="search"
+              name="ownerq"
+              defaultValue={ownerq}
+              maxLength={100}
+              className={selectClass}
+            />
+            {entities.nextCursor ? (
+              <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                {t('filters.ownerTruncated', { count: entities.items.length })}
+              </span>
+            ) : null}
+          </label>
           <label className="block text-sm font-medium text-foreground-strong">
             {t('filters.owner')}
             <select name="owner" defaultValue={shown.get('owner') ?? ''} className={selectClass}>

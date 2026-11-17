@@ -30,10 +30,17 @@ export default async function OperatorPage({ params, searchParams }: PageProps) 
   if (!viewer.platformRoles.some((r) => REVIEW_ROLES.includes(r))) notFound();
 
   // The onboarding queue by pages, oldest first (M6-01): ?after= is the last request seen.
-  const after = (await searchParams).after;
-  const cursor = typeof after === 'string' && /^[0-9a-f-]{36}$/.test(after) ? after : undefined;
+  const query = await searchParams;
+  const uuidOf = (value: unknown) =>
+    typeof value === 'string' && /^[0-9a-f-]{36}$/.test(value) ? value : undefined;
+  const cursor = uuidOf(query.after);
+  // The review queue by pages too (M6-11): ?versions= is the last version seen.
+  const versionsAfter = uuidOf(query.versions);
   const [queue, onboarding] = await Promise.all([
-    apiGet('/review/api-versions', reviewQueueSchema),
+    apiGet(
+      `/review/api-versions${versionsAfter ? `?cursor=${versionsAfter}` : ''}`,
+      reviewQueueSchema,
+    ),
     apiGet(`/review/entities${cursor ? `?cursor=${cursor}` : ''}`, entityRequestListSchema),
   ]);
 
@@ -166,6 +173,13 @@ export default async function OperatorPage({ params, searchParams }: PageProps) 
             </table>
           </div>
         )}
+        {queue.nextCursor ? (
+          <p className="mt-3">
+            <Link href={`/operator?versions=${queue.nextCursor}`} className="link">
+              {t('operator.queueNext')}
+            </Link>
+          </p>
+        ) : null}
       </Section>
     </Page>
   );

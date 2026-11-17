@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { EntityStatusActions, XroadMemberForm } from '../../../../components/entity-admin/forms';
 import { StatusBadge } from '../../../../components/ui/badge';
+import { inputClass } from '../../../../components/form/field';
 import { EmptyState, Page, PageHeader } from '../../../../components/ui/page';
 import { Button } from '../../../../components/ui/button';
 import { Link } from '../../../../i18n/navigation';
@@ -12,6 +13,7 @@ import { getViewer } from '../../../../lib/viewer';
 
 interface PageProps {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const READ_ROLES = ['platform_admin', 'platform_reviewer', 'regulator'];
@@ -23,14 +25,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 /** Operator console: entities of the network, their suspension and offboarding (M2-11). */
-export default async function EntitiesAdminPage({ params }: PageProps) {
+export default async function EntitiesAdminPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations();
   const viewer = await getViewer();
   if (!viewer.platformRoles.some((r) => READ_ROLES.includes(r))) notFound();
   const canDecide = viewer.platformRoles.includes('platform_admin');
-  const entities = await apiGet('/admin/entities', adminEntityListSchema);
+  // By pages and with a search (M6-11): a national network can have thousands of entities.
+  const query = await searchParams;
+  const q = typeof query.q === 'string' ? query.q.trim().slice(0, 100) : '';
+  const cursor =
+    typeof query.cursor === 'string' && /^[0-9a-f-]{36}$/.test(query.cursor) ? query.cursor : '';
+  const filters = new URLSearchParams();
+  if (q) filters.set('q', q);
+  const kept = filters.toString();
+  if (cursor) filters.set('cursor', cursor);
+  const entities = await apiGet(`/admin/entities?${filters.toString()}`, adminEntityListSchema);
 
   return (
     <Page>
@@ -45,8 +56,28 @@ export default async function EntitiesAdminPage({ params }: PageProps) {
           ) : null
         }
       />
+      <form method="get" className="flex flex-wrap items-end gap-3" role="search">
+        <label className="block text-sm font-medium text-foreground-strong">
+          {t('entityAdmin.search')}
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            maxLength={100}
+            className={`${inputClass} mt-1.5 min-w-72`}
+          />
+        </label>
+        <Button type="submit" variant="outline">
+          {t('entityAdmin.searchButton')}
+        </Button>
+        {q ? (
+          <Link href="/operator/entities" className="link text-sm">
+            {t('entityAdmin.searchClear')}
+          </Link>
+        ) : null}
+      </form>
       {entities.items.length === 0 ? (
-        <EmptyState>{t('entityAdmin.empty')}</EmptyState>
+        <EmptyState>{q ? t('entityAdmin.noMatch', { q }) : t('entityAdmin.empty')}</EmptyState>
       ) : (
         <div className="table-wrap">
           <table className="data-table">
@@ -103,6 +134,16 @@ export default async function EntitiesAdminPage({ params }: PageProps) {
           </table>
         </div>
       )}
+      {entities.nextCursor ? (
+        <p>
+          <Link
+            href={`/operator/entities?${kept ? `${kept}&` : ''}cursor=${entities.nextCursor}`}
+            className="link"
+          >
+            {t('entityAdmin.next')}
+          </Link>
+        </p>
+      ) : null}
     </Page>
   );
 }

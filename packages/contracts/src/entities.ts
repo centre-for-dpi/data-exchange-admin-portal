@@ -288,10 +288,19 @@ export const adminEntitySchema = z.object({
     liveSubscriptions: z.number().int(),
   }),
 });
-export const adminEntityListSchema = z.object({ items: z.array(adminEntitySchema) });
+/** The network's entities by pages (M6-11): `nextCursor` while there are more. */
+export const adminEntityListSchema = z.object({
+  items: z.array(adminEntitySchema),
+  nextCursor: z.uuid().nullable(),
+});
 export const adminEntityQuerySchema = z.strictObject({
   status: z.enum(['active', 'suspended', 'offboarded']).optional(),
+  /** Part of the short name, the legal name or the identifier (slug). */
+  q: z.string().trim().min(1).max(100).optional(),
+  cursor: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
 });
+export type AdminEntityQuery = z.output<typeof adminEntityQuerySchema>;
 
 export const suspendEntitySchema = z.strictObject({
   comment: z.string().trim().min(10, ValidationMessage.explain_reason).max(2_000),
