@@ -19,3 +19,11 @@ allowBuilds:
   prisma: true
   # Local file-copy script that selects the Vue 3 build (Scalar API reference).
   vue-demi: true
+
+# `pnpm audit` (CI) exceptions, each with its reason and when to remove it.
+auditConfig:
+  ignoreGhsas:
+    # picomatch ReDoS (high), 2026-11-17: development only (ESLint, through
+    # @next/eslint-plugin-next > fast-glob), in no image. No fixed release exists yet (>=4.0.8);
+    # remove this line once it is published and the lockfile picks it up.
+    - GHSA-fc5q-39xc-vjpf
