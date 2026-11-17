@@ -12,6 +12,8 @@
 #   sudo ./install.sh restore [time]  # restore the database: latest state, or the moment given
 #                                  # ("2026-11-20 14:30:00-05"); stops and restarts everything
 #   sudo ./install.sh update       # backup, git pull --ff-only, rebuild and restart
+#   sudo ./install.sh images <tag>|build  # published images from ghcr.io (0.2.0, sha-<commit>)
+#                                  # instead of building the API, web, hub and runner here
 #   sudo ./install.sh stop|start   # stop or start every container (data is kept)
 #
 # Re-running the install keeps the existing .env: secrets of a running deployment never change
@@ -88,12 +90,16 @@ ensure_env_additions() {
 }
 
 # --- compose ------------------------------------------------------------------------------------
+# Published images (docker-compose.images.yml) when .env names a tag; they exist for x86_64 only.
+uses_images() { [[ -n $(env_get DEN_IMAGE_TAG) && $(uname -m) == x86_64 ]]; }
+
 compose_args() {
   COMPOSE=(docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml)
   [[ $(env_get DEN_INSTALL_PROXY) == bundled ]] && COMPOSE+=(-f infra/compose/docker-compose.edge.yml)
   COMPOSE+=(--env-file "$ENV_FILE")
   [[ $(env_get DEN_INSTALL_OBSERVABILITY) == true ]] && COMPOSE+=(--profile observability)
   [[ $(env_get DEN_INSTALL_ANTIVIRUS) == true ]] && COMPOSE+=(--profile antivirus)
+  uses_images && COMPOSE+=(-f infra/compose/docker-compose.images.yml)
   return 0
 }
 dc() { compose_args; "${COMPOSE[@]}" "$@"; }
@@ -426,7 +432,11 @@ prepare_host() {
 
 start_stack() {
   step "Paso 9 · Construcción y arranque (10–20 minutos la primera vez)"
-  info "Se compilan el portal, el API y los servicios auxiliares; después arranca todo en orden."
+  if uses_images; then
+    info "Imágenes publicadas $(env_get DEN_IMAGE_TAG) del portal, el API, el hub y el runner; se compilan solo los auxiliares."
+  else
+    info "Se compilan el portal, el API y los servicios auxiliares; después arranca todo en orden."
+  fi
   if ! dc up -d --build --wait --wait-timeout 1800; then
     dc ps || true
     fail "Algún servicio no quedó sano. Revisa: sudo ./install.sh logs <servicio> (docs/INSTALL.md §8)."
@@ -602,6 +612,28 @@ cmd_update() {
   warn "Revisa en DEPLOYMENT.md §5.4 si la versión pide pasos manuales (realms, variables nuevas)."
 }
 
+# Switch between published images and local builds: `images 0.2.0`, `images sha-<commit>` or
+# `images build`. The tag must exist in ghcr.io and be readable without credentials.
+cmd_images() {
+  require_install; load_env_settings
+  local tag=${1:-}
+  [[ -n $tag ]] || fail "Uso: sudo ./install.sh images <etiqueta>|build (p. ej. 0.2.0 o sha-<commit>)"
+  if [[ $tag == build ]]; then
+    env_set DEN_IMAGE_TAG ''
+    info "Se vuelve a compilar en este servidor."
+    dc up -d --build --wait --wait-timeout 1800
+  else
+    [[ $(uname -m) == x86_64 ]] || fail "Las imágenes publicadas son solo para x86_64; este servidor es $(uname -m)."
+    env_set DEN_IMAGE_TAG "$tag"
+    if ! dc pull api web wg-hub contract-runner; then
+      env_set DEN_IMAGE_TAG ''
+      fail "No pude bajar las imágenes $tag de ghcr.io (¿existe la etiqueta? ¿son públicas?). Sigo compilando aquí."
+    fi
+    dc up -d --wait --wait-timeout 1800
+  fi
+  ok "Listo: $(uses_images && echo "imágenes publicadas $tag" || echo "imágenes compiladas aquí")"
+}
+
 case ${1:-install} in
   install) cmd_install ;;
   status) cmd_status ;;
@@ -611,8 +643,9 @@ case ${1:-install} in
   backup) cmd_backup ;;
   restore) shift; cmd_restore "${1:-}" ;;
   update) cmd_update ;;
+  images) shift; cmd_images "${1:-}" ;;
   stop) require_install; dc stop ;;
   start) require_install; dc up -d --wait --wait-timeout 900 ;;
-  -h | --help | help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help | help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) fail "Comando desconocido: $1 (ver ./install.sh help)" ;;
 esac

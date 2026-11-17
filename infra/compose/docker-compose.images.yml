@@ -1,0 +1,21 @@
+# Published images instead of building them on the server (pilot, after docker-compose.deploy.yml).
+#
+# The four images that .github/workflows/images.yml builds, scans and publishes come from ghcr.io
+# with the tag in DEN_IMAGE_TAG: a release (`0.2.0`) or a commit (`sha-<full hash>`). They are the
+# same Dockerfiles the pilot builds, with no build arguments, so they take the same .env.
+# Published for linux/amd64 only: install.sh uses this file on x86_64 servers alone.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.deploy.yml -f docker-compose.images.yml …
+services:
+  api:
+    build: !reset null
+    image: ghcr.io/centre-for-dpi/den-portal-api:${DEN_IMAGE_TAG:?set DEN_IMAGE_TAG in .env}
+  web:
+    build: !reset null
+    image: ghcr.io/centre-for-dpi/den-portal-web:${DEN_IMAGE_TAG:?set DEN_IMAGE_TAG in .env}
+  wg-hub:
+    build: !reset null
+    image: ghcr.io/centre-for-dpi/den-wg-hub:${DEN_IMAGE_TAG:?set DEN_IMAGE_TAG in .env}
+  contract-runner:
+    build: !reset null
+    image: ghcr.io/centre-for-dpi/den-contract-runner:${DEN_IMAGE_TAG:?set DEN_IMAGE_TAG in .env}
