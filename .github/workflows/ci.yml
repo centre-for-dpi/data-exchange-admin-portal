@@ -54,9 +54,29 @@ jobs:
       # application certificates are signed by the real CA (M3-01), and OpenSearch with Fluent Bit:
       # the access-log pipeline and the usage analytics run on the real index (M5).
       - run: cp .env.example .env
-      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres etcd apisix tsa step-ca opa mock-salud opensearch fluent-bit
+      # Keycloak too: the gateway's token route is tested against it (M3-10).
+      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env up -d --wait postgres etcd apisix tsa step-ca opa mock-salud opensearch fluent-bit keycloak
+      # The TSA has no health check (distroless image): wait until it stamps a real query, and
+      # show its log if it never does.
+      - name: TSA answers a timestamp query
+        run: |
+          openssl ts -query -data /etc/hostname -sha256 -cert -out /tmp/q.tsq
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /tmp/q.tsr -w '%{http_code}' -H 'content-type: application/timestamp-query' --data-binary @/tmp/q.tsq http://localhost:3004/api/v1/timestamp)
+            [ "$code" = 200 ] && exit 0
+            sleep 2
+          done
+          echo "TSA answered $code"; cat /tmp/q.tsr; docker compose -f infra/compose/docker-compose.yml --env-file .env logs --tail 50 tsa
+          exit 1
       - run: pnpm exec turbo run build --filter=@rid/api^...
       - run: pnpm --filter @rid/api test:integration
+        env:
+          # The contract runner (Schemathesis) is not started here: its checks run with the full
+          # local stack (M4-06).
+          RID_CONTRACT_RUNNER_URL: ''
+      - name: Logs of the stack when the tests fail
+        if: failure()
+        run: docker compose -f infra/compose/docker-compose.yml --env-file .env logs --tail 80 tsa keycloak opensearch
       # Compiled code under plain Node: catches CommonJS interop issues Vitest hides.
       - run: pnpm exec turbo run build --filter=@rid/api && pnpm --filter @rid/api test:dist
 

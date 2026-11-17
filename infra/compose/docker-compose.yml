@@ -220,6 +220,9 @@ services:
     environment:
       discovery.type: single-node
       bootstrap.memory_lock: 'false'
+      # One node on a laptop or a CI runner: a nearly full disk must not block index creation
+      # (the flood-stage watermark). Production runs the chart's cluster with its own disks.
+      cluster.routing.allocation.disk.threshold_enabled: 'false'
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
       # Dev only: no TLS/auth inside the private Compose network. Production uses the security plugin.
       DISABLE_SECURITY_PLUGIN: 'true'
