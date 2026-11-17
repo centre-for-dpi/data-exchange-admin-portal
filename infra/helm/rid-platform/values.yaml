@@ -3,6 +3,11 @@
 cloudnative-pg:
   enabled: true
 
+# Barman Cloud (M6-06): false on the very first install when cert-manager comes with this chart,
+# true on the upgrade right after (DEPLOYMENT.md §9.3).
+plugin-barman-cloud:
+  enabled: true
+
 external-secrets:
   enabled: true
   installCRDs: true

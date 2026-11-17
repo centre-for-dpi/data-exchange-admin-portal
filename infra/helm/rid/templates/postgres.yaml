@@ -63,4 +63,12 @@ spec:
   {{- end }}
   resources:
     {{- toYaml $db.spec.resources | nindent 4 }}
+  {{- if $pg.backup.enabled }}
+  # Continuous WAL archiving to the object store (postgres-backup.yaml).
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ include "rid.name" "db-backup" }}
+  {{- end }}
 {{- end }}

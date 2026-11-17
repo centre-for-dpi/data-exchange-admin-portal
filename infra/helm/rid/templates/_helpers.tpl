@@ -102,6 +102,9 @@ keycloak-db:
   type: kubernetes.io/basic-auth
   keys: [KEYCLOAK_DB_PASSWORD]
   derived: { username: keycloak, password: '{{ $o }} .KEYCLOAK_DB_PASSWORD {{ $c }}' }
+# The object store of the databases' backups (M6-06): an access key that can write only there.
+db-backup:
+  keys: [DB_BACKUP_ACCESS_KEY_ID, DB_BACKUP_SECRET_ACCESS_KEY]
 {{- end -}}
 
 {{/* Whether a component is deployed (its Secret is only made then). */}}
@@ -114,6 +117,7 @@ keycloak-db:
 {{- else if eq .component "prometheus" -}}{{ $v.prometheus.enabled }}
 {{- else if eq .component "alertmanager" -}}{{ and $v.prometheus.enabled $v.prometheus.alertmanager.enabled }}
 {{- else if eq .component "grafana" -}}{{ $v.grafana.enabled }}
+{{- else if eq .component "db-backup" -}}{{ $v.postgres.backup.enabled }}
 {{- else -}}true{{- end -}}
 {{- end -}}
 

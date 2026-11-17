@@ -49,6 +49,9 @@ postgres:
     instances: 1
     size: 1Gi
     resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { memory: 512Mi } }
+  # No object store in kind: the backups are tested with a real one (M6-06).
+  backup:
+    enabled: false
 
 keycloak:
   replicas: 1

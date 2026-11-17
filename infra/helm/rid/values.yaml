@@ -158,6 +158,28 @@ postgres:
     resources:
       requests: { cpu: 250m, memory: 512Mi }
       limits: { memory: 1Gi }
+  # Backups (M6-06, ADR-0026): Barman Cloud, the CloudNativePG plugin of rid-platform, to the
+  # operator's S3-compatible object store, outside the cluster. Both databases, each under its own
+  # name in the same store: the WAL continuously and a base backup a day, so either can be
+  # recovered to any moment within the retention (OPERATIONS.md §6). The access key is
+  # DB_BACKUP_ACCESS_KEY_ID / DB_BACKUP_SECRET_ACCESS_KEY (rid-db-backup).
+  backup:
+    enabled: true
+    # s3://<bucket>/<path>. Required while enabled.
+    destinationPath: ''
+    # An S3-compatible store in the operator's own data center (Ceph RGW, SeaweedFS, ...);
+    # empty for AWS S3.
+    endpointURL: ''
+    region: ''
+    # A Secret with the CA of that endpoint (key ca.crt), when its certificate is not public.
+    endpointCASecret: ''
+    # Server-side encryption of the objects: AES256, aws:kms, or empty when the store encrypts by
+    # itself. The store's access policy is what keeps them private: barman-cloud has no
+    # client-side encryption (ADR-0026).
+    encryption: AES256
+    retentionPolicy: 30d
+    # CloudNativePG's cron, with seconds: every day at 02:00 UTC.
+    schedule: '0 0 2 * * *'
 
 # --- Gateway -------------------------------------------------------------------------------------
 
