@@ -48,7 +48,14 @@ export interface ServerOptions {
    * JWKS, its result logged (the demo reads it); with `required`, a call without a valid one is
    * refused (401), as a provider that demands it would.
    */
-  assertion?: { jwksUrl: string; audience: string; required: boolean; fetchFn?: typeof fetch };
+  assertion?: {
+    jwksUrl: string;
+    audience: string;
+    /** The gateway's public URL (RID_ASSERTION_ISSUER): the assertions' `iss`. */
+    issuer?: string;
+    required: boolean;
+    fetchFn?: typeof fetch;
+  };
 }
 
 /** The assertion settings from the environment (RID_GATEWAY_JWKS_URL); undefined without it. */
@@ -61,6 +68,7 @@ export function assertionFromEnv(
   return {
     jwksUrl,
     audience: env.RID_ASSERTION_AUDIENCE?.trim() || provider,
+    ...(env.RID_ASSERTION_ISSUER?.trim() ? { issuer: env.RID_ASSERTION_ISSUER.trim() } : {}),
     required: env.RID_ASSERTION_REQUIRED === 'true',
   };
 }
@@ -94,7 +102,12 @@ export function buildServer(provider: Provider, options: ServerOptions = {}): Fa
     },
   );
 
-  // The raw body too: the assertion binds its SHA-256 (M6-10).
+  // The raw bytes of every body, whatever its content type: the assertion binds their SHA-256
+  // (M6-10), and a body the verifier did not see could not be checked.
+  app.addContentTypeParser('*', { parseAs: 'buffer' }, (request, body, done) => {
+    (request as { rawBody?: Buffer }).rawBody = body as Buffer;
+    done(null, body);
+  });
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
     (request as { rawBody?: Buffer }).rawBody = body as Buffer;

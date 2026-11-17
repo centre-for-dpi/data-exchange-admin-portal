@@ -1,7 +1,8 @@
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import { FIRST_ID } from './data.js';
+import { assertionVerifier } from './assertion.js';
 import { buildServer } from './server.js';
 
 const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
@@ -24,7 +25,7 @@ function assertion(
     aud: 'salud',
     iat: now,
     exp: now + 60,
-    jti: 'req-1',
+    jti: randomUUID(),
     rid: { consumer_entity: 'programas-sociales', purpose: 'eligibility_check' },
     req: {
       method: req.method,
@@ -51,7 +52,13 @@ function server(required = false) {
   });
   const app = buildServer('salud', {
     logStream,
-    assertion: { jwksUrl: 'http://portal/jwks', audience: 'salud', required, fetchFn: fetchJwks },
+    assertion: {
+      jwksUrl: 'http://portal/jwks',
+      audience: 'salud',
+      issuer: 'https://gateway.rid.example',
+      required,
+      fetchFn: fetchJwks,
+    },
   });
   const results = () =>
     lines
@@ -134,5 +141,57 @@ describe("the gateway's signed assertion (M6-10)", () => {
       headers: { 'x-rid-assertion': assertion({ method: 'GET', uri: URI }) },
     });
     expect(allowed.statusCode).toBe(200);
+  });
+
+  describe('the verifier itself (the reference for providers)', () => {
+    const check = () =>
+      assertionVerifier({
+        jwksUrl: 'http://portal/jwks',
+        audience: 'salud',
+        issuer: 'https://gateway.rid.example',
+        fetchFn: fetchJwks,
+      });
+
+    it('binds the bytes of any body, not only JSON, and requires the hash on POST', async () => {
+      const verify = check();
+      const url = '/salud/documentos';
+      const csv = Buffer.from('numero;campo\n1;2\n');
+      expect(
+        await verify(assertion({ method: 'POST', uri: url, body: csv.toString() }), {
+          method: 'POST',
+          url,
+          body: csv,
+        }),
+      ).toBe('verified');
+      expect(
+        await verify(assertion({ method: 'POST', uri: url, body: 'otro' }), {
+          method: 'POST',
+          url,
+          body: csv,
+        }),
+      ).toBe('invalid: body');
+      // A POST whose assertion binds no body: refused, even with an empty one.
+      expect(await verify(assertion({ method: 'POST', uri: url }), { method: 'POST', url })).toBe(
+        'invalid: body',
+      );
+      // A hash in the assertion must match even when nothing arrived.
+      expect(
+        await verify(assertion({ method: 'GET', uri: url, body: 'algo' }), { method: 'GET', url }),
+      ).toBe('invalid: body');
+    });
+
+    it('checks the issuer and refuses a replayed assertion', async () => {
+      const verify = check();
+      const uri = '/salud/afiliados/1';
+      expect(
+        await verify(assertion({ method: 'GET', uri }, { iss: 'https://otro.example' }), {
+          method: 'GET',
+          url: uri,
+        }),
+      ).toBe('invalid: issuer');
+      const once = assertion({ method: 'GET', uri });
+      expect(await verify(once, { method: 'GET', url: uri })).toBe('verified');
+      expect(await verify(once, { method: 'GET', url: uri })).toBe('invalid: replayed');
+    });
   });
 });

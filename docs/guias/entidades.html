@@ -401,7 +401,7 @@ details.faq[open] summary { color: var(--gov); }
       </div>
       <div class="callout info">
         <b>La aserción firmada del gateway</b>
-        <p>Si el país la tiene activada, cada consulta llega con <code>X-RID-Assertion</code>: un JWS ES256 del gateway con quién consulta, para qué, con qué suscripción y a qué petición corresponde (método, hash de la ruta y, si hay, del cuerpo). La entidad puede guardarla como prueba. Se verifica con el JWKS de la red, <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, comprobando la firma, <code>aud</code> (la entidad), <code>exp</code> y los hashes de la petición recibida. Los ejemplos en Node.js y Python están en <code>docs/guias/entidades.md</code> (§3.2).</p>
+        <p>Si el país la tiene activada, cada consulta llega con <code>X-RID-Assertion</code>: un JWS ES256 del gateway con quién consulta, para qué, con qué suscripción y a qué petición corresponde (método, hash de la ruta y, si hay, del cuerpo). La entidad puede guardarla como prueba. Se verifica con el JWKS de la red, <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, comprobando la firma, <code>aud</code> (la entidad), <code>iss</code> (el gateway), <code>exp</code>, los hashes de la petición recibida (el del cuerpo en todo POST, PUT y PATCH, sea cual sea su tipo) y que el <code>jti</code> no se repita. Los ejemplos en Node.js y Python están en <code>docs/guias/entidades.md</code> (§3.2).</p>
       </div>
     </section>
 

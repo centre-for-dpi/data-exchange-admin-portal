@@ -444,6 +444,8 @@ services:
       # portal runs on the host in development; the pilot sets MOCK_GATEWAY_JWKS_URL.
       RID_GATEWAY_JWKS_URL: ${MOCK_GATEWAY_JWKS_URL:-http://host.docker.internal:4000/api/v1/gateway/jwks}
       RID_ASSERTION_REQUIRED: ${MOCK_ASSERTION_REQUIRED:-false}
+      # The assertions' iss: the gateway's public URL.
+      RID_ASSERTION_ISSUER: ${RID_GATEWAY_PUBLIC_URL:-https://localhost:9443}
     extra_hosts:
       - host.docker.internal:host-gateway
     ports:
