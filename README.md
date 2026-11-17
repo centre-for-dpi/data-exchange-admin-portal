@@ -62,4 +62,4 @@ Todos los puertos se publican solo en `127.0.0.1`. Si alguno ya está ocupado en
 
 ## Licencia
 
-Apache-2.0 (propuesta; confirmar con el operador y CDPI antes de publicar).
+Apache-2.0, © 2026 Centre for Digital Public Infrastructure (CDPI). Ver [LICENSE](LICENSE) y [NOTICE](NOTICE).
