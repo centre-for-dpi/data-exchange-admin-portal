@@ -298,9 +298,15 @@ describe('citizen API: who consulted my data (MT-05)', () => {
       const path = `/data-subjects/me/accesses/${item?.id}/receipt`;
       expect((await asCitizen(path, token)).statusCode).toBe(409);
 
-      await evidence.sealPending();
-      await evidence.stampPending();
-      const res = await asCitizen(path, token);
+      // The app's own background round can seal the record at the same moment; its batch then gets
+      // its time-stamp on the next round. Seal and stamp until the receipt carries the stamp.
+      let res = await asCitizen(path, token);
+      for (let round = 0; round < 5; round++) {
+        await evidence.sealPending();
+        await evidence.stampPending();
+        res = await asCitizen(path, token);
+        if (res.statusCode === 200 && transparencyReceiptSchema.parse(res.json()).timestamp) break;
+      }
       expect(res.statusCode, res.body).toBe(200);
       const receipt = transparencyReceiptSchema.parse(res.json());
       const result = await verifyReceipt(receipt, {
