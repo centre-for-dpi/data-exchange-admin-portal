@@ -24,6 +24,8 @@ export const NOTIFICATION_KINDS = {
   access_suspended: { security: true, email: true },
   access_revoked: { security: true, email: true },
   certificate_expiring: { security: false, email: true },
+  /** The operator revoked it (M6-07): the application must ask for a new one. */
+  certificate_revoked: { security: true, email: true },
   node_offline: { security: false, email: true },
 } as const satisfies Record<string, { security: boolean; email: boolean }>;
 

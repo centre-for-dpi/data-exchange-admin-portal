@@ -30,5 +30,7 @@ export const NOTIFYING_ACTIONS: ReadonlySet<string> = new Set([
   'subscription.revoked',
   'subscription.renewal_notice_queued',
   'credential.expiry_notice_queued',
+  // Only the operator's mass revocation notifies (notification-rules.ts).
+  'credential.revoked',
   'node.offline',
 ]);

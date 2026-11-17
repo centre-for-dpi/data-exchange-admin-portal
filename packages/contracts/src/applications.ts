@@ -134,3 +134,63 @@ export const revokeCredentialSchema = z.strictObject({
   reason: z.string().trim().max(500).optional(),
 });
 export type RevokeCredentialInput = z.input<typeof revokeCredentialSchema>;
+
+/**
+ * The operator's mass revocation of client certificates (M6-07, docs/RUNBOOK.md): every live
+ * certificate (active or rotating) that matches all the filters given. No filter means every
+ * certificate of the network, for instance after a compromise of the CA's intermediate.
+ */
+export const certificateRevocationFilterSchema = z.strictObject({
+  /** Only the applications of this entity. */
+  entityId: z.uuid().optional(),
+  /** Issued by the portal at or after this moment (step-ca backdates notBefore by a minute). */
+  issuedFrom: z.iso.datetime({ offset: true }).optional(),
+  /** Issued by the portal before this moment. */
+  issuedTo: z.iso.datetime({ offset: true }).optional(),
+  /** Issued by this intermediate CA: SHA-256 of its certificate (DER), lowercase hex. */
+  issuer: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+});
+export type CertificateRevocationFilter = z.infer<typeof certificateRevocationFilterSchema>;
+
+/** What a revocation with these filters would revoke, before doing it. */
+export const certificateRevocationPreviewSchema = z.object({
+  count: z.number().int(),
+  entities: z.array(
+    z.object({
+      id: z.uuid(),
+      shortName: z.string(),
+      applications: z.number().int(),
+      certificates: z.number().int(),
+    }),
+  ),
+  /**
+   * The intermediates that issued the live certificates matching the other filters (not the
+   * issuer filter), to choose one.
+   */
+  issuers: z.array(
+    z.object({
+      fingerprint: z.string(),
+      subject: z.string(),
+      notAfter: z.iso.datetime().nullable(),
+      certificates: z.number().int(),
+    }),
+  ),
+});
+export type CertificateRevocationPreview = z.infer<typeof certificateRevocationPreviewSchema>;
+
+export const executeCertificateRevocationSchema = certificateRevocationFilterSchema.extend({
+  /** Why, for the audit trail of each certificate. */
+  reason: z.string().trim().min(10).max(500),
+  /** The count of the preview: if it changed since, 409, and the operator previews again. */
+  expectedCount: z.number().int().min(1),
+});
+export type ExecuteCertificateRevocationInput = z.input<typeof executeCertificateRevocationSchema>;
+
+export const certificateRevocationResultSchema = z.object({
+  /** The revocation, as audited (`certificate_revocation.executed`). */
+  id: z.uuid(),
+  revoked: z.number().int(),
+});

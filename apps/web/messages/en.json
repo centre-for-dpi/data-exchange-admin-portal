@@ -730,6 +730,9 @@
       },
       "sync": {
         "retry_requested": "Sync retry requested by the operator"
+      },
+      "certificate_revocation": {
+        "executed": "Mass certificate revocation"
       }
     },
     "filters": {
@@ -975,6 +978,7 @@
       "access_suspended": "The access of {application} to {api} was suspended",
       "access_revoked": "The access of {application} to {api} was revoked",
       "certificate_expiring": "The client certificate of {application} expires on {date}",
+      "certificate_revoked": "The operator revoked the client certificate of {application}: issue a new one",
       "entity_status_changed": "{entity} {decision, select, suspended {was suspended on the network} reactivated {was reactivated on the network} other {was offboarded from the network}}",
       "node_offline": "Node {node} of {entity} has sent no heartbeat for 5 minutes"
     },
@@ -995,6 +999,7 @@
       "access_suspended": "Suspended access",
       "access_revoked": "Revoked access",
       "certificate_expiring": "Certificates about to expire",
+      "certificate_revoked": "Certificates revoked by the operator",
       "entity_status_changed": "Suspension or offboarding of your entity",
       "node_offline": "Nodes offline"
     },
@@ -1543,5 +1548,48 @@
       "service_unavailable": "A service of the network is not answering. Try again in a few minutes.",
       "mfa_required": "This action requires the second factor. Sign out and sign in again with your code."
     }
+  },
+  "certificateRevocations": {
+    "title": "Mass certificate revocation",
+    "lead": "Revoke at once the live client certificates that match the filters, in an incident: a compromised entity, a batch issued with a flaw, or the intermediate CA. Each one stops working at the gateway with the next OPA bundle (under 60 seconds), and the developers of each application are told to issue a new one. The full procedure is in the operator runbook.",
+    "filters": {
+      "title": "Which certificates",
+      "hint": "All filters apply together. Dates are of issuance, in UTC. Without filters, every live certificate of the network.",
+      "entity": "Entity",
+      "any": "All",
+      "from": "Issued from",
+      "to": "Issued until",
+      "apply": "See what would be revoked",
+      "clear": "Clear filters",
+      "issuerSelected": "Only those issued by the intermediate"
+    },
+    "preview": {
+      "title": "What would be revoked",
+      "empty": "No live certificate matches these filters.",
+      "count": "{count, plural, one {# certificate} other {# certificates}} of {entities, plural, one {# entity} other {# entities}}",
+      "wholeNetwork": "No filters: every live certificate of the network would be revoked. Use it only if the intermediate CA is compromised.",
+      "byEntity": "Certificates by entity",
+      "entity": "Entity",
+      "applications": "Applications",
+      "certificates": "Certificates"
+    },
+    "issuers": {
+      "title": "Intermediate CAs that issued them",
+      "hint": "To revoke only what one intermediate issued (for instance, the previous one after a rotation).",
+      "subject": "Intermediate",
+      "validUntil": "Valid until",
+      "action": "Filter",
+      "only": "Only those of {subject}",
+      "selected": "Selected",
+      "unknown": "No name"
+    },
+    "revokeTitle": "Revoke",
+    "revokeHint": "It cannot be undone: each application will have to issue a new certificate. If someone issues or revokes a certificate meanwhile, nothing is revoked and the list must be seen again.",
+    "reason": "Reason",
+    "reasonHint": "It goes to the audit trail of each certificate. At least 10 characters; no personal data.",
+    "confirm": "I understand that {count, plural, one {# certificate} other {# certificates}} will be revoked and that it cannot be undone.",
+    "confirmRequired": "Confirm that you understand what will be revoked.",
+    "revoke": "Revoke {count, plural, one {# certificate} other {# certificates}}",
+    "done": "{count, plural, one {# certificate was} other {# certificates were}} revoked. The gateway rejects them from the next OPA bundle."
   }
 }

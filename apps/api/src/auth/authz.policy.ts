@@ -151,6 +151,8 @@ export const PLATFORM_PERMISSIONS = {
   'entity_admin.read': ['platform_admin', 'platform_reviewer', 'regulator'],
   /** Suspend, reactivate or offboard an entity (SPEC.md §2.1: "suspender cualquier cosa"). */
   'entity_admin.decide': ['platform_admin'],
+  /** Revoke client certificates of any entity at once, in an incident (M6-07, RUNBOOK.md). */
+  'certificate.mass_revoke': ['platform_admin'],
   /** Register an entity directly, without an onboarding request (SPEC.md §4.1 step 1). */
   'entity_admin.create': ['platform_admin'],
   /** See the whole purpose catalogue, inactive purposes and their use included (M2-10). */

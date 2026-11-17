@@ -62,6 +62,8 @@ export const AUDIT_ACTIONS = [
   'credential.rotation_started',
   'credential.rotation_ended',
   'credential.revoked',
+  // The operator's mass revocation of client certificates (M6-07)
+  'certificate_revocation.executed',
   // Certificates of the gateway itself (M3-02)
   'gateway_certificate.issued',
   // Subscriptions (M1, M2-04, M2-06, M2-07)

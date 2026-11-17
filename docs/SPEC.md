@@ -241,7 +241,7 @@ enrollment_issued → enrolled → online ⇄ offline
 
 ## 7. Notificaciones
 
-En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobada/rechazada, API enviada a revisión / cambios solicitados / publicada, nueva solicitud de acceso, solicitud aprobada/rechazada/con preguntas, suscripción suspendida/revocada/por vencer, certificado por vencer, nodo offline, versión de API en deprecación. Cada usuario elige qué recibe por correo (los de seguridad no se pueden desactivar).
+En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobada/rechazada, API enviada a revisión / cambios solicitados / publicada, nueva solicitud de acceso, solicitud aprobada/rechazada/con preguntas, suscripción suspendida/revocada/por vencer, certificado por vencer, certificado revocado por el operador (revocación masiva, M6-07), nodo offline, versión de API en deprecación. Cada usuario elige qué recibe por correo (los de seguridad no se pueden desactivar).
 
 ## 8. Indicadores (vienen de la propuesta de la red)
 

@@ -48,6 +48,7 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `regulator.decide` | · | · | ✓ | · |
 | `entity_admin.read` | ✓ | ✓ | ✓ | · |
 | `entity_admin.decide` | ✓ | · | · | · |
+| `certificate.mass_revoke` | ✓ | · | · | · |
 | `entity_admin.create` | ✓ | · | · | · |
 | `purpose.read` | ✓ | ✓ | ✓ | · |
 | `purpose.manage` | ✓ | ✓ | · | · |
@@ -66,6 +67,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | Método | Ruta | Acceso |
 | :-- | :-- | :-- |
 | GET | `/api/v1/admin/bootcamp` | plataforma: `bootcamp.list` |
+| POST | `/api/v1/admin/certificate-revocations` | plataforma: `certificate.mass_revoke` |
+| GET | `/api/v1/admin/certificate-revocations/preview` | plataforma: `certificate.mass_revoke` |
 | GET | `/api/v1/admin/entities` | plataforma: `entity_admin.read` |
 | POST | `/api/v1/admin/entities` | plataforma: `entity_admin.create` |
 | POST | `/api/v1/admin/entities/:id/offboard` | plataforma: `entity_admin.decide` |

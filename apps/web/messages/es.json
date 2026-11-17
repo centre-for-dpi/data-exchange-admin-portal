@@ -730,6 +730,9 @@
       },
       "sync": {
         "retry_requested": "Reintento de sincronización pedido por el operador"
+      },
+      "certificate_revocation": {
+        "executed": "Revocación masiva de certificados"
       }
     },
     "filters": {
@@ -975,6 +978,7 @@
       "access_suspended": "Se suspendió el acceso de {application} a {api}",
       "access_revoked": "Se revocó el acceso de {application} a {api}",
       "certificate_expiring": "El certificado de cliente de {application} vence el {date}",
+      "certificate_revoked": "El operador revocó el certificado de cliente de {application}: emite uno nuevo",
       "entity_status_changed": "{entity} {decision, select, suspended {fue suspendida en la red} reactivated {fue reactivada en la red} other {fue dada de baja de la red}}",
       "node_offline": "El nodo {node} de {entity} no envía heartbeat hace 5 minutos"
     },
@@ -995,6 +999,7 @@
       "access_suspended": "Accesos suspendidos",
       "access_revoked": "Accesos revocados",
       "certificate_expiring": "Certificados por vencer",
+      "certificate_revoked": "Certificados revocados por el operador",
       "entity_status_changed": "Suspensión o baja de tu entidad",
       "node_offline": "Nodos sin conexión"
     },
@@ -1543,5 +1548,48 @@
       "service_unavailable": "Un servicio de la red no responde. Intenta de nuevo en unos minutos.",
       "mfa_required": "Esta acción requiere el segundo factor. Cierra sesión e ingresa de nuevo con tu código."
     }
+  },
+  "certificateRevocations": {
+    "title": "Revocación masiva de certificados",
+    "lead": "Revoca de una vez los certificados de cliente vigentes que cumplen los filtros, ante un incidente: una entidad comprometida, un lote emitido con un defecto o la CA intermedia. Cada uno deja de funcionar en el gateway con el siguiente bundle de OPA (menos de 60 segundos), y los desarrolladores de cada aplicación reciben un aviso para emitir uno nuevo. El procedimiento completo está en el runbook del operador.",
+    "filters": {
+      "title": "Qué certificados",
+      "hint": "Se combinan todos los filtros. Las fechas son de emisión, en UTC. Sin filtros, todos los certificados vigentes de la red.",
+      "entity": "Entidad",
+      "any": "Todas",
+      "from": "Emitidos desde",
+      "to": "Emitidos hasta",
+      "apply": "Ver qué se revocaría",
+      "clear": "Quitar filtros",
+      "issuerSelected": "Solo los emitidos por la intermedia"
+    },
+    "preview": {
+      "title": "Qué se revocaría",
+      "empty": "Ningún certificado vigente cumple estos filtros.",
+      "count": "{count, plural, one {# certificado} other {# certificados}} de {entities, plural, one {# entidad} other {# entidades}}",
+      "wholeNetwork": "Sin filtros: se revocarían todos los certificados vigentes de la red. Úsalo solo si la CA intermedia está comprometida.",
+      "byEntity": "Certificados por entidad",
+      "entity": "Entidad",
+      "applications": "Aplicaciones",
+      "certificates": "Certificados"
+    },
+    "issuers": {
+      "title": "CA intermedias que los emitieron",
+      "hint": "Para revocar solo lo que emitió una intermedia (por ejemplo, la anterior tras una rotación).",
+      "subject": "Intermedia",
+      "validUntil": "Vigente hasta",
+      "action": "Filtro",
+      "only": "Solo los de {subject}",
+      "selected": "Seleccionada",
+      "unknown": "Sin nombre"
+    },
+    "revokeTitle": "Revocar",
+    "revokeHint": "No se puede deshacer: cada aplicación tendrá que emitir un certificado nuevo. Si alguien emite o revoca un certificado mientras tanto, no se revoca nada y hay que volver a ver la lista.",
+    "reason": "Motivo",
+    "reasonHint": "Queda en la bitácora de cada certificado. Mínimo 10 caracteres; no pongas datos personales.",
+    "confirm": "Entiendo que se {count, plural, one {revocará # certificado} other {revocarán # certificados}} y que no se puede deshacer.",
+    "confirmRequired": "Confirma que entiendes lo que se revocará.",
+    "revoke": "Revocar {count, plural, one {# certificado} other {# certificados}}",
+    "done": "Se {count, plural, one {revocó # certificado} other {revocaron # certificados}}. El gateway los rechaza desde el siguiente bundle de OPA."
   }
 }

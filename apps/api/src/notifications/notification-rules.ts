@@ -275,6 +275,25 @@ export async function resolveNotification(
     };
   }
 
+  // The operator revoked it in a mass revocation (M6-07); an application revoking its own
+  // certificate is told nothing (it did it).
+  if (event.action === 'credential.revoked' && field(event.after, 'revocationId')) {
+    const credential = await prisma.credential.findUnique({
+      where: { id: event.targetId },
+      include: { application: true },
+    });
+    if (!credential) return null;
+    const app = credential.application;
+    const developers = await membersWith(prisma, app.entityId, ['app_developer']);
+    const requester = await stillMembers(prisma, app.entityId, [credential.createdBy]);
+    return {
+      kind: 'certificate_revoked',
+      params: { application: app.name },
+      link: `/my-apps/${app.id}`,
+      recipients: [...new Set([...developers, ...requester])],
+    };
+  }
+
   if (event.action === 'node.offline') {
     const node = await prisma.node.findUnique({
       where: { id: event.targetId },

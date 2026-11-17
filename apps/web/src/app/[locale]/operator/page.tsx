@@ -62,9 +62,14 @@ export default async function OperatorPage({ params, searchParams }: PageProps) 
               {t('syncConsole.title')}
             </Link>
             {viewer.platformRoles.includes('platform_admin') ? (
-              <Link href="/operator/documents" className="link">
-                {t('documentsAdmin.title')}
-              </Link>
+              <>
+                <Link href="/operator/documents" className="link">
+                  {t('documentsAdmin.title')}
+                </Link>
+                <Link href="/operator/certificates" className="link">
+                  {t('certificateRevocations.title')}
+                </Link>
+              </>
             ) : null}
           </>
         }
