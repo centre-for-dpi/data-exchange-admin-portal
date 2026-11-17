@@ -73,8 +73,12 @@ export default async function ServiceSheetPage({ params }: PageProps) {
         <dl className="facts">
           <dt>{t('serviceSheet.entity')}</dt>
           <dd>{detail.entity.legalName}</dd>
-          <dt>{t('serviceSheet.owner')}</dt>
-          <dd>{detail.api.ownerContact}</dd>
+          {detail.api.ownerContact ? (
+            <>
+              <dt>{t('serviceSheet.owner')}</dt>
+              <dd>{detail.api.ownerContact}</dd>
+            </>
+          ) : null}
           <dt>{t('serviceSheet.sector')}</dt>
           <dd>{sector ? localize(sector.name, locale) : detail.api.sector}</dd>
           <dt>{t('serviceSheet.classification')}</dt>

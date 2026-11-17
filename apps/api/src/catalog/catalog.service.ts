@@ -142,7 +142,8 @@ export class CatalogService {
         sector: api.sector,
         classification: api.classification,
         tags: api.tags,
-        ownerContact: api.ownerContact,
+        // The public catalogue (SPEC.md §2.3) shows the API, not who answers for it.
+        ownerContact: viewer.anonymous ? null : api.ownerContact,
       },
       entity: {
         id: api.entity.id,
@@ -175,6 +176,7 @@ export class CatalogService {
         legalBasisText: v.legalBasisText,
         legalReferences: v.legalReferences,
         node: (() => {
+          if (viewer.anonymous) return null;
           const node = nodes.get(nodeIdOf(v.upstream) ?? '');
           return node ? { status: node.status, lastHeartbeatAt: node.lastHeartbeatAt } : null;
         })(),

@@ -51,7 +51,7 @@ Un usuario puede pertenecer a varias entidades con roles distintos. Un mismo usu
 
 ### 2.3 Usuario anónimo
 
-Puede ver la página pública del catálogo **solo** si `features.publicCatalog: true` en la configuración del país, y solo APIs con clasificación `public`.
+Puede ver la página pública del catálogo **solo** si `features.publicCatalog: true` en la configuración del país, y solo APIs con clasificación `public`. No ve el contacto del responsable de la API (puede ser el correo de una persona) ni el estado de los nodos de la entidad (M6-08).
 
 ### 2.4 Titular de los datos (ciudadano)
 

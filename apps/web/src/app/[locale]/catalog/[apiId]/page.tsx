@@ -101,8 +101,12 @@ export default async function CatalogApiPage({ params, searchParams }: PageProps
                   {t(`classification.${detail.api.classification}`)}
                 </Badge>
               </dd>
-              <dt>{t('catalog.detail.owner')}</dt>
-              <dd>{detail.api.ownerContact}</dd>
+              {detail.api.ownerContact ? (
+                <>
+                  <dt>{t('catalog.detail.owner')}</dt>
+                  <dd>{detail.api.ownerContact}</dd>
+                </>
+              ) : null}
             </dl>
           </Card>
         </aside>

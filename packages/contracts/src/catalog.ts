@@ -68,7 +68,10 @@ export const catalogVersionSchema = z.object({
   defaultRateLimit: z.number().int(),
   legalBasisText: z.string().nullable(),
   legalReferences: z.array(z.string()),
-  /** State of the kit node that serves the version, when it is served by one (M4-04). */
+  /**
+   * State of the kit node that serves the version, when it is served by one (M4-04). Null for
+   * anonymous visitors of the public catalogue: it is operational information (M6-08).
+   */
   node: upstreamNodeSchema.pick({ status: true, lastHeartbeatAt: true }).nullable(),
 });
 export type CatalogVersion = z.infer<typeof catalogVersionSchema>;
@@ -76,7 +79,8 @@ export type CatalogVersion = z.infer<typeof catalogVersionSchema>;
 export const catalogDetailSchema = z.object({
   api: catalogItemSchema.shape.api.extend({
     description: z.string(),
-    ownerContact: z.string(),
+    /** Null for anonymous visitors of the public catalogue: it may be a person's address. */
+    ownerContact: z.string().nullable(),
   }),
   entity: entityRef.extend({ legalName: z.string() }),
   versions: z.array(catalogVersionSchema),
