@@ -412,7 +412,7 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
 
 **Producción (M6):**
 - Gateway: ≥ 2 nodos APISIX en zonas distintas, OPA local en cada uno, etcd en clúster de 3 con mTLS.
-- Portal: ≥ 2 réplicas de web y api; PostgreSQL con réplica y respaldos (pgBackRest).
+- Portal: ≥ 2 réplicas de web y api; PostgreSQL con réplica y respaldos continuos (Barman Cloud de CloudNativePG al almacenamiento de objetos del operador; pgBackRest en el piloto con Compose; ADR-0026).
 - Keycloak en clúster con base de datos propia.
 - step-ca con raíz fuera de línea; intermedia con clave en HSM.
 - Helm charts en `infra/helm/`: `rid-platform` (operadores) y `rid` (todo RID). Están escritos y validados de forma estática, pero todavía no se instalaron en ningún clúster (M6-05; `DEPLOYMENT.md §9`).

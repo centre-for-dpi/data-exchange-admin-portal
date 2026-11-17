@@ -229,13 +229,15 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | `.env` completo | Sin él no se recuperan los datos ni se verifican comprobantes | AND, copia cifrada fuera del servidor |
 | `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | Definen los seudónimos; **no se rotan** | AND |
 | Volumen de step-ca | Llaves de la CA de la red | AND (respaldo cifrado) |
+| `PGBACKREST_REPO1_CIPHER_PASS` | Cifra los respaldos de la base: sin ella no se restaura ninguno | AND, copia fuera del servidor, junto al `.env` |
 | Administrador de Keycloak | Control de las identidades | AND, dos personas |
 | Usuarios con rol `regulator` | Supervisión | MinTIC |
 
 ## 8. Operación del día a día
 
 - **Diario** (`OPERATIONS.md §4.1`): servicios sanos (`sudo ./install.sh status`), nada fuera de sincronía con el gateway, cadena de auditoría íntegra (Consola → Auditoría → "Verificar integridad"), registro de transparencia íntegro.
-- **Respaldos:** `sudo ./install.sh backup` antes de cada actualización y con regularidad; los archivos van fuera del servidor.
+- **Respaldos:** la base se respalda sola (pgBackRest): cada cambio queda archivado a los pocos minutos y hay un respaldo cada día, con un mes de historia. `sudo ./install.sh backup` antes de cada actualización y con regularidad, para llevar una copia fuera del servidor. Guarda también fuera del servidor la clave `PGBACKREST_REPO1_CIPHER_PASS` del `.env`: sin ella no se restaura nada.
+- **Restaurar:** `sudo ./install.sh restore` vuelve al último estado; `sudo ./install.sh restore "2026-11-20 14:30:00-05"`, a ese instante (`OPERATIONS.md §6`).
 - **Actualizar:** `sudo ./install.sh update`, que respalda, actualiza, recompila y reinicia.
 - **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte. Si algo no cuadra, se mira `sync_state` (`OPERATIONS.md §4.2`).
 - **Alertas** (con la observabilidad activada): Prometheus vigila el gateway, el API y OPA, y Alertmanager avisa por correo al operador (en el piloto, a `/mail`) cuando hay muchos 5xx o latencia alta, un servicio no responde, OPA se atrasa con la política, falla una reconciliación, hay nodos fuera de línea, vence pronto un certificado o se acumula la cola de trabajos. El tablero del operador está en `https://<portal>/grafana/`.
@@ -251,7 +253,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
 | Identidad ciudadana | Simulada (`rid-citizens`) | La del país |
 | Datos iniciales | Entidades ficticias y usuarios de demo | Sin datos de demo; primer administrador por un procedimiento propio |
-| Respaldos | Manuales (`install.sh backup`) | pgBackRest con restauración probada (M6-06) |
+| Respaldos | Automáticos con pgBackRest en el mismo servidor; la copia fuera de él con `install.sh backup` | Automáticos al almacenamiento de objetos del operador (Barman Cloud) |
 | Métricas y alertas | Prometheus, Alertmanager y Grafana en el mismo servidor; avisos a Mailpit | Los mismos, con el SMTP del operador y almacenamiento de métricas de larga duración |
 
 ## 10. Preguntas que suelen surgir

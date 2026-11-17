@@ -902,6 +902,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td><code>.env</code> completo</td><td class="wrap">Sin él no se recuperan los datos ni se verifican comprobantes</td><td class="wrap">AND, copia cifrada fuera del servidor</td></tr>
             <tr><td><code>RID_SUBJECT_REF_KEY</code><br><code>RID_END_USER_HASH_SALT</code></td><td class="wrap">Definen los seudónimos; <b>no se rotan</b></td><td>AND</td></tr>
             <tr><td>Volumen de step-ca</td><td class="wrap">Llaves de la CA de la red</td><td class="wrap">AND, respaldo cifrado</td></tr>
+            <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Cifra los respaldos de la base: sin ella no se restaura ninguno</td><td class="wrap">AND, copia fuera del servidor, junto al <code>.env</code></td></tr>
             <tr><td>Administrador de Keycloak</td><td class="wrap">Control de las identidades</td><td class="wrap">AND, dos personas</td></tr>
             <tr><td>Usuarios <code>regulator</code></td><td class="wrap">Supervisión</td><td>MinTIC</td></tr>
           </tbody>
@@ -918,7 +919,8 @@ sudo ./install.sh</code></pre></div>
         <div class="cmd"><code>sudo ./install.sh credentials</code><button class="copy" type="button">Copiar</button><span>Usuarios de demo, administrador de Keycloak, correo de pruebas y Grafana.</span></div>
         <div class="cmd"><code>sudo ./install.sh otp</code><button class="copy" type="button">Copiar</button><span>Código vigente de segundo factor de los usuarios de demo con rol crítico.</span></div>
         <div class="cmd"><code>sudo ./install.sh logs api</code><button class="copy" type="button">Copiar</button><span>Logs de un servicio (<code>api</code>, <code>apisix</code>, <code>keycloak</code>, <code>edge</code>…), o de todos sin argumento.</span></div>
-        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copiar</button><span>Respaldo en <code>backups/&lt;fecha&gt;/</code>: bases <code>rid</code> y <code>keycloak</code>, volúmenes de la CA, la TSA, documentos y carpeta, y <code>.env</code>. Los archivos van fuera del servidor.</span></div>
+        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copiar</button><span>Respaldo completo y copia en <code>backups/&lt;fecha&gt;/</code>: volcados de <code>rid</code> y <code>keycloak</code>, el repositorio de respaldos (cifrado), volúmenes de la CA, la TSA, documentos y carpeta, y <code>.env</code>. Los archivos van fuera del servidor. Los respaldos diarios ya corren solos.</span></div>
+        <div class="cmd"><code>sudo ./install.sh restore</code><button class="copy" type="button">Copiar</button><span>Restaura la base al último estado archivado; con un instante (<code>"2026-11-20 14:30:00-05"</code>), a ese momento. Detiene y arranca todo.</span></div>
         <div class="cmd"><code>sudo ./install.sh update</code><button class="copy" type="button">Copiar</button><span>Respaldo, <code>git pull --ff-only</code>, recompilación y reinicio.</span></div>
         <div class="cmd"><code>sudo ./install.sh stop</code><button class="copy" type="button">Copiar</button><span>Detiene todo sin perder datos; <code>start</code> lo vuelve a arrancar.</span></div>
       </div>
@@ -960,7 +962,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td>Secretos</td><td class="wrap"><code>.env</code> en disco</td><td class="wrap">Gestor de secretos (OpenBao)</td></tr>
             <tr><td>Identidad ciudadana</td><td class="wrap">Simulada (<code>rid-citizens</code>)</td><td class="wrap">La del país</td></tr>
             <tr><td>Datos iniciales</td><td class="wrap">Entidades ficticias y usuarios de demo</td><td class="wrap">Sin datos de demo; primer administrador por un procedimiento propio</td></tr>
-            <tr><td>Respaldos</td><td class="wrap">Manuales (<code>install.sh backup</code>)</td><td class="wrap">pgBackRest con restauración probada</td></tr>
+            <tr><td>Respaldos</td><td class="wrap">Automáticos con pgBackRest en el mismo servidor; la copia fuera de él con <code>install.sh backup</code></td><td class="wrap">Automáticos al almacenamiento de objetos del operador (Barman Cloud)</td></tr>
             <tr><td>Métricas y alertas</td><td class="wrap">Prometheus, Alertmanager y Grafana en el mismo servidor; avisos a Mailpit</td><td class="wrap">Los mismos, con el SMTP del operador</td></tr>
           </tbody>
         </table>

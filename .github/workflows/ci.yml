@@ -73,3 +73,16 @@ jobs:
       - run: opa test --verbose packages/policy
       # ARCHITECTURE.md §4.2: policy coverage of at least 90 %.
       - run: opa test --coverage --threshold 90 --format=json packages/policy > /dev/null
+
+  restore:
+    name: Backup and restore (pgBackRest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      # The pilot's backup and restore procedure, end to end (M6-06, OPERATIONS.md §6): a lost
+      # data volume restored, a point-in-time recovery, and an encrypted repository.
+      - run: node scripts/restore-test.mjs

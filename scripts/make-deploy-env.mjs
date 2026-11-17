@@ -108,6 +108,9 @@ const set = {
   RID_METRICS_TOKEN: secret(32),
   // APISIX's data_encryption key for the private keys in etcd: 16 characters (M6-01).
   RID_APISIX_KEYRING: secret(12),
+  // Encryption key of the pgBackRest repository (M6-06): without it no backup can be restored, so
+  // a copy is kept off the server (OPERATIONS.md §6).
+  PGBACKREST_REPO1_CIPHER_PASS: secret(32),
   // The proxy's address or network (M6-01): only it may set X-Forwarded-For, the caller's address
   // for rate limits and security events. Pass it when generating (RID_TRUST_PROXY=172.30.0.2
   // node scripts/make-deploy-env.mjs ...); empty, the API trusts nobody (DEPLOYMENT.md).

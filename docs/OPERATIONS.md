@@ -315,20 +315,61 @@ La rotación y la revocación de los secretos y certificados de las aplicaciones
 
 ## 6. Respaldos
 
-Hasta M6-06 (pgBackRest con restauración probada) el respaldo es manual. Qué guardar:
+Las bases `rid` y `keycloak` se respaldan con pgBackRest en el piloto y con Barman Cloud en Kubernetes (ADR-0026). Las dos permiten volver a cualquier instante de la retención, no solo al último respaldo.
 
-| Qué | Por qué | Cómo |
+### 6.1 Piloto (Compose): pgBackRest
+
+- **Continuo.** PostgreSQL archiva cada segmento de WAL en el repositorio `pgbackrest-repo`, al menos cada 5 minutos: se pierden como mucho 5 minutos de cambios. El repositorio va cifrado (AES-256) con `PGBACKREST_REPO1_CIPHER_PASS`.
+- **Programado.** El servicio `pgbackrest` toma un respaldo completo los domingos y uno diferencial los demás días, a las 02:00 UTC (`RID_BACKUP_FULL_DAY`, `RID_BACKUP_HOUR`). Conserva cuatro completos: se puede volver a cualquier instante del último mes.
+- **Estado:** `dc exec pgbackrest pgbackrest --stanza=rid info` muestra los respaldos y el rango de WAL archivado. `dc logs pgbackrest` muestra cada respaldo. Si `info` dice algo distinto de `status: ok`, o el último respaldo tiene más de dos días, hay que revisarlo.
+
+**La clave `PGBACKREST_REPO1_CIPHER_PASS` se guarda fuera del servidor**, con la copia del `.env`. Sin ella no se puede restaurar ningún respaldo.
+
+**El repositorio vive en el mismo servidor.** No protege de la pérdida del disco ni de la máquina. `sudo ./install.sh backup` copia todo a `backups/<fecha>/`, para llevarlo fuera del servidor:
+- un respaldo completo de pgBackRest y el repositorio entero (`pgbackrest-repo.tgz`, ya cifrado);
+- los volcados lógicos `rid.dump` y `keycloak.dump`, que sirven para restaurar en otra versión de PostgreSQL o en otra plataforma (del piloto a Kubernetes);
+- los volúmenes y el `.env` (tabla de abajo).
+
+Hazlo antes de cada actualización y con regularidad.
+
+**Restaurar la base** (`sudo ./install.sh restore`):
+
+| Caso | Comando |
+| :-- | :-- |
+| Volver al último estado archivado (el volumen de datos se dañó o se perdió) | `sudo ./install.sh restore` |
+| Volver a un instante (un borrado o una migración que salió mal) | `sudo ./install.sh restore "2026-11-20 14:30:00-05"` |
+
+El comando:
+1. muestra los respaldos;
+2. pide confirmación;
+3. detiene todo y restaura la base con `pgbackrest --delta restore`, que solo reescribe lo que cambió;
+4. arranca de nuevo y toma un respaldo completo en la nueva línea de tiempo.
+
+Lo escrito después del instante elegido se pierde. Después de restaurar:
+- revisa la cadena de auditoría (Consola → Auditoría → "Verificar integridad");
+- revisa que nada quede fuera de sincronía con el gateway (§4.2). Los reconciliadores llevan APISIX, OPA y Keycloak al estado de la base restaurada.
+
+**Si se perdió el servidor:** instala el portal en otro (`INSTALL.md`) con el `.env` guardado. Antes del primer arranque, restaura el volumen `pgbackrest-repo` desde `pgbackrest-repo.tgz` y los demás volúmenes desde sus `.tgz`. Luego ejecuta `sudo ./install.sh restore`.
+
+**La prueba del procedimiento:** `pnpm restore:test`, también en CI. Usa la misma imagen y los mismos comandos, en contenedores aparte. Prueba la pérdida del volumen de datos, la recuperación a un instante, un respaldo después de restaurar y que el repositorio no se lee sin su clave.
+
+**Otros datos** que `install.sh backup` guarda aparte:
+
+| Qué | Por qué | Cómo se restaura |
 | :-- | :-- | :-- |
-| Base `rid` | Única fuente de verdad del portal, bitácora y registro de transparencia | `dc exec -T postgres pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB" > rid-$(date +%F).dump` |
-| Base `keycloak` | Usuarios, realms, clientes de aplicaciones | `dc exec -T postgres pg_dump -U "$POSTGRES_USER" -Fc keycloak > keycloak-$(date +%F).dump` |
-| Volumen `step-ca-data` | Claves de la CA: sin él, todos los certificados quedan huérfanos | `docker run --rm -v rid_step-ca-data:/v:ro -v "$PWD":/b alpine tar czf /b/step-ca-data.tgz -C /v .` |
+| Volumen `step-ca-data` | Claves de la CA: sin él, todos los certificados quedan huérfanos | `docker run --rm -v rid_step-ca-data:/v -v "$PWD":/b alpine tar xzf /b/step-ca-data.tgz -C /v`, con el servicio detenido |
 | Volumen `tsa-data` | Cadena y clave de la TSA de desarrollo (los sellos ya emitidos se verifican con la cadena) | Igual, con `rid_tsa-data` |
 | Volumen `api-documents` | Documentos subidos (designaciones, acuerdos) | Igual, con `rid_api-documents` |
-| `.env` | Claves sin las que los datos no se pueden verificar ni seudonimizar igual | Copia cifrada fuera de la máquina |
+| `.env` | Claves sin las que los datos no se pueden verificar, seudonimizar igual ni restaurar | Copia cifrada fuera de la máquina |
 
-No hace falta respaldar `etcd-data` (se reconstruye desde PostgreSQL), OPA (sin estado) ni `opensearch-data` (analítica, se puede perder). `transparency-buffer` solo tiene lo que aún no llegó al API.
+No hace falta respaldar `etcd-data` (se reconstruye desde PostgreSQL), OPA (guarda solo una copia del bundle) ni `opensearch-data` (analítica, se puede perder). `transparency-buffer` solo tiene lo que aún no llegó al API.
 
-Haz el respaldo **antes de cada actualización con migraciones**, y guarda los archivos con permisos `600`.
+### 6.2 Kubernetes: Barman Cloud
+
+El chart `rid` archiva el WAL y toma un respaldo base diario de las dos bases (`rid-db` y `rid-keycloak-db`) en el almacenamiento S3-compatible del operador (`postgres.backup`, `DEPLOYMENT.md §9.5`). La retención es de 30 días por omisión.
+- **Estado:** `kubectl get backups,scheduledbackups -n rid`, y en cada `Cluster` las condiciones `ContinuousArchiving` y `LastBackupSucceeded` (`kubectl cnpg status rid-db`).
+- **Restaurar:** se crea un `Cluster` nuevo con `bootstrap.recovery`, con el `ObjectStore` `rid-db-backup` como origen (plugin `barman-cloud.cloudnative-pg.io`, `serverName` = nombre del cluster original). Para volver a un instante, se agrega `recoveryTarget.targetTime`. Luego se apunta el API (o Keycloak) al cluster nuevo.
+- **Prueba:** el procedimiento no está probado en un clúster: el chart no se ha instalado (M6-05). Se prueba en la primera instalación, contra el almacenamiento real del operador.
 
 ## 7. Problemas frecuentes
 

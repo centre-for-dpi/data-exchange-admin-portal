@@ -48,7 +48,8 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 
 | Servicio | Imagen | Puerto interno | Puerto dev (host) | Volumen | Perfil | Health check |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| `postgres` | `postgres:18.6-alpine` | 5432 | `POSTGRES_PORT` 5432 | `pg-data` | base | `pg_isready` |
+| `postgres` | `rid/postgres` (`postgres:18.6-alpine` con pgBackRest, `infra/postgres`) | 5432 | `POSTGRES_PORT` 5432 | `pg-data`; en el piloto también `pgbackrest-repo` y `pg-socket` | base | `pg_isready` |
+| `pgbackrest` | `rid/postgres` | — (sin red) | — | `pg-data`, `pgbackrest-repo`, `pg-socket` | solo piloto (M6-06) | ninguno |
 | `keycloak` | `quay.io/keycloak/keycloak:26.8.0` | 8080 (HTTP), 9000 (gestión) | `KEYCLOAK_PORT` 8080 | — (usa `postgres`) | base | `GET /health/ready` en 9000 |
 | `etcd` | `quay.io/coreos/etcd:v3.6.16` | 2379 | no se publica | `etcd-data` | base | `etcdctl endpoint health` |
 | `apisix` | `apache/apisix:3.19.0-debian` | 9080 (HTTP), 9443 (HTTPS), 9180 (admin), 7085 (estado), 9091 (métricas) | 9080, 9443, 9180 | — (estado en etcd) | base | `GET /status/ready` en 7085 |
@@ -87,6 +88,7 @@ Prometheus, Alertmanager y Grafana **no** están en el Compose todavía (M5-06).
 Lo que hay en APISIX, OPA y en los clientes de Keycloak se calcula desde aquí, así que se puede reconstruir. Si PostgreSQL cae, el portal se detiene, pero el gateway sigue atendiendo con la última configuración.
 
 - Una sola instancia guarda la base del portal (`POSTGRES_DB`, por defecto `rid`), la de pruebas (`rid_test`) y la de Keycloak (`keycloak`).
+- **Respaldos (M6-06, ADR-0026).** La imagen trae pgBackRest. En el piloto, PostgreSQL archiva su WAL en el repositorio cifrado `pgbackrest-repo` (`PGBACKREST_REPO1_CIPHER_PASS`). El servicio `pgbackrest` toma los respaldos programados: llega a la base por el socket y el volumen de datos, sin red. En desarrollo no se archiva. Procedimiento y restauración en `OPERATIONS.md §6`.
 - **Scripts de inicialización** (`infra/postgres/init`, solo con el volumen vacío):
   - `01-keycloak.sh`: rol `KEYCLOAK_DB_USER` y base `keycloak`.
   - `02-app-role.sh`: rol `rid_app` (sin DDL) con la contraseña `RID_APP_DB_PASSWORD`, base `rid_test` y privilegios por defecto para que `rid_app` use todo lo que cree el dueño.
@@ -470,7 +472,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 ### 5.4 Actualización
 
 ```bash
-# 1. Respaldo si la versión trae migraciones (OPERATIONS.md §6)
+# 1. Respaldo si la versión trae migraciones (OPERATIONS.md §6): sudo ./install.sh backup
 # 2. Código nuevo
 git pull --ff-only
 # 3. Reconstruir y reiniciar (todo, o solo los servicios que cambiaron)
@@ -492,6 +494,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
      - Recrear `keycloak` (arranca con el proveedor x509 `nginx`), luego `apisix` y el API. El API reemite el certificado de servidor del gateway para el nombre nuevo, agrega `client.ca` al objeto SSL, crea la ruta `rid-oauth-token` y liga los tokens de cada aplicación al certificado.
      - Desde ese momento, una aplicación sin certificado vigente no puede llamar: cada desarrollador emite el suyo desde la ficha de su aplicación (M3-01).
   6. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-RID-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
+- **Al pasar a M6-06 (respaldos con pgBackRest)**, sobre un piloto anterior: agregar a `.env` `PGBACKREST_REPO1_CIPHER_PASS` (32 caracteres al azar) y guardar una copia fuera del servidor. `install.sh` lo hace solo si falta, al instalar o actualizar. Si la actualización la corre el `install.sh` anterior, Compose se detiene pidiendo la variable: basta volver a ejecutar `sudo ./install.sh update`. Al arrancar, PostgreSQL se reinicia con el archivado activo y `pgbackrest` toma el primer respaldo completo.
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
 ## 6. Desarrollo local
@@ -537,18 +540,18 @@ En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.d
 | Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
 | Alta disponibilidad | Ninguna | ≥ 2 nodos de APISIX con OPA local, ≥ 2 réplicas de web y API, PostgreSQL con réplica |
 | Métricas y alertas | No hay Prometheus; APISIX expone métricas en 9091 sin que nadie las lea | Prometheus + Alertmanager (M5-06) |
-| Respaldos | `pg_dump` manual | pgBackRest con restauración probada (M6-06) |
+| Respaldos | pgBackRest: WAL continuo y respaldos diarios en un repositorio cifrado del mismo servidor; la copia fuera de él es manual (`install.sh backup`) | Barman Cloud al almacenamiento de objetos del operador (M6-06) |
 | mTLS de aplicaciones | Desactivado (`features.mtls.required: false`, ADR-0010) | Obligatorio desde M3-10 |
 
 ## 9. Kubernetes: charts de Helm (M6-05, en curso)
 
-> **Estado (2026-11-16).** Los charts están completos y validados de forma estática: `helm lint`, más `helm template` y kubeconform estricto contra Kubernetes 1.31 (112 recursos válidos). Las imágenes se construyeron y escanearon en local, sin hallazgos altos ni críticos. **Todavía no se instalaron en ningún clúster.** `pnpm helm:kind` lo hará en kind cuando se decida, y es de esperar que haya ajustes en esa primera instalación.
+> **Estado (2026-11-16).** Los charts están completos y validados de forma estática: `helm lint`, más `helm template` y kubeconform estricto contra Kubernetes 1.31 (116 recursos válidos). Las imágenes se construyeron y escanearon en local, sin hallazgos altos ni críticos. **Todavía no se instalaron en ningún clúster.** `pnpm helm:kind` lo hará en kind cuando se decida, y es de esperar que haya ajustes en esa primera instalación.
 
 ### 9.1 Los dos charts
 
 | Chart | Qué instala | Cuándo |
 | :-- | :-- | :-- |
-| `infra/helm/rid-platform` | Los operadores del clúster: CloudNativePG 0.29.1 (PostgreSQL con réplicas), External Secrets 2.14.0 (secretos desde OpenBao u otro almacén) y cert-manager v1.21.3 | Una vez por clúster, antes de `rid`, en el namespace `rid-platform` |
+| `infra/helm/rid-platform` | Los operadores del clúster: CloudNativePG 0.29.1 (PostgreSQL con réplicas) con su plugin Barman Cloud 0.8.1 (respaldos, M6-06), External Secrets 2.14.0 (secretos desde OpenBao u otro almacén) y cert-manager v1.21.3 | Una vez por clúster, antes de `rid`, en el namespace `rid-platform` |
 | `infra/helm/rid` | Todo RID: web y API, el gateway (APISIX con su OPA y los Fluent Bit de transparencia y de errores en cada pod), etcd con mTLS, Keycloak, las dos bases de datos, step-ca, el hub de nodos, el runner de contrato, el pipeline de acceso, OpenSearch con su plugin de seguridad, Prometheus con Alertmanager, Grafana, la PKI interna (cert-manager) y las NetworkPolicies de entrada y de salida | Un `helm install` |
 
 Son dos porque Helm no puede crear un operador y sus recursos en la misma instalación: los recursos (un `Cluster` de base de datos, un `ExternalSecret`) llegan al webhook del operador antes de que este responda.
@@ -558,6 +561,7 @@ Son dos porque Helm no puede crear un operador y sus recursos en la misma instal
 - **Una StorageClass con `ReadWriteMany`** para los documentos subidos (`api.documents`). Las demás piezas usan `ReadWriteOnce`.
 - **Un balanceador de red (`LoadBalancer`)** para el gateway, que termina el mTLS de las aplicaciones (no pasa por el ingress), y para el UDP del hub de nodos.
 - **OpenBao** (o cualquier almacén de External Secrets) con un `ClusterSecretStore`: `secrets.externalSecrets.secretStoreRef`.
+- **Un almacenamiento de objetos S3-compatible fuera del clúster** para los respaldos de las bases (`postgres.backup`): un bucket propio, con cifrado, y una clave de acceso que solo escriba en él.
 - **Un colector de logs del clúster** (un DaemonSet de Fluent Bit, Vector u otro) que lleve la salida de los contenedores al sistema central del operador. Ahí llegan los logs del API, en JSON enmascarado (`ARCHITECTURE.md §8`), y el error log enmascarado del gateway. El chart no lo instala: es de la plataforma, como para cualquier otra carga.
 - **Un CNI que aplique NetworkPolicies** (Calico, Cilium). Sin él, las políticas del chart no tienen efecto.
 
@@ -567,6 +571,7 @@ Cada componente tiene su Secret `rid-<componente>`, solo con las claves que usa.
 - `DB_OWNER_PASSWORD` y `DB_APP_PASSWORD`, de las que se derivan `DATABASE_MIGRATION_URL` y `DATABASE_URL`;
 - `KEYCLOAK_SMTP_USER` y `KEYCLOAK_SMTP_PASSWORD`, para el correo del realm;
 - `ALERTMANAGER_SMTP_PASSWORD`, la del servidor de correo de las alertas (`prometheus.alertmanager.config.global`);
+- `DB_BACKUP_ACCESS_KEY_ID` y `DB_BACKUP_SECRET_ACCESS_KEY`, la clave de acceso al almacenamiento de los respaldos;
 - `OPENSEARCH_INTERNAL_USERS_YML`, el `internal_users.yml` del plugin de seguridad de OpenSearch con tres usuarios: `admin`, `rid-logs` (Fluent Bit: `OPENSEARCH_USER` y `OPENSEARCH_PASSWORD`) y `rid-api` (el portal: `RID_OPENSEARCH_AUTH`, `usuario:contraseña`). Lleva solo los hashes bcrypt, hechos con `plugins/opensearch-security/tools/hash.sh` de la imagen de OpenSearch. El índice de seguridad se crea desde él en el primer arranque; cambios posteriores van con `securityadmin.sh` y el certificado `rid-opensearch-admin`.
 
 `GRAFANA_ADMIN_PASSWORD` es la de `.env.example`; el usuario es `admin`.
@@ -577,6 +582,7 @@ Las URL de conexión usan `sslmode=verify-full` con el certificado de la CA de c
 
 ### 9.3 Primera instalación
 
+0. **`rid-platform`.** Si trae cert-manager (lo normal), la primera vez se instala con `--set plugin-barman-cloud.enabled=false` y enseguida se actualiza sin esa opción: el plugin de respaldos emite sus certificados con cert-manager, que debe estar corriendo antes. Si el clúster ya tiene cert-manager (`cert-manager.enabled=false`), basta una instalación.
 1. **La CA de la red.** La raíz se crea fuera del clúster, fuera de línea. El Secret `stepCa.pkiSecret` lleva `root_ca.crt`, `intermediate_ca.crt` e `intermediate_ca_key` (cifrada con `RID_STEP_CA_PROVISIONER_PASSWORD`). `stepCa.rootFingerprint` es la huella de la raíz, que el API fija. En el primer arranque, step-ca escribe su `ca.json` y los tres provisioners del portal, como `infra/step-ca/configure.sh`.
 2. **Keycloak.** Importa los realms de producción: los de desarrollo sin sus personas (`pnpm helm:sync` solo deja las cuentas de servicio de los clientes) y con el SMTP de `keycloak.smtp`. Arranca con un administrador temporal (`keycloak.bootstrapAdmin`), que se reemplaza por uno propio con segundo factor.
 3. **El primer `platform_admin`.** Producción no tiene seed. `api.bootstrapAdminEmail` (`RID_BOOTSTRAP_ADMIN_EMAIL`) le da el rol a quien entra primero con esa dirección, verificada por Keycloak, mientras la red no tiene ninguno. Queda auditado. Después se borra el valor, y el resto de los roles se da desde la consola.
@@ -597,6 +603,7 @@ Helm solo lee archivos dentro del chart. `pnpm helm:sync` copia a `infra/helm/ri
 
 Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
 - `stepCa.rootFingerprint` y `stepCa.pkiSecret` (§9.3);
+- `postgres.backup.destinationPath` (`s3://<bucket>/<ruta>`) y, con un almacenamiento propio del operador, `endpointURL` y `endpointCASecret`. Sin `destinationPath` el chart no se instala; los respaldos solo se desactivan a propósito (`postgres.backup.enabled=false`, como en kind);
 - `keycloak.smtp` (servidor y remitente del realm) y `prometheus.alertmanager.config` (servidor, remitente y destinatarios de las alertas);
 - `grafana."grafana.ini".server.root_url`: `<publicUrl>/grafana/`. Sin él, Grafana redirige a `localhost`;
 - `networkPolicy`: el namespace del ingress (`ingressControllerNamespace`), y las redes privadas que el gateway (`gatewayExtraEgressCidrs`: proveedores dentro de la red del operador, un Security Server de X-Road) o el API y Keycloak (`servicesEgressCidrs`: el correo, la TSA) deban alcanzar. Por omisión solo salen a direcciones públicas.

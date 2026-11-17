@@ -7,7 +7,10 @@
 #   sudo ./install.sh credentials  # where to log in and with what (demo users, Keycloak admin)
 #   sudo ./install.sh otp          # one-time code of the demo users with a critical role
 #   sudo ./install.sh logs [svc]   # follow the logs (all services, or one)
-#   sudo ./install.sh backup       # databases, CA, TSA, documents and .env into backups/
+#   sudo ./install.sh backup       # full pgBackRest backup, plus dumps, CA, TSA, documents, the
+#                                  # backup repository and .env into backups/
+#   sudo ./install.sh restore [time]  # restore the database: latest state, or the moment given
+#                                  # ("2026-11-20 14:30:00-05"); stops and restarts everything
 #   sudo ./install.sh update       # backup, git pull --ff-only, rebuild and restart
 #   sudo ./install.sh stop|start   # stop or start every container (data is kept)
 #
@@ -72,6 +75,15 @@ env_set() {
     cat "$tmp" >"$ENV_FILE"; rm -f "$tmp"
   else
     printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+  fi
+}
+
+# Secrets added by later versions to an existing .env (re-running never changes the others).
+ensure_env_additions() {
+  if [[ -z $(env_get PGBACKREST_REPO1_CIPHER_PASS) ]]; then
+    env_set PGBACKREST_REPO1_CIPHER_PASS "$(head -c 32 /dev/urandom | base64 | tr -d '\n/+=')"
+    chmod 600 "$ENV_FILE"
+    warn "Nueva clave de cifrado de los respaldos (PGBACKREST_REPO1_CIPHER_PASS) en .env: guarda una copia fuera del servidor. Sin ella no se puede restaurar ningún respaldo."
   fi
 }
 
@@ -447,6 +459,7 @@ cmd_install() {
   check_ports
   check_dns
   [[ -f $ENV_FILE ]] || write_env
+  ensure_env_additions
   write_edge
   prepare_host
   start_stack
@@ -495,9 +508,15 @@ cmd_backup() {
   user=$(env_get POSTGRES_USER); user=${user:-rid}
   db=$(env_get POSTGRES_DB); db=${db:-rid}
   info "Respaldando en $dir"
+  # A full pgBackRest backup first (OPERATIONS.md §6), when the service runs (M6-06 onwards).
+  if dc ps --status running --services 2>/dev/null | grep -qx pgbackrest; then
+    dc exec -T pgbackrest pgbackrest --stanza=rid --type=full backup
+  fi
+  # Logical dumps too: they restore into another PostgreSQL version or another platform.
   dc exec -T postgres pg_dump -U "$user" -Fc "$db" >"$dir/rid.dump"
   dc exec -T postgres pg_dump -U "$user" -Fc keycloak >"$dir/keycloak.dump"
-  for v in step-ca-data tsa-data api-documents carpeta-data; do
+  # The pgBackRest repository is encrypted: it can leave the server as is.
+  for v in step-ca-data tsa-data api-documents carpeta-data pgbackrest-repo; do
     docker volume inspect "rid_$v" >/dev/null 2>&1 &&
       docker run --rm -v "rid_$v:/v:ro" -v "$dir:/b" "$NODE_IMAGE" tar czf "/b/$v.tgz" -C /v .
   done
@@ -506,10 +525,29 @@ cmd_backup() {
   ok "Respaldo completo: $(du -sh "$dir" | cut -f1). Cópialo fuera del servidor."
 }
 
+cmd_restore() {
+  require_install; load_env_settings
+  local target=${1:-} args=(--stanza=rid --delta)
+  [[ -n $target ]] && args+=(--type=time "--target=$target" --target-action=promote)
+  dc ps --status running --services 2>/dev/null | grep -qx pgbackrest ||
+    fail "El servicio pgbackrest no está corriendo: no hay respaldos que restaurar (sudo ./install.sh start)."
+  dc exec -T pgbackrest pgbackrest --stanza=rid info
+  warn "Se detiene todo, se restaura la base ${target:+al instante $target}${target:-al último estado archivado} y se arranca de nuevo. Lo escrito después de ese instante se pierde."
+  yes_no "¿Continuar?" n || exit 0
+  dc stop
+  # The same command as scripts/restore-test.mjs; the mkdir covers a lost data volume.
+  dc run --rm --no-deps pgbackrest sh -c     "mkdir -p /var/lib/postgresql/18 && pgbackrest $(printf '%q ' "${args[@]}")restore"
+  dc up -d --wait --wait-timeout 1800
+  # A full backup on the new timeline, the base of the next point-in-time recoveries.
+  dc exec -T pgbackrest pgbackrest --stanza=rid --type=full backup
+  ok "Base restaurada${target:+ al instante $target}. Revisa el portal; los volúmenes (CA, documentos) se restauran aparte (OPERATIONS.md §6)."
+}
+
 cmd_update() {
   require_install; load_env_settings
   cmd_backup
   git pull --ff-only
+  ensure_env_additions
   write_edge
   dc up -d --build --wait --wait-timeout 1800
   ok "Actualizado a $(git log -1 --format='%h %s')"
@@ -523,9 +561,10 @@ case ${1:-install} in
   otp) cmd_otp ;;
   logs) require_install; shift; dc logs -f --tail=200 "$@" ;;
   backup) cmd_backup ;;
+  restore) shift; cmd_restore "${1:-}" ;;
   update) cmd_update ;;
   stop) require_install; dc stop ;;
   start) require_install; dc up -d --wait --wait-timeout 900 ;;
-  -h | --help | help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help | help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) fail "Comando desconocido: $1 (ver ./install.sh help)" ;;
 esac

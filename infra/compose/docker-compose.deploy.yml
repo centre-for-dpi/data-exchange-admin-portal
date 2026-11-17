@@ -27,6 +27,46 @@ services:
   postgres:
     <<: *no-ports
     restart: unless-stopped
+    # Continuous archiving to the encrypted pgBackRest repository (M6-06, ADR-0026): with the
+    # scheduled backups below, recovery to any moment of the retention (OPERATIONS.md §6). A
+    # segment is archived at least every 5 minutes, so at most 5 minutes of changes can be lost.
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=rid archive-push %p
+      - -c
+      - archive_timeout=300
+    environment: &pgbackrest-env
+      PGBACKREST_PG1_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set PGBACKREST_REPO1_CIPHER_PASS in .env}
+    volumes:
+      - pgbackrest-repo:/var/lib/pgbackrest
+      - pg-socket:/var/run/postgresql
+
+  # Scheduled backups (infra/postgres/backup-scheduler.sh): a full one a week and a differential
+  # one every other day, at RID_BACKUP_HOUR (UTC). It reaches the database through its socket and
+  # data volume only: no network.
+  pgbackrest:
+    # The database's own image (built once, cached for the second service).
+    build: ../postgres
+    image: rid/postgres:local
+    restart: unless-stopped
+    user: postgres
+    network_mode: none
+    command: [rid-backup-scheduler]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *pgbackrest-env
+      RID_BACKUP_HOUR: ${RID_BACKUP_HOUR:-2}
+      RID_BACKUP_FULL_DAY: ${RID_BACKUP_FULL_DAY:-0}
+    volumes:
+      - pg-data:/var/lib/postgresql
+      - pgbackrest-repo:/var/lib/pgbackrest
+      - pg-socket:/var/run/postgresql
 
   keycloak:
     <<: *no-ports
@@ -226,6 +266,8 @@ services:
 volumes:
   carpeta-data:
   api-documents:
+  pgbackrest-repo:
+  pg-socket:
 
 networks:
   # The API and the contract runner only (the runner's results come back to the API).

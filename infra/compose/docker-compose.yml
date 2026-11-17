@@ -11,7 +11,10 @@ x-healthcheck-defaults: &healthcheck-defaults
 
 services:
   postgres:
-    image: postgres:18.6-alpine
+    # postgres:18.6-alpine with pgBackRest (infra/postgres, M6-06). Development does not archive;
+    # the pilot does (docker-compose.deploy.yml).
+    build: ../postgres
+    image: rid/postgres:local
     networks: [default]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}

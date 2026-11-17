@@ -129,7 +129,8 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 | `sudo ./install.sh credentials` | Usuarios de demo, administrador de Keycloak, usuario del correo de pruebas y de Grafana |
 | `sudo ./install.sh otp` | Código vigente de segundo factor de los usuarios de demo con rol crítico |
 | `sudo ./install.sh logs [servicio]` | Logs (p. ej. `logs api`) |
-| `sudo ./install.sh backup` | Respaldo en `backups/<fecha>/`: bases `rid` y `keycloak`, volúmenes de la CA, la TSA, documentos y carpeta, y `.env` |
+| `sudo ./install.sh backup` | Respaldo completo de pgBackRest y copia en `backups/<fecha>/`: volcados de `rid` y `keycloak`, el repositorio de respaldos (cifrado), los volúmenes de la CA, la TSA, documentos y carpeta, y `.env`. Los respaldos diarios ya corren solos (`OPERATIONS.md §6`) |
+| `sudo ./install.sh restore [instante]` | Restaura la base al último estado archivado, o al instante dado (`"2026-11-20 14:30:00-05"`). Detiene y arranca todo |
 | `sudo ./install.sh update` | Respaldo, `git pull --ff-only`, recompilación y reinicio |
 | `sudo ./install.sh stop` / `start` | Detiene o arranca todo, sin perder datos |
 

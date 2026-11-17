@@ -800,7 +800,7 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
     - Al volver el portal, el registro de transparencia tiene todas las consultas de la caída y una revocación llega en 18 s.
     - **Corregido:** OPA guarda el último bundle en disco (volumen `opa-data`, `persist: true`). Antes, un OPA reiniciado sin el portal quedaba sin política y el gateway lo negaba todo.
 - [ ] **M6-05 — Helm charts** para producción con la topología de `ARCHITECTURE.md §11`.
-  - _Avance (2026-11-16):_ `infra/helm/rid-platform` y `infra/helm/rid`, en `DEPLOYMENT.md §9`. Completos y validados de forma estática con `helm lint`, `helm template` y kubeconform estricto (112 recursos). Sin instalar en ningún clúster por ahora, por decisión del equipo. Por eso la historia sigue abierta.
+  - _Avance (2026-11-16):_ `infra/helm/rid-platform` y `infra/helm/rid`, en `DEPLOYMENT.md §9`. Completos y validados de forma estática con `helm lint`, `helm template` y kubeconform estricto (116 recursos). Sin instalar en ningún clúster por ahora, por decisión del equipo. Por eso la historia sigue abierta.
     - **Hecho:**
       - portal, gateway (APISIX con OPA local en el loopback y los Fluent Bit por pod), etcd de 3 miembros con mTLS y CA propia, Keycloak en modo producción con base propia, PostgreSQL con réplica (CloudNativePG, `verify-full`), step-ca con raíz fuera de línea, hub y runner;
       - OpenSearch con TLS y su plugin de seguridad, y Prometheus, Alertmanager y Grafana como subcharts;
@@ -812,10 +812,14 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - imágenes de producción del API y la web (816 MB y 1,33 GB, antes 2,9 y 3,2 GB), sin dependencias de desarrollo ni gestor de paquetes; `images.yml` las construye con SBOM, las escanea con Trivy y las publica con una etiqueta. Las cuatro pasan el escaneo en local;
       - logs del API enmascarados y en JSON para el colector del clúster (ASVS 16.4.3).
     - **Falta:**
-      - instalarlo: kind con `pnpm helm:kind`, y luego el entorno del operador;
+      - instalarlo: kind con `pnpm helm:kind`, y luego el entorno del operador, con una restauración de Barman Cloud desde su almacenamiento (M6-06);
       - publicar la primera versión de las imágenes (etiqueta `v0.1.0`).
     - **Para M6-06:** CloudNativePG respalda con Barman, no con pgBackRest. El operador de pgBackRest (Crunchy) distribuye sus imágenes con términos no OSI, así que hace falta un ADR.
-- [ ] **M6-06 — Respaldos y recuperación**: pgBackRest, procedimiento de restauración probado.
+- [x] **M6-06 — Respaldos y recuperación**: pgBackRest, procedimiento de restauración probado.
+  - _Hecho (2026-11-16):_ ADR-0026, con dos herramientas, una por topología:
+    - **Compose (piloto): pgBackRest.** Archivado continuo del WAL (como mucho 5 minutos de pérdida) a un repositorio cifrado. El servicio `pgbackrest` toma un respaldo completo por semana y uno diferencial por día, y conserva cuatro semanas. Se restaura con `install.sh restore [instante]`. `pnpm restore:test`, también en CI, prueba la pérdida del volumen, la recuperación a un instante, el respaldo posterior y el repositorio ilegible sin su clave.
+    - **Kubernetes: Barman Cloud**, el plugin oficial de CloudNativePG, en `rid-platform`. Lleva las dos bases al almacenamiento S3-compatible del operador, con 30 días de retención. Validado solo de forma estática; su restauración se prueba al instalar el chart (M6-05).
+    - Procedimientos en `OPERATIONS.md §6`. Un piloto existente necesita `PGBACKREST_REPO1_CIPHER_PASS`: `install.sh` la genera si falta (`DEPLOYMENT.md §5.4`).
 - [ ] **M6-07 — Runbook del operador**: alta de entidad, incidentes, rotación de la CA intermedia, revocación masiva.
 - [ ] **M6-08 — Antivirus de documentos** (ClamAV) y catálogo público opcional.
 - [ ] **M6-09 — Inglés completo** y plantilla `example.yaml` probada levantando un "país de ejemplo".
