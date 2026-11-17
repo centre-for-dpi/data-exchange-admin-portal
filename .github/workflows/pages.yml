@@ -1,0 +1,45 @@
+name: Guides site
+
+# Publishes the HTML guides (docs/guides, docs/es/guides) to GitHub Pages.
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/guides/*.html
+      - docs/es/guides/*.html
+      - docs/site/**
+      - scripts/docs-site.sh
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash scripts/docs-site.sh _site
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

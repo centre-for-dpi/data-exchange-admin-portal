@@ -63,3 +63,6 @@ backups/
 
 # Helm dependencies: Chart.lock pins them, `helm dependency build` fetches them (M6-05)
 infra/helm/*/charts/
+
+# GitHub Pages build of the guides (scripts/docs-site.sh)
+_site/

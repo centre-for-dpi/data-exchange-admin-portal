@@ -9,6 +9,7 @@ pnpm-lock.yaml
 *.md
 docs/guides/*.html
 docs/es/guides/*.html
+docs/site/*.html
 
 # Playwright
 **/test-results/
