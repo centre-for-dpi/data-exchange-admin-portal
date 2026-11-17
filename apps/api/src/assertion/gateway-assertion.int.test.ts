@@ -120,7 +120,7 @@ describe("the gateway's signed assertion to providers (M6-10)", () => {
     );
     await admin.put('routes', ROUTE, {
       uri: `${BASE}/*`,
-      methods: ['GET', 'POST'],
+      methods: ['GET', 'POST', 'DELETE'],
       plugins: {
         'request-id': { header_name: 'X-Request-Id', include_in_response: true },
         'rid-header-guard': {},
@@ -170,6 +170,20 @@ describe("the gateway's signed assertion to providers (M6-10)", () => {
     // A client's own X-RID-Assertion never reaches the provider.
     await call('/afiliados/1000000001', { headers: { 'X-RID-Assertion': 'forged' } });
     expect(received.at(-1)?.assertion).not.toBe('forged');
+  });
+
+  it('binds a body on any method: a DELETE that carries one too', async () => {
+    const body = 'cuerpo de un DELETE';
+    const res = await call('/afiliados/1000000001', { method: 'DELETE', body });
+    expect(res.status, res.text).toBe(200);
+    const got = received.at(-1);
+    expect(got?.body).toBe(body);
+    const claims = verifyAssertion(got?.assertion ?? '', await jwks());
+    expect(claims?.req).toMatchObject({ method: 'DELETE', body_sha256: sha256(body) });
+    // Without a body, a GET binds none.
+    await call('/afiliados/1000000001');
+    const plain = verifyAssertion(received.at(-1)?.assertion ?? '', await jwks());
+    expect(plain?.req.body_sha256).toBeUndefined();
   });
 
   it('binds the body of a request with one', async () => {

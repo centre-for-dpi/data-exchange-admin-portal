@@ -174,6 +174,14 @@ describe("the gateway's signed assertion (M6-10)", () => {
       expect(await verify(assertion({ method: 'POST', uri: url }), { method: 'POST', url })).toBe(
         'invalid: body',
       );
+      // A body on any method must be bound: a GET that brought one, unbound, is refused.
+      expect(
+        await verify(assertion({ method: 'GET', uri: url }), {
+          method: 'GET',
+          url,
+          body: Buffer.from('cuerpo'),
+        }),
+      ).toBe('invalid: body');
       // A hash in the assertion must match even when nothing arrived.
       expect(
         await verify(assertion({ method: 'GET', uri: url, body: 'algo' }), { method: 'GET', url }),

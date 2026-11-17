@@ -11,8 +11,9 @@ import { createHash, createPublicKey, type KeyObject, verify } from 'node:crypto
  *   - `iss` is the gateway, when the provider was told its URL;
  *   - `req.method` and `req.uri_sha256` are those of the request received (method, path and
  *     query as they arrived);
- *   - for POST, PUT and PATCH, and whenever the assertion carries one, `req.body_sha256` is the
- *     SHA-256 of the bytes received (of nothing, without a body), whatever their content type;
+ *   - for POST, PUT and PATCH, for any request that brought a body and whenever the assertion
+ *     carries one, `req.body_sha256` is the SHA-256 of the bytes received (of nothing, without a
+ *     body), whatever their content type;
  *   - its `jti` was not seen before while it is valid: a captured assertion cannot be replayed.
  */
 export type AssertionResult = 'verified' | 'absent' | `invalid: ${string}`;
@@ -99,7 +100,9 @@ export function assertionVerifier(options: AssertionVerifierOptions) {
     const method = request.method.toUpperCase();
     if (req.method !== method) return 'invalid: method';
     if (req.uri_sha256 !== sha256(request.url)) return 'invalid: uri';
-    if (WITH_BODY.has(method) || req.body_sha256 !== undefined) {
+    // Any body that arrived must be bound, whatever the method (a GET or DELETE with one too).
+    const received = request.body !== undefined && request.body.length > 0;
+    if (WITH_BODY.has(method) || req.body_sha256 !== undefined || received) {
       if (req.body_sha256 !== sha256(request.body ?? '')) return 'invalid: body';
     }
     if (typeof claims.jti !== 'string' || !remember(claims.jti, claims.exp + SKEW_S, seconds)) {

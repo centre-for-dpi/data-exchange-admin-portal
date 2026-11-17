@@ -13,8 +13,9 @@
 -- limit-count (1002). A route whose metadata is missing fails closed (503): the provider must not
 -- receive a call without the assertion it was told to expect.
 --
--- A request with a body (POST, PUT, PATCH) also binds it: req.body_sha256 is the SHA-256 of the
--- bytes the provider receives (M6-10), so the assertion cannot be moved to another body either.
+-- POST, PUT and PATCH, and any request that carries a body, also bind it: req.body_sha256 is the
+-- SHA-256 of the bytes the provider receives (M6-10), so the assertion cannot be moved to another
+-- body either.
 --
 local core = require("apisix.core")
 local plugin = require("apisix.plugin")
@@ -124,12 +125,14 @@ function _M.access(conf, ctx)
         method = ngx.req.get_method(),
         uri_sha256 = sha256_hex(upstream_uri),
     }
-    if req.method == "POST" or req.method == "PUT" or req.method == "PATCH" then
-        local body, body_err = core.request.get_body(conf.max_body_bytes, ctx)
-        if body_err then
-            core.log.warn("rid-assertion: body not readable: ", body_err)
-            return 413
-        end
+    -- Every body is bound, whatever the method: a GET or DELETE that carries one too.
+    local body, body_err = core.request.get_body(conf.max_body_bytes, ctx)
+    if body_err then
+        core.log.warn("rid-assertion: body not readable: ", body_err)
+        return 413
+    end
+    if req.method == "POST" or req.method == "PUT" or req.method == "PATCH"
+        or (body ~= nil and body ~= "") then
         req.body_sha256 = sha256_hex(body or "")
     end
     local claims = {
