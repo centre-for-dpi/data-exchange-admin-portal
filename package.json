@@ -36,6 +36,7 @@
     "load:test": "node scripts/load-test.mjs",
     "resilience:test": "node scripts/resilience-test.mjs",
     "restore:test": "node scripts/restore-test.mjs",
+    "example:country": "node scripts/example-country.mjs",
     "helm:sync": "node scripts/helm-sync.mjs",
     "helm:kind": "node scripts/helm-kind.mjs"
   },

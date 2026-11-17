@@ -310,6 +310,7 @@ La rotación y la revocación de los secretos y certificados de las aplicaciones
 | Contraseñas de PostgreSQL | `ALTER ROLE ... PASSWORD` **y** `.env` (con sus URLs), y recrear los servicios |
 | `RID_TRANSPARENCY_SIGNING_JWK` | Clave nueva con otro `kid`; la pública anterior va a `RID_TRANSPARENCY_RETIRED_JWKS`. Procedimiento completo pendiente para producción |
 | Certificados del gateway (servidor y clientes hacia proveedores) | Los renueva solo el reconciliador de APISIX; para forzarlo, reiniciar el API tras borrar la fila de `gateway_certificate` correspondiente |
+| Clave de firma de la aserción del gateway (M6-10) | La rota sola el portal cada `lifecycle.assertionKeyRotationDays` (90 días); la anterior sigue en el JWKS. Para rotarla ya: `POST /api/v1/admin/gateway-signing-keys/rotate` como `platform_admin`; con `"compromised": true` la anterior sale del JWKS (`RUNBOOK.md §2.2`) |
 | `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | **No se rotan**: rompen el vínculo con los registros anteriores (`DEPLOYMENT.md §4.1`) |
 | CA intermedia | `RUNBOOK.md §3` |
 

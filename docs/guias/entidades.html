@@ -399,6 +399,10 @@ details.faq[open] summary { color: var(--gov); }
         <b>Guía de proveedoras</b>
         <p>Los requisitos del servidor y de la red, la instalación del nodo, la publicación de una API y lo que recibe el servicio en cada consulta están en la guía de proveedoras del repositorio del kit: <code>docs/guias/proveedoras.md</code>, con su versión para proyectar <code>proveedoras.html</code>.</p>
       </div>
+      <div class="callout info">
+        <b>La aserción firmada del gateway</b>
+        <p>Si el país la tiene activada, cada consulta llega con <code>X-RID-Assertion</code>: un JWS ES256 del gateway con quién consulta, para qué, con qué suscripción y a qué petición corresponde (método, hash de la ruta y, si hay, del cuerpo). La entidad puede guardarla como prueba. Se verifica con el JWKS de la red, <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, comprobando la firma, <code>aud</code> (la entidad), <code>exp</code> y los hashes de la petición recibida. Los ejemplos en Node.js y Python están en <code>docs/guias/entidades.md</code> (§3.2).</p>
+      </div>
     </section>
 
     <section id="preparacion">

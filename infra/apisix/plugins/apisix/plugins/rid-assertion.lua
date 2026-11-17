@@ -13,6 +13,9 @@
 -- limit-count (1002). A route whose metadata is missing fails closed (503): the provider must not
 -- receive a call without the assertion it was told to expect.
 --
+-- A request with a body (POST, PUT, PATCH) also binds it: req.body_sha256 is the SHA-256 of the
+-- bytes the provider receives (M6-10), so the assertion cannot be moved to another body either.
+--
 local core = require("apisix.core")
 local plugin = require("apisix.plugin")
 local pkey = require("resty.openssl.pkey")
@@ -28,6 +31,8 @@ local schema = {
         -- useless at another.
         audience = { type = "string", minLength = 1, maxLength = 128 },
         ttl = { type = "integer", minimum = 10, maximum = 300, default = 60 },
+        -- Largest body it hashes; a bigger one is refused (413) rather than signed without it.
+        max_body_bytes = { type = "integer", minimum = 1, default = 1048576 },
     },
     required = { "audience" },
     additionalProperties = false,
@@ -115,6 +120,18 @@ function _M.access(conf, ctx)
     -- What the provider receives, after the gateway's rewrite: the hash binds the assertion to
     -- this request without carrying the path (identification numbers) in the token.
     local upstream_uri = ctx.var.upstream_uri or ngx.var.request_uri
+    local req = {
+        method = ngx.req.get_method(),
+        uri_sha256 = sha256_hex(upstream_uri),
+    }
+    if req.method == "POST" or req.method == "PUT" or req.method == "PATCH" then
+        local body, body_err = core.request.get_body(conf.max_body_bytes, ctx)
+        if body_err then
+            core.log.warn("rid-assertion: body not readable: ", body_err)
+            return 413
+        end
+        req.body_sha256 = sha256_hex(body or "")
+    end
     local claims = {
         iss = metadata.value.issuer,
         aud = conf.audience,
@@ -122,10 +139,7 @@ function _M.access(conf, ctx)
         exp = now + conf.ttl,
         jti = ngx.var.request_id,
         rid = rid,
-        req = {
-            method = ngx.req.get_method(),
-            uri_sha256 = sha256_hex(upstream_uri),
-        },
+        req = req,
     }
     local header = { alg = "ES256", typ = "JWT", kid = metadata.value.kid }
     local input = b64url(core.json.encode(header)) .. "." .. b64url(core.json.encode(claims))

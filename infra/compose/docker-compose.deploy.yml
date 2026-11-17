@@ -168,10 +168,15 @@ services:
   mock-salud:
     <<: *no-ports
     restart: unless-stopped
+    environment:
+      # Like a real provider: the gateway's public keys from the portal's public address (M6-10).
+      RID_GATEWAY_JWKS_URL: ${RID_PUBLIC_URL:?set RID_PUBLIC_URL in .env}/api/v1/gateway/jwks
 
   mock-socioeconomico:
     <<: *no-ports
     restart: unless-stopped
+    environment:
+      RID_GATEWAY_JWKS_URL: ${RID_PUBLIC_URL:?set RID_PUBLIC_URL in .env}/api/v1/gateway/jwks
 
   contract-runner:
     <<: *no-ports

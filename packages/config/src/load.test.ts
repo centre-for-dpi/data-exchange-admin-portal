@@ -74,10 +74,11 @@ describe('versioned country files', () => {
     );
     expect(config.features).toEqual({
       publicCatalog: false,
-      mtls: { required: false }, // ADR-0010: back to true in M3-10
+      mtls: { required: true }, // M3-10 closed ADR-0010
       sandbox: { autoApprove: true },
       approval: { regulatorForSensitive: true },
       lint: { noIdInQuery: true },
+      gatewayAssertion: true,
     });
     expect(config.subscriptionMaxValidityMonths).toEqual({
       public: 24,
@@ -182,6 +183,7 @@ describe('validation', () => {
       credentialRotationDays: 7,
       enrollmentTokenValidityHours: 72,
       nodeOfflineAfterMinutes: 5,
+      assertionKeyRotationDays: 90,
     });
     expect(loaded.retention).toEqual({
       auditYears: 5,

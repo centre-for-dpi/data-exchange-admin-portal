@@ -81,6 +81,9 @@ features:
     regulatorForSensitive: true
   lint:
     noIdInQuery: true
+  # The gateway signs each call to the provider (X-RID-Assertion, ADR-0024): proof the provider
+  # can keep. Providers verify it with the JWKS at /api/v1/gateway/jwks.
+  gatewayAssertion: true
 
 subscriptionMaxValidityMonths:
   public: 24

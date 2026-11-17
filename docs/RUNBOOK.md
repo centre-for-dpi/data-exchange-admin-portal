@@ -83,6 +83,7 @@ Comprobación: la entidad figura activa en Consola → Entidades, su nodo en lí
 | **Cadena de auditoría con error** (Consola → Auditoría → Verificar integridad) | Exportar la bitácora y los anclajes; no tocar la base | Restaurar la base a un instante anterior a la alteración (`OPERATIONS.md §6`) y comparar con la exportación para saber qué cambió |
 | **Base de datos dañada o borrado por error** | Detener el API | `sudo ./install.sh restore [instante]` (`OPERATIONS.md §6`) |
 | **Clave privada de la CA intermedia comprometida** | §3.3 | §3.3 |
+| **Clave de firma de la aserción del gateway comprometida** (M6-10) | Rotarla como comprometida: `POST /api/v1/admin/gateway-signing-keys/rotate` con `{"compromised": true, "reason": "…"}` (`platform_admin`). El gateway firma con la nueva desde la siguiente pasada del reconciliador, en segundos; la anterior sale del JWKS | Avisar a los proveedores: lo que firmó la clave comprometida ya no verifica, y quien lo archivó debe saber desde cuándo dejó de ser confiable (la fecha está en la bitácora, `gateway_signing_key.created`) |
 | **Nodos del gateway agregados o quitados** (no es un incidente, pero altera los límites) | — | Ajustar `RID_GATEWAY_NODES` (en el chart, sale de `gateway.replicas`): cada nodo cuenta los límites por su lado y el bundle le da a cada uno su parte (ADR-0020) |
 
 ## 3. Rotación de la CA intermedia

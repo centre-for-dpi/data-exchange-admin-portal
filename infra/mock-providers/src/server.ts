@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
+import { type AssertionResult, assertionVerifier } from './assertion.js';
 import { generateAfiliados, generateHogares } from './data.js';
 import type { Provider } from './providers.js';
 
@@ -32,7 +33,7 @@ export function traceHeaders(
   return result;
 }
 
-function problem(reply: FastifyReply, status: 400 | 404, title: string, detail?: string) {
+function problem(reply: FastifyReply, status: 400 | 401 | 404, title: string, detail?: string) {
   return reply
     .code(status)
     .type('application/problem+json')
@@ -42,6 +43,26 @@ function problem(reply: FastifyReply, status: 400 | 404, title: string, detail?:
 export interface ServerOptions {
   /** Destination for logs (tests capture them); defaults to stdout. */
   logStream?: NodeJS.WritableStream;
+  /**
+   * The gateway's signed assertion (ADR-0024, M6-10): verified on every call with the portal's
+   * JWKS, its result logged (the demo reads it); with `required`, a call without a valid one is
+   * refused (401), as a provider that demands it would.
+   */
+  assertion?: { jwksUrl: string; audience: string; required: boolean; fetchFn?: typeof fetch };
+}
+
+/** The assertion settings from the environment (RID_GATEWAY_JWKS_URL); undefined without it. */
+export function assertionFromEnv(
+  provider: Provider,
+  env: NodeJS.ProcessEnv = process.env,
+): ServerOptions['assertion'] {
+  const jwksUrl = env.RID_GATEWAY_JWKS_URL?.trim();
+  if (!jwksUrl) return undefined;
+  return {
+    jwksUrl,
+    audience: env.RID_ASSERTION_AUDIENCE?.trim() || provider,
+    required: env.RID_ASSERTION_REQUIRED === 'true',
+  };
 }
 
 export function buildServer(provider: Provider, options: ServerOptions = {}): FastifyInstance {
@@ -72,6 +93,38 @@ export function buildServer(provider: Provider, options: ServerOptions = {}): Fa
         .send({ type: 'about:blank', title: 'Error interno', status: 500 });
     },
   );
+
+  // The raw body too: the assertion binds its SHA-256 (M6-10).
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
+    (request as { rawBody?: Buffer }).rawBody = body as Buffer;
+    try {
+      done(null, (body as Buffer).length > 0 ? JSON.parse(body.toString('utf8')) : undefined);
+    } catch {
+      done(Object.assign(new Error('Body is not JSON'), { statusCode: 400 }), undefined);
+    }
+  });
+
+  const checkAssertion = options.assertion ? assertionVerifier(options.assertion) : undefined;
+  if (checkAssertion && options.assertion) {
+    const { required } = options.assertion;
+    app.addHook('preHandler', async (request, reply) => {
+      const route = request.routeOptions.url;
+      if (route === '/health' || route === '/openapi.yaml') return;
+      const result: AssertionResult = await checkAssertion(request.headers['x-rid-assertion'], {
+        method: request.method,
+        url: request.raw.url ?? '',
+        body: (request as { rawBody?: Buffer }).rawBody,
+      });
+      request.log.info(
+        { provider, rid: { 'x-request-id': request.headers['x-request-id'] }, assertion: result },
+        'gateway assertion',
+      );
+      if (required && result !== 'verified') {
+        return problem(reply, 401, 'Aserción del gateway inválida', result);
+      }
+    });
+  }
 
   app.addHook('onRequest', (request, _reply, done) => {
     if (request.routeOptions.url !== '/health') {

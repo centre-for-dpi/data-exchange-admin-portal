@@ -1061,6 +1061,27 @@ model GatewayCertificate {
   @@map("gateway_certificate")
 }
 
+/// Keys the gateway signs its assertions to providers with (X-RID-Assertion, ADR-0024, M6-10).
+/// The newest one without retiredAt signs; every key ever used stays published in the JWKS
+/// (/api/v1/gateway/jwks) so that the assertions providers archived keep verifying, unless it was
+/// compromised.
+model GatewaySigningKey {
+  id               String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// The JWS key id.
+  kid              String    @unique
+  /// Public key as a JWK (EC P-256).
+  publicJwk        Json      @map("public_jwk")
+  /// PKCS#8 PEM of the private key, sealed with RID_SECRETS_KEY (AAD: the kid).
+  sealedPrivateKey String    @map("sealed_private_key")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// When a newer key took over the signing.
+  retiredAt        DateTime? @map("retired_at") @db.Timestamptz(3)
+  /// Taken out of the JWKS: assertions signed with it no longer verify.
+  compromisedAt    DateTime? @map("compromised_at") @db.Timestamptz(3)
+
+  @@map("gateway_signing_key")
+}
+
 // ---------------------------------------------------------------------------------------------
 // Nodes of the instant-APIs kit (SPEC.md §3, §4.6; ARCHITECTURE.md §10; M4)
 // ---------------------------------------------------------------------------------------------

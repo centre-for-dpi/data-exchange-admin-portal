@@ -10,6 +10,7 @@ import {
   parseHostNames,
   parseHostPort,
 } from './apisix/desired-state.js';
+import { GatewaySigningKeysService } from '../assertion/gateway-signing-keys.service.js';
 import { GatewayCertificates } from './apisix/gateway-certificates.js';
 import { HttpKeycloakGatewayAdmin, KEYCLOAK_ADMIN } from './keycloak/keycloak-admin.js';
 import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
@@ -61,6 +62,12 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
           },
         },
         wgHub: process.env.RID_GATEWAY_WG_HUB ?? 'wg-hub:8443',
+        // Read when used, like mtlsRequired (M6-10).
+        get assertion() {
+          return getCountryConfig().features.gatewayAssertion
+            ? { issuer: process.env.RID_GATEWAY_PUBLIC_URL ?? 'https://localhost:9443' }
+            : undefined;
+        },
         validationToken: process.env.RID_VALIDATION_TOKEN || undefined,
         xroad:
           process.env.RID_XROAD_SECURITY_SERVER_URL && process.env.RID_XROAD_CLIENT
@@ -82,6 +89,7 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
       }),
     },
     GatewayCertificates,
+    GatewaySigningKeysService,
     ApisixReconciler,
     {
       provide: HUB_AGENT,
@@ -96,6 +104,7 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
     WireguardReconciler,
   ],
   exports: [
+    GatewaySigningKeysService,
     KeycloakReconciler,
     KEYCLOAK_ADMIN,
     ApisixReconciler,

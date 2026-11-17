@@ -64,7 +64,7 @@ services:
       RID_WEB_URL: ${RID_WEB_URL:-http://localhost:3000}
       RID_CARPETA_CLIENT_SECRET: ${RID_CARPETA_CLIENT_SECRET:?set RID_CARPETA_CLIENT_SECRET in .env}
       RID_CARPETA_URL: ${RID_CARPETA_URL:-http://localhost:3100}
-      RID_DEMO_USER_PASSWORD: ${RID_DEMO_USER_PASSWORD:-demo}
+      RID_DEMO_USER_PASSWORD: ${RID_DEMO_USER_PASSWORD:-rid-demo-password}
       # TOTP key of the seed users with a critical role (M3-08); random in the pilot.
       RID_DEMO_TOTP_SECRET: ${RID_DEMO_TOTP_SECRET:-rid-demo-totp-secret}
     volumes:
@@ -437,9 +437,15 @@ services:
       dockerfile: infra/mock-providers/Dockerfile
     networks: [providers]
     image: rid/mock-providers:dev
-    environment:
+    environment: &mock-env
       PROVIDER: salud
       PORT: '8000'
+      # The gateway's signed assertion (M6-10): verified with the portal's JWKS and logged. The
+      # portal runs on the host in development; the pilot sets MOCK_GATEWAY_JWKS_URL.
+      RID_GATEWAY_JWKS_URL: ${MOCK_GATEWAY_JWKS_URL:-http://host.docker.internal:4000/api/v1/gateway/jwks}
+      RID_ASSERTION_REQUIRED: ${MOCK_ASSERTION_REQUIRED:-false}
+    extra_hosts:
+      - host.docker.internal:host-gateway
     ports:
       - 127.0.0.1:${MOCK_SALUD_PORT:-8101}:8000
     healthcheck: &mock-healthcheck
@@ -452,8 +458,10 @@ services:
     networks: [providers]
     image: rid/mock-providers:dev
     environment:
+      <<: *mock-env
       PROVIDER: socioeconomico
-      PORT: '8000'
+    extra_hosts:
+      - host.docker.internal:host-gateway
     ports:
       - 127.0.0.1:${MOCK_SOCIOECONOMICO_PORT:-8102}:8000
     healthcheck: *mock-healthcheck

@@ -89,8 +89,9 @@ export const countryConfigSchema = z.strictObject({
     dataProtectionAuthority: nonEmpty,
   }),
   identifiers: z.strictObject({
-    person: z.array(nonEmpty).min(1),
-    organization: z.array(nonEmpty).min(1),
+    // At most 32 characters: the length the citizens' realm accepts for document_type.
+    person: z.array(nonEmpty.max(32)).min(1),
+    organization: z.array(nonEmpty.max(32)).min(1),
   }),
   sectors: z
     .array(catalogEntrySchema)
@@ -106,6 +107,11 @@ export const countryConfigSchema = z.strictObject({
     sandbox: z.strictObject({ autoApprove: z.boolean() }),
     approval: z.strictObject({ regulatorForSensitive: z.boolean() }),
     lint: z.strictObject({ noIdInQuery: z.boolean() }),
+    /**
+     * The gateway signs each call to the provider (X-RID-Assertion, ADR-0024, M6-10): a JWS the
+     * provider verifies with the portal's JWKS and can keep as proof. Off by default.
+     */
+    gatewayAssertion: z.boolean().default(false),
   }),
   /** Maximum subscription validity per API classification (SPEC.md §5). */
   subscriptionMaxValidityMonths: z.strictObject({
@@ -128,6 +134,8 @@ export const countryConfigSchema = z.strictObject({
       credentialRotationDays: z.number().int().min(1).max(30).default(7),
       enrollmentTokenValidityHours: z.number().int().min(1).max(720).default(72),
       nodeOfflineAfterMinutes: z.number().int().min(1).default(5),
+      /** Days a signing key of the gateway's assertions signs before the next one takes over. */
+      assertionKeyRotationDays: z.number().int().min(7).max(365).default(90),
     })
     .default({
       apiRetirementNoticeDays: 90,
@@ -137,6 +145,7 @@ export const countryConfigSchema = z.strictObject({
       credentialRotationDays: 7,
       enrollmentTokenValidityHours: 72,
       nodeOfflineAfterMinutes: 5,
+      assertionKeyRotationDays: 90,
     }),
   /** Retention periods (SPEC.md §11). */
   retention: z

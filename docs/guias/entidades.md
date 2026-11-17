@@ -43,6 +43,62 @@ Toda proveedora se conecta por medio del **nodo**, que se instala dentro de su r
 
 Los requisitos del servidor y de la red, la instalación y la publicación están en la **guía de proveedoras** del repositorio del kit.
 
+#### Verificar la aserción del gateway
+
+Si el país la tiene activada (`features.gatewayAssertion`), cada consulta llega con la cabecera `X-RID-Assertion` (ADR-0024). Es un JWS ES256 firmado por el gateway con lo que autorizó:
+- quién consulta: entidad, aplicación y suscripción;
+- para qué: la finalidad;
+- qué operación;
+- el funcionario y el titular, como seudónimos;
+- a qué petición corresponde: método y SHA-256 de la ruta con su query; con cuerpo, también el SHA-256 del cuerpo.
+
+La entidad puede guardarla como prueba de que la red autorizó esa consulta. Para aceptarla, el servicio comprueba:
+1. que la firma verifica con una clave del JWKS de la red (`https://<portal>/api/v1/gateway/jwks`, por `kid`; si llega un `kid` desconocido, volver a descargarlo);
+2. que `aud` es el identificador de la entidad (su slug en el portal) y que `exp` no pasó;
+3. que `req.method` y `req.uri_sha256` son los de la petición recibida (método, y ruta con query tal como llegaron);
+4. que, si la petición trae cuerpo, `req.body_sha256` es el SHA-256 de esos bytes.
+
+El token no lleva números de identificación: el número va en la ruta, y la aserción solo lleva su hash. Se puede archivar sin datos personales en claro. `jti` es el identificador de la petición en el gateway (`X-Request-Id`), el mismo del registro de transparencia del titular.
+
+Node.js, sin librerías:
+
+```js
+import { createHash, createPublicKey, verify } from 'node:crypto';
+const sha256 = (v) => createHash('sha256').update(v).digest('hex');
+const jwks = await (await fetch('https://<portal>/api/v1/gateway/jwks')).json();
+
+function checkAssertion(token, { method, url, body, audience }) {
+  const [h, c, s] = token.split('.');
+  const { kid, alg } = JSON.parse(Buffer.from(h, 'base64url'));
+  const jwk = jwks.keys.find((k) => k.kid === kid);
+  if (!jwk || alg !== 'ES256') return false;
+  const key = createPublicKey({ key: jwk, format: 'jwk' });
+  if (!verify('sha256', Buffer.from(`${h}.${c}`), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(s, 'base64url'))) return false;
+  const claims = JSON.parse(Buffer.from(c, 'base64url'));
+  return claims.aud === audience && claims.exp * 1000 > Date.now()
+    && claims.req.method === method && claims.req.uri_sha256 === sha256(url)
+    && (!body?.length || claims.req.body_sha256 === sha256(body));
+}
+```
+
+Python, con PyJWT (MIT) y `cryptography`:
+
+```python
+import hashlib, jwt
+jwks = jwt.PyJWKClient("https://<portal>/api/v1/gateway/jwks")
+
+def check_assertion(token, method, url, body, audience):
+    key = jwks.get_signing_key_from_jwt(token).key
+    claims = jwt.decode(token, key, algorithms=["ES256"], audience=audience)  # firma, aud y exp
+    req = claims["req"]
+    ok = req["method"] == method and req["uri_sha256"] == hashlib.sha256(url.encode()).hexdigest()
+    if body:
+        ok = ok and req.get("body_sha256") == hashlib.sha256(body).hexdigest()
+    return ok
+```
+
+En Java sirve Nimbus JOSE + JWT (Apache-2.0) y en .NET `System.IdentityModel.Tokens.Jwt` (MIT), con la misma lista de comprobaciones. El proveedor de prueba del portal (`infra/mock-providers/src/assertion.ts`) es una referencia completa.
+
 ### 3.3 Lista de preparación
 
 El portal tiene esta lista por entidad (Mi entidad → Preparación del bootcamp), y el operador ve el avance de todas:

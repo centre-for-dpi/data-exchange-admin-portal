@@ -836,7 +836,36 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
       - Compose: perfil `antivirus` (`clamav/clamav:1.5.4`), que `install.sh` pregunta. Helm: activado con dos réplicas, sin root y con el sistema de archivos de solo lectura (probado con Docker), y NetworkPolicy: solo el API entra; sale solo a HTTPS público (firmas).
       - Pruebas: el cliente contra un clamd falso (limpio, infectado, error, puerto cerrado, sin respuesta) y la subida con transacción real (sin fila ni archivo si está infectado; 503 sin antivirus). Verificado contra un clamd real: PDF limpios pasan y EICAR se detecta. Un clamd real solo marca EICAR al inicio del archivo, y la comprobación de PDF lo rechaza antes.
     - **Catálogo público.** Ya existía detrás de `features.publicCatalog` (solo APIs `public` para anónimos). Ahora el anónimo no ve el contacto del responsable ni el estado de los nodos. Probado con el flag activado (una copia de `co.yaml`): lista, detalle, OpenAPI y token inválido.
-- [ ] **M6-09 — Inglés completo** y plantilla `example.yaml` probada levantando un "país de ejemplo".
-- [ ] **M6-10 — Aserción firmada del gateway (ADR-0024)**. Clave generada y rotada por el portal y empujada por el reconciliador a la metadata de `rid-assertion`. JWKS público. Activación por configuración del país. `body_sha256` en operaciones con cuerpo. Verificación en los mocks y guía del proveedor.
+- [x] **M6-09 — Inglés completo** y plantilla `example.yaml` probada levantando un "país de ejemplo".
+  - _Hecho (2026-11-17):_
+    - **Inglés.** Los catálogos de la web tienen las mismas 1264 claves en los dos idiomas; los 34 textos iguales son legítimos ("API", "Sector", "Client ID"). Los correos del API y la carpeta ciudadana ya eran bilingües y eligen el idioma por el locale del país.
+      - Interpretación: el idioma por omisión de la web sigue siendo el español (regla 7). Para un país angloparlante se cambia `defaultLocale` en `apps/web/src/i18n/routing.ts`, junto con las URL de cierre de sesión del realm (`DEPLOYMENT.md §10`).
+    - **País de ejemplo.** `pnpm example:country`:
+      - convierte `example.yaml` en el país XX;
+      - levanta un stack propio (`ridxx`, puertos + 10000) sin tocar el de desarrollo;
+      - arranca el portal con XX y comprueba la web en los dos idiomas con su marca;
+      - corre la demo de punta a punta: 12 pasos en verde, con el sector, las finalidades y el tipo de documento de XX, y con la aserción firmada (M6-10) verificada por el proveedor.
+    - **La demo ya no supone Colombia:** toma el sector, las finalidades y el tipo de documento de la configuración del país, y el contenedor del mock del proyecto Compose.
+    - **Lo que encontró la prueba, corregido:**
+      - la contraseña de demo por omisión (`demo`) incumplía la política del realm de M6-01 (12 caracteres): un entorno nuevo desde `.env.example` no podía importar el realm. Ahora es `rid-demo-password`, y `install.sh` y `make-deploy-env` rechazan una más corta;
+      - el realm `rid-citizens` limitaba el tipo de documento a 10 caracteres (`NATIONAL_ID` tiene 11): ahora 32, el mismo tope que impone el esquema de la configuración;
+      - una prueba de la configuración seguía esperando mTLS apagado en `co.yaml` desde M3-10.
+- [x] **M6-10 — Aserción firmada del gateway (ADR-0024)**. Clave generada y rotada por el portal y empujada por el reconciliador a la metadata de `rid-assertion`. JWKS público. Activación por configuración del país. `body_sha256` en operaciones con cuerpo. Verificación en los mocks y guía del proveedor.
+  - _Hecho (2026-11-17):_
+    - **Activación:** `features.gatewayAssertion` (activada en `co.yaml` y en `example.yaml`, apagada por omisión).
+    - **Clave:** EC P-256 en `gateway_signing_key`, sellada con `RID_SECRETS_KEY`, creada al primer uso y rotada cada `lifecycle.assertionKeyRotationDays` (90). Rotación inmediata del operador: `POST /admin/gateway-signing-keys/rotate`, `platform_admin`; con `compromised`, la anterior sale del JWKS. Cada clave nueva queda en la bitácora (`gateway_signing_key.created`).
+    - **Reconciliador:** pone la clave en la metadata de `rid-assertion` antes que las rutas, compara por emisor y `kid` (APISIX la guarda cifrada), la quita si el país apaga la aserción, y agrega el plugin a las rutas de las versiones servidas con `audience` = la entidad proveedora.
+    - **JWKS público** en `GET /api/v1/gateway/jwks`: todas las claves usadas salvo las comprometidas, para que lo archivado siga verificando.
+    - **Plugin:** `body_sha256` en POST, PUT y PATCH; un cuerpo mayor que `max_body_bytes` da 413 en vez de firmarse sin él.
+    - **Mocks:** verifican como un proveedor real (Node, sin librerías), registran el resultado y pueden exigirla (`MOCK_ASSERTION_REQUIRED`). La demo comprueba que el proveedor la verificó.
+    - **Guía del proveedor:** `docs/guias/entidades.md` §3.2, con ejemplos en Node.js y Python.
+    - **Pruebas:**
+      - de integración contra el APISIX real: firma ligada a la URI y al cuerpo, aserción del cliente descartada, rotación, clave comprometida fuera del JWKS, autorización y falla cerrada sin clave;
+      - del verificador del mock: URI, cuerpo, `aud`, vencimiento, método y firma alterados;
+      - unitarias del reconciliador y del estado deseado.
+
+- [ ] **M6-11 — Listas del operador sin tope oculto.** La cola de revisión de versiones (`GET /review/api-versions`, 200 más antiguas) y la lista de entidades de la consola (`GET /admin/entities`, 500 por nombre) se cortan sin avisar. Una red nacional puede pasar las 500 entidades. Paginación por cursor, como la cola de altas (M6-01, ASVS corrección 13).
+  - _Origen (2026-11-17):_ la base de pruebas acumulada hizo fallar dos pruebas de integración que buscaban un elemento nuevo en esas listas.
 
 **Cierre M6:** despliegue en un entorno tipo producción del operador con las pruebas de M6-03 y M6-04 en verde.
+  - _Estado (2026-11-17):_ M6-01, M6-02, M6-04 y M6-06 a M6-10 hechas. Quedan abiertas M6-03 (la prueba de carga, en el entorno tipo producción) y M6-05 (instalar el chart), que dependen de ese entorno, y M6-11.

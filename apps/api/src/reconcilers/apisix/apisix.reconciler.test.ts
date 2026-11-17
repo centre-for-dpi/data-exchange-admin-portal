@@ -4,6 +4,7 @@ import type { QueueService } from '../../queue/queue.service.js';
 import { type ApisixAdmin, ApisixAdminError, type ApisixKind } from './apisix-admin.js';
 import { ApisixReconciler } from './apisix.reconciler.js';
 import { type GatewaySettings, parseDevNodes, routeId, upstreamId } from './desired-state.js';
+import type { GatewaySigningKeysService } from '../../assertion/gateway-signing-keys.service.js';
 import type { GatewayCertificates } from './gateway-certificates.js';
 
 const VERSION = '0190d0c4-0000-7000-8000-0000000000aa';
@@ -60,7 +61,14 @@ const prisma = {
 } as unknown as PrismaService;
 
 const reconciler = (admin: ApisixAdmin) =>
-  new ApisixReconciler(prisma, {} as QueueService, admin, settings, {} as GatewayCertificates);
+  new ApisixReconciler(
+    prisma,
+    {} as QueueService,
+    admin,
+    settings,
+    {} as GatewayCertificates,
+    {} as GatewaySigningKeysService,
+  );
 
 describe('APISIX reconciler: removing a version', () => {
   it('retries the upstream while APISIX still sees the deleted route', async () => {
@@ -74,5 +82,50 @@ describe('APISIX reconciler: removing a version', () => {
     const admin = new LaggingApisix(5, 'invalid configuration');
     await expect(reconciler(admin).reconcileVersion(VERSION)).rejects.toThrow(/invalid/);
     expect(admin.attempts).toBe(1);
+  });
+});
+
+describe("APISIX reconciler: the assertion's signing key (M6-10)", () => {
+  const PEM = '-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----\n';
+  let kid = 'rid-gw-1';
+  const keys = {
+    current: () => Promise.resolve({ kid, privateKeyPem: PEM }),
+  } as unknown as GatewaySigningKeysService;
+  const withAssertion = (admin: ApisixAdmin, on: boolean) =>
+    new ApisixReconciler(
+      prisma,
+      {} as QueueService,
+      admin,
+      { ...settings, ...(on ? { assertion: { issuer: 'https://gw.example' } } : {}) },
+      {} as GatewayCertificates,
+      keys,
+    );
+
+  it('puts the current key in the metadata, then leaves it while the kid is the same', async () => {
+    const admin = new LaggingApisix(0);
+    expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('created');
+    expect(admin.objects.get('plugin_metadata/rid-assertion')).toEqual({
+      issuer: 'https://gw.example',
+      kid: 'rid-gw-1',
+      private_key: PEM,
+    });
+    // APISIX returns the key encrypted: only issuer and kid are compared.
+    admin.objects.set('plugin_metadata/rid-assertion', {
+      issuer: 'https://gw.example',
+      kid: 'rid-gw-1',
+      private_key: 'encrypted',
+    });
+    expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('unchanged');
+    kid = 'rid-gw-2';
+    expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('updated');
+    expect(admin.objects.get('plugin_metadata/rid-assertion')).toMatchObject({ kid: 'rid-gw-2' });
+  });
+
+  it('removes the key from APISIX when the country turns the assertion off', async () => {
+    const admin = new LaggingApisix(0);
+    await withAssertion(admin, true).reconcileAssertionKey();
+    expect(await withAssertion(admin, false).reconcileAssertionKey()).toBe('deleted');
+    expect(admin.objects.has('plugin_metadata/rid-assertion')).toBe(false);
+    expect(await withAssertion(admin, false).reconcileAssertionKey()).toBe('absent');
   });
 });

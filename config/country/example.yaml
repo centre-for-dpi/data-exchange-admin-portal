@@ -57,6 +57,8 @@ features:
     regulatorForSensitive: true # Sensitive APIs/subscriptions also need the regulator.
   lint:
     noIdInQuery: true # OpenAPI lint rejects identifiers in query strings.
+  # The gateway signs each call to the provider (ADR-0024).
+  gatewayAssertion: true
 
 subscriptionMaxValidityMonths: # Per API classification.
   public: 24

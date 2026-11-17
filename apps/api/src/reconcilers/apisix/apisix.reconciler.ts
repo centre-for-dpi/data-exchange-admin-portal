@@ -49,10 +49,11 @@ import {
   UnsupportedUpstreamError,
   upstreamId,
 } from './desired-state.js';
+import { GatewaySigningKeysService } from '../../assertion/gateway-signing-keys.service.js';
 import { GatewayCertificates } from './gateway-certificates.js';
+import { GATEWAY_SYNC_TOPIC } from './topics.js';
 
-/** Outbox topic for changes that affect an API version's route (aggregate apiVersion:<id>). */
-export const GATEWAY_SYNC_TOPIC = 'gateway.sync';
+export { GATEWAY_SYNC_TOPIC } from './topics.js';
 export const APISIX_SETTINGS = Symbol('APISIX_SETTINGS');
 const FULL_RECONCILE_MS = 5 * 60 * 1000;
 
@@ -64,6 +65,8 @@ export type GatewayResult = 'created' | 'updated' | 'unchanged' | 'deleted' | 'a
 export const gatewaySyncTarget = (apiVersionId: string): string =>
   `apisix:route:${routeId(apiVersionId)}`;
 export const GATEWAY_TLS_SYNC_TARGET = `apisix:ssl:${GATEWAY_SSL_ID}`;
+const ASSERTION_PLUGIN = 'rid-assertion';
+export const ASSERTION_SYNC_TARGET = `apisix:plugin_metadata:${ASSERTION_PLUGIN}`;
 export const GATEWAY_TOKEN_SYNC_TARGET = `apisix:route:${TOKEN_ROUTE_ID}`;
 export const NODE_CONTROL_SYNC_TARGET = `apisix:route:${NODE_CONTROL_ROUTE_ID}`;
 export const gatewayClientTlsSyncTarget = (entityId: string): string =>
@@ -91,6 +94,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     @Inject(APISIX_ADMIN) private readonly admin: ApisixAdmin,
     @Inject(APISIX_SETTINGS) private readonly settings: GatewaySettings,
     private readonly certificates: GatewayCertificates,
+    private readonly signingKeys: GatewaySigningKeysService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -118,6 +122,12 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       await this.reconcileTls();
     } catch (error) {
       this.logger.warn(`APISIX TLS reconcile failed: ${String(error)}`);
+    }
+    // The signing key before the routes that use it (M6-10).
+    try {
+      await this.reconcileAssertionKey();
+    } catch (error) {
+      this.logger.warn(`APISIX assertion key reconcile failed: ${String(error)}`);
     }
     try {
       await this.reconcileTokenRoute();
@@ -464,6 +474,42 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       return result;
     } catch (error) {
       await this.recordError(GATEWAY_TLS_SYNC_TARGET, desiredHash, error);
+      throw error;
+    }
+  }
+
+  /**
+   * The signing key of the gateway's assertions (ADR-0024, M6-10) in rid-assertion's metadata,
+   * shared by every route: the current one of GatewaySigningKeysService, which also rotates it.
+   * APISIX keeps the private key encrypted in etcd (encrypt_fields) and never returns it in
+   * clear, so the comparison is by issuer and kid. With the feature off, the metadata is removed:
+   * no private key stays in etcd for nothing.
+   */
+  async reconcileAssertionKey(now = new Date()): Promise<GatewayResult> {
+    let desiredHash = hash(null);
+    try {
+      const actual = await this.admin.get('plugin_metadata', ASSERTION_PLUGIN);
+      const assertion = this.settings.assertion;
+      if (!assertion) {
+        if (actual) await this.admin.delete('plugin_metadata', ASSERTION_PLUGIN);
+        await this.recordSuccess(ASSERTION_SYNC_TARGET, desiredHash);
+        return actual ? 'deleted' : 'absent';
+      }
+      const key = await this.signingKeys.current(now);
+      desiredHash = hash({ issuer: assertion.issuer, kid: key.kid });
+      let result: GatewayResult = 'unchanged';
+      if (!actual || actual.issuer !== assertion.issuer || actual.kid !== key.kid) {
+        await this.admin.put('plugin_metadata', ASSERTION_PLUGIN, {
+          issuer: assertion.issuer,
+          kid: key.kid,
+          private_key: key.privateKeyPem,
+        });
+        result = actual ? 'updated' : 'created';
+      }
+      await this.recordSuccess(ASSERTION_SYNC_TARGET, desiredHash);
+      return result;
+    } catch (error) {
+      await this.recordError(ASSERTION_SYNC_TARGET, desiredHash, error);
       throw error;
     }
   }

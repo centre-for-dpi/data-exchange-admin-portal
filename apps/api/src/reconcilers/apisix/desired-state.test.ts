@@ -104,6 +104,16 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     ]);
   });
 
+  it('signs for the provider entity when the country turns the assertion on (M6-10)', () => {
+    const off = desiredGateway(version(), settings).route.plugins as Plugins;
+    expect(off['rid-assertion']).toBeUndefined();
+    const on = desiredGateway(version(), {
+      ...settings,
+      assertion: { issuer: 'https://gw.example' },
+    }).route.plugins as Plugins;
+    expect(on['rid-assertion']).toEqual({ audience: 'salud' });
+  });
+
   it('applies the plugin chain: request id, token for the gateway, header cleanup, OPA, logs', () => {
     const plugins = desiredGateway(version(), settings).route.plugins as Plugins;
     expect(Object.keys(plugins).sort()).toEqual([

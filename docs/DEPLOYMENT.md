@@ -285,6 +285,7 @@ Muestra lo que debe implementar una carpeta real; no es un producto.
 
 - Una sola imagen (`rid/mock-providers:dev`); `PROVIDER` elige el servicio y sus datos (`salud` o `socioeconomico`), con su OpenAPI en `infra/mock-providers/<proveedor>/openapi.yaml`.
 - Escuchan en 8000 dentro de la red de Compose; en desarrollo se publican en 8101 y 8102.
+- Verifican la aserción firmada del gateway (`X-RID-Assertion`, M6-10) como lo haría un proveedor real, con el JWKS de `RID_GATEWAY_JWKS_URL`: en desarrollo, el API del host (`MOCK_GATEWAY_JWKS_URL`); en el piloto, la URL pública del portal. Registran el resultado (`verified`, `absent` o `invalid: <motivo>`) y la demo lo comprueba. Con `MOCK_ASSERTION_REQUIRED=true` rechazan (401) la llamada sin una aserción válida.
 
 ### 3.14 Hub WireGuard (`infra/wg-hub`, M4-03, ADR-0023)
 
@@ -376,7 +377,7 @@ Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX 
 | `RID_CITIZEN_ISSUER` | `http://localhost:8080/realms/rid-citizens` | `${RID_PUBLIC_URL}/auth/realms/rid-citizens` |
 | `RID_CARPETA_URL` | `http://localhost:3100` | `${RID_PUBLIC_URL}/carpeta` |
 | `RID_CITIZEN_APPS` (webhook) | `http://localhost:3100/api/rid/alerts` | `http://carpeta:3100/carpeta/api/rid/alerts` |
-| `RID_DEMO_USER_PASSWORD` | `demo` | aleatoria, salvo `--demo-password` |
+| `RID_DEMO_USER_PASSWORD` | `rid-demo-password` (12 caracteres o más: la política de contraseñas del realm, M6-01) | aleatoria, salvo `--demo-password` |
 | `RID_DEMO_TOTP_SECRET` | `rid-demo-totp-secret` | aleatoria (`pnpm demo:otp` da el código) |
 | `RID_GATEWAY_PORTAL_API_URL` (ruta de control de los nodos) | `http://host.docker.internal:4000` | `http://api:4000` |
 | `RID_NODE_CONTROL_TOKEN` | valor de desarrollo | aleatorio |
@@ -635,3 +636,26 @@ Las imágenes del API y de la web son de varias etapas. La de ejecución lleva s
 
 - **Instalar** en kind (`pnpm helm:kind`) y luego en el entorno tipo producción del operador. El chart nunca se ha instalado.
 - **Publicar la primera versión** de las imágenes (una etiqueta `v0.1.0`), cuando se decida.
+
+## 10. Un país nuevo (M6-09)
+
+El código no cambia de un país a otro (regla 6 de CLAUDE.md). Lo propio de cada país está en:
+
+| Qué | Dónde |
+| :-- | :-- |
+| Nombre, idioma de fechas y números, zona horaria, autoridades, marco legal, tipos de documento, sectores, finalidades, reglas (`features`), plazos, retención, plantilla de acuerdo y marca | `config/country/<código>.yaml`, copiado de `config/country/example.yaml`. El esquema (`packages/config/src/schema.ts`) rechaza claves desconocidas y valores inválidos, y el API no arranca con un archivo inválido |
+| Textos de la interfaz | `apps/web/messages/es.json` y `en.json`: completos en los dos idiomas. Los textos del país en el YAML aceptan uno o los dos idiomas |
+| Identidad ciudadana | El realm del país reemplaza a `rid-citizens`. Su token trae el tipo y el número de documento en los claims de `RID_CITIZEN_DOCUMENT_TYPE_CLAIM` y `RID_CITIZEN_DOCUMENT_NUMBER_CLAIM`, con los tipos de `identifiers.person` |
+| Selección del país | `RID_COUNTRY=<código>` (y `RID_CONFIG_DIR` si los archivos no están en `config/country`), en el API y en la web |
+
+**Idioma por omisión.** La web abre en español y sirve el inglés bajo `/en` (regla 7 de CLAUDE.md). Para un país cuyo idioma principal es el inglés, el idioma por omisión es `defaultLocale` en `apps/web/src/i18n/routing.ts`: cambiarlo cambia también las URL de cierre de sesión que el realm acepta (`post.logout.redirect.uris`).
+
+**Prueba:** `pnpm example:country` (`scripts/example-country.mjs`):
+1. Convierte `example.yaml` en el país XX.
+2. Levanta un stack propio: el proyecto Compose `ridxx`, con todos los puertos desplazados en 10000 y sus volúmenes. El de desarrollo no se toca.
+3. Arranca el portal con ese país.
+4. Comprueba la web en los dos idiomas con la marca del país.
+5. Corre la demo de `DEMO.md` de punta a punta, con el sector, las finalidades y el tipo de documento de XX.
+6. Borra lo que creó (`--keep` lo conserva para mirar).
+
+La demo (`pnpm demo`) toma esos datos de la configuración del país, así que también sirve para el despliegue de cualquier país.

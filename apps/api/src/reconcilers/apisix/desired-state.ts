@@ -79,6 +79,11 @@ export interface GatewaySettings {
    */
   xroad?: { securityServerUrl: string; client: string; caPem?: string };
   /**
+   * The gateway's signed assertion to providers (features.gatewayAssertion, ADR-0024, M6-10):
+   * its issuer (the gateway's public URL). Without it, routes carry no rid-assertion.
+   */
+  assertion?: { issuer: string };
+  /**
    * Token of the check routes of versions in review (M4-06, RID_VALIDATION_TOKEN): only the
    * portal's validations reach them. Without it there are no check routes.
    */
@@ -572,6 +577,9 @@ export function desiredGateway(
       },
       // That 429 in problem+json; a provider's own 429 passes untouched.
       'rid-rate-limited': {},
+      // The signed assertion of what OPA authorized, for the provider entity (ADR-0024, M6-10);
+      // its key is in the plugin's metadata (ApisixReconciler.reconcileAssertionKey).
+      ...(settings.assertion ? { 'rid-assertion': { audience: v.entitySlug } } : {}),
       prometheus: { prefer_name: false },
       ...(v.deprecation
         ? { 'response-rewrite': { headers: { set: deprecationHeaders(v.deprecation) } } }

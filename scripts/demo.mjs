@@ -32,6 +32,26 @@ const {
 
 const env = (name, fallback) => process.env[name] ?? fallback;
 const RUN = Date.now().toString(36);
+
+// The country of the deployment (RID_COUNTRY, RID_CONFIG_DIR): the demo runs in any of them
+// (M6-09). Its sector, its purposes and its person document type come from its configuration.
+const { loadCountryConfig } = await import(
+  pathToFileURL(resolve(root, 'packages/config/dist/index.js')).href
+);
+const country = loadCountryConfig();
+const SECTOR = (country.sectors.find((s) => s.code === 'salud') ?? country.sectors[0]).code;
+const PURPOSE = (
+  country.purposes.find((p) => p.code === 'eligibility_check') ?? country.purposes[0]
+).code;
+const OTHER_PURPOSE = country.purposes.find((p) => p.code !== PURPOSE)?.code ?? 'not_allowed';
+const PERSON_DOCUMENT_TYPE = country.identifiers.person[0];
+/** The provider mock's OpenAPI, with the country's person document type for its data subject. */
+const providerOpenapi = () =>
+  readFileSync(resolve(root, 'infra/mock-providers/salud/openapi.yaml'), 'utf8').replace(
+    /documentType: CC$/gm,
+    `documentType: ${PERSON_DOCUMENT_TYPE}`,
+  );
+const MOCK_CONTAINER = `${env('COMPOSE_PROJECT_NAME', 'rid')}-mock-salud-1`;
 const SLUG = `afiliacion-${RUN}`;
 
 // --- Output ----------------------------------------------------------------------------------
@@ -70,22 +90,26 @@ async function callGateway(token, headers = {}) {
   return { status: res.status, reason: res.headers.get('x-rid-deny-reason'), body };
 }
 
-/** X-RID-* headers the provider (salud mock) logged for one request. */
-function providerSaw(requestId) {
-  const logs = spawnSync('docker', ['logs', '--since', '2m', 'rid-mock-salud-1'], {
+/** What the provider (salud mock) logged for one request: its log entries, by message. */
+function providerLog(requestId) {
+  const logs = spawnSync('docker', ['logs', '--since', '2m', MOCK_CONTAINER], {
     encoding: 'utf8',
   });
+  const entries = {};
   for (const line of `${logs.stdout}${logs.stderr}`.split('\n')) {
     if (!line.includes(requestId)) continue;
     try {
       const entry = JSON.parse(line);
-      if (entry.rid?.['x-request-id'] === requestId) return entry.rid;
+      if (entry.rid?.['x-request-id'] === requestId) entries[entry.msg] = entry;
     } catch {
       // not a JSON log line
     }
   }
-  return undefined;
+  return entries;
 }
+
+/** X-RID-* headers the provider logged for one request. */
+const providerSaw = (requestId) => providerLog(requestId)['request received']?.rid;
 
 // --- Script ------------------------------------------------------------------------------------
 
@@ -120,16 +144,16 @@ async function main() {
     name: `Consulta de afiliación (demo ${RUN})`,
     summary: 'Consulta el estado de afiliación de una persona al sistema de salud.',
     description: 'API de demostración con datos sintéticos.',
-    sector: 'salud',
+    sector: SECTOR,
     tags: ['afiliacion'],
     classification: 'personal',
     ownerContact: 'apis@salud.demo.rid.example',
   });
   const version = await pedro.call('POST', `/entities/${salud}/apis/${api.id}/versions`, {
     version: '1.0',
-    openapi: readFileSync(resolve(root, 'infra/mock-providers/salud/openapi.yaml'), 'utf8'),
+    openapi: providerOpenapi(),
     upstream: { type: 'node', servicePath: '/salud' },
-    allowedPurposes: ['eligibility_check'],
+    allowedPurposes: [PURPOSE],
     exposedFields: [
       { name: 'regimen', personal: true, sensitive: false },
       { name: 'estado', personal: true, sensitive: false },
@@ -207,7 +231,7 @@ async function main() {
   // denied as certificate_revoked.
   const noSubscription = await waitFor(
     async () => {
-      const r = await callGateway(token, { 'x-rid-purpose': 'eligibility_check' });
+      const r = await callGateway(token, { 'x-rid-purpose': PURPOSE });
       return r.reason === 'certificate_revoked' ? undefined : r;
     },
     { timeoutMs: 60_000, what: 'the gateway did not learn the new client certificate' },
@@ -218,11 +242,11 @@ async function main() {
   );
   ok('Credenciales listas. Con token pero sin suscripción → 403 no_subscription');
 
-  step('Solicitar acceso con finalidad eligibility_check', 'carlos.dev');
+  step(`Solicitar acceso con finalidad ${PURPOSE}`, 'carlos.dev');
   const subscription = await carlos.call('POST', `/entities/${programas}/subscriptions`, {
     applicationId: created.application.id,
     apiVersionId: version.id,
-    purposeCode: 'eligibility_check',
+    purposeCode: PURPOSE,
     purposeDetail: 'Verificar afiliación al asignar el subsidio X',
     legalBasisText: 'Ley de protección de datos personales, tratamiento para fines del trámite.',
     validityMonths: 12,
@@ -256,7 +280,7 @@ async function main() {
   step('Llamar a la API', 'terminal');
   const requestId = `demo-${RUN}`;
   const allowed = await callGateway(token, {
-    'x-rid-purpose': 'eligibility_check',
+    'x-rid-purpose': PURPOSE,
     'x-rid-end-user': 'funcionario-42',
     'x-request-id': requestId,
   });
@@ -269,10 +293,22 @@ async function main() {
   ok('Cabeceras que recibió el proveedor:');
   for (const [name, value] of Object.entries(seen)) info(`  ${name}: ${value}`);
   expect(!('x-rid-end-user' in seen), 'the provider received the official in clear');
+  if (country.features.gatewayAssertion) {
+    // The gateway's signed assertion (ADR-0024, M6-10): the provider verified it with the JWKS.
+    const checked = await waitFor(async () => providerLog(requestId)['gateway assertion'], {
+      timeoutMs: 10_000,
+      what: 'the provider did not check the gateway assertion',
+    });
+    expect(
+      checked.assertion === 'verified',
+      `the provider could not verify the gateway assertion: ${checked.assertion}`,
+    );
+    ok('El proveedor verificó la aserción firmada del gateway (X-RID-Assertion) con el JWKS');
+  }
 
   step('Finalidad incorrecta', 'terminal');
   const wrongPurpose = await callGateway(token, {
-    'x-rid-purpose': 'benefit_targeting',
+    'x-rid-purpose': OTHER_PURPOSE,
     'x-rid-end-user': 'funcionario-42',
   });
   expect(
@@ -290,7 +326,7 @@ async function main() {
   await waitFor(
     async () => {
       const r = await callGateway(token, {
-        'x-rid-purpose': 'eligibility_check',
+        'x-rid-purpose': PURPOSE,
         'x-rid-end-user': 'funcionario-42',
       });
       return r.status === 403 && r.reason === 'no_subscription';
@@ -312,8 +348,7 @@ async function main() {
     const certificateRevokedAt = Date.now();
     await waitFor(
       async () =>
-        (await callGateway(token, { 'x-rid-purpose': 'eligibility_check' })).reason ===
-        'certificate_revoked',
+        (await callGateway(token, { 'x-rid-purpose': PURPOSE })).reason === 'certificate_revoked',
       { timeoutMs: 60_000, what: 'the revoked certificate kept working' },
     );
     const after = (Date.now() - certificateRevokedAt) / 1000;
@@ -363,7 +398,7 @@ async function main() {
     { timeoutMs: 30_000, what: 'the citizen does not see the call of step 7' },
   );
   ok(
-    `${mine.consumer.entity?.shortName} consultó ${mine.api.name} para "${mine.purpose.name?.es ?? mine.purpose.code}"`,
+    `${mine.consumer.entity?.shortName} consultó ${mine.api.name} para "${mine.purpose.name?.es ?? mine.purpose.name?.en ?? mine.purpose.code}"`,
   );
   info(`  funcionario (referencia): ${mine.officialRef?.slice(0, 16)}…`);
   const receipt = await waitFor(
