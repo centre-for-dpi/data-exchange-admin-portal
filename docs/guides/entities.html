@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>Guía de entidades RID</title>
+<title>RID entity guide</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -288,180 +288,181 @@ details.faq[open] summary { color: var(--gov); }
         <circle cx="21" cy="20.5" r="3.2" fill="var(--data)"></circle>
         <path d="M8 13 H13 M13 13 L18 7 M13 13 L18 19" stroke="var(--ink)" stroke-width="1.6" fill="none"></path>
       </svg>
-      <span>Red de Intercambio de Datos <small>· guía para entidades participantes</small></span>
+      <span>Data Exchange Network <small>· guide for participating entities</small></span>
     </div>
     <span class="spacer"></span>
-    <button class="tool" id="bigtext" type="button" aria-pressed="false" title="Letra más grande para proyectar">Modo proyección</button>
+    <button class="tool" id="bigtext" type="button" aria-pressed="false" title="Larger text for projecting">Presentation mode</button>
   </div>
 </div>
 
 <header class="hero">
   <div class="hero-inner">
-    <span class="eyebrow">Jornada de incorporación · miércoles 18 de noviembre de 2026</span>
-    <h1>Lo que cada entidad designa, dispone y hace para conectarse</h1>
-    <p class="lede">Como proveedora de datos, como consumidora o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso. Las proveedoras tienen además su propia guía, en el repositorio del kit.</p>
+    <span class="eyebrow">Onboarding day · Wednesday, November 18, 2026</span>
+    <h1>What each entity appoints, provides and does to connect</h1>
+    <p class="lede">As a data provider, as a consumer, or as both. The national operator runs the central platform (portal and gateway): the entity installs none of it. Providers also have their own guide, in the kit repository.</p>
     <div class="meta">
-      <span><b>Para</b> los equipos de TI y de datos de cada entidad</span>
-      <span><b>Versión</b> 1.2 · noviembre 2026</span>
+      <span><b>For</b> each entity's IT and data teams</span>
+      <span><b>Version</b> 1.2 · November 2026</span>
+      <span><a href="../es/guides/entities.html" hreflang="es" lang="es">Versión en español</a></span>
     </div>
   </div>
 </header>
 
 <div class="shell">
-  <nav class="toc" aria-label="Contenido">
-    <p>Antes de la jornada</p>
+  <nav class="toc" aria-label="Contents">
+    <p>Before the day</p>
     <ol>
-      <li><a href="#que-significa">1. Qué significa</a></li>
-      <li><a href="#personas">2. Personas a designar</a></li>
-      <li><a href="#consumidora">3. Como consumidora</a></li>
-      <li><a href="#proveedora">4. Como proveedora</a></li>
-      <li><a href="#preparacion">5. Lista de preparación</a></li>
+      <li><a href="#que-significa">1. What it means</a></li>
+      <li><a href="#personas">2. People to appoint</a></li>
+      <li><a href="#consumidora">3. As a consumer</a></li>
+      <li><a href="#proveedora">4. As a provider</a></li>
+      <li><a href="#preparacion">5. Readiness checklist</a></li>
     </ol>
-    <p>Durante la jornada</p>
+    <p>On the day</p>
     <ol>
-      <li><a href="#verificar">6. Verificar la red</a></li>
-      <li><a href="#alta">7. Alta de la entidad</a></li>
-      <li><a href="#publicar">8. Publicar una API</a></li>
-      <li><a href="#consultar">9. Primera consulta</a></li>
+      <li><a href="#verificar">6. Check the network</a></li>
+      <li><a href="#alta">7. Registering the entity</a></li>
+      <li><a href="#publicar">8. Publishing an API</a></li>
+      <li><a href="#consultar">9. First request</a></li>
     </ol>
-    <p>Referencia</p>
+    <p>Reference</p>
     <ol>
-      <li><a href="#negaciones">10. Por qué se niega una llamada</a></li>
-      <li><a href="#compromisos">11. Compromisos</a></li>
-      <li><a href="#contactos">12. Contactos</a></li>
+      <li><a href="#negaciones">10. Why a call is rejected</a></li>
+      <li><a href="#compromisos">11. Commitments</a></li>
+      <li><a href="#contactos">12. Contacts</a></li>
     </ol>
   </nav>
 
   <main>
     <details class="toc-mobile">
-      <summary>Contenido</summary>
+      <summary>Contents</summary>
       <ol>
-        <li><a href="#que-significa">Qué significa</a></li>
-        <li><a href="#personas">Personas a designar</a></li>
-        <li><a href="#consumidora">Como consumidora</a></li>
-        <li><a href="#proveedora">Como proveedora</a></li>
-        <li><a href="#preparacion">Lista de preparación</a></li>
-        <li><a href="#verificar">Verificar la red</a></li>
-        <li><a href="#alta">Alta de la entidad</a></li>
-        <li><a href="#publicar">Publicar una API</a></li>
-        <li><a href="#consultar">Primera consulta</a></li>
-        <li><a href="#negaciones">Por qué se niega una llamada</a></li>
-        <li><a href="#compromisos">Compromisos</a></li>
-        <li><a href="#contactos">Contactos</a></li>
+        <li><a href="#que-significa">What it means</a></li>
+        <li><a href="#personas">People to appoint</a></li>
+        <li><a href="#consumidora">As a consumer</a></li>
+        <li><a href="#proveedora">As a provider</a></li>
+        <li><a href="#preparacion">Readiness checklist</a></li>
+        <li><a href="#verificar">Check the network</a></li>
+        <li><a href="#alta">Registering the entity</a></li>
+        <li><a href="#publicar">Publishing an API</a></li>
+        <li><a href="#consultar">First request</a></li>
+        <li><a href="#negaciones">Why a call is rejected</a></li>
+        <li><a href="#compromisos">Commitments</a></li>
+        <li><a href="#contactos">Contacts</a></li>
       </ol>
     </details>
 
     <section id="que-significa">
-      <div class="part">Antes de la jornada</div>
-      <h2><span class="num">1</span>Qué significa para una entidad</h2>
+      <div class="part">Before the day</div>
+      <h2><span class="num">1</span>What it means for an entity</h2>
       <div class="principles">
-        <div class="principle"><b>Como proveedora</b><span>Publica una API sobre sus datos. Su <b>responsable de datos</b> decide quién accede, para qué finalidad, a qué operaciones y por cuánto tiempo. Sabe en cada consulta quién la hizo y para qué. Los datos nunca se copian a la plataforma.</span></div>
-        <div class="principle"><b>Como consumidora</b><span>Encuentra APIs en el catálogo, crea una aplicación con sus credenciales y pide acceso declarando una <b>finalidad</b>. Cuando el proveedor aprueba, sus sistemas consultan a través del gateway.</span></div>
-        <div class="principle"><b>Ante el ciudadano</b><span>El ciudadano ve qué entidad consultó sus datos y para qué. Cada consulta debe responder a una finalidad legítima y declarada.</span></div>
+        <div class="principle"><b>As a provider</b><span>It publishes an API over its data. Its <b>data steward</b> decides who gets access, for what purpose, to which operations and for how long. For every request, it knows who made it and why. The data is never copied to the platform.</span></div>
+        <div class="principle"><b>As a consumer</b><span>It finds APIs in the catalog, creates an application with its credentials and requests access by declaring a <b>purpose</b>. Once the provider approves, its systems send requests through the gateway.</span></div>
+        <div class="principle"><b>Toward citizens</b><span>Citizens see which entity queried their data and why. Every request must serve a legitimate, declared purpose.</span></div>
       </div>
     </section>
 
     <section id="personas">
-      <h2><span class="num">2</span>Personas que la entidad debe designar</h2>
+      <h2><span class="num">2</span>People the entity must appoint</h2>
       <div class="roles">
-        <div class="role"><header><code>entity_admin</code></header><span class="who">Jefe de TI o de la oficina de datos</span><p>Pide el alta de la entidad, invita a su gente, asigna roles y gestiona los nodos del kit.</p></div>
-        <div class="role"><header><code>data_steward</code><span class="tag mfa">2.º factor obligatorio</span></header><span class="who">Responsable de datos (designación formal)</span><p>Aprueba, rechaza, suspende y revoca accesos a las APIs de la entidad.</p></div>
-        <div class="role"><header><code>api_publisher</code></header><span class="who">Responsable técnico</span><p>Registra las APIs y las envía a revisión.</p></div>
-        <div class="role"><header><code>app_developer</code></header><span class="who">Desarrollador del sistema consumidor</span><p>Crea aplicaciones, maneja credenciales y pide accesos.</p></div>
+        <div class="role"><header><code>entity_admin</code></header><span class="who">Head of IT or of the data office</span><p>Requests the entity's registration, invites its people, assigns roles and manages the kit's nodes.</p></div>
+        <div class="role"><header><code>data_steward</code><span class="tag mfa">2nd factor required</span></header><span class="who">Data steward (formal appointment)</span><p>Approves, rejects, suspends and revokes access to the entity's APIs.</p></div>
+        <div class="role"><header><code>api_publisher</code></header><span class="who">Technical lead</span><p>Registers the APIs and submits them for review.</p></div>
+        <div class="role"><header><code>app_developer</code></header><span class="who">Developer of the consumer system</span><p>Creates applications, manages credentials and requests access.</p></div>
       </div>
       <ul class="ticks">
-        <li>Cada persona necesita un <b>correo institucional propio</b>: la cuenta se verifica por correo y las invitaciones llegan a esa dirección.</li>
-        <li>El segundo factor se configura con una app autenticadora (FreeOTP, Aegis, Google Authenticator u otra TOTP) en el teléfono de la persona.</li>
-        <li><b>Documento:</b> el acto de designación del responsable de datos y del responsable técnico, en PDF. Se adjunta en la solicitud de alta.</li>
+        <li>Each person needs their <b>own institutional email address</b>: the account is verified by email, and invitations are sent to that address.</li>
+        <li>The second factor is set up with an authenticator app (FreeOTP, Aegis, Google Authenticator or any other TOTP app) on the person's phone.</li>
+        <li><b>Document:</b> the act appointing the data steward and the technical lead, as a PDF. It is attached to the registration request.</li>
       </ul>
     </section>
 
     <section id="consumidora">
-      <h2><span class="num">3</span>Lo que dispone una consumidora</h2>
+      <h2><span class="num">3</span>What a consumer provides</h2>
       <div class="tablewrap">
         <table class="t">
-          <thead><tr><th>Qué</th><th>Detalle</th></tr></thead>
+          <thead><tr><th>What</th><th>Details</th></tr></thead>
           <tbody>
-            <tr><td>Sistema consumidor</td><td class="wrap">El servidor o la aplicación que hará las consultas. Debe hacer HTTPS con <b>certificado de cliente</b> (mTLS): cualquier lenguaje moderno lo permite (curl, Java, .NET, Python, Node).</td></tr>
-            <tr><td>Salida a internet</td><td class="wrap"><code>443/tcp</code> hacia el nombre del gateway y el nombre del portal.</td></tr>
-            <tr><td>Lugar para secretos</td><td class="wrap">La llave privada del certificado y el secreto de la aplicación: nunca en el código ni en un repositorio.</td></tr>
-            <tr><td><code>openssl</code></td><td class="wrap">Para generar la llave y la solicitud de certificado (CSR). La llave <b>nunca sale</b> del servidor de la entidad.</td></tr>
-            <tr><td>Funcionario</td><td class="wrap">Las APIs con datos personales exigen <code>X-RID-End-User</code>: el usuario o el correo institucional de quien consulta. Solo se registra como hash.</td></tr>
+            <tr><td>Consumer system</td><td class="wrap">The server or application that will send the requests. It must make HTTPS calls with a <b>client certificate</b> (mTLS): any modern language can (curl, Java, .NET, Python, Node).</td></tr>
+            <tr><td>Outbound internet</td><td class="wrap"><code>443/tcp</code> to the gateway name and the portal name.</td></tr>
+            <tr><td>A place for secrets</td><td class="wrap">The certificate's private key and the application secret: never in code or in a repository.</td></tr>
+            <tr><td><code>openssl</code></td><td class="wrap">To generate the private key and the certificate signing request (CSR). The private key <b>never leaves</b> the entity's server.</td></tr>
+            <tr><td>Official</td><td class="wrap">APIs with personal data require <code>X-RID-End-User</code>: the username or institutional email of the person making the request. It is only recorded as a hash.</td></tr>
           </tbody>
         </table>
       </div>
     </section>
 
     <section id="proveedora">
-      <h2><span class="num">4</span>Lo que dispone una proveedora</h2>
-      <p>Toda proveedora se conecta por medio del <b>nodo</b>, que se instala dentro de su red y abre un túnel cifrado <b>hacia afuera</b>: salida <code>51820/udp</code> y <code>443/tcp</code>, ningún puerto de entrada. Detrás del nodo va la API propia de la entidad (modo canal) o APIs instantáneas sobre vistas de su base de datos (modo completo: SQL Server, PostgreSQL, MySQL u Oracle). Las entidades que ya publican en X-Road llegan por el Security Server del operador.</p>
+      <h2><span class="num">4</span>What a provider provides</h2>
+      <p>Every provider connects through the <b>node</b>, which is installed inside its network and opens an encrypted tunnel <b>outbound</b>: outbound <code>51820/udp</code> and <code>443/tcp</code>, no inbound ports. Behind the node sits either the entity's own API (<code>canal</code> mode) or instant APIs over views in its database (<code>completo</code> mode: SQL Server, PostgreSQL, MySQL or Oracle). Entities that already publish on X-Road come in through the operator's Security Server.</p>
       <div class="callout info">
-        <b>Guía de proveedoras</b>
-        <p>Los requisitos del servidor y de la red, la instalación del nodo, la publicación de una API y lo que recibe el servicio en cada consulta están en la guía de proveedoras del repositorio del kit: <code>docs/guias/proveedoras.md</code>, con su versión para proyectar <code>proveedoras.html</code>.</p>
+        <b>Provider guide</b>
+        <p>The server and network requirements, installing the node, publishing an API and what the service receives with each request are in the provider guide in the kit repository: <code>docs/guides/providers.md</code>, with its presentation version <code>providers.html</code>.</p>
       </div>
       <div class="callout info">
-        <b>La aserción firmada del gateway</b>
-        <p>Si el país la tiene activada, cada consulta llega con <code>X-RID-Assertion</code>: un JWS ES256 del gateway con quién consulta, para qué, con qué suscripción y a qué petición corresponde (método, hash de la ruta y, si hay, del cuerpo). La entidad puede guardarla como prueba. Se verifica con el JWKS de la red, <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, comprobando la firma, <code>aud</code> (la entidad), <code>iss</code> (el gateway), <code>exp</code>, los hashes de la petición recibida (el del cuerpo en todo POST, PUT y PATCH, y en cualquier otra petición que traiga cuerpo, también un GET o un DELETE, sea cual sea su tipo; se calcula sobre los bytes tal como llegaron, antes de interpretarlos) y que el <code>jti</code> no se repita. Los ejemplos en Node.js y Python están en <code>docs/guias/entidades.md</code> (§3.2).</p>
+        <b>The gateway's signed assertion</b>
+        <p>If the country has it enabled, every request arrives with <code>X-RID-Assertion</code>: an ES256 JWS from the gateway stating who is making the request, what for, under which subscription and which request it belongs to (the method, the hash of the path and, if there is one, of the body). The entity can keep it as proof. It is verified with the network's JWKS, <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, by checking the signature, <code>aud</code> (the entity), <code>iss</code> (the gateway), <code>exp</code>, the hashes of the request received (the body hash on every POST, PUT and PATCH, and on any other request that carries a body, a GET or a DELETE too, whatever its type; it is computed over the bytes exactly as they arrived, before parsing them) and that the <code>jti</code> is not repeated. The Node.js and Python examples are in <code>docs/guides/entities.md</code> (§3.2).</p>
       </div>
     </section>
 
     <section id="preparacion">
-      <h2><span class="num">5</span>Lista de preparación</h2>
-      <p>El portal lleva esta lista por entidad (Mi entidad → Preparación del bootcamp) y el operador ve el avance de todas. Aquí puedes marcarla para tu propio control.</p>
+      <h2><span class="num">5</span>Readiness checklist</h2>
+      <p>The portal keeps this checklist for each entity (My entity → Bootcamp readiness), and the operator sees the progress of all of them. You can tick it here for your own tracking.</p>
       <div class="check" id="pre">
-        <label><input type="checkbox" id="pre-1"><span><b>Servidor</b> disponible: el sistema consumidor, o el del nodo.</span></label>
-        <label><input type="checkbox" id="pre-2"><span><b>Usuario de solo lectura</b> en la base de datos (solo proveedoras con el modo completo del nodo).</span></label>
-        <label><input type="checkbox" id="pre-3"><span><b>Salida 443</b> hacia el gateway, y UDP 51820 para el nodo de una proveedora.</span></label>
-        <label><input type="checkbox" id="pre-4"><span><b>Responsables designados.</b> El portal lo marca solo cuando hay un <code>api_publisher</code> y un <code>data_steward</code> activos.</span></label>
-        <label><input type="checkbox" id="pre-5"><span><b>Caso de uso</b> definido: qué dato, para qué finalidad, con qué base legal y entre qué entidades.</span></label>
+        <label><input type="checkbox" id="pre-1"><span><b>Server</b> available: the consumer system, or the node's server.</span></label>
+        <label><input type="checkbox" id="pre-2"><span><b>Read-only user</b> in the database (only providers using the node's <code>completo</code> mode).</span></label>
+        <label><input type="checkbox" id="pre-3"><span><b>Outbound 443</b> to the gateway, and UDP 51820 for a provider's node.</span></label>
+        <label><input type="checkbox" id="pre-4"><span><b>Appointed leads.</b> The portal ticks this on its own once there is an active <code>api_publisher</code> and an active <code>data_steward</code>.</span></label>
+        <label><input type="checkbox" id="pre-5"><span><b>Use case</b> defined: which data, for what purpose, on what legal basis and between which entities.</span></label>
       </div>
     </section>
 
     <section id="verificar">
-      <div class="part">Durante la jornada</div>
-      <h2><span class="num">6</span>Verificar la red desde el servidor de la entidad</h2>
-      <p>El operador entrega los dos nombres de la plataforma, el del <b>portal</b> y el del <b>gateway</b>, y el script <code>entity-check.sh</code>. Solo necesita <code>bash</code>, <code>curl</code> y <code>openssl</code>. Se ejecuta en el servidor que hará las consultas, o en el del nodo.</p>
-      <div class="code"><button class="copy" type="button">Copiar</button><pre><code>chmod +x entity-check.sh
+      <div class="part">On the day</div>
+      <h2><span class="num">6</span>Check the network from the entity's server</h2>
+      <p>The operator hands out the platform's two names, the <b>portal</b>'s and the <b>gateway</b>'s, and the <code>entity-check.sh</code> script. It only needs <code>bash</code>, <code>curl</code> and <code>openssl</code>. Run it on the server that will send the requests, or on the node's server.</p>
+      <div class="code"><button class="copy" type="button">Copy</button><pre><code>chmod +x entity-check.sh
 ./entity-check.sh check &lt;portal&gt; &lt;gateway&gt;</code></pre></div>
-      <p>Comprueba el DNS, la salida HTTPS al portal y al gateway, y que el certificado del gateway verifica contra la raíz de la red. Deja la raíz en <code>./rid-network-ca.pem</code>.</p>
+      <p>It checks DNS, outbound HTTPS to the portal and to the gateway, and that the gateway's certificate verifies against the network's root. It saves the root to <code>./rid-network-ca.pem</code>.</p>
     </section>
 
     <section id="alta">
-      <h2><span class="num">7</span>Alta de la entidad y de su gente</h2>
+      <h2><span class="num">7</span>Registering the entity and its people</h2>
       <ol class="steps">
-        <li><span>El futuro <code>entity_admin</code> entra a <code>https://&lt;portal&gt;</code>, crea su cuenta y confirma el correo.</span></li>
-        <li><span>Pide el alta de la entidad: datos, responsables designados y documento de designación. El operador la revisa y la aprueba. Si la entidad ya está incorporada por un acto formal, el operador la da de alta directamente.</span></li>
-        <li><span>El <code>entity_admin</code> invita a cada persona a su correo y le asigna roles. Cada invitado crea su cuenta con <b>ese mismo correo</b> y acepta la invitación.</span></li>
-        <li><span>El <code>data_steward</code> configura su segundo factor la primera vez que el portal lo pide.</span></li>
+        <li><span>The future <code>entity_admin</code> goes to <code>https://&lt;portal&gt;</code>, creates an account and confirms the email address.</span></li>
+        <li><span>They request the entity's registration: its details, the appointed leads and the appointment document. The operator reviews and approves it. If the entity has already been onboarded by a formal act, the operator registers it directly.</span></li>
+        <li><span>The <code>entity_admin</code> invites each person by email and assigns their roles. Each invitee creates an account with <b>that same email address</b> and accepts the invitation.</span></li>
+        <li><span>The <code>data_steward</code> sets up the second factor the first time the portal asks for it.</span></li>
       </ol>
     </section>
 
     <section id="publicar">
-      <h2><span class="num">8</span>Entidad proveedora: instalar el nodo y publicar una API</h2>
-      <div class="flow" aria-label="Estados de una API">
-        <span class="st">borrador</span><span class="arrow">→</span>
-        <span class="st">en revisión</span><span class="arrow">→</span>
-        <span class="st">aprobada por el operador</span><span class="arrow">→</span>
-        <span class="st opt">aprobada por el regulador · si es sensible</span><span class="arrow">→</span>
-        <span class="st goal">publicada</span>
+      <h2><span class="num">8</span>Provider entity: install the node and publish an API</h2>
+      <div class="flow" aria-label="States of an API">
+        <span class="st">draft</span><span class="arrow">→</span>
+        <span class="st">in review</span><span class="arrow">→</span>
+        <span class="st">approved by the operator</span><span class="arrow">→</span>
+        <span class="st opt">approved by the regulator · if sensitive</span><span class="arrow">→</span>
+        <span class="st goal">published</span>
       </div>
       <div class="callout info">
-        <b>Guía de proveedoras</b>
-        <p>El token de enrolamiento, la instalación del nodo, la publicación de la API con su sandbox y la revisión están paso a paso en la guía de proveedoras del repositorio del kit.</p>
+        <b>Provider guide</b>
+        <p>The enrollment token, installing the node, publishing the API with its sandbox, and the review are covered step by step in the provider guide in the kit repository.</p>
       </div>
     </section>
 
     <section id="consultar">
-      <h2><span class="num">9</span>Entidad consumidora: primera consulta</h2>
+      <h2><span class="num">9</span>Consumer entity: first request</h2>
       <figure>
         <div class="figscroll">
-          <svg viewBox="0 0 1000 500" role="img" aria-label="El sistema consumidor pide un token al gateway con su certificado y su secreto; Keycloak lo emite ligado al certificado por 5 minutos. Luego llama al gateway con el certificado, el token, la finalidad y el funcionario. El gateway pregunta a OPA; si OPA permite, reenvía al proveedor con las cabeceras de trazabilidad, y la respuesta vuelve sin guardarse.">
+          <svg viewBox="0 0 1000 500" role="img" aria-label="The consumer system requests a token from the gateway with its certificate and its secret; Keycloak issues it, bound to the certificate, for 5 minutes. It then calls the gateway with the certificate, the token, the purpose and the official. The gateway asks OPA; if OPA allows it, the gateway forwards the request to the provider with the traceability headers, and the response comes back without being stored.">
             <defs>
               <marker id="s-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ah"></path></marker>
               <marker id="s-ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahd"></path></marker>
             </defs>
             <rect x="30" y="14" width="150" height="44" rx="6" class="d-box"></rect>
-            <text x="105" y="41" text-anchor="middle" class="d-tb">Sistema consumidor</text>
+            <text x="105" y="41" text-anchor="middle" class="d-tb">Consumer system</text>
             <rect x="255" y="14" width="150" height="44" rx="6" class="d-data"></rect>
             <text x="330" y="41" text-anchor="middle" class="d-tb">Gateway</text>
             <rect x="455" y="14" width="130" height="44" rx="6" class="d-gov"></rect>
@@ -469,7 +470,7 @@ details.faq[open] summary { color: var(--gov); }
             <rect x="635" y="14" width="130" height="44" rx="6" class="d-data"></rect>
             <text x="700" y="41" text-anchor="middle" class="d-tb">OPA</text>
             <rect x="825" y="14" width="150" height="44" rx="6" class="d-box"></rect>
-            <text x="900" y="41" text-anchor="middle" class="d-tb">Proveedor</text>
+            <text x="900" y="41" text-anchor="middle" class="d-tb">Provider</text>
             <line x1="105" y1="58" x2="105" y2="490" class="d-life"></line>
             <line x1="330" y1="58" x2="330" y2="490" class="d-life"></line>
             <line x1="520" y1="58" x2="520" y2="490" class="d-life"></line>
@@ -478,92 +479,92 @@ details.faq[open] summary { color: var(--gov); }
             <text x="40" y="95" class="d-cap">1 · TOKEN</text>
             <line x1="105" y1="112" x2="328" y2="112" class="d-line" marker-end="url(#s-ah)"></line>
             <text x="217" y="105" text-anchor="middle" class="d-lab">POST /oauth/token</text>
-            <text x="217" y="128" text-anchor="middle" class="d-ts">certificado + secreto</text>
+            <text x="217" y="128" text-anchor="middle" class="d-ts">certificate + secret</text>
             <line x1="330" y1="150" x2="518" y2="150" class="d-line" marker-end="url(#s-ah)"></line>
-            <text x="425" y="143" text-anchor="middle" class="d-ts">con el certificado verificado</text>
+            <text x="425" y="143" text-anchor="middle" class="d-ts">with the verified certificate</text>
             <line x1="520" y1="185" x2="107" y2="185" class="d-dash" marker-end="url(#s-ah)"></line>
-            <text x="312" y="178" text-anchor="middle" class="d-ts">token de 5 minutos, ligado al certificado</text>
-            <text x="40" y="228" class="d-cap">2 · CONSULTA</text>
+            <text x="312" y="178" text-anchor="middle" class="d-ts">5-minute token, bound to the certificate</text>
+            <text x="40" y="228" class="d-cap">2 · REQUEST</text>
             <line x1="105" y1="248" x2="328" y2="248" class="d-strong" marker-end="url(#s-ahd)"></line>
-            <text x="217" y="241" text-anchor="middle" class="d-lab">GET /&lt;entidad&gt;/&lt;api&gt;/v1/…</text>
-            <text x="217" y="264" text-anchor="middle" class="d-ts">certificado + token</text>
+            <text x="217" y="241" text-anchor="middle" class="d-lab">GET /&lt;entity&gt;/&lt;api&gt;/v1/…</text>
+            <text x="217" y="264" text-anchor="middle" class="d-ts">certificate + token</text>
             <text x="217" y="279" text-anchor="middle" class="d-ts">X-RID-Purpose · X-RID-End-User</text>
             <line x1="330" y1="300" x2="698" y2="300" class="d-line" marker-end="url(#s-ah)"></line>
-            <text x="515" y="293" text-anchor="middle" class="d-ts">¿se permite? (suscripción, finalidad, operación, certificado)</text>
+            <text x="515" y="293" text-anchor="middle" class="d-ts">allowed? (subscription, purpose, operation, certificate)</text>
             <line x1="700" y1="335" x2="332" y2="335" class="d-dash" marker-end="url(#s-ah)"></line>
-            <text x="515" y="328" text-anchor="middle" class="d-ts">sí + cabeceras de trazabilidad · o 403 con su razón</text>
+            <text x="515" y="328" text-anchor="middle" class="d-ts">yes + traceability headers · or 403 with its reason</text>
             <line x1="330" y1="375" x2="898" y2="375" class="d-strong" marker-end="url(#s-ahd)"></line>
-            <text x="615" y="368" text-anchor="middle" class="d-ts">consulta + quién, para qué, con qué suscripción</text>
+            <text x="615" y="368" text-anchor="middle" class="d-ts">request + who, what for, under which subscription</text>
             <line x1="900" y1="415" x2="332" y2="415" class="d-dash" marker-end="url(#s-ah)"></line>
-            <text x="615" y="408" text-anchor="middle" class="d-ts">respuesta</text>
+            <text x="615" y="408" text-anchor="middle" class="d-ts">response</text>
             <line x1="330" y1="455" x2="107" y2="455" class="d-strong" marker-end="url(#s-ahd)"></line>
-            <text x="217" y="448" text-anchor="middle" class="d-ts">respuesta (no se guarda)</text>
+            <text x="217" y="448" text-anchor="middle" class="d-ts">response (not stored)</text>
           </svg>
         </div>
-        <figcaption>Dos pasos para el sistema consumidor: pedir el token con su certificado y llamar con ese token, la finalidad y el funcionario. Un token robado no sirve sin la llave privada.</figcaption>
+        <figcaption>Two steps for the consumer system: request the token with its certificate, then call with that token, the purpose and the official. A stolen token is useless without the private key.</figcaption>
       </figure>
 
       <ol class="steps">
-        <li><span><b>Probar en sandbox primero.</b> El <code>app_developer</code> crea una aplicación de tipo <b>sandbox</b>. Sus solicitudes a APIs con sandbox se aprueban al instante y llaman a <code>/sandbox/…</code>, con datos sintéticos.</span></li>
-        <li><span><b>Guardar el secreto</b> que se muestra al crear la aplicación: se ve una sola vez.</span></li>
-        <li><span><b>Certificado de la aplicación</b>, en el servidor de la entidad. Pega la CSR en la ficha de la aplicación → Certificado de cliente (mTLS), descarga el certificado y guárdalo como <code>&lt;client_id&gt;.crt</code> junto a la llave.
-          <div class="code" style="margin-top:8px"><button class="copy" type="button">Copiar</button><pre><code>./entity-check.sh csr &lt;client_id&gt;   # crea &lt;client_id&gt;.key (600) y &lt;client_id&gt;.csr</code></pre></div></span></li>
-        <li><span><b>Pedir acceso:</b> en el catálogo, la API → Solicitar acceso. Elige la aplicación, la finalidad, el detalle, la base legal, las operaciones, la vigencia y el acuerdo de intercambio. En producción la aprueba el <code>data_steward</code> del proveedor, y el regulador si es sensible.</span></li>
-        <li><span><b>Llamar.</b> El script pide el token, hace la consulta con <code>X-RID-Purpose</code> y <code>X-RID-End-User</code>, y explica la respuesta. Las URL exactas están en la ficha de la API y en la de la suscripción.
-          <div class="code" style="margin-top:8px"><button class="copy" type="button">Copiar</button><pre><code>CLIENT_SECRET=... ./entity-check.sh call &lt;portal&gt; &lt;gateway&gt; &lt;client_id&gt; \
-  /sandbox/&lt;entidad&gt;/&lt;api&gt;/v1/&lt;recurso&gt; &lt;finalidad&gt; &lt;funcionario&gt;</code></pre></div></span></li>
-        <li><span>Con la aplicación de <b>producción</b> se repiten los pasos 2 a 5 con la ruta real (sin <code>/sandbox</code>), una vez aprobada la solicitud.</span></li>
+        <li><span><b>Try the sandbox first.</b> The <code>app_developer</code> creates an application of type <b>sandbox</b>. Its requests for access to APIs that have a sandbox are approved instantly, and it calls <code>/sandbox/…</code>, with synthetic data.</span></li>
+        <li><span><b>Save the secret</b> shown when the application is created: it is shown only once.</span></li>
+        <li><span><b>Application certificate</b>, on the entity's server. Paste the CSR into the application's page → Client certificate (mTLS), download the certificate and save it as <code>&lt;client_id&gt;.crt</code> next to the private key.
+          <div class="code" style="margin-top:8px"><button class="copy" type="button">Copy</button><pre><code>./entity-check.sh csr &lt;client_id&gt;   # creates &lt;client_id&gt;.key (600) and &lt;client_id&gt;.csr</code></pre></div></span></li>
+        <li><span><b>Request access:</b> in the catalog, open the API → Request access. Choose the application, the purpose, the details, the legal basis, the operations, the validity period and the data exchange agreement. In production, the provider's <code>data_steward</code> approves it, and the regulator too if the data is sensitive.</span></li>
+        <li><span><b>Call.</b> The script requests the token, sends the request with <code>X-RID-Purpose</code> and <code>X-RID-End-User</code>, and explains the response. The exact URLs are on the API's page and on the subscription's page.
+          <div class="code" style="margin-top:8px"><button class="copy" type="button">Copy</button><pre><code>CLIENT_SECRET=... ./entity-check.sh call &lt;portal&gt; &lt;gateway&gt; &lt;client_id&gt; \
+  /sandbox/&lt;entity&gt;/&lt;api&gt;/v1/&lt;resource&gt; &lt;purpose&gt; &lt;official&gt;</code></pre></div></span></li>
+        <li><span>With the <b>production</b> application, repeat steps 2 to 5 with the real path (without <code>/sandbox</code>), once the request is approved.</span></li>
       </ol>
       <div class="callout info">
-        <b>Guía de integración en el portal</b>
-        <p>La página de cada aplicación trae un programa completo en curl, Python, Node.js, Java y C#: pide el token con el certificado y llama con las cabeceras de la red. El secreto se lee de la variable <code>RID_CLIENT_SECRET</code>, nunca del código.</p>
+        <b>Integration guide in the portal</b>
+        <p>Each application's page includes a complete program in curl, Python, Node.js, Java and C#: it requests the token with the certificate and calls with the network's headers. The secret is read from the <code>RID_CLIENT_SECRET</code> variable, never from the code.</p>
       </div>
     </section>
 
     <section id="negaciones">
-      <div class="part">Referencia</div>
-      <h2><span class="num">10</span>Por qué el gateway niega una llamada</h2>
-      <p>Responde <code>403</code> con <code>application/problem+json</code> y un campo <code>code</code> estable.</p>
+      <div class="part">Reference</div>
+      <h2><span class="num">10</span>Why the gateway rejects a call</h2>
+      <p>It responds with <code>403</code>, <code>application/problem+json</code> and a stable <code>code</code> field.</p>
       <div class="tablewrap">
         <table class="t">
-          <thead><tr><th><code>code</code></th><th>Qué significa</th><th>Qué hacer</th></tr></thead>
+          <thead><tr><th><code>code</code></th><th>What it means</th><th>What to do</th></tr></thead>
           <tbody>
-            <tr><td><code>no_subscription</code></td><td class="wrap">La aplicación no tiene acceso activo a esa versión</td><td class="wrap">Pedir acceso, o esperar la aprobación ("Aprobada, activándose" tarda segundos)</td></tr>
-            <tr><td><code>purpose_not_allowed</code></td><td class="wrap">Falta <code>X-RID-Purpose</code> o no es la finalidad aprobada</td><td class="wrap">Enviar el código de finalidad de la suscripción</td></tr>
-            <tr><td><code>operation_not_allowed</code></td><td class="wrap">La suscripción no cubre esa operación</td><td class="wrap">Pedir acceso a esa operación</td></tr>
-            <tr><td><code>end_user_required</code><br><code>end_user_invalid</code></td><td class="wrap">Falta <code>X-RID-End-User</code> o es inválido (1 a 128 caracteres visibles, sin espacios)</td><td class="wrap">Enviar el usuario institucional del funcionario</td></tr>
-            <tr><td><code>client_certificate_required</code><br><code>certificate_mismatch</code><br><code>certificate_revoked</code></td><td class="wrap">Sin certificado, el de otra aplicación o uno revocado</td><td class="wrap">Usar el certificado vigente de <b>esa</b> aplicación</td></tr>
-            <tr><td><code>token_not_bound</code></td><td class="wrap">El token no está ligado al certificado</td><td class="wrap">Pedir el token en <code>https://&lt;gateway&gt;/oauth/token</code> con el certificado</td></tr>
-            <tr><td><code>environment_mismatch</code></td><td class="wrap">Aplicación sandbox en una ruta real, o al revés</td><td class="wrap">Usar la ruta del tipo de aplicación</td></tr>
-            <tr><td><code>subscription_expired</code><br><code>app_suspended</code></td><td class="wrap">Venció la vigencia o la aplicación está suspendida</td><td class="wrap">Renovar la solicitud o hablar con el operador</td></tr>
+            <tr><td><code>no_subscription</code></td><td class="wrap">The application has no active access to that version</td><td class="wrap">Request access, or wait for approval ("Approved (activating)" takes a few seconds)</td></tr>
+            <tr><td><code>purpose_not_allowed</code></td><td class="wrap"><code>X-RID-Purpose</code> is missing or is not the approved purpose</td><td class="wrap">Send the subscription's purpose code</td></tr>
+            <tr><td><code>operation_not_allowed</code></td><td class="wrap">The subscription does not cover that operation</td><td class="wrap">Request access to that operation</td></tr>
+            <tr><td><code>end_user_required</code><br><code>end_user_invalid</code></td><td class="wrap"><code>X-RID-End-User</code> is missing or invalid (1 to 128 visible characters, no spaces)</td><td class="wrap">Send the official's institutional username</td></tr>
+            <tr><td><code>client_certificate_required</code><br><code>certificate_mismatch</code><br><code>certificate_revoked</code></td><td class="wrap">No certificate, another application's certificate, or a revoked one</td><td class="wrap">Use the current certificate of <b>that</b> application</td></tr>
+            <tr><td><code>token_not_bound</code></td><td class="wrap">The token is not bound to the certificate</td><td class="wrap">Request the token from <code>https://&lt;gateway&gt;/oauth/token</code> with the certificate</td></tr>
+            <tr><td><code>environment_mismatch</code></td><td class="wrap">A sandbox application on a real path, or the other way round</td><td class="wrap">Use the path that matches the application type</td></tr>
+            <tr><td><code>subscription_expired</code><br><code>app_suspended</code></td><td class="wrap">The validity period ended or the application is suspended</td><td class="wrap">Renew the request or talk to the operator</td></tr>
           </tbody>
         </table>
       </div>
       <div class="legend">
-        <span class="tag warn">401</span><span>token vencido o inválido (dura 5 minutos)</span>
-        <span class="tag plain">404</span><span>no hay API publicada en esa ruta</span>
-        <span class="tag bad">429</span><span>límite de la suscripción alcanzado</span>
+        <span class="tag warn">401</span><span>token expired or invalid (it lasts 5 minutes)</span>
+        <span class="tag plain">404</span><span>no API published at that path</span>
+        <span class="tag bad">429</span><span>the subscription's limit was reached</span>
       </div>
     </section>
 
     <section id="compromisos">
-      <h2><span class="num">11</span>Compromisos de la entidad</h2>
+      <h2><span class="num">11</span>The entity's commitments</h2>
       <div class="guar">
-        <div><b>Finalidad real</b><span>Solo consultar para la finalidad declarada y aprobada. Cada consulta queda en la bitácora y el ciudadano la ve.</span></div>
-        <div><b>Funcionario identificado</b><span>Enviar en <code>X-RID-End-User</code> a la persona que realmente consulta.</span></div>
-        <div><b>Credenciales protegidas</b><span>La llave privada y el secreto no se comparten ni se suben a repositorios. Ante una sospecha, se revocan desde la ficha de la aplicación.</span></div>
-        <div><b>Certificados al día</b><span>Duran 90 días, con aviso a los 15. Se emite otro antes de que venza: el anterior sigue sirviendo durante la ventana de rotación.</span></div>
-        <div><b>No guardar de más</b><span>Conservar solo lo que la finalidad exige.</span></div>
-        <div><b>Avisar los cambios</b><span>Un cambio incompatible en una API publicada exige una versión mayor nueva. La anterior se deprecia con fecha de retiro.</span></div>
+        <div><b>A real purpose</b><span>Only send requests for the declared and approved purpose. Every request is recorded in the log, and the citizen sees it.</span></div>
+        <div><b>An identified official</b><span>Send in <code>X-RID-End-User</code> the person who is actually making the request.</span></div>
+        <div><b>Protected credentials</b><span>The private key and the secret are not shared or pushed to repositories. If you suspect a leak, revoke them from the application's page.</span></div>
+        <div><b>Certificates kept current</b><span>They last 90 days, with a warning at 15. Issue a new one before it expires: the previous one keeps working during the rotation window.</span></div>
+        <div><b>Don't keep more than needed</b><span>Keep only what the purpose requires.</span></div>
+        <div><b>Announce changes</b><span>An incompatible change to a published API requires a new major version. The previous one is deprecated with a retirement date.</span></div>
       </div>
     </section>
 
     <section id="contactos">
-      <h2><span class="num">12</span>Contactos y soporte</h2>
+      <h2><span class="num">12</span>Contacts and support</h2>
       <div class="roles">
-        <div class="role"><header><b>Operador (AND)</b></header><p>Altas de entidades, revisión de APIs, problemas de conexión con el gateway.</p></div>
-        <div class="role"><header><b>Regulador (MinTIC)</b></header><p>Aprobaciones de datos sensibles y marco normativo.</p></div>
-        <div class="role"><header><b>Dentro de la entidad</b></header><p>El <code>entity_admin</code> gestiona su gente y sus nodos; el <code>data_steward</code> decide los accesos.</p></div>
+        <div class="role"><header><b>Operator (AND)</b></header><p>Entity registrations, API reviews, connection problems with the gateway.</p></div>
+        <div class="role"><header><b>Regulator (MinTIC)</b></header><p>Approvals for sensitive data and the regulatory framework.</p></div>
+        <div class="role"><header><b>Within the entity</b></header><p>The <code>entity_admin</code> manages its people and its nodes; the <code>data_steward</code> decides on access.</p></div>
       </div>
     </section>
   </main>
@@ -583,8 +584,8 @@ details.faq[open] summary { color: var(--gov); }
     btn.addEventListener('click', function () {
       var box = btn.closest('.code, .cmd');
       var text = box.querySelector('pre, code').innerText.trim();
-      var done = function () { btn.textContent = 'Copiado'; setTimeout(function () { btn.textContent = 'Copiar'; }, 1500); };
-      var fallback = function () { var r = document.createRange(); r.selectNodeContents(box.querySelector('pre, code')); var s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Seleccionado'; };
+      var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+      var fallback = function () { var r = document.createRange(); r.selectNodeContents(box.querySelector('pre, code')); var s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Selected'; };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
     });
   });

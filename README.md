@@ -1,16 +1,18 @@
-# Portal RID — Red de Intercambio de Datos
+# RID Portal — Data Exchange Network
 
-Portal de desarrolladores y consola de gobierno para una red nacional de intercambio de datos entre entidades públicas, construido 100 % con software open source.
+> Versión en español: [docs/es/README.md](docs/es/README.md)
 
-- Las entidades publican sus APIs (existentes o creadas con el kit de APIs instantáneas).
-- Otras entidades las consumen con control: finalidad declarada, aprobación del dueño del dato, credenciales propias y trazabilidad de cada consulta.
-- El tráfico pasa por un API gateway central (Apache APISIX) operado por el operador nacional; los datos se quedan en cada entidad.
+Developer portal and governance console for a national data exchange network between public entities, built 100% with open source software.
 
-Primer despliegue: **Colombia** (operador: AND · gobierno: MinTIC). Diseñado para reutilizarse en cualquier país mediante `config/country/<código>.yaml`.
+- Entities publish their APIs (existing ones, or ones created with the instant API kit).
+- Other entities consume them under control: a declared purpose, approval from the data owner, their own credentials and traceability of every query.
+- Traffic goes through a central API gateway (Apache APISIX) run by the national operator; the data stays at each entity.
 
-## Empezar
+First deployment: **Colombia** (operator: AND · governance: MinTIC). Designed to be reused in any country through `config/country/<code>.yaml`.
 
-Requisitos: Node.js 24, pnpm 11, Docker Engine (o Podman) con Compose v2.
+## Getting started
+
+Requirements: Node.js 24, pnpm 11, Docker Engine (or Podman) with Compose v2.
 
 ```bash
 cp .env.example .env
@@ -20,46 +22,46 @@ pnpm db:migrate && pnpm db:seed
 pnpm dev
 ```
 
-Abre http://localhost:3000. Usuarios de prueba en `docs/DEMO.md`. La carpeta ciudadana de referencia ("¿Quién consultó mis datos?", MT-07) queda en http://localhost:3100 con `ciudadana.demo`.
+Open http://localhost:3000. Test users are listed in `docs/DEMO.md`. The reference citizen folder ("Who accessed my data?", MT-07) runs at http://localhost:3100, with `ciudadana.demo`.
 
-Para las pruebas e2e (`pnpm test:e2e`, con el stack arriba) instala una vez el navegador: `pnpm --filter @rid/web exec playwright install chromium`.
+For the e2e tests (`pnpm test:e2e`, with the stack up), install the browser once: `pnpm --filter @rid/web exec playwright install chromium`.
 
-### Infraestructura local
+### Local infrastructure
 
-| Comando | Qué hace |
+| Command | What it does |
 | :-- | :-- |
-| `pnpm infra:up` | Levanta todo y espera a que cada servicio esté sano |
-| `pnpm infra:up:core` | Igual, sin OpenSearch ni el Fluent Bit de analítica (más liviano). Incluye el Fluent Bit del registro de transparencia y la TSA de desarrollo (puerto 3004) |
-| `pnpm infra:ps` / `pnpm infra:logs` | Estado y logs |
-| `pnpm infra:down` | Detiene los servicios (conserva datos) |
-| `pnpm infra:reset` | Detiene y **borra** volúmenes (base de datos, CA, índices) |
+| `pnpm infra:up` | Starts everything and waits until every service is healthy |
+| `pnpm infra:up:core` | Same, without OpenSearch or the analytics Fluent Bit (lighter). Includes the transparency log Fluent Bit and the development TSA (port 3004) |
+| `pnpm infra:ps` / `pnpm infra:logs` | Status and logs |
+| `pnpm infra:down` | Stops the services (keeps the data) |
+| `pnpm infra:reset` | Stops and **deletes** the volumes (database, CA, indexes) |
 
-Todos los puertos se publican solo en `127.0.0.1`. Si alguno ya está ocupado en tu máquina, cámbialo en `.env` con la variable `*_PORT` correspondiente (ver `.env.example`).
+All ports are published on `127.0.0.1` only. If one is already in use on your machine, change it in `.env` with the matching `*_PORT` variable (see `.env.example`).
 
-## Arrancar con Claude Code
+## Starting with Claude Code
 
-1. Crea el repositorio, copia estos archivos y haz el primer commit.
-2. Abre Claude Code en la raíz y usa como primer mensaje:
+1. Create the repository, copy these files and make the first commit.
+2. Open Claude Code at the root and use this as the first message:
 
-   > Lee CLAUDE.md y todos los documentos de docs/. Luego implementa el hito M0 de docs/BACKLOG.md historia por historia, siguiendo la definición de terminado. Al cerrar cada historia, márcala en el backlog y haz commit.
+   > Read CLAUDE.md and all the documents in docs/. Then implement milestone M0 of docs/BACKLOG.md story by story, following the definition of done. When you close each story, mark it in the backlog and commit.
 
-3. Al cerrar M0, sigue con: "Continúa con el hito M1, empezando por el SPIKE S-1."
+3. When M0 is closed, continue with: "Continue with milestone M1, starting with SPIKE S-1."
 
-## Documentación
+## Documentation
 
-- [CLAUDE.md](CLAUDE.md) — contexto y reglas para desarrollo con Claude Code
-- [docs/SPEC.md](docs/SPEC.md) — especificación funcional
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — arquitectura técnica
-- [docs/BACKLOG.md](docs/BACKLOG.md) — hitos e historias
-- [docs/DEMO.md](docs/DEMO.md) — guion de demo
-- [docs/INSTALL.md](docs/INSTALL.md) — **instalación en un servidor** con `sudo ./install.sh` y requisitos del VPS
-- [docs/guias/operador.md](docs/guias/operador.md) — la plataforma explicada para el operador y el regulador (versión para proyectar: `operador.html`)
-- [docs/guias/entidades.md](docs/guias/entidades.md) — qué designa, dispone y hace cada entidad participante (versión para proyectar: `entidades.html`). La guía de las proveedoras (nodo, instalación y publicación) está en el repositorio del kit: `docs/guias/proveedoras.md`
-- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — despliegue de cada componente (desarrollo y piloto)
-- [docs/OPERATIONS.md](docs/OPERATIONS.md) — puesta en marcha, rutina de operación, respaldos y problemas frecuentes
-- [docs/AUTHZ.md](docs/AUTHZ.md) — matriz de autorización (generada)
-- [docs/adr/](docs/adr/) — decisiones de arquitectura
+- [CLAUDE.md](CLAUDE.md) — context and rules for development with Claude Code
+- [docs/SPEC.md](docs/SPEC.md) — functional specification
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — technical architecture
+- [docs/BACKLOG.md](docs/BACKLOG.md) — milestones and stories
+- [docs/DEMO.md](docs/DEMO.md) — demo script
+- [docs/INSTALL.md](docs/INSTALL.md) — **installing on a server** with `sudo ./install.sh`, and VPS requirements
+- [docs/guides/operator.md](docs/guides/operator.md) — the platform explained for the operator and the regulator (presentation version: `operator.html`)
+- [docs/guides/entities.md](docs/guides/entities.md) — what each participating entity designates, provides and does (presentation version: `entities.html`). The guide for providers (node, installation and publication) is in the kit repository: `docs/guides/providers.md`
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deployment of each component (development and pilot)
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — go-live, operating routine, backups and common problems
+- [docs/AUTHZ.md](docs/AUTHZ.md) — authorization matrix (generated)
+- [docs/adr/](docs/adr/) — architecture decisions
 
-## Licencia
+## License
 
-Apache-2.0, © 2026 Centre for Digital Public Infrastructure (CDPI). Ver [LICENSE](LICENSE) y [NOTICE](NOTICE).
+Apache-2.0, © 2026 Centre for Digital Public Infrastructure (CDPI). See [LICENSE](LICENSE) and [NOTICE](NOTICE).

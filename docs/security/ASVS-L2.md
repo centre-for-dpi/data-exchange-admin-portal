@@ -1,87 +1,89 @@
-# Revisión OWASP ASVS 5.0 nivel 2 (M6-01)
+# OWASP ASVS 5.0 level 2 review (M6-01)
 
-- Fecha: 2026-11-16 · Alcance: portal (`apps/web`, `apps/api`), gateway (APISIX, OPA, plugins `rid-*`), Keycloak, infraestructura de Compose (desarrollo y piloto).
-- Método: revisión contra el código y la configuración, no contra la documentación, capítulo por capítulo de ASVS 5.0 (V17 WebRTC no aplica). Cada hallazgo se verificó en el código antes de anotarlo.
-- Estados: **Cumple** · **Corregido** (en esta historia) · **Parcial** · **Pendiente** (con destino) · **No aplica**.
+> Versión en español: [docs/es/security/ASVS-L2.md](../es/security/ASVS-L2.md)
 
-## Resumen
+- Date: 2026-11-16 · Scope: portal (`apps/web`, `apps/api`), gateway (APISIX, OPA, `rid-*` plugins), Keycloak, Compose infrastructure (development and pilot).
+- Method: review against the code and the configuration, not against the documentation, chapter by chapter of ASVS 5.0 (V17 WebRTC does not apply). Each finding was verified in the code before it was recorded.
+- Statuses: **Meets** · **Fixed** (in this story) · **Partial** · **Pending** (with a target) · **Not applicable**.
 
-El núcleo cumple: autorización en el backend con aislamiento por entidad, validación de tokens, defensa contra SSRF, almacenamiento de documentos, CSP con nonce y bitácora de auditoría encadenada.
+## Summary
 
-M6-01 corrigió lo que podía corregirse sin cambiar la topología: límites de peticiones, cabeceras del API, eventos de seguridad, política de contraseñas, URIs exactas de OIDC, segmentación de red, keyring propio de APISIX, lista mínima de plugins, escaneo de dependencias y la cola paginada del operador.
+The core meets the standard: authorization in the backend with per-entity isolation, token validation, SSRF defense, document storage, nonce-based CSP and a chained audit log.
 
-Lo que exigía otra topología (TLS y autenticación entre componentes internos, Keycloak en modo producción, bóveda de secretos), el SBOM y los logs del API en el pipeline central quedaron en el chart de Helm de M6-05 (correcciones 14 a 19), que falta instalar. El antivirus de documentos se agregó en M6-08 (corrección 20).
+M6-01 fixed what could be fixed without changing the topology: request limits, API headers, security events, password policy, exact OIDC URIs, network segmentation, APISIX's own keyring, a minimal plugin list, dependency scanning and the operator's paginated queue.
 
-## Correcciones de M6-01
+What required a different topology (TLS and authentication between internal components, Keycloak in production mode, a secrets vault), the SBOM, and the API logs in the central pipeline went into the M6-05 Helm chart (fixes 14 to 19), which has yet to be installed. Antivirus for documents was added in M6-08 (fix 20).
 
-| # | Hallazgo | Corrección | Prueba |
+## M6-01 fixes
+
+| # | Finding | Fix | Test |
 | :-- | :-- | :-- | :-- |
-| 1 | Sin límite de peticiones (2.4.1) | `@fastify/rate-limit` en el API, antes de leer el cuerpo:<br>• cuota por usuario verificado, o por dirección si el token no es válido: inventar tokens no da cuotas nuevas (`RID_RATE_LIMIT_PER_MINUTE`, 600);<br>• cuota estricta en rutas costosas (subidas, versiones nuevas, solicitudes de alta, invitaciones, enrolamiento de nodos; `RID_RATE_LIMIT_STRICT_PER_MINUTE`, 30);<br>• sin límite solo en las rutas de control de los servicios de la plataforma, cada una con su credencial, reconocidas por plantilla de ruta;<br>• `X-Forwarded-For` solo desde la dirección del proxy (`RID_TRUST_PROXY`);<br>• 429 en RFC 9457.<br>El proxy agrega límites por dirección en `/api/v1` y `/auth` (`infra/edge/rid.yml.template`). | `common/rate-limit.int.test.ts`, `trust-proxy.test.ts` |
-| 2 | Una subida con token inventado se leía (10 MiB) antes del 401 | El hook de la subida verifica el JWT de verdad antes de leer el cuerpo | `common/rate-limit.int.test.ts` |
-| 3 | Respuestas del API sin cabeceras de seguridad (3.4.x, 4.1.x) | `nosniff`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, HSTS y `Cache-Control: no-store` (salvo que el endpoint declare otro) | `health/health.controller.test.ts` |
-| 4 | Rechazos sin registro atribuible (16.3.1-16.3.3) | Una línea JSON por cada 400/401/403/404/409/429: quién (`sub`), desde dónde (IP con `RID_TRUST_PROXY`, user agent), qué (plantilla de ruta, ruta sin query) y por qué. Nunca la query, el token ni el cuerpo | `common/security-event.test.ts` |
-| 5 | Keycloak registraba solo errores de login y cambios de credencial | Eventos de LOGIN, LOGOUT, REGISTER, CODE_TO_TOKEN_ERROR, REFRESH_TOKEN_ERROR, RESET_PASSWORD y VERIFY_EMAIL, más eventos de administración | Realm `rid-portal` |
-| 6 | Sin política de contraseñas con registro abierto (6.2.x) | `length(12) and maxLength(128) and notUsername and notEmail and passwordHistory(5)` | Realm `rid-portal` |
-| 7 | URIs de redirección con comodín (10.4.1) | URIs exactas: el callback de Auth.js, los inicios por idioma y el callback de la carpeta | Realms `rid-portal` y `rid-citizens` |
-| 8 | etcd y OPA sin autenticación, alcanzables desde cualquier contenedor (13.2.1); salida del gateway a las redes de la plataforma (pendiente de M1-08) | Segmentación en tres redes:<br>• `gateway`: control del gateway, con etcd y OPA solo ahí;<br>• `providers`: upstreams y el runner de contrato;<br>• `default`: la plataforma.<br>El gateway no alcanza la base de datos, la CA, OpenSearch ni el correo. Los upstreams no alcanzan etcd, OPA, la plataforma ni el API (en el piloto el API comparte con el runner de contrato una red `runner` solo de ellos dos) | `tests/infra/src/networks.int.test.ts` (desarrollo y piloto) |
-| 9 | Keyring de APISIX de fábrica, público (S-6) | Keyring propio por despliegue (`RID_APISIX_KEYRING`). La clave de fábrica queda solo para leer lo escrito antes, hasta que se reescriba (renovación de certificados, ≤ 90 días) | `tests/infra/src/gateway.int.test.ts` |
-| 10 | Todos los plugins de APISIX habilitados, incluidas funciones serverless (15.2.3) | Solo los quince que usan las rutas del portal; `serverless-*`, `inspect`, `echo` y los `ai-*` quedan fuera | `tests/infra/src/gateway.int.test.ts` |
-| 11 | Sin escaneo de vulnerabilidades (15.2.1) | `pnpm audit --audit-level high` en CI y política de corrección (abajo) | `.github/workflows/ci.yml` |
-| 12 | Etiqueta GCM truncada aceptada (por confirmar) | `authTagLength: 16` al abrir secretos sellados | `common/secrets.test.ts` |
-| 13 | La cola de altas del operador mostraba solo las 200 más antiguas | Paginación por cursor en API y consola | `entities/entity-requests.int.test.ts` |
+| 1 | No request limit (2.4.1) | `@fastify/rate-limit` in the API, before reading the body:<br>• quota per verified user, or per address if the token is not valid: forging tokens does not grant new quotas (`RID_RATE_LIMIT_PER_MINUTE`, 600);<br>• strict quota on expensive routes (uploads, new versions, onboarding requests, invitations, node enrollment; `RID_RATE_LIMIT_STRICT_PER_MINUTE`, 30);<br>• no limit only on the control routes of the platform services, each with its own credential, recognized by route template;<br>• `X-Forwarded-For` only from the proxy's address (`RID_TRUST_PROXY`);<br>• 429 in RFC 9457.<br>The proxy adds per-address limits on `/api/v1` and `/auth` (`infra/edge/rid.yml.template`). | `common/rate-limit.int.test.ts`, `trust-proxy.test.ts` |
+| 2 | An upload with a forged token was read (10 MiB) before the 401 | The upload hook actually verifies the JWT before reading the body | `common/rate-limit.int.test.ts` |
+| 3 | API responses without security headers (3.4.x, 4.1.x) | `nosniff`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, `Referrer-Policy: no-referrer`, HSTS and `Cache-Control: no-store` (unless the endpoint declares otherwise) | `health/health.controller.test.ts` |
+| 4 | Rejections without an attributable record (16.3.1-16.3.3) | One JSON line for each 400/401/403/404/409/429: who (`sub`), from where (IP with `RID_TRUST_PROXY`, user agent), what (route template, path without query) and why. Never the query, the token or the body | `common/security-event.test.ts` |
+| 5 | Keycloak recorded only login errors and credential changes | LOGIN, LOGOUT, REGISTER, CODE_TO_TOKEN_ERROR, REFRESH_TOKEN_ERROR, RESET_PASSWORD and VERIFY_EMAIL events, plus admin events | Realm `rid-portal` |
+| 6 | No password policy with open registration (6.2.x) | `length(12) and maxLength(128) and notUsername and notEmail and passwordHistory(5)` | Realm `rid-portal` |
+| 7 | Redirect URIs with wildcards (10.4.1) | Exact URIs: the Auth.js callback, the per-language home pages and the citizen folder's callback | Realms `rid-portal` and `rid-citizens` |
+| 8 | etcd and OPA without authentication, reachable from any container (13.2.1); gateway egress to the platform networks (pending from M1-08) | Segmentation into three networks:<br>• `gateway`: gateway control, with etcd and OPA only there;<br>• `providers`: upstreams and the contract runner;<br>• `default`: the platform.<br>The gateway cannot reach the database, the CA, OpenSearch or mail. Upstreams cannot reach etcd, OPA, the platform or the API (in the pilot the API shares a `runner` network with the contract runner, for the two of them only) | `tests/infra/src/networks.int.test.ts` (development and pilot) |
+| 9 | APISIX's factory keyring, which is public (S-6) | A keyring of its own per deployment (`RID_APISIX_KEYRING`). The factory key remains only to read what was written before, until it is rewritten (certificate renewal, ≤ 90 days) | `tests/infra/src/gateway.int.test.ts` |
+| 10 | All APISIX plugins enabled, including serverless functions (15.2.3) | Only the fifteen that the portal's routes use; `serverless-*`, `inspect`, `echo` and the `ai-*` plugins are left out | `tests/infra/src/gateway.int.test.ts` |
+| 11 | No vulnerability scanning (15.2.1) | `pnpm audit --audit-level high` in CI and a remediation policy (below) | `.github/workflows/ci.yml` |
+| 12 | Truncated GCM tag accepted (to be confirmed) | `authTagLength: 16` when opening sealed secrets | `common/secrets.test.ts` |
+| 13 | The operator's onboarding queue showed only the 200 oldest | Cursor pagination in the API and the console | `entities/entity-requests.int.test.ts` |
 
-## Correcciones de M6-05 (chart de Helm) y M6-08
+## M6-05 (Helm chart) and M6-08 fixes
 
-Las de M6-05 (14 a 19) están en `infra/helm/rid` y se validaron solo de forma estática (`helm template` y kubeconform). El chart no se ha instalado en ningún clúster (`DEPLOYMENT.md §9`). La 20 (M6-08) corre también en el piloto.
+The M6-05 fixes (14 to 19) are in `infra/helm/rid` and were validated only statically (`helm template` and kubeconform). The chart has not been installed on any cluster (`DEPLOYMENT.md §9`). Fix 20 (M6-08) also runs in the pilot.
 
-| # | Pendiente | Corrección | Prueba |
+| # | Pending item | Fix | Test |
 | :-- | :-- | :-- | :-- |
-| 14 | Componentes internos sin TLS ni autenticación propia (12.3.x, 13.2.1) | PKI interna con cert-manager:<br>• etcd con mTLS y una CA propia, que solo firma a sus miembros y al gateway;<br>• OpenSearch con TLS y su plugin de seguridad, con un usuario por cliente y solo los permisos que usa;<br>• Postgres con `sslmode=verify-full`;<br>• la API de OPA solo en el loopback del pod del gateway, con la escucha de diagnóstico aparte | `helm template` + kubeconform |
-| 15 | Keycloak en `start-dev` y realms con usuarios de prueba (13.4.2) | `start` con realms de producción: `pnpm helm:sync` quita las personas y pone el SMTP del despliegue | `tests/infra/src/helm-files.test.ts` |
-| 16 | Secretos en `.env` (13.3.x) | Un Secret por componente con solo sus claves, desde OpenBao con External Secrets | `helm template` |
-| 17 | Salida de red sin límite | NetworkPolicies de entrada y de salida por componente. Hacia fuera, solo direcciones públicas en los puertos que usa cada uno | `helm template` + kubeconform |
-| 18 | Sin SBOM ni escaneo de imágenes (15.1.2, 15.2.1) | SBOM CycloneDX y Trivy en CI: una vulnerabilidad alta o crítica con arreglo detiene la publicación. Imágenes del API y la web sin dependencias de desarrollo ni gestor de paquetes | `.github/workflows/images.yml` |
-| 19 | Logs del API fuera del pipeline central, sin enmascarar (16.4.3, 14.x) | Cada línea enmascarada (queries, números de 6 dígitos o más, correos, credenciales en URL). En el chart, JSON para el colector de logs del clúster | `common/logger.test.ts` |
-| 20 | Documentos sin antivirus (5.4.3) | ClamAV (`clamd`, M6-08) revisa cada documento antes de guardarlo; uno infectado se rechaza y, si no responde, la subida falla. Activado en el chart; opcional en el piloto (`--profile antivirus`) | `documents/antivirus.test.ts`, `documents/antivirus.int.test.ts` |
-| 21 | Una sola `RID_SECRETS_KEY`, sin identificador ni rotación (11.1) | Cada valor sellado nombra su clave (`v2.<kid>`); `RID_SECRETS_KEYS_PREVIOUS` abre lo anterior (también el formato `v1`) y `secrets:reseal` lo sella de nuevo con la actual, de forma idempotente y auditada | `common/secrets.test.ts`, `secrets/reseal.int.test.ts` |
+| 14 | Internal components without TLS or authentication of their own (12.3.x, 13.2.1) | Internal PKI with cert-manager:<br>• etcd with mTLS and its own CA, which signs only its members and the gateway;<br>• OpenSearch with TLS and its security plugin, with one user per client and only the permissions it uses;<br>• Postgres with `sslmode=verify-full`;<br>• the OPA API only on the loopback of the gateway pod, with the diagnostics listener separate | `helm template` + kubeconform |
+| 15 | Keycloak in `start-dev` and realms with test users (13.4.2) | `start` with production realms: `pnpm helm:sync` removes the personas and sets the deployment's SMTP | `tests/infra/src/helm-files.test.ts` |
+| 16 | Secrets in `.env` (13.3.x) | One Secret per component with only its keys, from OpenBao through External Secrets | `helm template` |
+| 17 | Unrestricted network egress | Ingress and egress NetworkPolicies per component. Outbound, only public addresses on the ports each one uses | `helm template` + kubeconform |
+| 18 | No SBOM or image scanning (15.1.2, 15.2.1) | CycloneDX SBOM and Trivy in CI: a high or critical vulnerability with a fix available stops the release. API and web images without development dependencies or a package manager | `.github/workflows/images.yml` |
+| 19 | API logs outside the central pipeline, unmasked (16.4.3, 14.x) | Every line masked (queries, numbers of 6 digits or more, email addresses, credentials in URLs). In the chart, JSON for the cluster's log collector | `common/logger.test.ts` |
+| 20 | Documents without antivirus (5.4.3) | ClamAV (`clamd`, M6-08) scans each document before storing it; an infected one is rejected and, if ClamAV does not respond, the upload fails. Enabled in the chart; optional in the pilot (`--profile antivirus`) | `documents/antivirus.test.ts`, `documents/antivirus.int.test.ts` |
+| 21 | A single `RID_SECRETS_KEY`, with no identifier or rotation (11.1) | Each sealed value names its key (`v2.<kid>`); `RID_SECRETS_KEYS_PREVIOUS` opens older values (including the `v1` format) and `secrets:reseal` seals them again with the current key, idempotently and with an audit record | `common/secrets.test.ts`, `secrets/reseal.int.test.ts` |
 
-## Estado por capítulo
+## Status by chapter
 
-| Capítulo | Estado | Notas |
+| Chapter | Status | Notes |
 | :-- | :-- | :-- |
-| V1 Codificación y saneamiento | Cumple | React escapa la salida y no hay HTML en markdown. Prisma en todo (la única consulta cruda es constante). `subprocess` sin shell. Defensa SSRF con DNS fijado. YAML con límite de alias. Nombres de archivo saneados. Correo en texto plano |
-| V2 Validación y lógica | Cumple · Corregido | zod con objetos estrictos en todo `@Body`/`@Query`; transiciones condicionadas. **Corregido:** anti-automatización (1, 2). **Parcial:** las re-subidas del documento de designación se guardan todas (límite de tasa sí; tope por solicitud pendiente) |
-| V3 Frontend web | Cumple · Corregido | CSP con nonce y `strict-dynamic`, HSTS, cookies `__Host-`/`__Secure-` HttpOnly SameSite, CSRF (API solo bearer). **Corregido:** cabeceras del API (3). **Parcial (baja):** abrir una notificación por GET la marca leída |
-| V4 API | Cumple | Solo JSON y PDF, límites de cuerpo, cabeceras `X-RID-*` imposibles de fijar por el cliente, errores RFC 9457 |
-| V5 Archivos | Cumple · Corregido | Tamaño, bytes mágicos, nombres aleatorios fuera del web root, descarga con `attachment`. **Corregido:** antivirus con ClamAV antes de guardar, falla cerrada (20) |
-| V6 Autenticación | Corregido · **Decisión** | **Corregido:** política de contraseñas (6). Fuerza bruta de Keycloak, TOTP, aviso de cambios de credencial. **Decisión pendiente (6.3.3):** hoy el segundo factor se exige a los roles de plataforma y a `data_steward`. L2 lo pide para todo acceso; extenderlo a `entity_admin` y `api_publisher` cambia el ingreso de las entidades y de los usuarios de demostración |
-| V7 Sesiones | Cumple | Roles y estado desde la base en cada petición, expiración por inactividad y absoluta, cierre RP-initiated. Por confirmar: consola de cuenta de Keycloak para cerrar otras sesiones |
-| V8 Autorización | Cumple | Política central, falla cerrada sin declaración de acceso, aislamiento por entidad (404 fuera), roles con efecto inmediato. El tráfico lo autoriza OPA y falla cerrado |
-| V9 Tokens autocontenidos | Cumple | RS256 contra el JWKS del emisor, `exp`/`iss`/`aud`; el gateway valida antes de OPA |
-| V10 OAuth/OIDC | Cumple · Corregido | Código con PKCE S256, sin implícito ni password grant, clientes confidenciales con token ligado al certificado. **Corregido:** URIs exactas (7) |
-| V11 Criptografía | Cumple · Corregido | AES-256-GCM con IV aleatorio y AAD, aleatoriedad del sistema, comparaciones en tiempo constante. **Corregido:** etiqueta GCM (12). **Corregido:** identificador de clave y rotación de `RID_SECRETS_KEY` (21) |
-| V12 Comunicaciones | Cumple · Corregido en el chart | TLS externo, verificación de certificados hacia proveedores, mTLS de aplicaciones y nodos. **Corregido en el chart de Helm (M6-05, 14):** etcd con mTLS y CA propia, OpenSearch con TLS, Postgres con `verify-full`, OPA solo en el loopback del pod. El piloto con Compose sigue con la red interna como única barrera |
-| V13 Configuración | Corregido · Corregido en el chart | **Corregido:** segmentación (8), keyring (9), plugins (10). Rol de base de datos de mínimo privilegio. **Corregido en el chart (14 a 17):**<br>• etcd con mTLS y OpenSearch con su plugin de seguridad;<br>• Keycloak en `start` (modo producción) con realms sin usuarios de prueba;<br>• imagen de Fluent Bit sin `-debug`;<br>• secretos desde OpenBao con External Secrets;<br>• NetworkPolicies de entrada y de salida por componente |
-| V14 Protección de datos | Cumple · Corregido | Sin datos sensibles en URLs ni logs; sin cuerpos; lista blanca de campos; seudónimos con clave. **Corregido:** la clave de seudónimos en los datos de OPA ya no es alcanzable desde los upstreams (8). En el chart, la API de OPA solo escucha en el loopback del pod del gateway (14) |
-| V15 Codificación segura | Corregido | Contenedores sin root, `select` explícito, bloqueos de concurrencia. **Corregido:** escaneo de dependencias (11); SBOM y escaneo de imágenes con Trivy en CI, e imágenes de producción sin dependencias de desarrollo ni gestor de paquetes (18) |
-| V16 Logs y errores | Corregido · Parcial | Inventario de logs (§8), bitácora protegida y anclada, errores genéricos. **Corregido:** eventos de seguridad del API y de Keycloak (4, 5). **Corregido:** las líneas del API van enmascaradas y, en el chart, en JSON para el colector de logs del clúster, que las lleva al sistema central del operador (19) |
+| V1 Encoding and Sanitization | Meets | React escapes output and there is no HTML in markdown. Prisma everywhere (the only raw query is a constant). `subprocess` without a shell. SSRF defense with pinned DNS. YAML with an alias limit. Sanitized file names. Plain-text email |
+| V2 Validation and Business Logic | Meets · Fixed | zod with strict objects on every `@Body`/`@Query`; guarded transitions. **Fixed:** anti-automation (1, 2). **Partial:** every re-upload of the designation document is stored (rate limit yes; per-request cap pending) |
+| V3 Web Frontend Security | Meets · Fixed | CSP with nonce and `strict-dynamic`, HSTS, `__Host-`/`__Secure-` HttpOnly SameSite cookies, CSRF (bearer-only API). **Fixed:** API headers (3). **Partial (low):** opening a notification via GET marks it as read |
+| V4 API and Web Service | Meets | JSON and PDF only, body limits, `X-RID-*` headers that the client cannot set, RFC 9457 errors |
+| V5 File Handling | Meets · Fixed | Size, magic bytes, random names outside the web root, download with `attachment`. **Fixed:** antivirus with ClamAV before storing, failing closed (20) |
+| V6 Authentication | Fixed · **Decision** | **Fixed:** password policy (6). Keycloak brute-force protection, TOTP, notification of credential changes. **Pending decision (6.3.3):** today the second factor is required for platform roles and for `data_steward`. L2 asks for it on all access; extending it to `entity_admin` and `api_publisher` changes how entities and demo users sign in |
+| V7 Session Management | Meets | Roles and status from the database on every request, inactivity and absolute expiration, RP-initiated logout. To be confirmed: Keycloak's account console for ending other sessions |
+| V8 Authorization | Meets | Central policy, fails closed without an access declaration, per-entity isolation (404 outside it), roles that take effect immediately. Traffic is authorized by OPA, which fails closed |
+| V9 Self-contained Tokens | Meets | RS256 against the issuer's JWKS, `exp`/`iss`/`aud`; the gateway validates before OPA |
+| V10 OAuth and OIDC | Meets · Fixed | Authorization code with PKCE S256, no implicit or password grant, confidential clients with certificate-bound tokens. **Fixed:** exact URIs (7) |
+| V11 Cryptography | Meets · Fixed | AES-256-GCM with a random IV and AAD, system randomness, constant-time comparisons. **Fixed:** GCM tag (12). **Fixed:** key identifier and rotation for `RID_SECRETS_KEY` (21) |
+| V12 Secure Communication | Meets · Fixed in the chart | External TLS, certificate verification towards providers, mTLS for applications and nodes. **Fixed in the Helm chart (M6-05, 14):** etcd with mTLS and its own CA, OpenSearch with TLS, Postgres with `verify-full`, OPA only on the pod's loopback. The Compose pilot still relies on the internal network as its only barrier |
+| V13 Configuration | Fixed · Fixed in the chart | **Fixed:** segmentation (8), keyring (9), plugins (10). Least-privilege database role. **Fixed in the chart (14 to 17):**<br>• etcd with mTLS and OpenSearch with its security plugin;<br>• Keycloak in `start` (production mode) with realms without test users;<br>• Fluent Bit image without `-debug`;<br>• secrets from OpenBao through External Secrets;<br>• ingress and egress NetworkPolicies per component |
+| V14 Data Protection | Meets · Fixed | No sensitive data in URLs or logs; no bodies; field allowlist; keyed pseudonyms. **Fixed:** the pseudonym key in OPA's data can no longer be reached from the upstreams (8). In the chart, the OPA API listens only on the gateway pod's loopback (14) |
+| V15 Secure Coding and Architecture | Fixed | Non-root containers, explicit `select`, concurrency locks. **Fixed:** dependency scanning (11); SBOM and image scanning with Trivy in CI, and production images without development dependencies or a package manager (18) |
+| V16 Security Logging and Error Handling | Fixed · Partial | Log inventory (§8), protected and anchored audit log, generic errors. **Fixed:** API and Keycloak security events (4, 5). **Fixed:** API lines are masked and, in the chart, emitted as JSON for the cluster's log collector, which forwards them to the operator's central system (19) |
 
-## Pendientes y su destino
+## Pending items and their target
 
-| Pendiente | ASVS | Destino |
+| Pending item | ASVS | Target |
 | :-- | :-- | :-- |
-| Segundo factor para `entity_admin` y `api_publisher` | 6.3.3 | Decisión del operador. Si se adopta, es configuración y una guía para las entidades |
-| Comprobar en un clúster lo corregido en el chart (14 a 19): no se ha instalado | 12.3.x, 13.x, 16.4.3 | M6-05 (instalación) |
-| Tope de re-subidas del documento de designación | 2.3.2 | Mejora menor (hoy limitado por tasa) |
-| Retirar la clave de fábrica del keyring de APISIX | 11.x | Operación: después de la primera renovación de certificados del despliegue |
+| Second factor for `entity_admin` and `api_publisher` | 6.3.3 | Operator decision. If adopted, it is configuration plus a guide for the entities |
+| Verify on a cluster what was fixed in the chart (14 to 19): it has not been installed | 12.3.x, 13.x, 16.4.3 | M6-05 (installation) |
+| Cap on re-uploads of the designation document | 2.3.2 | Minor improvement (rate-limited today) |
+| Remove the factory key from APISIX's keyring | 11.x | Operations: after the deployment's first certificate renewal |
 
-## Política de corrección de vulnerabilidades
+## Vulnerability remediation policy
 
-| Severidad (CVSS / aviso del proveedor) | Plazo para corregir o mitigar en producción |
+| Severity (CVSS / vendor advisory) | Deadline to fix or mitigate in production |
 | :-- | :-- |
-| Crítica | 7 días |
-| Alta | 30 días |
-| Media | 90 días |
-| Baja | En la siguiente versión planificada |
+| Critical | 7 days |
+| High | 30 days |
+| Medium | 90 days |
+| Low | In the next planned release |
 
-CI falla con vulnerabilidades altas o críticas en las dependencias (`pnpm audit --audit-level high`). Una excepción temporal se documenta en el PR con su mitigación y su fecha de revisión.
+CI fails on high or critical vulnerabilities in the dependencies (`pnpm audit --audit-level high`). A temporary exception is documented in the PR with its mitigation and its review date.

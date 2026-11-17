@@ -1,115 +1,117 @@
-# Especificación funcional — Portal RID
+# Functional specification — RID Portal
 
-Versión 0.1 · noviembre 2026 · Estado: borrador para construcción
+> Versión en español: [docs/es/SPEC.md](es/SPEC.md)
 
-## 1. Propósito y alcance
+Version 0.1 · November 2026 · Status: draft for construction
 
-El Portal RID gobierna una red de intercambio de datos entre entidades públicas. Permite que una entidad publique una API, que otra la consuma con una finalidad autorizada, y que el operador y el regulador vean y controlen todo el ciclo. El tráfico pasa por un gateway central (APISIX); los datos se quedan en cada entidad y el gateway no guarda contenido.
+## 1. Purpose and scope
 
-**Dentro del alcance del MVP**
+The RID Portal governs a data exchange network between public entities. It lets one entity publish an API, lets another consume it for an authorized purpose, and lets the operator and the regulator see and control the whole lifecycle. Traffic goes through a central gateway (APISIX); the data stays in each entity and the gateway stores no content.
 
-- Registro y gobierno de entidades, usuarios y roles.
-- Registro, revisión, publicación, versionado y retiro de APIs.
-- Catálogo con documentación interactiva.
-- Aplicaciones consumidoras con credenciales OAuth2 y certificados mTLS.
-- Solicitudes de acceso con finalidad, base legal y acuerdo; aprobación por el dueño del dato.
-- Propagación automática al gateway (rutas, políticas, límites) y revocación casi inmediata.
-- Bitácora de auditoría encadenada, analítica de uso por entidad e indicadores de la red.
-- Registro de nodos del kit de incorporación (contrato con el kit; el kit en sí es otro proyecto).
-- Configuración por país.
+**In scope for the MVP**
 
-**Fuera del alcance del MVP**
+- Registration and governance of entities, users and roles.
+- Registration, review, publication, versioning and retirement of APIs.
+- Catalog with interactive documentation.
+- Consumer applications with OAuth2 credentials and mTLS certificates.
+- Access requests with purpose, legal basis and agreement; approval by the data owner.
+- Automatic propagation to the gateway (routes, policies, limits) and near-immediate revocation.
+- Chained audit log, usage analytics per entity and network indicators.
+- Registry of nodes of the onboarding kit (contract with the kit; the kit itself is a separate project).
+- Per-country configuration.
 
-- La hoja de vida del ciudadano (se construirá sobre las APIs ya en uso).
-- Consentimiento ciudadano en línea (se diseña el punto de extensión, ver §9).
-- Credenciales verificables.
-- Facturación o cobro entre entidades.
-- El kit de APIs instantáneas y su instalador (proyecto hermano; aquí solo se define su contrato con el portal).
+**Out of scope for the MVP**
 
-## 2. Actores y roles
+- The citizen's record (it will be built on top of the APIs already in use).
+- Online citizen consent (the extension point is designed, see §9).
+- Verifiable credentials.
+- Billing or charging between entities.
+- The instant API kit and its installer (sibling project; only its contract with the portal is defined here).
 
-### 2.1 Roles de plataforma (no pertenecen a una entidad)
+## 2. Actors and roles
 
-| Rol | Quién (Colombia) | Puede |
+### 2.1 Platform roles (not tied to an entity)
+
+| Role | Who (Colombia) | Can |
 | :-- | :-- | :-- |
-| `platform_admin` | Equipo técnico del operador (AND) | Todo lo operativo: aprobar entidades, revisar y publicar APIs, gestionar nodos, suspender cualquier cosa, ver toda la analítica |
-| `platform_reviewer` | Analistas del operador | Revisar publicaciones y altas de entidades; no gestiona infraestructura |
-| `regulator` | MinTIC | Ver todo en solo lectura; aprobar publicaciones y suscripciones cuando la política lo exige (datos sensibles); ver indicadores; exportar auditoría |
-| `auditor` | Órganos de control, auditor externo | Solo lectura de auditoría y analítica; sin acceso a configuración |
+| `platform_admin` | Operator's technical team (AND) | Everything operational: approve entities, review and publish APIs, manage nodes, suspend anything, see all analytics |
+| `platform_reviewer` | Operator's analysts | Review publications and entity registrations; does not manage infrastructure |
+| `regulator` | MinTIC | See everything read-only; approve publications and subscriptions when policy requires it (sensitive data); see indicators; export the audit log |
+| `auditor` | Oversight bodies, external auditor | Read-only access to audit and analytics; no access to configuration |
 
-### 2.2 Roles dentro de una entidad
+### 2.2 Roles within an entity
 
-| Rol | Puede |
+| Role | Can |
 | :-- | :-- |
-| `entity_admin` | Gestionar miembros y roles de su entidad, datos de la entidad, aceptar acuerdos marco |
-| `api_publisher` | Registrar APIs y versiones de su entidad, enviarlas a revisión |
-| `data_steward` (responsable de datos) | Aprobar, rechazar, suspender y revocar suscripciones a las APIs de su entidad; definir finalidades permitidas |
-| `app_developer` | Crear aplicaciones de su entidad, gestionar credenciales, solicitar acceso a APIs |
-| `entity_viewer` | Ver todo lo de su entidad en solo lectura |
+| `entity_admin` | Manage the members and roles of their entity, the entity's data, accept framework agreements |
+| `api_publisher` | Register APIs and versions for their entity, submit them for review |
+| `data_steward` | Approve, reject, suspend and revoke subscriptions to their entity's APIs; define allowed purposes |
+| `app_developer` | Create applications for their entity, manage credentials, request access to APIs |
+| `entity_viewer` | See everything in their entity read-only |
 
-Un usuario puede pertenecer a varias entidades con roles distintos. Un mismo usuario no puede aprobar una suscripción que él mismo solicitó (separación de funciones).
+A user can belong to several entities with different roles. A user cannot approve a subscription they requested themselves (separation of duties).
 
-### 2.3 Usuario anónimo
+### 2.3 Anonymous user
 
-Puede ver la página pública del catálogo **solo** si `features.publicCatalog: true` en la configuración del país, y solo APIs con clasificación `public`. No ve el contacto del responsable de la API (puede ser el correo de una persona) ni el estado de los nodos de la entidad (M6-08).
+Can see the public catalog page **only** if `features.publicCatalog: true` in the country configuration, and only APIs classified as `public`. They do not see the API owner's contact (it may be a person's email address) or the status of the entity's nodes (M6-08).
 
-### 2.4 Titular de los datos (ciudadano)
+### 2.4 Data subject (citizen)
 
-No usa el portal. Ve **quién consultó sus datos**, cuándo, qué dato, para qué y con qué funcionario (como referencia), desde la Carpeta Ciudadana Digital del país, autenticado con la identidad digital nacional. También activa avisos y descarga un comprobante verificable de cada consulta. En esta versión solo ve las consultas que pasan por el gateway (ADR-0015).
+Does not use the portal. Sees **who queried their data**, when, which data, for what purpose and through which official (as a reference), from the country's Carpeta Ciudadana Digital (digital citizen folder), authenticated with the national digital identity. They can also turn on alerts and download a verifiable receipt for each query. In this version they only see the queries that go through the gateway (ADR-0015).
 
-## 3. Modelo de dominio
+## 3. Domain model
 
-Los nombres son los del código. Todos los registros tienen `id` (UUIDv7), `createdAt`, `updatedAt`, `createdBy`.
+The names are the ones used in the code. Every record has `id` (UUIDv7), `createdAt`, `updatedAt`, `createdBy`.
 
-### Entity (entidad)
-`legalName`, `shortName`, `slug`, `taxId` (p. ej. NIT), `kind` (`national` | `territorial` | `autonomous` | `private_authorized`), `sector` (de la config del país), `parentEntityId?`, `status` (§4.1), `contactEmail`, `website?`, `dataProtectionOfficer` (nombre, correo).
+### Entity
+`legalName`, `shortName`, `slug`, `taxId` (e.g. NIT), `kind` (`national` | `territorial` | `autonomous` | `private_authorized`), `sector` (from the country config), `parentEntityId?`, `status` (§4.1), `contactEmail`, `website?`, `dataProtectionOfficer` (name, email).
 
 ### User
-`keycloakSub`, `email`, `fullName`, `idDocumentType?`, `idDocumentNumberHash?` (solo hash, nunca el número en claro), `status` (`active` | `disabled`).
+`keycloakSub`, `email`, `fullName`, `idDocumentType?`, `idDocumentNumberHash?` (hash only, never the number in clear text), `status` (`active` | `disabled`).
 
 ### Membership
 `userId`, `entityId`, `roles[]`, `status` (`invited` | `active` | `revoked`), `invitedBy`.
 
 ### Api
-`entityId` (proveedora), `slug` (único por entidad), `name`, `summary`, `description` (markdown), `sector`, `tags[]`, `classification` (`public` | `internal` | `personal` | `sensitive`), `status` (derivado de sus versiones: `draft` | `published` | `deprecated` | `retired`), `ownerContact`.
+`entityId` (provider), `slug` (unique per entity), `name`, `summary`, `description` (markdown), `sector`, `tags[]`, `classification` (`public` | `internal` | `personal` | `sensitive`), `status` (derived from its versions: `draft` | `published` | `deprecated` | `retired`), `ownerContact`.
 
 ### ApiVersion
-`apiId`, `version` (semver mayor.menor), `status` (§4.2), `openapiSpec` (JSON almacenado + hash), `lintReport`, `upstream` (§3.1), `basePath` (calculado: `/{entitySlug}/{apiSlug}/v{major}`), `exposedFields[]` (atributos de datos con marca `personal: bool`, `sensitive: bool`), `legalBasis` (texto + referencias normativas), `allowedPurposes[]` (códigos del catálogo de finalidades), `sla` (`availabilityTarget`, `maxLatencyMs`, `supportHours`), `defaultRateLimit` (peticiones/minuto), `deprecatedAt?`, `sunsetAt?`, `serviceSheet` (la "ficha del servicio": responsable, descripción, esquema, nivel de servicio — se genera de estos campos).
+`apiId`, `version` (semver major.minor), `status` (§4.2), `openapiSpec` (stored JSON + hash), `lintReport`, `upstream` (§3.1), `basePath` (computed: `/{entitySlug}/{apiSlug}/v{major}`), `exposedFields[]` (data attributes flagged `personal: bool`, `sensitive: bool`), `legalBasis` (text + legal references), `allowedPurposes[]` (codes from the purpose catalog), `sla` (`availabilityTarget`, `maxLatencyMs`, `supportHours`), `defaultRateLimit` (requests/minute), `deprecatedAt?`, `sunsetAt?`, `serviceSheet` (the "service sheet": owner, description, schema, service level — generated from these fields).
 
-### 3.1 Upstream (dónde vive el servicio)
-Uno de:
+### 3.1 Upstream (where the service lives)
+One of:
 
-- `node`: servicio expuesto por un nodo del kit (`nodeId`, `servicePath`). Es el camino de las APIs instantáneas. El nodo debe ser de la entidad que publica; el gateway lo llama por su túnel y deja de hacerlo si se da de baja. El detalle de la API, para el proveedor, el revisor y el consumidor, muestra el estado del nodo.
-- `xroad`: servicio consumido vía X-Road (`serviceId` con instancia/clase/miembro/subsistema/servicio, y una ruta opcional). El gateway actúa como miembro cliente, a través del Security Server del operador, que fija la configuración del despliegue y no la versión (SPIKE S-5). El miembro del servicio debe ser el miembro X-Road de la entidad, que registra el operador.
-- `direct`: URL HTTPS de una API existente de la entidad (`url`, `mtls: bool`).
+- `node`: a service exposed by a kit node (`nodeId`, `servicePath`). This is the path for instant APIs. The node must belong to the publishing entity; the gateway calls it through its tunnel and stops doing so if the node is decommissioned. The API detail page shows the node's status to the provider, the reviewer and the consumer.
+- `xroad`: a service consumed through X-Road (`serviceId` with instance/class/member/subsystem/service, and an optional path). The gateway acts as a client member, through the operator's Security Server, which pins the deployment's configuration and not the version (SPIKE S-5). The service's member must be the entity's X-Road member, which the operator registers.
+- `direct`: HTTPS URL of an existing entity API (`url`, `mtls: bool`).
 
-### Application (aplicación consumidora)
-`entityId` (consumidora), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (determinista), `status` (`active` | `suspended` | `deleted`), `technicalContact`.
+### Application (consumer application)
+`entityId` (consumer), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (deterministic), `status` (`active` | `suspended` | `deleted`), `technicalContact`.
 
 ### Credential
-`applicationId`, `kind` (`client_secret` | `mtls_certificate`), `status` (`active` | `rotating` | `revoked` | `expired`), `fingerprint` / `serial`, `notAfter`, `lastUsedAt?`. El secreto se muestra una sola vez al crearlo; nunca se almacena en claro en el portal.
+`applicationId`, `kind` (`client_secret` | `mtls_certificate`), `status` (`active` | `rotating` | `revoked` | `expired`), `fingerprint` / `serial`, `notAfter`, `lastUsedAt?`. The secret is shown only once, when it is created; it is never stored in clear text in the portal.
 
-### Purpose (catálogo de finalidades)
-`code`, `name`, `description`, `legalReference?`. Catálogo por país en la config, ampliable por el operador. Ejemplos: `eligibility_check` (verificar requisitos de un trámite), `benefit_targeting` (focalización de programas), `identity_validation`, `statistics_anonymized`, `oversight` (control y auditoría).
+### Purpose (purpose catalog)
+`code`, `name`, `description`, `legalReference?`. A per-country catalog in the config, which the operator can extend. Examples: `eligibility_check` (verify the requirements of a procedure), `benefit_targeting` (program targeting), `identity_validation`, `statistics_anonymized`, `oversight` (oversight and audit).
 
-### Subscription (solicitud y acceso)
-`applicationId`, `apiVersionId`, `purposeCode`, `purposeDetail` (texto), `legalBasis` (texto + referencia), `agreementDocumentId?`, `requestedOperations[]` (subconjunto de `operationId` del OpenAPI; vacío = todas las de solo lectura), `requestedRateLimit?`, `validFrom`, `validUntil` (máximo según config, por defecto 12 meses), `status` (§4.4), `decisions[]` (quién decidió, cuándo, comentario), `endUserIdentificationRequired: bool`.
+### Subscription (request and access)
+`applicationId`, `apiVersionId`, `purposeCode`, `purposeDetail` (text), `legalBasis` (text + reference), `agreementDocumentId?`, `requestedOperations[]` (subset of the OpenAPI `operationId`s; empty = all read-only ones), `requestedRateLimit?`, `validFrom`, `validUntil` (maximum per config, 12 months by default), `status` (§4.4), `decisions[]` (who decided, when, comment), `endUserIdentificationRequired: bool`.
 
-### Node (nodo del kit)
-`entityId`, `name`, `status` (§4.6), `tunnelAddress`, `wireguardPublicKey`, `certificateSerial`, `kitVersion`, `lastHeartbeatAt`, `services[]` (lo que el nodo declara exponer).
+### Node (kit node)
+`entityId`, `name`, `status` (§4.6), `tunnelAddress`, `wireguardPublicKey`, `certificateSerial`, `kitVersion`, `lastHeartbeatAt`, `services[]` (what the node declares it exposes).
 
 ### Document
-Archivos adjuntos (acuerdos, actas). `ownerEntityId`, `kind` (`agreement` | `annex` | `other`), `sha256`, `size`, `mimeType`, `storageKey`. Solo PDF en el MVP.
+Attached files (agreements, minutes). `ownerEntityId`, `kind` (`agreement` | `annex` | `other`), `sha256`, `size`, `mimeType`, `storageKey`. PDF only in the MVP.
 
 ### AuditEvent
-`seq` (secuencial), `occurredAt`, `actor` (usuario, sistema o aplicación), `actorEntityId?`, `action` (p. ej. `subscription.approved`), `targetType`, `targetId`, `before?`, `after?` (solo campos de dominio, nunca secretos), `ip?`, `prevHash`, `hash`. Inmutable.
+`seq` (sequential), `occurredAt`, `actor` (user, system or application), `actorEntityId?`, `action` (e.g. `subscription.approved`), `targetType`, `targetId`, `before?`, `after?` (domain fields only, never secrets), `ip?`, `prevHash`, `hash`. Immutable.
 
 ### Notification
 `userId`, `kind`, `payload`, `readAt?`, `emailSentAt?`.
 
-## 4. Flujos y estados
+## 4. Flows and states
 
-### 4.1 Alta de entidad
+### 4.1 Entity registration
 
 ```
 requested → under_review → active
@@ -118,16 +120,16 @@ active ⇄ suspended
 active → offboarded
 ```
 
-1. Un funcionario inicia la solicitud de alta (o el operador la crea directamente): datos de la entidad, responsable de datos, responsable técnico, documento de designación (PDF).
-2. `platform_reviewer` revisa; puede pedir correcciones (vuelve a `requested` con comentario) o aprobar.
-3. Al aprobar: la entidad pasa a `active`, el solicitante queda como `entity_admin` y se envían invitaciones a los responsables designados.
-- **Detalle (M2-01).** Cualquier persona con cuenta (autorregistro con correo verificado, ADR-0018) puede pedir un alta. Tiene hasta 3 solicitudes abiertas a la vez. En `requested` le toca al solicitante: corrige los datos, adjunta el documento de designación y la envía (pasa a `under_review`). Pedir correcciones o rechazar exige un comentario que el solicitante lee. El identificador y la identificación tributaria quedan reservados solo desde que la solicitud se envía. Un borrador no reserva nada, y entre borradores gana el primero que se envía. El rechazo es definitivo, pero libera ambos datos para una nueva solicitud. Así una solicitud falsa no bloquea para siempre a la entidad real.
-- **Separación de funciones:** nadie decide sobre una solicitud que presentó o en la que figura como responsable designado.
-- **Alta directa.** `platform_admin` registra la entidad sin solicitud cuando un acto o una decisión ya la incorporó a la red. Indica ese fundamento, que queda en la bitácora, y el administrador de la entidad. La entidad queda activa de inmediato; el administrador y los responsables reciben una invitación por correo. El operador no puede ser el administrador ni uno de los responsables.
-- **Responsables designados.** El responsable de datos recibe `data_steward`. El responsable técnico recibe `api_publisher` y `app_developer`. Si el solicitante se designa a sí mismo, los roles se suman a su membresía sin invitación. Cada invitación vence a los `RID_INVITATION_TTL_DAYS` días (14 por omisión).
-4. `suspended` bloquea toda publicación nueva y suspende en el gateway todas sus suscripciones como consumidora (no como proveedora, salvo decisión explícita). Lo decide el `platform_admin` con un motivo; reactivar devuelve cada suscripción a su estado. `offboarded` es definitivo: cierra sus suscripciones de ambos lados, retira sus versiones y revoca sus membresías (M2-11).
+1. An official starts the registration request (or the operator creates it directly): entity data, data steward, technical lead, designation document (PDF).
+2. `platform_reviewer` reviews it; they can ask for corrections (it goes back to `requested` with a comment) or approve it.
+3. On approval: the entity becomes `active`, the requester becomes `entity_admin` and invitations are sent to the designated officers.
+- **Detail (M2-01).** Anyone with an account (self-registration with a verified email, ADR-0018) can request a registration. They can have up to 3 open requests at a time. In `requested` it is the requester's turn: they correct the data, attach the designation document and submit it (it moves to `under_review`). Asking for corrections or rejecting requires a comment that the requester reads. The identifier and the tax ID are reserved only from the moment the request is submitted. A draft reserves nothing, and between drafts the first one submitted wins. Rejection is final, but it frees both values for a new request. This way a fake request cannot block the real entity forever.
+- **Separation of duties:** nobody decides on a request they submitted or in which they appear as a designated officer.
+- **Direct registration.** `platform_admin` registers the entity without a request when an act or a decision has already brought it into the network. They state that basis, which is recorded in the audit log, and the entity's administrator. The entity is active immediately; the administrator and the officers receive an invitation by email. The operator cannot be the administrator or one of the officers.
+- **Designated officers.** The data steward receives `data_steward`. The technical lead receives `api_publisher` and `app_developer`. If the requester designates themselves, the roles are added to their membership without an invitation. Each invitation expires after `RID_INVITATION_TTL_DAYS` days (14 by default).
+4. `suspended` blocks any new publication and suspends in the gateway all of the entity's subscriptions as a consumer (not as a provider, unless explicitly decided). The `platform_admin` decides it, with a reason; reactivating returns each subscription to its previous state. `offboarded` is final: it closes the entity's subscriptions on both sides, retires its versions and revokes its memberships (M2-11).
 
-### 4.2 Publicación de una versión de API
+### 4.2 Publishing an API version
 
 ```
 draft → in_review → approved_operator → [approved_regulator] → published
@@ -135,133 +137,133 @@ draft → in_review → approved_operator → [approved_regulator] → published
 published → deprecated → retired
 ```
 
-1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige upstream, completa campos expuestos, base legal, finalidades permitidas, SLA.
-2. Validaciones automáticas al enviar a revisión (bloqueantes):
-   - Lint del OpenAPI con el conjunto de reglas RID (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), descripciones en español.
-   - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba (GET a la raíz del servicio; pasa con cualquier respuesta que no sea 5xx).
-   - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo. El sandbox es el servicio de pruebas con datos sintéticos que la versión declara; sin sandbox, la prueba se omite y no bloquea.
+1. `api_publisher` creates the API and the version: uploads OpenAPI 3.x, chooses the upstream, fills in the exposed fields, legal basis, allowed purposes and SLA.
+2. Automatic validations when submitting for review (blocking):
+   - OpenAPI lint with the RID ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), descriptions in Spanish.
+   - Connectivity: the portal asks the node/URL for a `healthcheck` through the gateway in test mode (GET to the service root; it passes with any response that is not a 5xx).
+   - Contract test (Schemathesis) against the sandbox, with a time limit. The sandbox is the test service with synthetic data that the version declares; without a sandbox, the test is skipped and does not block.
 
-   Las dos corren en segundo plano al enviar a revisión, y sus resultados acompañan la revisión. El operador solo aprueba si pasaron; el proveedor puede repetirlas después de corregir su servicio. De la prueba de contrato solo se guardan, por operación, los códigos de las verificaciones que fallaron y el código HTTP, nunca un cuerpo.
-3. `platform_reviewer` revisa ficha, clasificación y minimización. Si `classification ∈ {sensitive}` y `features.approval.regulatorForSensitive`, pasa además por `regulator`. El regulador aprueba (se publica) o la devuelve al proveedor con motivo (`changes_requested`). No decide quien ya participó en la versión ni quien pertenece a la entidad proveedora.
-4. Al publicar: se crea la ruta en el gateway en modo "cerrado" (sin suscripciones nadie entra) y la API aparece en el catálogo.
-5. Una versión nueva mayor convive con la anterior. `deprecated` muestra aviso y fecha de retiro; `retired` elimina la ruta y revoca las suscripciones (con aviso previo configurable, por defecto 90 días).
+   Both run in the background when the version is submitted for review, and their results go with the review. The operator only approves if they passed; the provider can rerun them after fixing their service. From the contract test, only the codes of the failed checks and the HTTP status are stored, per operation, never a body.
+3. `platform_reviewer` reviews the service sheet, the classification and minimization. If `classification ∈ {sensitive}` and `features.approval.regulatorForSensitive`, it also goes through `regulator`. The regulator approves it (it is published) or sends it back to the provider with a reason (`changes_requested`). Nobody who has already taken part in the version, or who belongs to the provider entity, can decide.
+4. On publication: the route is created in the gateway in "closed" mode (without subscriptions nobody gets in) and the API appears in the catalog.
+5. A new major version coexists with the previous one. `deprecated` shows a notice and the retirement date; `retired` removes the route and revokes the subscriptions (with configurable advance notice, 90 days by default).
 
-Cambios en una versión publicada: solo se permiten cambios compatibles (descripciones, SLA, nuevas operaciones opcionales). Un cambio incompatible exige versión mayor nueva. El lint compara contra la versión publicada y bloquea incompatibilidades.
+Changes to a published version: only compatible changes are allowed (descriptions, SLA, new optional operations). An incompatible change requires a new major version. The lint compares against the published version and blocks incompatibilities.
 
-### 4.3 Aplicaciones y credenciales
+### 4.3 Applications and credentials
 
-1. `app_developer` crea una aplicación en su entidad (sandbox o producción).
-2. El portal crea un cliente confidencial en Keycloak (`client_credentials`), muestra el secreto una sola vez.
-3. Si `features.mtls.required`, el desarrollador genera un CSR (el portal ofrece instrucciones y un comando) y lo sube; el portal lo firma vía step-ca con el `client_id` en el CN/SAN. Certificados de 90 días por defecto, con aviso a los 15 días.
-4. Rotación: se puede crear una segunda credencial antes de revocar la primera (ventana de rotación). Al rotar el secreto o pedir un certificado nuevo, el anterior queda `rotating` y sigue funcionando `lifecycle.credentialRotationDays` (7 por defecto); después pasa a `expired`. Revocar corta la credencial de inmediato. El secreto actual no se revoca: primero se rota. Una rotación a la vez por tipo de credencial.
-5. Una aplicación sin suscripciones aprobadas puede obtener token pero el gateway rechaza todas sus llamadas.
+1. `app_developer` creates an application in their entity (sandbox or production).
+2. The portal creates a confidential client in Keycloak (`client_credentials`) and shows the secret only once.
+3. If `features.mtls.required`, the developer generates a CSR (the portal offers instructions and a command) and uploads it; the portal signs it through step-ca with the `client_id` in the CN/SAN. Certificates last 90 days by default, with a notice 15 days before expiry.
+4. Rotation: a second credential can be created before revoking the first (rotation window). When the secret is rotated or a new certificate is requested, the previous one becomes `rotating` and keeps working for `lifecycle.credentialRotationDays` (7 by default); after that it becomes `expired`. Revoking cuts the credential off immediately. The current secret is not revoked: it is rotated first. One rotation at a time per credential type.
+5. An application without approved subscriptions can obtain a token, but the gateway rejects all its calls.
 
-### 4.4 Suscripción (solicitud de acceso)
+### 4.4 Subscription (access request)
 
 ```
 pending_provider → [pending_regulator] → approved → active
         ↘ rejected                ↘ rejected
 active ⇄ suspended
 active → revoked
-active → expired (al pasar validUntil)
-pending_* → withdrawn (el solicitante desiste)
-pending_provider → info_requested → pending_provider (pregunta del responsable y respuesta)
+active → expired (when validUntil passes)
+pending_* → withdrawn (the requester withdraws)
+pending_provider → info_requested → pending_provider (question from the steward and answer)
 ```
 
-1. `app_developer` de la entidad consumidora elige API y versión, aplicación, finalidad (del catálogo permitido por esa API), detalle de la finalidad, base legal, operaciones requeridas, vigencia, y adjunta el acuerdo de intercambio o referencia a un convenio vigente.
-2. Se notifica a los `data_steward` de la entidad proveedora. El responsable puede aprobar (opcionalmente reduciendo operaciones, límite o vigencia), rechazar con motivo o pedir información (comentario; vuelve al solicitante).
-3. Si la API es `sensitive` y la política lo exige, pasa además por `regulator`.
-4. `approved → active` ocurre cuando los reconciliadores confirman que el gateway ya tiene los datos de política. El portal muestra "activándose" mientras tanto. Objetivo: menos de 60 segundos.
-5. Suspender o revocar (proveedor, operador o regulador) se refleja en el gateway en menos de 60 segundos.
-6. Renovación: 30 días antes de `validUntil` se notifica al consumidor; la renovación es una nueva solicitud prellenada.
+1. The consumer entity's `app_developer` chooses the API and version, the application, the purpose (from the catalog allowed by that API), the purpose detail, the legal basis, the required operations and the validity period, and attaches the data exchange agreement or a reference to an agreement in force.
+2. The provider entity's `data_steward`s are notified. The steward can approve (optionally reducing operations, limit or validity), reject with a reason, or ask for information (a comment; it goes back to the requester).
+3. If the API is `sensitive` and policy requires it, it also goes through `regulator`.
+4. `approved → active` happens when the reconcilers confirm that the gateway already has the policy data. The portal shows "activating" in the meantime. Target: under 60 seconds.
+5. Suspending or revoking (by the provider, the operator or the regulator) is reflected in the gateway in under 60 seconds.
+6. Renewal: 30 days before `validUntil` the consumer is notified; renewal is a new, prefilled request.
 
-**Reglas**
-- Una aplicación tiene como máximo una suscripción activa por versión de API y finalidad.
-- Sandbox (M4-08): las suscripciones de aplicaciones sandbox se aprueban automáticamente si `features.sandbox.autoApprove` y solo apuntan al upstream de pruebas. Una aplicación sandbox solo puede pedir acceso a versiones que declaran un sandbox, y llama a `/sandbox{basePath}`. El gateway nunca la deja llegar al servicio real, ni a una aplicación de producción llegar al sandbox (`environment_mismatch`). La aprobación automática la decide el sistema y queda en la bitácora.
-- Separación de funciones: quien solicita no puede aprobar, aunque tenga ambos roles en entidades distintas. No aplica a revocar ni a suspender: esas acciones solo quitan acceso, y un responsable de datos debe poder cortar el acceso de una aplicación propia comprometida.
+**Rules**
+- An application has at most one active subscription per API version and purpose.
+- Sandbox (M4-08): subscriptions of sandbox applications are approved automatically if `features.sandbox.autoApprove`, and they only point to the test upstream. A sandbox application can only request access to versions that declare a sandbox, and it calls `/sandbox{basePath}`. The gateway never lets it reach the real service, nor lets a production application reach the sandbox (`environment_mismatch`). The automatic approval is decided by the system and recorded in the audit log.
+- Separation of duties: the requester cannot approve, even if they hold both roles in different entities. This does not apply to revoking or suspending: those actions only remove access, and a data steward must be able to cut off access for one of their own applications that has been compromised.
 
-### 4.5 Llamada a una API (lo que el portal hace posible)
+### 4.5 Calling an API (what the portal makes possible)
 
-El sistema consumidor obtiene un token de Keycloak con sus credenciales y llama al gateway con:
+The consumer system obtains a token from Keycloak with its credentials and calls the gateway with:
 - `Authorization: Bearer <token>`
-- `X-RID-Purpose: <código de finalidad>` (obligatorio)
-- `X-RID-End-User: <identificador del funcionario>`: obligatorio en APIs con datos personales o sensibles. Es un identificador de 1 a 128 caracteres visibles, sin espacios, como el usuario o el correo institucional. Solo se registra como hash con la sal del despliegue.
-- `X-Request-Id` (opcional; si no viene el gateway lo genera)
+- `X-RID-Purpose: <purpose code>` (required)
+- `X-RID-End-User: <official's identifier>`: required for APIs with personal or sensitive data. It is an identifier of 1 to 128 visible characters, with no spaces, such as the username or the institutional email. It is only recorded as a hash with the deployment's salt.
+- `X-Request-Id` (optional; if it is missing, the gateway generates it)
 
-El gateway permite la llamada solo si existe una suscripción `active` para ese cliente, esa versión, esa operación y esa finalidad. El proveedor recibe cabeceras de trazabilidad (ver `ARCHITECTURE.md §6`).
+The gateway allows the call only if there is an `active` subscription for that client, that version, that operation and that purpose. The provider receives traceability headers (see `ARCHITECTURE.md §6`).
 
-### 4.6 Nodos del kit
+### 4.6 Kit nodes
 
 ```
 enrollment_issued → enrolled → online ⇄ offline
                                  ↘ decommissioned
 ```
 
-1. `platform_admin` o `entity_admin` registra el nodo (nombre único en la entidad) y recibe un token de enrolamiento de un solo uso (válido 72 h), que se muestra una sola vez. Se usa en el bootcamp. Mientras el nodo no se enrola, se puede anular el token o emitir otro, que anula el vigente: un nodo tiene a lo sumo un token usable. El portal guarda solo el hash del token.
-2. El kit, al instalarse, llama a `POST /api/v1/nodes/enroll` con el token, su CSR y su clave pública WireGuard. Recibe certificado, configuración del túnel y el ID del nodo. El token deja de servir.
-3. El nodo envía heartbeat cada 60 s con versión y servicios expuestos. Sin heartbeat por 5 min → `offline` y alerta a los administradores de la entidad y al operador. El siguiente heartbeat lo devuelve a `online`.
-4. El nodo renueva su certificado antes de que venza. `entity_admin` o `platform_admin` pueden dar de baja un nodo (`decommissioned`): deja de funcionar para siempre.
-5. Las APIs con upstream `node` muestran el estado del nodo.
+1. `platform_admin` or `entity_admin` registers the node (name unique within the entity) and receives a single-use enrollment token (valid for 72 h), which is shown only once. It is used at the bootcamp. While the node has not enrolled, the token can be voided or a new one issued, which voids the current one: a node has at most one usable token. The portal stores only the token's hash.
+2. When the kit is installed, it calls `POST /api/v1/nodes/enroll` with the token, its CSR and its WireGuard public key. It receives a certificate, the tunnel configuration and the node ID. The token stops working.
+3. The node sends a heartbeat every 60 s with its version and exposed services. No heartbeat for 5 min → `offline` and an alert to the entity's administrators and to the operator. The next heartbeat brings it back to `online`.
+4. The node renews its certificate before it expires. `entity_admin` or `platform_admin` can decommission a node (`decommissioned`): it stops working for good.
+5. APIs with a `node` upstream show the node's status.
 
-**Preparación del bootcamp (M4-07).** Antes del bootcamp, cada entidad confirma cinco requisitos: un servidor para el nodo, un usuario de solo lectura de la base de datos, salida a internet por 443, los responsables designados (se calcula: miembros con `api_publisher` y `data_steward`) y el caso de uso. Los marca el `entity_admin` (o el operador) y el operador ve el avance de todas las entidades.
+**Bootcamp preparation (M4-07).** Before the bootcamp, each entity confirms five requirements: a server for the node, a read-only database user, outbound internet access on 443, the designated officers (computed: members with `api_publisher` and `data_steward`) and the use case. The `entity_admin` (or the operator) checks them off, and the operator sees the progress of every entity.
 
-### 4.7 Transparencia para el titular (ADR-0015, ADR-0016)
+### 4.7 Transparency for the data subject (ADR-0015, ADR-0016)
 
-1. Al publicar una versión de una API `personal` o `sensitive`, cada operación declara dónde está el titular (`x-rid-data-subject`) o que no tiene titular (`none`).
-2. En cada llamada autorizada, el gateway calcula un seudónimo del titular y registra la consulta: entidad y aplicación que consultaron, entidad proveedora, API y datos expuestos, operación, finalidad, funcionario (hash), fecha y resultado. Nunca registra el contenido ni el número de documento.
-3. Las consultas se agrupan en lotes sellados (firma del operador y sello de tiempo de una TSA independiente). Cada consulta tiene un comprobante que cualquiera puede verificar.
-4. El ciudadano ve sus consultas en la Carpeta Ciudadana Digital. El portal solo responde a la Carpeta con el token del ciudadano, y le avisa de consultas nuevas si el ciudadano lo pidió.
+1. When a version of a `personal` or `sensitive` API is published, each operation declares where the data subject is (`x-rid-data-subject`) or that it has no data subject (`none`).
+2. On each authorized call, the gateway computes a pseudonym for the data subject and records the query: the entity and application that queried, the provider entity, the API and the exposed data, the operation, the purpose, the official (hash), the date and the result. It never records the content or the document number.
+3. Queries are grouped into sealed batches (operator signature and a timestamp from an independent TSA). Each query has a receipt that anyone can verify.
+4. Citizens see their queries in the Carpeta Ciudadana Digital. The portal only answers the Carpeta with the citizen's token, and alerts the citizen about new queries if the citizen asked for it.
 
-## 5. Reglas de negocio transversales
+## 5. Cross-cutting business rules
 
-- **Minimización:** el revisor ve los `exposedFields` y debe confirmar que corresponden a las finalidades permitidas. El catálogo muestra qué datos personales expone cada API.
-- **Clasificación:** `public` (datos abiertos), `internal` (no personal, uso interno), `personal` (datos personales), `sensitive` (categorías especiales: salud, etc.). La clasificación decide aprobaciones adicionales, vigencia máxima y si se exige `X-RID-End-User`.
-- **Vigencia máxima de suscripción** por clasificación, configurable (por defecto: public 24 m, internal 24 m, personal 12 m, sensitive 6 m).
-- **Nada se borra** en el dominio: las entidades, APIs y suscripciones cambian de estado. La única eliminación física es de documentos adjuntos por orden legal, y se registra en auditoría.
+- **Minimization:** the reviewer sees the `exposedFields` and must confirm that they match the allowed purposes. The catalog shows which personal data each API exposes.
+- **Classification:** `public` (open data), `internal` (non-personal, internal use), `personal` (personal data), `sensitive` (special categories: health, etc.). The classification determines additional approvals, maximum validity and whether `X-RID-End-User` is required.
+- **Maximum subscription validity** per classification, configurable (by default: public 24 months, internal 24 months, personal 12 months, sensitive 6 months).
+- **Nothing is deleted** in the domain: entities, APIs and subscriptions change state. The only physical deletion is of attached documents by legal order, and it is recorded in the audit log.
 
-## 6. Pantallas
+## 6. Screens
 
-**Portal (todas las entidades)**
-- Inicio: buscador del catálogo, accesos rápidos según rol, pendientes (bandeja).
-- Catálogo: filtros por sector, entidad, clasificación, estado; tarjetas con datos personales expuestos.
-- Detalle de API: descripción, ficha del servicio, documentación interactiva (Scalar) con "probar en sandbox", versiones, finalidades permitidas, estado del nodo, botón "Solicitar acceso".
-- Mi entidad: datos, miembros e invitaciones, nodos, acuerdos.
-- Mis APIs (proveedor): lista, crear/editar versión, envío a revisión, solicitudes recibidas, consumidores activos, uso.
-- Mis aplicaciones (consumidor): credenciales, certificados, suscripciones y su estado, uso, guía de integración (programas en curl, Python, Node.js, Java y C#).
-- Bandeja de solicitudes (responsable de datos): pendientes, historial, acciones de aprobar/rechazar/suspender/revocar.
+**Portal (all entities)**
+- Home: catalog search, quick links by role, pending items (inbox).
+- Catalog: filters by sector, entity, classification, status; cards showing the personal data exposed.
+- API detail: description, service sheet, interactive documentation (Scalar) with "try in sandbox", versions, allowed purposes, node status, "Request access" button.
+- My entity: data, members and invitations, nodes, agreements.
+- My APIs (provider): list, create/edit a version, submit for review, requests received, active consumers, usage.
+- My applications (consumer): credentials, certificates, subscriptions and their status, usage, integration guide (programs in curl, Python, Node.js, Java and C#).
+- Request inbox (data steward): pending, history, approve/reject/suspend/revoke actions.
 
-**Consola del operador**
-- Altas de entidades, revisiones de API, nodos (estado, versión, último heartbeat), estado de sincronización del gateway (último reconcile, diferencias), suscripciones globales, finalidades, configuración.
+**Operator console**
+- Entity registrations, API reviews, nodes (status, version, last heartbeat), gateway sync status (last reconcile, differences), all subscriptions, purposes, configuration.
 
-**Vista del regulador**
-- Indicadores de la red (§8), aprobaciones pendientes que le corresponden, mapa de intercambios (qué entidad consume de cuál), auditoría y exportación.
+**Regulator view**
+- Network indicators (§8), pending approvals that fall to the regulator, exchange map (which entity consumes from which), audit and export.
 
-**Auditoría** (regulador, auditor, operador; cada entidad ve lo suyo)
-- Línea de tiempo filtrable, verificación de integridad de la cadena, exportación CSV/JSON firmada.
+**Audit** (regulator, auditor, operator; each entity sees its own)
+- Filterable timeline, chain integrity verification, signed CSV/JSON export.
 
-## 7. Notificaciones
+## 7. Notifications
 
-En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobada/rechazada, API enviada a revisión / cambios solicitados / publicada, nueva solicitud de acceso, solicitud aprobada/rechazada/con preguntas, suscripción suspendida/revocada/por vencer, certificado por vencer, certificado revocado por el operador (revocación masiva, M6-07), nodo offline, versión de API en deprecación. Cada usuario elige qué recibe por correo (los de seguridad no se pueden desactivar).
+In the portal and by email. Minimum events: invitation to an entity, registration approved/rejected, API submitted for review / changes requested / published, new access request, request approved/rejected/with questions, subscription suspended/revoked/about to expire, certificate about to expire, certificate revoked by the operator (mass revocation, M6-07), node offline, API version being deprecated. Each user chooses what they receive by email (security notices cannot be turned off).
 
-## 8. Indicadores (vienen de la propuesta de la red)
+## 8. Indicators (taken from the network proposal)
 
-| Indicador | Cálculo |
+| Indicator | Calculation |
 | :-- | :-- |
-| Tiempo a la primera API en uso | Días entre el alta de la entidad (o enrolamiento del nodo) y la primera llamada exitosa de un consumidor de producción |
-| Entidades conectadas por mes | Entidades con al menos una API publicada, por mes de publicación |
-| APIs con consumo real | APIs publicadas con ≥ 1 llamada exitosa de producción en el mes |
-| Consultas exitosas | % de respuestas 2xx sobre el total (excluye 401/403 de autorización, que se reportan aparte) |
-| Disponibilidad del gateway | % de tiempo con health OK (Prometheus) |
-| Tiempo de aprobación | Mediana de horas entre solicitud y decisión del proveedor |
-| Pasos manuales evitados | Campo manual por caso de uso: se captura con el caso de uso del bootcamp de la entidad (M4-07) |
+| Time to first API in use | Days between the entity's registration (or the node's enrollment) and the first successful call from a production consumer |
+| Entities connected per month | Entities with at least one published API, by month of publication |
+| APIs with real usage | Published APIs with ≥ 1 successful production call in the month |
+| Successful queries | % of 2xx responses over the total (excludes authorization 401/403s, which are reported separately) |
+| Gateway availability | % of time with health OK (Prometheus) |
+| Approval time | Median hours between request and the provider's decision |
+| Manual steps avoided | Manual field per use case: captured with the use case from the entity's bootcamp (M4-07) |
 
-## 9. Puntos de extensión previstos
+## 9. Planned extension points
 
-- **Consentimiento:** el modelo de suscripción admite `consentRequired: bool`. Cuando se active, OPA consultará un servicio de consentimiento antes de permitir. No se implementa en el MVP; la interfaz de política ya recibe la cabecera `X-RID-Consent-Ref` si viene.
-- **Instancias territoriales** (p. ej. Bogotá): una instancia del gateway con su propio subconjunto de rutas, gobernada desde el mismo portal (`Gateway` como entidad de primer nivel en una versión futura).
-- **Credenciales verificables:** una entidad proveedora podrá marcar una API como "fuente de emisión" para un emisor de credenciales; fuera del MVP.
+- **Consent:** the subscription model supports `consentRequired: bool`. When it is enabled, OPA will query a consent service before allowing. It is not implemented in the MVP; the policy interface already receives the `X-RID-Consent-Ref` header if present.
+- **Territorial instances** (e.g. Bogotá): a gateway instance with its own subset of routes, governed from the same portal (`Gateway` as a first-class entity in a future version).
+- **Verifiable credentials:** a provider entity will be able to mark an API as an "issuance source" for a credential issuer; out of the MVP.
 
-## 10. Configuración por país (ejemplo abreviado)
+## 10. Per-country configuration (abridged example)
 
 ```yaml
 country:
@@ -293,15 +295,15 @@ subscriptionMaxValidityMonths: { public: 24, internal: 24, personal: 12, sensiti
 branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/logo.svg", primaryColor: "#6564DB" }
 ```
 
-## 11. Requisitos no funcionales
+## 11. Non-functional requirements
 
-- **Disponibilidad:** el portal puede caer sin afectar el tráfico; el gateway sigue operando con la última configuración y el último bundle de OPA.
-- **Latencia agregada por el gateway:** p95 < 50 ms (sin contar el upstream) con OPA local.
-- **Propagación:** aprobación o revocación reflejada en el gateway en < 60 s.
-- **Escala inicial:** 200 entidades, 1.000 APIs, 5.000 suscripciones, 500 peticiones/s sostenidas en el gateway.
-- **Seguridad:** OWASP ASVS L2; MFA obligatorio para roles de plataforma y `data_steward` (Keycloak pide el código; el API lo exige en cada petición, ADR-0021).
-- **Privacidad:** sin cuerpos en logs; identificadores en rutas enmascarados; `X-RID-End-User` guardado como hash con sal por despliegue.
-- **Retención:** bitácora de auditoría 5 años (configurable); logs de acceso 1 año (configurable).
-- **Accesibilidad:** WCAG 2.1 AA.
-- **Idiomas:** español (por defecto) e inglés.
-- **Despliegue:** Docker Compose para desarrollo y pilotos; Helm/Kubernetes para producción (hito M6).
+- **Availability:** the portal can go down without affecting traffic; the gateway keeps operating with the last configuration and the last OPA bundle.
+- **Latency added by the gateway:** p95 < 50 ms (not counting the upstream) with a local OPA.
+- **Propagation:** approval or revocation reflected in the gateway in < 60 s.
+- **Initial scale:** 200 entities, 1,000 APIs, 5,000 subscriptions, 500 sustained requests/s at the gateway.
+- **Security:** OWASP ASVS L2; mandatory MFA for platform roles and `data_steward` (Keycloak asks for the code; the API requires it on every request, ADR-0021).
+- **Privacy:** no bodies in logs; identifiers in paths masked; `X-RID-End-User` stored as a hash with a per-deployment salt.
+- **Retention:** audit log 5 years (configurable); access logs 1 year (configurable).
+- **Accessibility:** WCAG 2.1 AA.
+- **Languages:** Spanish (default) and English.
+- **Deployment:** Docker Compose for development and pilots; Helm/Kubernetes for production (milestone M6).

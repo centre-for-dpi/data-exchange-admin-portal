@@ -1,5 +1,7 @@
 # Guía para el operador y el regulador
 
+> English version (official): [docs/guides/operator.md](../../guides/operator.md)
+
 Versión 1.2 · noviembre 2026 · código con el hito M6 (endurecimiento) cerrado · para la sesión de arquitectura y despliegue con el operador (AND) y el regulador (MinTIC)
 
 Esta guía explica **qué es cada pieza de la plataforma, por qué está y quién la opera**, y cómo se despliega la infraestructura central. Para el detalle técnico remite a `ARCHITECTURE.md`, `DEPLOYMENT.md` y `OPERATIONS.md`; la instalación paso a paso está en [`INSTALL.md`](../INSTALL.md).

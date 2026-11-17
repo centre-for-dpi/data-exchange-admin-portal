@@ -1,17 +1,19 @@
-# Arquitectura técnica — Portal RID
+# Technical architecture — RID Portal
 
-Versión 0.1 · noviembre 2026
+> Versión en español: [docs/es/ARCHITECTURE.md](es/ARCHITECTURE.md)
 
-## 1. Vista general
+Version 0.1 · November 2026
+
+## 1. Overview
 
 ```mermaid
 flowchart TB
-  subgraph Personas
-    U1[Funcionarios de entidades]
-    U2[Operador AND]
-    U3[Regulador MinTIC]
+  subgraph People
+    U1[Entity officials]
+    U2[Operator AND]
+    U3[Regulator MinTIC]
   end
-  subgraph Plano_de_gobierno["Plano de gobierno (portal)"]
+  subgraph Governance_plane["Governance plane (portal)"]
     WEB[apps/web · Next.js]
     API[apps/api · NestJS]
     PG[(PostgreSQL)]
@@ -19,173 +21,173 @@ flowchart TB
     CA[step-ca]
     OS[(OpenSearch)]
   end
-  subgraph Plano_de_datos["Plano de datos (tráfico)"]
+  subgraph Data_plane["Data plane (traffic)"]
     GW[APISIX + etcd]
     OPA[OPA]
     FB[Fluent Bit]
   end
-  subgraph Entidades
-    C[Sistema consumidor]
-    N1[Nodo del kit · APIs instantáneas]
-    D1[API existente]
+  subgraph Entities
+    C[Consumer system]
+    N1[Kit node · instant APIs]
+    D1[Existing API]
     XR[X-Road Security Server]
   end
   U1 & U2 & U3 --> WEB --> API --> PG
   WEB -. OIDC .-> KC
-  API -- reconcilia rutas/upstreams --> GW
-  API -- clientes OAuth2 --> KC
-  API -- firma CSR --> CA
-  OPA -- descarga bundle --> API
-  API -- consulta analítica --> OS
+  API -- reconciles routes/upstreams --> GW
+  API -- OAuth2 clients --> KC
+  API -- signs CSR --> CA
+  OPA -- downloads bundle --> API
+  API -- analytics query --> OS
   C -- token --> KC
   C -- "HTTPS + mTLS + Bearer + X-RID-Purpose" --> GW
-  GW -- decide --> OPA
-  GW -- túnel WireGuard + mTLS --> N1
+  GW -- decides --> OPA
+  GW -- WireGuard tunnel + mTLS --> N1
   GW --> D1
   GW --> XR
-  GW -- logs (solo metadatos) --> FB --> OS
+  GW -- logs (metadata only) --> FB --> OS
 ```
 
-Dos planos separados:
+Two separate planes:
 
-- **Plano de gobierno:** el portal. Si cae, el tráfico sigue funcionando con la última configuración.
-- **Plano de datos:** APISIX + OPA. Autoriza cada llamada con datos que el portal publica. Nunca consulta la base de datos del portal en línea.
+- **Governance plane:** the portal. If it goes down, traffic keeps flowing with the last configuration.
+- **Data plane:** APISIX + OPA. It authorizes every call with data that the portal publishes. It never queries the portal's database online.
 
-## 2. Componentes
+## 2. Components
 
-| Componente | Responsabilidad | Notas |
+| Component | Responsibility | Notes |
 | :-- | :-- | :-- |
-| `apps/web` | UI del portal, consolas de operador/regulador | Next.js App Router, Server Components, Auth.js con Keycloak. Llama a `apps/api` con el token del usuario |
-| `apps/api` | Dominio, flujos, autorización, auditoría, reconciliadores, bundle OPA, contrato con nodos | NestJS + Fastify, Prisma, pg-boss |
-| PostgreSQL | Estado de dominio, outbox, auditoría, colas pg-boss | Única fuente de verdad |
-| Keycloak | Realm `rid-portal` (personas, MFA) y realm `rid-gateway` (clientes de aplicaciones) | Dos realms para separar políticas de tokens |
-| APISIX + etcd | Gateway: mTLS, validación de token, llamada a OPA, límites, enrutamiento, logs | Admin API solo en red interna |
-| OPA | Decisión de autorización por llamada | Se despliega junto a cada nodo de APISIX (sidecar o mismo host) |
-| step-ca | CA intermedia para aplicaciones y nodos | Raíz fuera de línea; en producción, en HSM (PKCS#11) |
-| Fluent Bit | Recibe logs de APISIX, aplica enmascarado, envía a OpenSearch | Segunda barrera de privacidad |
-| OpenSearch | Logs de acceso (metadatos) y analítica | El navegador nunca habla con OpenSearch |
-| Prometheus + Alertmanager | Métricas y alertas | Grafana opcional para operadores |
-| WireGuard hub | Extremo central de los túneles de los nodos y enrutador TLS por SNI hacia ellos | Contenedor `wg-hub` en la red del gateway (M4-03, ADR-0023); no reenvía paquetes |
+| `apps/web` | Portal UI, operator/regulator consoles | Next.js App Router, Server Components, Auth.js with Keycloak. Calls `apps/api` with the user's token |
+| `apps/api` | Domain, flows, authorization, audit, reconcilers, OPA bundle, contract with nodes | NestJS + Fastify, Prisma, pg-boss |
+| PostgreSQL | Domain state, outbox, audit, pg-boss queues | Single source of truth |
+| Keycloak | Realm `rid-portal` (people, MFA) and realm `rid-gateway` (application clients) | Two realms to keep token policies separate |
+| APISIX + etcd | Gateway: mTLS, token validation, call to OPA, limits, routing, logs | Admin API on the internal network only |
+| OPA | Authorization decision per call | Deployed next to each APISIX node (sidecar or same host) |
+| step-ca | Intermediate CA for applications and nodes | Offline root; in production, in an HSM (PKCS#11) |
+| Fluent Bit | Receives APISIX logs, applies masking, sends to OpenSearch | Second privacy barrier |
+| OpenSearch | Access logs (metadata) and analytics | The browser never talks to OpenSearch |
+| Prometheus + Alertmanager | Metrics and alerts | Grafana optional for operators |
+| WireGuard hub | Central end of the nodes' tunnels and TLS router to them by SNI | `wg-hub` container on the gateway network (M4-03, ADR-0023); does not forward packets |
 
-## 3. Identidad y autenticación
+## 3. Identity and authentication
 
-### 3.1 Personas (realm `rid-portal`)
+### 3.1 People (realm `rid-portal`)
 
-- Login OIDC (Authorization Code + PKCE) desde `apps/web` vía Auth.js.
-- `apps/api` valida el access token (JWKS de Keycloak, `aud = rid-portal-api`).
-- Los recursos de una entidad se exponen bajo `/api/v1/entities/{entityId}/...` y un guard global aplica la tabla de permisos (`apps/api/src/auth/authz.policy.ts`): otra entidad → 404, miembro sin rol → 403 (ADR-0014).
-- **Matriz completa (M2-03).** Cada ruta declara su acceso: `@Public`, `@CitizenAccess`, `@OptionalAuth`, `@SignedIn` (cualquier sesión, solo recursos propios), `@EntityAccess(acción)` o `@PlatformAccess(acción)`. El guard rechaza con 403 la ruta que no declare nada (falla cerrado). La matriz acción × rol y ruta → acceso está en `docs/AUTHZ.md`, generada desde la política; un test falla si queda desactualizada. Un test de integración generado llama cada ruta protegida con cada rol de entidad, cada rol de plataforma, un miembro de otra entidad, un usuario sin roles y sin sesión, y compara con la política.
-- La web guarda los tokens solo en la cookie cifrada de Auth.js y renueva el access token (5 min) con el refresh token antes de que venza.
-- **Cuentas (ADR-0018).** Autorregistro con verificación de correo obligatoria. Una cuenta nueva no tiene roles: los roles llegan solo con un alta aprobada (el solicitante pasa a `entity_admin`) o con una invitación aceptada. La invitación va a un correo y solo la ve y acepta quien entra con ese correo **verificado** (`email_verified` del token y el mismo correo con que se registró). El aviso por correo trae un enlace al portal, sin secreto. El portal no crea usuarios en Keycloak. El `entity_admin` invita, cambia roles y revoca (M2-02). Una revocación aplica en la siguiente petición, porque los roles se leen en cada una, y la entidad siempre conserva un administrador activo.
-- **Los roles NO viven en Keycloak.** Keycloak solo autentica; roles de plataforma y membresías por entidad viven en PostgreSQL. Así el portal tiene roles personalizados por entidad sin depender de grupos de Keycloak.
-- **Segundo factor (M3-08, ADR-0021).** Lo exigen los roles de plataforma y `data_steward` en cualquier entidad, por escalado de sesión:
-  - el flujo `rid-browser` de `rid-portal` tiene dos niveles: contraseña (`acr=password`) y código TOTP (`acr=mfa`). Pedir `acr_values=mfa` solo agrega el código a la sesión; quien no tiene uno pasa por `CONFIGURE_TOTP`;
-  - el API responde 403 `mfa_required` en toda ruta de entidad o de plataforma si los roles lo exigen y el `acr` del token no es `mfa`, siempre después de las comprobaciones de rol. `/me` informa `mfa.required` y `mfa.satisfied`;
-  - la web, al verlo, vuelve a iniciar sesión con `acr_values=mfa` (`/api/session/step-up`). Una cookie corta evita los bucles y deja un aviso para reintentar;
-  - el portal no escribe en los usuarios de Keycloak: decide quién lo necesita con los roles de PostgreSQL y lo comprueba en cada petición;
-  - **riesgo residual: el enrolamiento en el primer uso.** Quien tiene la contraseña de una cuenta con rol crítico que aún no enroló su app puede enrolar la suya. Para que no pase inadvertido, Keycloak le avisa por correo al dueño de la cuenta cuando se pone o se quita una credencial (listener `email`, solo `UPDATE_CREDENTIAL` y `REMOVE_CREDENTIAL`), y guarda esos eventos 90 días. Un despliegue que necesite cerrar esa ventana puede exigir el enrolamiento al activar la cuenta (acción requerida `CONFIGURE_TOTP` para todas las cuentas nuevas) o enrolar fuera de banda.
+- OIDC login (Authorization Code + PKCE) from `apps/web` through Auth.js.
+- `apps/api` validates the access token (Keycloak JWKS, `aud = rid-portal-api`).
+- An entity's resources are exposed under `/api/v1/entities/{entityId}/...` and a global guard applies the permission table (`apps/api/src/auth/authz.policy.ts`): another entity → 404, member without the role → 403 (ADR-0014).
+- **Full matrix (M2-03).** Every route declares its access: `@Public`, `@CitizenAccess`, `@OptionalAuth`, `@SignedIn` (any session, own resources only), `@EntityAccess(action)` or `@PlatformAccess(action)`. The guard rejects with 403 any route that declares nothing (fails closed). The action × role and route → access matrix is in `docs/AUTHZ.md`, generated from the policy; a test fails if it gets out of date. A generated integration test calls every protected route with every entity role, every platform role, a member of another entity, a user with no roles and no session, and compares the result with the policy.
+- The web app keeps tokens only in the encrypted Auth.js cookie and renews the access token (5 min) with the refresh token before it expires.
+- **Accounts (ADR-0018).** Self-registration with mandatory email verification. A new account has no roles: roles only come with an approved registration (the requester becomes `entity_admin`) or an accepted invitation. The invitation goes to an email address, and only the person who signs in with that **verified** email (`email_verified` in the token and the same email they registered with) can see and accept it. The email notice carries a link to the portal, with no secret. The portal does not create users in Keycloak. The `entity_admin` invites, changes roles and revokes (M2-02). A revocation applies on the next request, because roles are read on every request, and the entity always keeps one active administrator.
+- **Roles do NOT live in Keycloak.** Keycloak only authenticates; platform roles and per-entity memberships live in PostgreSQL. This gives the portal custom roles per entity without depending on Keycloak groups.
+- **Second factor (M3-08, ADR-0021).** Required for platform roles and for `data_steward` in any entity, through session step-up:
+  - the `rid-browser` flow of `rid-portal` has two levels: password (`acr=password`) and TOTP code (`acr=mfa`). Asking for `acr_values=mfa` only adds the code to the session; a user who has none goes through `CONFIGURE_TOTP`;
+  - the API responds 403 `mfa_required` on every entity or platform route if the roles require it and the token's `acr` is not `mfa`, always after the role checks. `/me` reports `mfa.required` and `mfa.satisfied`;
+  - when the web app sees it, it signs in again with `acr_values=mfa` (`/api/session/step-up`). A short-lived cookie prevents loops and leaves a notice to retry;
+  - the portal does not write to Keycloak users: it decides who needs it from the roles in PostgreSQL and checks it on every request;
+  - **residual risk: enrollment on first use.** Someone who has the password of an account with a critical role that has not yet enrolled its authenticator app can enroll their own. So that this does not go unnoticed, Keycloak emails the account owner when a credential is added or removed (`email` listener, only `UPDATE_CREDENTIAL` and `REMOVE_CREDENTIAL`), and keeps those events for 90 days. A deployment that needs to close that window can require enrollment when the account is activated (required action `CONFIGURE_TOTP` for all new accounts) or enroll out of band.
 
-### 3.2 Aplicaciones consumidoras (realm `rid-gateway`)
+### 3.2 Consumer applications (realm `rid-gateway`)
 
-- Una `Application` = un cliente confidencial con `serviceAccountsEnabled`, solo grant `client_credentials`, `clientId = rid-app-<uuid>`.
-- Mapper de audiencia `rid-gateway`. Vida del access token: 5 min.
-- Con `features.mtls.required` (activo en `co.yaml` desde M3-10): la aplicación se autentica con su **secreto**, y sus **tokens quedan ligados al certificado** (RFC 8705, claim `cnf.x5t#S256`, atributo `tls.client.certificate.bound.access.tokens` del cliente). No se usa `tls_client_auth` (ADR-0022). Cómo lo comprueba el gateway (SPIKE S-3, `docs/spikes/S-3.md`):
-  - un objeto SSL de APISIX con `client.ca` (cadena de step-ca) rechaza en el handshake a quien no presenta un certificado válido;
-  - el plugin propio `rid-client-cert` pone en `X-RID-Client-Cert-S256` la huella (base64url del SHA-256 del DER) del certificado verificado, tras borrar la que mande el cliente. No sirve `$ssl_client_fingerprint`, que es SHA-1;
-  - OPA la compara con `cnf.x5t#S256` y con las huellas vigentes de la aplicación en el bundle (`data.clients[id].certificates`). Revocar es quitar la huella. La cabecera nunca llega al proveedor;
-  - el TLS del gateway debe terminar en APISIX: delante solo puede haber un balanceador de capa 4 con paso directo TLS.
-  - el token también se pide al gateway, en `POST <gateway>/oauth/token` (SPIKE S-4, ADR-0022).
-    - La ruta `rid-oauth-token` (reconciliador de APISIX) lleva al endpoint de tokens de `rid-gateway` el certificado ya verificado, en `SSL_CLIENT_CERT` (`$ssl_client_escaped_cert`) y `ssl-client-verify` (`$ssl_client_verify`). Siempre reescribe esas cabeceras y borra sus otras grafías.
-    - Keycloak usa el proveedor x509 `nginx` con `trust-proxy-verification`. `tokenUrl` de la aplicación es esa ruta.
-    - Como Keycloak cree en esa cabecera, toda otra vía hacia él debe borrarla. Aun así, una cabecera inventada no autentica a nadie (hace falta el secreto), y un token ligado a un certificado ajeno no sirve sin su clave privada.
-  - la raíz de la red, que también emite el certificado del gateway, es pública: `GET /api/v1/pki/ca`. La guía de la aplicación la ofrece.
-- El portal usa una cuenta de servicio con permiso `manage-clients` **solo** en `rid-gateway`.
+- One `Application` = one confidential client with `serviceAccountsEnabled`, only the `client_credentials` grant, `clientId = rid-app-<uuid>`.
+- Audience mapper `rid-gateway`. Access token lifetime: 5 min.
+- With `features.mtls.required` (enabled in `co.yaml` since M3-10): the application authenticates with its **secret**, and its **tokens are bound to the certificate** (RFC 8705, claim `cnf.x5t#S256`, client attribute `tls.client.certificate.bound.access.tokens`). `tls_client_auth` is not used (ADR-0022). How the gateway checks it (SPIKE S-3, `docs/spikes/S-3.md`):
+  - an APISIX SSL object with `client.ca` (the step-ca chain) rejects in the handshake anyone who does not present a valid certificate;
+  - the custom plugin `rid-client-cert` puts in `X-RID-Client-Cert-S256` the fingerprint (base64url of the SHA-256 of the DER) of the verified certificate, after deleting any the client sends. `$ssl_client_fingerprint` does not work, because it is SHA-1;
+  - OPA compares it with `cnf.x5t#S256` and with the application's current fingerprints in the bundle (`data.clients[id].certificates`). Revoking means removing the fingerprint. The header never reaches the provider;
+  - the gateway's TLS must terminate in APISIX: only a layer 4 load balancer with TLS passthrough can sit in front of it.
+  - the token is also requested from the gateway, at `POST <gateway>/oauth/token` (SPIKE S-4, ADR-0022).
+    - The `rid-oauth-token` route (APISIX reconciler) carries the already verified certificate to the `rid-gateway` token endpoint, in `SSL_CLIENT_CERT` (`$ssl_client_escaped_cert`) and `ssl-client-verify` (`$ssl_client_verify`). It always rewrites those headers and deletes their other spellings.
+    - Keycloak uses the `nginx` x509 provider with `trust-proxy-verification`. The application's `tokenUrl` is that route.
+    - Since Keycloak trusts that header, every other path to it must delete it. Even so, a forged header authenticates nobody (the secret is required), and a token bound to someone else's certificate is useless without its private key.
+  - the network root, which also issues the gateway's certificate, is public: `GET /api/v1/pki/ca`. The application guide offers it.
+- The portal uses a service account with the `manage-clients` permission **only** in `rid-gateway`.
 
-## 4. Patrón de reconciliación
+## 4. Reconciliation pattern
 
-Nada se escribe en APISIX/Keycloak/OPA desde un controlador HTTP.
+Nothing is written to APISIX/Keycloak/OPA from an HTTP controller.
 
 ```
-Transacción de dominio
-  ├─ cambia estado (p. ej. subscription → approved)
+Domain transaction
+  ├─ changes state (e.g. subscription → approved)
   ├─ AuditService.record(...)
   └─ outbox.insert({ topic: "gateway.sync", aggregate: "apiVersion:<id>" })
 
 Worker (pg-boss)
-  └─ toma outbox → encola job "reconcile:<target>"
+  └─ takes outbox → enqueues job "reconcile:<target>"
 
-Reconciliador
-  1. desired = buildDesiredState(target)        // desde PostgreSQL
+Reconciler
+  1. desired = buildDesiredState(target)        // from PostgreSQL
   2. actual  = readActualState(target)          // Admin API / Keycloak Admin API
   3. diff    = compare(desired, actual)
-  4. apply(diff) con PUT idempotente e IDs deterministas
+  4. apply(diff) with idempotent PUT and deterministic IDs
   5. sync_state.upsert({ target, hash(desired), appliedAt, status })
-  6. si el objetivo era una suscripción → marcar active/suspended/revoked cuando se confirma
+  6. if the target was a subscription → mark active/suspended/revoked once confirmed
 ```
 
-- **Reconciliación completa** cada 5 minutos además de la incremental, para corregir derivas.
-- **Consola del operador (`/operator/sync`, M5-07).** Muestra `sync_state` por sistema y estado: si el hash deseado está aplicado, los errores con sus intentos y la deriva encontrada.
-  - **Deriva.** Es una pasada que tuvo que escribir aunque el estado deseado no había cambiado desde que se aplicó (`appliedHash = desiredHash` y `in_sync`): alguien cambió el objeto fuera del portal. El reconciliador la corrige y deja `driftDetectedAt` y `driftCount`. Así lo detectan las versiones en APISIX y los clientes de Keycloak.
-  - **Reintento.** `POST /admin/sync/retry`, solo `platform_admin`, encola el trabajo del reconciliador dueño del objetivo: `gateway.sync` (`apiVersion:<id>`, o `gateway:all` para TLS y las rutas propias), `keycloak.sync`, `policy.sync`, `wireguard.sync` u `opensearch.sync`. Nunca llama al sistema desde el controlador, y queda en auditoría (`sync.retry_requested`).
-- IDs deterministas: `rid-route-<apiVersionId>`, `rid-upstream-<apiVersionId>`, `rid-app-<applicationId>`.
+- **Full reconciliation** every 5 minutes in addition to the incremental one, to correct drift.
+- **Operator console (`/operator/sync`, M5-07).** Shows `sync_state` by system and status: whether the desired hash is applied, the errors with their attempts, and the drift found.
+  - **Drift.** A pass that had to write even though the desired state had not changed since it was applied (`appliedHash = desiredHash` and `in_sync`): someone changed the object outside the portal. The reconciler corrects it and records `driftDetectedAt` and `driftCount`. This is how drift is detected in APISIX versions and in Keycloak clients.
+  - **Retry.** `POST /admin/sync/retry`, `platform_admin` only, enqueues the job of the reconciler that owns the target: `gateway.sync` (`apiVersion:<id>`, or `gateway:all` for TLS and the custom routes), `keycloak.sync`, `policy.sync`, `wireguard.sync` or `opensearch.sync`. It never calls the system from the controller, and it is recorded in the audit log (`sync.retry_requested`).
+- Deterministic IDs: `rid-route-<apiVersionId>`, `rid-upstream-<apiVersionId>`, `rid-app-<applicationId>`.
 
-### 4.1 Objetos en APISIX por versión de API publicada
+### 4.1 APISIX objects per published API version
 
 **Upstream** `rid-upstream-<apiVersionId>`
-- `node` con `nodeId` (M4-04, ADR-0023): `nodes = { "<RID_GATEWAY_WG_HUB>": 1 }` (el enrutador SNI del hub, `wg-hub:8443`), `scheme = https`, `pass_host = rewrite` y `upstream_host = rid-node-<nodeId>`, que es también el SNI con el que el hub elige el nodo y el nombre que se verifica en su certificado. mTLS hacia el nodo (M3-03): `tls.client_cert_id = rid-ssl-gateway-client-<entityId>`, `tls.verify = true` y `tls.ca_certs` = la CA de la red. El hub pasa la conexión, sin abrirla, a `<dirección del túnel>:<servicePort>`, y el servicio vive en el `servicePath` del nodo (la ruta pública se reescribe a `servicePath/...`). El reconciliador lee el nodo en cada pasada: si no es de la entidad de la versión, no está `enrolled`, `online` u `offline`, o falta el hub o la CA, borra la ruta y el upstream (falla cerrado). Un nodo `offline` conserva su ruta y vuelve a responder cuando se reconecta. Enrolar o dar de baja un nodo encola `gateway.sync` de sus versiones. Al registrar la versión, el `nodeId` debe ser de un nodo de la entidad que no esté dado de baja (400 en `upstream.nodeId`).
-- `node` sin `nodeId`: el servicio de prueba del entorno. El reconciliador resuelve el nodo con `RID_DEV_NODES` (`slug-entidad=host:puerto` del mock de esa entidad, `scheme = http`; con `https://host:puerto`, el mTLS de arriba hacia ese host). Una entidad que no figura ahí queda en error de sincronización, sin escribir nada en APISIX.
-- `direct`: host de la API existente, `scheme = https` con `tls.verify = true` (el certificado del proveedor se verifica contra las CA del sistema y para su nombre), y la ruta del URL como prefijo. Con `mtls`, además `tls.client_cert_id = rid-ssl-gateway-client-<entityId>` (M3-03): el proveedor confía en la CA de la red y **solo** en su propio nombre, `CN=rid-gateway.<slug-de-la-entidad>`. **SSRF:** el host debe ser un nombre DNS público o una IP pública. Se rechazan IPs privadas, de loopback, link-local o de metadatos, y nombres sin dominio o internos (`keycloak`, `*.local`, `*.internal`). Se valida al registrar la versión (`isPublicHostname` en `packages/contracts`, incluidas las IPv6 que embeben una IPv4) y otra vez en el reconciliador. El reconciliador además resuelve todas las direcciones A/AAAA del host en cada pasada y, si alguna no es pública, borra la ruta y el upstream (falla cerrado). Si la resolución falla, solo registra el error. **Sin DNS rebinding (M3-03):** los `nodes` del upstream son las direcciones que el reconciliador resolvió y encontró públicas, no el nombre, con `pass_host = rewrite` y `upstream_host` = el nombre (Host, SNI y nombre verificado). Si el nombre cambia de dirección, la siguiente pasada actualiza el upstream. **Despliegue (M6):** la salida del gateway debe filtrarse por red, bloqueando RFC 1918, link-local y las subredes de la plataforma.
-- `xroad` (M4-05, SPIKE S-5): el Security Server del operador (`RID_XROAD_SECURITY_SERVER_URL`), nunca un URL de la versión, que solo guarda el `serviceId` y una ruta opcional. La ruta se reescribe a `/r1/{instancia}/{clase}/{miembro}[/{subsistema}]/{servicio}{servicePath}/…` con las partes literales, porque APISIX codifica `upstream_uri`. Las partes se validan al registrar y otra vez en el reconciliador: letras, dígitos, espacio y `. _ - : ~`, nunca solo puntos. La ruta posterior no admite segmentos vacíos, `.` ni `..`, que el Security Server podría resolver hacia otro servicio. La instancia debe ser la del operador (primera parte de `RID_XROAD_CLIENT`).
-  - `proxy-rewrite` fija `X-Road-Client` = `RID_XROAD_CLIENT` (el subsistema del operador) y borra `X-Road-Security-Server`, `-Represented-Party`, `-Id` y `-Request-Hash` del consumidor.
-  - `opa` suma `X-Road-UserId` y `X-Road-Issue` a `send_headers_upstream`. La política (rutas con `xroad: true` en el bundle) pone el hash del funcionario y `rid:subscription:<id>`, y lo que mande el consumidor se borra.
-  - Sobre HTTPS, el gateway presenta su certificado para X-Road (`rid-ssl-gateway-xroad`, `CN=<RID_GATEWAY_CLIENT_NAME>.xroad`, que el operador registra en el Security Server) y verifica el del Security Server con `RID_XROAD_SECURITY_SERVER_CA`.
-  - Diputado confundido: el miembro del `serviceId` debe ser el miembro X-Road de la entidad, que registra el operador (`PUT /admin/entities/{id}/xroad-member`, `entity.xroad_member_set`, único por entidad). Se valida al registrar (400) y en cada pasada del reconciliador (falla cerrado). Cambiar el miembro reconcilia las versiones `xroad` de la entidad.
-  - Sin `RID_XROAD_SECURITY_SERVER_URL` y `RID_XROAD_CLIENT`, las versiones `xroad` quedan en error de sincronización, sin ruta.
+- `node` with `nodeId` (M4-04, ADR-0023): `nodes = { "<RID_GATEWAY_WG_HUB>": 1 }` (the hub's SNI router, `wg-hub:8443`), `scheme = https`, `pass_host = rewrite` and `upstream_host = rid-node-<nodeId>`, which is also the SNI the hub uses to pick the node and the name verified in its certificate. mTLS to the node (M3-03): `tls.client_cert_id = rid-ssl-gateway-client-<entityId>`, `tls.verify = true` and `tls.ca_certs` = the network CA. The hub passes the connection through, without opening it, to `<tunnel address>:<servicePort>`, and the service lives at the node's `servicePath` (the public path is rewritten to `servicePath/...`). The reconciler reads the node on every pass: if it does not belong to the version's entity, is not `enrolled`, `online` or `offline`, or the hub or the CA is missing, it deletes the route and the upstream (fails closed). An `offline` node keeps its route and answers again when it reconnects. Enrolling or decommissioning a node enqueues `gateway.sync` for its versions. When the version is registered, the `nodeId` must belong to a node of the entity that has not been decommissioned (400 on `upstream.nodeId`).
+- `node` without `nodeId`: the environment's test service. The reconciler resolves the node with `RID_DEV_NODES` (`entity-slug=host:port` of that entity's mock, `scheme = http`; with `https://host:port`, the mTLS above to that host). An entity not listed there ends up in sync error, without anything being written to APISIX.
+- `direct`: host of the existing API, `scheme = https` with `tls.verify = true` (the provider's certificate is verified against the system CAs and for its name), and the URL's path as a prefix. With `mtls`, also `tls.client_cert_id = rid-ssl-gateway-client-<entityId>` (M3-03): the provider trusts the network CA and **only** its own name, `CN=rid-gateway.<entity-slug>`. **SSRF:** the host must be a public DNS name or a public IP. Private, loopback, link-local or metadata IPs are rejected, as are names without a domain or internal names (`keycloak`, `*.local`, `*.internal`). This is validated when the version is registered (`isPublicHostname` in `packages/contracts`, including IPv6 addresses that embed an IPv4) and again in the reconciler. The reconciler also resolves all the host's A/AAAA addresses on every pass and, if any is not public, deletes the route and the upstream (fails closed). If resolution fails, it only logs the error. **No DNS rebinding (M3-03):** the upstream's `nodes` are the addresses the reconciler resolved and found to be public, not the name, with `pass_host = rewrite` and `upstream_host` = the name (Host, SNI and verified name). If the name changes address, the next pass updates the upstream. **Deployment (M6):** the gateway's egress must be filtered at the network level, blocking RFC 1918, link-local and the platform's subnets.
+- `xroad` (M4-05, SPIKE S-5): the operator's Security Server (`RID_XROAD_SECURITY_SERVER_URL`), never a URL from the version, which only stores the `serviceId` and an optional path. The path is rewritten to `/r1/{instance}/{class}/{member}[/{subsystem}]/{service}{servicePath}/…` with the literal parts, because APISIX encodes `upstream_uri`. The parts are validated when the version is registered and again in the reconciler: letters, digits, space and `. _ - : ~`, never dots alone. The trailing path does not accept empty segments, `.` or `..`, which the Security Server could resolve to another service. The instance must be the operator's (first part of `RID_XROAD_CLIENT`).
+  - `proxy-rewrite` sets `X-Road-Client` = `RID_XROAD_CLIENT` (the operator's subsystem) and deletes the consumer's `X-Road-Security-Server`, `-Represented-Party`, `-Id` and `-Request-Hash`.
+  - `opa` adds `X-Road-UserId` and `X-Road-Issue` to `send_headers_upstream`. The policy (routes with `xroad: true` in the bundle) sets the official's hash and `rid:subscription:<id>`, and whatever the consumer sends is deleted.
+  - Over HTTPS, the gateway presents its certificate for X-Road (`rid-ssl-gateway-xroad`, `CN=<RID_GATEWAY_CLIENT_NAME>.xroad`, which the operator registers in the Security Server) and verifies the Security Server's with `RID_XROAD_SECURITY_SERVER_CA`.
+  - Confused deputy: the member in the `serviceId` must be the entity's X-Road member, which the operator registers (`PUT /admin/entities/{id}/xroad-member`, `entity.xroad_member_set`, unique per entity). It is validated when the version is registered (400) and on every reconciler pass (fails closed). Changing the member reconciles the entity's `xroad` versions.
+  - Without `RID_XROAD_SECURITY_SERVER_URL` and `RID_XROAD_CLIENT`, `xroad` versions stay in sync error, without a route.
 
 **Route** `rid-route-<apiVersionId>`
-- `uri = /{entitySlug}/{apiSlug}/v{major}/*`, métodos declarados en el OpenAPI.
-- Plugins. APISIX los ejecuta por fase y, dentro de cada fase, por prioridad (no en el orden en que se listan). Verificado en SPIKE S-1 (`docs/spikes/S-1.md`):
-  1. `request-id` (rewrite, 12015): genera `X-Request-Id` si el cliente no lo envía.
-  - `rid-header-guard` (plugin propio, rewrite, 2700, M3-07): antes que cualquier otro plugin lea o ponga una, borra **toda** cabecera `X-RID-*` del cliente salvo `X-RID-Purpose` y `X-RID-End-User`, que el consumidor declara. Así una cabecera de trazabilidad nueva queda protegida sin tocar ninguna lista. Los guiones bajos cuentan como guiones (`X_RID_Subscription` también se borra): APISIX acepta guiones bajos en los nombres, y los servidores tipo CGI (WSGI, PHP, Rack) leen `X_RID_*` y `X-RID-*` como la misma variable `HTTP_X_RID_*`. La lista de `proxy-rewrite` del paso 3 queda como segunda barrera.
-  2. `openid-connect` (rewrite, 2599): `client_id: rid-gateway`, `bearer_only: true`, `use_jwks: true`, `discovery` del realm `rid-gateway` (como lo alcanza APISIX: `RID_GATEWAY_KEYCLOAK_URL`), `set_userinfo_header`, `set_access_token_header` y `set_id_token_header` en `false` (el token no viaja al proveedor en otra cabecera), y `claim_validator.audience` con `required` y `match_with_client_id`: solo pasan tokens con `aud = rid-gateway`. El emisor se valida contra el de la discovery.
-  3. `proxy-rewrite` (rewrite, 1008): elimina las cabeceras que solo el gateway puede poner (`X-RID-Consumer-Entity`, `X-RID-Consumer-App`, `X-RID-Subscription`, `X-RID-Operation`, `X-RID-End-User-Hash`, `X-RID-Subject-Ref`) si vienen del cliente, antes de que OPA arme su entrada; conserva `X-RID-Purpose` y `X-RID-End-User`, que OPA necesita leer. Antes, en la misma fase y con prioridad 1020, el plugin propio `rid-data-subject` lee del cuerpo JSON el titular de las operaciones que lo declaran allí y lo pasa como `X-RID-Body-Subject`, después de borrar cualquier valor que haya enviado el cliente (ADR-0017). Con prioridad 1025, el plugin propio `rid-client-cert` borra la `X-RID-Client-Cert-S256` que mande el cliente y, si nginx verificó un certificado de cliente en el handshake, pone su huella RFC 8705 (S-3). Reescribe la ruta quitando el prefijo (solo cambia `upstream_uri`; OPA sigue viendo la ruta pública completa).
-  4. `opa` (access, 2001): `host` del OPA local, `policy: rid/authz/decision` (solo `allow`, `headers`, `status_code` y `reason`, lo que el plugin lee: consultar el paquete entero evaluaba y devolvía todas sus reglas y saturaba OPA a 500 peticiones/s, M6-03), `with_route: true`, `send_headers_upstream: [X-RID-Consumer-Entity, X-RID-Consumer-App, X-RID-Subscription, X-RID-Purpose, X-RID-Operation, X-RID-End-User-Hash, X-RID-Subject-Ref, X-RID-End-User, X-RID-Body-Subject, X-RID-Client-Cert-S256, X-RID-Data-Subject, X-Request-Id]`. Para cada nombre de esa lista el plugin pone el valor que devuelve la política y, **si la política no lo devuelve, borra la cabecera del cliente**. Por eso la política devuelve siempre `X-RID-Purpose` y `X-Request-Id`, y **nunca** `X-RID-End-User`, `X-RID-Body-Subject` ni `X-RID-Client-Cert-S256` (así los valores en claro del funcionario y del titular no llegan al proveedor; ADR-0015, ADR-0017). `X-RID-Data-Subject`, la cabecera que antes declaraba el consumidor, también se elimina. Si OPA no responde, niega con 403 (falla cerrado).
-     - Justo después, `rid-assertion` (plugin propio, access, 2000, M6-10, ADR-0024), solo con `features.gatewayAssertion`: firma lo que OPA autorizó en un JWS ES256 para el proveedor (`audience` = slug de la entidad proveedora) y lo pone en `X-RID-Assertion`. Lleva quién consulta, la finalidad, la suscripción, la operación, el funcionario y el titular como seudónimos, el método y el SHA-256 de la URI que recibe el proveedor y, con cuerpo, el de los bytes del cuerpo. `jti` es el request id. La clave está en la metadata del plugin (compartida, cifrada en etcd con el keyring del despliegue), que pone el reconciliador. Sin clave responde 503 (falla cerrado).
-  5. `limit-count` (access, 1002): límite por suscripción con `key_type: var`, `key: http_x_rid_subscription` y `count: "$http_x_rid_rate_limit"`, las dos cabeceras que puso OPA desde el bundle. Contadores locales en cada nodo, con el límite repartido entre los nodos (ADR-0020). Ver SPIKE S-2.
-  6. `rid-rate-limited` (plugin propio, 898, M3-05): convierte en problem+json (`code: rate_limited`) el 429 de `limit-count`, el que tiene `$upstream_status` vacío; el 429 de un proveedor pasa intacto (S-2). Las cabeceras `X-RateLimit-Limit`, `-Remaining` y `-Reset` quedan. No se usa `response-rewrite` con `vars` (lo que probó S-2) porque una ruta tiene uno solo y las versiones deprecadas lo usan para `Deprecation` y `Sunset`.
+- `uri = /{entitySlug}/{apiSlug}/v{major}/*`, methods declared in the OpenAPI.
+- Plugins. APISIX runs them by phase and, within each phase, by priority (not in the order they are listed). Verified in SPIKE S-1 (`docs/spikes/S-1.md`):
+  1. `request-id` (rewrite, 12015): generates `X-Request-Id` if the client does not send it.
+  - `rid-header-guard` (custom plugin, rewrite, 2700, M3-07): before any other plugin reads or sets one, it deletes **every** `X-RID-*` header from the client except `X-RID-Purpose` and `X-RID-End-User`, which the consumer declares. This way a new traceability header is protected without touching any list. Underscores count as hyphens (`X_RID_Subscription` is also deleted): APISIX accepts underscores in names, and CGI-style servers (WSGI, PHP, Rack) read `X_RID_*` and `X-RID-*` as the same `HTTP_X_RID_*` variable. The `proxy-rewrite` list in step 3 remains as a second barrier.
+  2. `openid-connect` (rewrite, 2599): `client_id: rid-gateway`, `bearer_only: true`, `use_jwks: true`, `discovery` of the `rid-gateway` realm (as APISIX reaches it: `RID_GATEWAY_KEYCLOAK_URL`), `set_userinfo_header`, `set_access_token_header` and `set_id_token_header` set to `false` (the token does not travel to the provider in another header), and `claim_validator.audience` with `required` and `match_with_client_id`: only tokens with `aud = rid-gateway` get through. The issuer is validated against the discovery's.
+  3. `proxy-rewrite` (rewrite, 1008): deletes the headers that only the gateway may set (`X-RID-Consumer-Entity`, `X-RID-Consumer-App`, `X-RID-Subscription`, `X-RID-Operation`, `X-RID-End-User-Hash`, `X-RID-Subject-Ref`) if they come from the client, before OPA builds its input; it keeps `X-RID-Purpose` and `X-RID-End-User`, which OPA needs to read. Before that, in the same phase and with priority 1020, the custom plugin `rid-data-subject` reads the data subject from the JSON body for the operations that declare it there and passes it on as `X-RID-Body-Subject`, after deleting any value the client sent (ADR-0017). With priority 1025, the custom plugin `rid-client-cert` deletes any `X-RID-Client-Cert-S256` the client sends and, if nginx verified a client certificate in the handshake, sets its RFC 8705 fingerprint (S-3). It rewrites the path by removing the prefix (it only changes `upstream_uri`; OPA still sees the full public path).
+  4. `opa` (access, 2001): `host` of the local OPA, `policy: rid/authz/decision` (only `allow`, `headers`, `status_code` and `reason`, which is what the plugin reads: querying the whole package evaluated and returned all its rules and saturated OPA at 500 requests/s, M6-03), `with_route: true`, `send_headers_upstream: [X-RID-Consumer-Entity, X-RID-Consumer-App, X-RID-Subscription, X-RID-Purpose, X-RID-Operation, X-RID-End-User-Hash, X-RID-Subject-Ref, X-RID-End-User, X-RID-Body-Subject, X-RID-Client-Cert-S256, X-RID-Data-Subject, X-Request-Id]`. For each name in that list the plugin sets the value the policy returns and, **if the policy does not return it, deletes the client's header**. That is why the policy always returns `X-RID-Purpose` and `X-Request-Id`, and **never** `X-RID-End-User`, `X-RID-Body-Subject` or `X-RID-Client-Cert-S256` (so the clear-text values of the official and of the data subject do not reach the provider; ADR-0015, ADR-0017). `X-RID-Data-Subject`, the header the consumer used to declare, is also removed. If OPA does not respond, it denies with 403 (fails closed).
+     - Right after it, `rid-assertion` (custom plugin, access, 2000, M6-10, ADR-0024), only with `features.gatewayAssertion`: it signs what OPA authorized in an ES256 JWS for the provider (`audience` = the provider entity's slug) and puts it in `X-RID-Assertion`. It carries who is querying, the purpose, the subscription, the operation, the official and the data subject as pseudonyms, the method and the SHA-256 of the URI the provider receives and, with a body, the SHA-256 of the body bytes. `jti` is the request id. The key is in the plugin metadata (shared, encrypted in etcd with the deployment's keyring), which the reconciler sets. Without a key it responds 503 (fails closed).
+  5. `limit-count` (access, 1002): limit per subscription with `key_type: var`, `key: http_x_rid_subscription` and `count: "$http_x_rid_rate_limit"`, the two headers that OPA set from the bundle. Local counters on each node, with the limit split across the nodes (ADR-0020). See SPIKE S-2.
+  6. `rid-rate-limited` (custom plugin, 898, M3-05): turns the 429 from `limit-count`, the one with an empty `$upstream_status`, into problem+json (`code: rate_limited`); a provider's 429 passes through untouched (S-2). The `X-RateLimit-Limit`, `-Remaining` and `-Reset` headers stay. `response-rewrite` with `vars` (what S-2 tested) is not used because a route has only one, and deprecated versions use it for `Deprecation` and `Sunset`.
   7. `prometheus` (log, 500).
-  8. `http-logger` (log, 410): hacia Fluent Bit con `log_format` de §8.
+  8. `http-logger` (log, 410): to Fluent Bit with the `log_format` from §8.
 
-Mientras una API no tiene suscripciones activas, la ruta existe pero OPA niega todo.
+While an API has no active subscriptions, the route exists but OPA denies everything.
 
-**SSL** `rid-ssl-gateway-client-<entityId>` (M3-03): uno por entidad proveedora, de tipo `client`, con el certificado de cliente que el gateway presenta a los upstreams con mTLS de esa entidad: `CN=rid-gateway.<slug>` (el prefijo es `RID_GATEWAY_CLIENT_NAME`). Es una identidad por proveedor y no una compartida para que una entidad no pueda apuntar su versión a la API mTLS de otra y usar la identidad del gateway (diputado confundido): cada proveedor acepta solo su nombre. Lo emite step-ca con el provisioner `rid-portal` (solo autenticación de cliente). El portal guarda la clave sellada y lo renueva igual que el de servidor. Los upstreams de la entidad lo referencian por id, así que renovarlo cambia un solo objeto. Lo asegura el reconciliador solo cuando una versión lo necesita, de modo que los upstreams sin mTLS no dependen de step-ca; la pasada completa borra el de una entidad que ya no sirve versiones.
+**SSL** `rid-ssl-gateway-client-<entityId>` (M3-03): one per provider entity, of type `client`, with the client certificate the gateway presents to that entity's mTLS upstreams: `CN=rid-gateway.<slug>` (the prefix is `RID_GATEWAY_CLIENT_NAME`). It is one identity per provider rather than a shared one so that an entity cannot point its version at another entity's mTLS API and use the gateway's identity (confused deputy): each provider accepts only its own name. step-ca issues it with the `rid-portal` provisioner (client authentication only). The portal stores the key sealed and renews it the same way as the server certificate. The entity's upstreams reference it by id, so renewing it changes a single object. The reconciler ensures it only when a version needs it, so upstreams without mTLS do not depend on step-ca; the full pass deletes the one for an entity that no longer serves versions.
 
 **SSL** `rid-ssl-gateway` (M3-02, S-3)
-- `snis` = `RID_GATEWAY_TLS_HOSTS`. `cert` y `key` son el certificado de servidor del gateway, que emite step-ca con el provisioner `rid-gateway-tls`. El portal genera la clave, la guarda sellada (`gateway_certificate`, `RID_SECRETS_KEY`) y renueva el certificado en el último tercio de su vida. Lo audita (`gateway_certificate.issued`) sin la clave.
-- `client.ca` lleva la intermedia y la raíz de step-ca (`depth: 2`). Con `features.mtls.required`, sin `skip_mtls_uri_regex`: APISIX rechaza en el handshake toda llamada sin un certificado válido de la red. Sin el flag, el certificado es opcional (si llega, se verifica) salvo en el canal de control de los nodos (`/api/v1/nodes/{id}/heartbeat|renew|config`), donde APISIX lo exige: `skip_mtls_uri_regex` exime todo lo demás (M4-02).
-- Lo aplica el reconciliador de APISIX en cada pasada completa (`sync_state` `apisix:ssl:rid-ssl-gateway`). La clave no se compara, porque APISIX la guarda cifrada: una clave nueva siempre llega con un certificado nuevo.
+- `snis` = `RID_GATEWAY_TLS_HOSTS`. `cert` and `key` are the gateway's server certificate, which step-ca issues with the `rid-gateway-tls` provisioner. The portal generates the key, stores it sealed (`gateway_certificate`, `RID_SECRETS_KEY`) and renews the certificate in the last third of its lifetime. It audits it (`gateway_certificate.issued`) without the key.
+- `client.ca` carries the step-ca intermediate and root (`depth: 2`). With `features.mtls.required`, without `skip_mtls_uri_regex`: APISIX rejects in the handshake every call without a valid network certificate. Without the flag, the certificate is optional (if one arrives, it is verified) except on the nodes' control channel (`/api/v1/nodes/{id}/heartbeat|renew|config`), where APISIX requires it: `skip_mtls_uri_regex` exempts everything else (M4-02).
+- The APISIX reconciler applies it on every full pass (`sync_state` `apisix:ssl:rid-ssl-gateway`). The key is not compared, because APISIX stores it encrypted: a new key always comes with a new certificate.
 
-**Sandbox (M4-08)** de una versión servida con `sandboxUpstream`: ruta `rid-sandbox-<id>` en `/sandbox{basePath}/*`, con el upstream de pruebas dentro de la ruta y la misma cadena de plugins de la publicada (token, OPA, límite, logs), sin el registro de transparencia, porque los datos son sintéticos. El bundle tiene una ruta `rid-sandbox-<id>` con `sandbox: true`, cada cliente lleva su `environment`, y las suscripciones de una aplicación sandbox apuntan a la ruta del sandbox. La política niega con `environment_mismatch` a una aplicación sandbox en una ruta real y a una de producción en un sandbox. Una versión que deja de servirse pierde también su sandbox, y la pasada completa borra los que sobran.
+**Sandbox (M4-08)** of a version served with `sandboxUpstream`: route `rid-sandbox-<id>` at `/sandbox{basePath}/*`, with the test upstream inside the route and the same plugin chain as the published one (token, OPA, limit, logs), without the transparency record, because the data is synthetic. The bundle has a `rid-sandbox-<id>` route with `sandbox: true`, each client carries its `environment`, and the subscriptions of a sandbox application point to the sandbox route. The policy denies with `environment_mismatch` a sandbox application on a real route and a production one on a sandbox. A version that stops being served also loses its sandbox, and the full pass deletes the leftover ones.
 
-**Rutas de verificación (M4-06)** de una versión `in_review`, para las validaciones al enviar a revisión (`SPEC.md §4.2` paso 2). Se saltan el token y la política, así que son estrechas:
-- solo existen para una petición con `X-RID-Validation` = el token de esa versión, `HMAC(RID_VALIDATION_TOKEN, versionId)` (`vars` de APISIX; sin él, 404): un token filtrado abre solo las rutas de su versión. Ni el healthcheck ni Schemathesis siguen redirecciones, que llevarían el token a otra parte, y el lint rechaza rutas del OpenAPI con segmentos `.`/`..`, puntos o barras codificados o segmentos vacíos;
-- `rid-check-<id>` (`/__rid/check/<id>`) solo acepta GET y lo envía a la raíz del servicio del upstream real (`servicePath/`): prueba la conectividad (TLS, mTLS, túnel, Security Server), nunca un dato;
-- `rid-check-sandbox-<id>` (`/__rid/check-sandbox/<id>/*`) va al `sandboxUpstream` de la versión, con datos sintéticos, para la prueba de contrato;
-- los upstreams van dentro de la ruta y se construyen como el publicado (mTLS, hub, Security Server y sus controles). Fuera de `in_review` se borran, y la pasada completa elimina las que sobran.
+**Verification routes (M4-06)** of an `in_review` version, for the validations run on submission for review (`SPEC.md §4.2` step 2). They skip the token and the policy, so they are narrow:
+- they only exist for a request with `X-RID-Validation` = that version's token, `HMAC(RID_VALIDATION_TOKEN, versionId)` (APISIX `vars`; without it, 404): a leaked token only opens the routes of its own version. Neither the healthcheck nor Schemathesis follow redirects, which would carry the token elsewhere, and the lint rejects OpenAPI paths with `.`/`..` segments, encoded dots or slashes, or empty segments;
+- `rid-check-<id>` (`/__rid/check/<id>`) only accepts GET and sends it to the service root of the real upstream (`servicePath/`): it tests connectivity (TLS, mTLS, tunnel, Security Server), never data;
+- `rid-check-sandbox-<id>` (`/__rid/check-sandbox/<id>/*`) goes to the version's `sandboxUpstream`, with synthetic data, for the contract test;
+- the upstreams go inside the route and are built like the published one (mTLS, hub, Security Server and their controls). Outside `in_review` they are deleted, and the full pass removes the leftover ones.
 
-El trabajo `version.validate` (encolado al enviar y al pedir que se repitan) hace el healthcheck por APISIX (`RID_GATEWAY_INTERNAL_URL`, pasa con cualquier respuesta que no sea 5xx) y le pide la prueba de contrato al runner (`infra/contract-runner`: Schemathesis 4, MIT, detrás de un API interno con `RID_CONTRACT_RUNNER_TOKEN`). El runner corre `st run` contra la ruta del sandbox con un límite de ejemplos y de tiempo, y devuelve solo, por operación, los códigos de las verificaciones que fallaron (`ST101`…) y el código HTTP, sin cuerpos ni comandos `curl`. El resultado queda en `api_version.validation_report` y en la bitácora (`api_version.validated`). El operador aprueba solo con validaciones `passed` (409 si no). Sin sandbox, la prueba de contrato queda `skipped` y no bloquea.
+The `version.validate` job (enqueued on submission and when a rerun is requested) runs the healthcheck through APISIX (`RID_GATEWAY_INTERNAL_URL`, passes with any response that is not a 5xx) and asks the runner for the contract test (`infra/contract-runner`: Schemathesis 4, MIT, behind an internal API with `RID_CONTRACT_RUNNER_TOKEN`). The runner runs `st run` against the sandbox route with a limit on examples and on time, and returns only, per operation, the codes of the failed checks (`ST101`…) and the HTTP status, with no bodies or `curl` commands. The result is stored in `api_version.validation_report` and in the audit log (`api_version.validated`). The operator approves only with `passed` validations (409 otherwise). Without a sandbox, the contract test is `skipped` and does not block.
 
-**Reconciliador (M1-08):** consume `gateway.sync` (aggregate `apiVersion:<id>`) y sirve las versiones `published` y `deprecated`. Compara el estado deseado con lo que guarda APISIX campo por campo (APISIX agrega valores por defecto, que no cuentan como deriva) y solo escribe si algo cambió: upstream antes que ruta, y al borrar, ruta antes que upstream. Hace una pasada completa al arrancar y cada 5 minutos, que también borra los objetos `rid-` que ninguna versión pide. Los objetos sin ese prefijo no se tocan. El resultado queda en `sync_state` (`apisix:route:rid-route-<id>`).
+**Reconciler (M1-08):** consumes `gateway.sync` (aggregate `apiVersion:<id>`) and serves `published` and `deprecated` versions. It compares the desired state with what APISIX stores field by field (APISIX adds default values, which do not count as drift) and writes only if something changed: upstream before route and, when deleting, route before upstream. It does a full pass at startup and every 5 minutes, which also deletes the `rid-` objects that no version asks for. Objects without that prefix are not touched. The result is stored in `sync_state` (`apisix:route:rid-route-<id>`).
 
-- **Versiones deprecadas (ADR-0019).** La ruta sigue sirviendo y lleva `response-rewrite` con `Deprecation: @<segundos>` (RFC 9745) y `Sunset: <fecha HTTP>` (RFC 8594). Al retirarse, la versión deja de estar en el estado deseado y el reconciliador borra la ruta.
+- **Deprecated versions (ADR-0019).** The route keeps serving and carries `response-rewrite` with `Deprecation: @<seconds>` (RFC 9745) and `Sunset: <HTTP date>` (RFC 8594). When it is retired, the version leaves the desired state and the reconciler deletes the route.
 
-### 4.2 Bundle de OPA
+### 4.2 OPA bundle
 
-- `apps/api` expone `GET /api/v1/opa/bundle.tar.gz` (autenticado con el token de servicio `OPA_BUNDLE_TOKEN`; sin token configurado rechaza todo; soporta `ETag`). OPA lo consulta cada 10–20 s (`polling.min_delay_seconds`).
-- **Sin el portal (M6-04).** OPA guarda el último bundle activado en disco (`persist: true`) y lo carga al arrancar. Si el portal no responde, sigue decidiendo con él. Un OPA que reinicia en ese momento también, en lugar de quedar sin política y negarlo todo. El tráfico sigue y las negaciones también. Lo nuevo (una suscripción aprobada, una revocación) llega cuando el portal vuelve: en una caída, una revocación espera a que el portal responda. Prueba: `pnpm resilience:test` (`docs/performance/M6-04.md`).
-- El bundle se arma desde PostgreSQL en cada consulta y es reproducible. Incluye un `.manifest` con `revision` (SHA-256 de políticas + datos) y `roots: [rid, routes, clients, config]`. El ETag es la revisión, y una revisión igual responde 304.
-- **Activación (`approved → active`):** OPA tiene configurado el plugin `status`, que envía `POST /api/v1/opa/status` (mismo token) en cuanto activa un bundle. El portal guarda qué suscripciones contiene cada revisión (`policy_bundle`, se poda a las 24 h). Cuando OPA informa una revisión activa, pasa a `active` las suscripciones `approved` que contiene, con el evento `subscription.activated` (actor `system:opa`) en la misma transacción que cada una, en lotes de 100 por transacción (M6-03: un atraso de miles, tras una caída de OPA o una carga masiva, no cabía en el límite de tiempo de una sola transacción y se reintentaba sin fin), y actualiza `sync_state` `opa:bundle`. Con varios gateways basta el primer OPA que informa; distinguir por nodo queda para M4. Objetivo: menos de 60 s (encuesta de 10–20 s y aviso inmediato).
-- Contenido: políticas Rego de `packages/policy` + `data.json`:
+- `apps/api` exposes `GET /api/v1/opa/bundle.tar.gz` (authenticated with the service token `OPA_BUNDLE_TOKEN`; with no token configured it rejects everything; supports `ETag`). OPA polls it every 10–20 s (`polling.min_delay_seconds`).
+- **Without the portal (M6-04).** OPA saves the last activated bundle to disk (`persist: true`) and loads it at startup. If the portal does not respond, it keeps deciding with it. So does an OPA that restarts at that moment, instead of being left with no policy and denying everything. Traffic keeps flowing, and so do denials. Anything new (an approved subscription, a revocation) arrives when the portal comes back: during an outage, a revocation waits until the portal responds. Test: `pnpm resilience:test` (`docs/performance/M6-04.md`).
+- The bundle is built from PostgreSQL on every request and is reproducible. It includes a `.manifest` with `revision` (SHA-256 of policies + data) and `roots: [rid, routes, clients, config]`. The ETag is the revision, and an unchanged revision gets a 304.
+- **Activation (`approved → active`):** OPA has the `status` plugin configured, which sends `POST /api/v1/opa/status` (same token) as soon as it activates a bundle. The portal stores which subscriptions each revision contains (`policy_bundle`, pruned after 24 h). When OPA reports an active revision, the portal moves the `approved` subscriptions it contains to `active`, with the `subscription.activated` event (actor `system:opa`) in the same transaction as each one, in batches of 100 per transaction (M6-03: a backlog of thousands, after an OPA outage or a bulk load, did not fit within a single transaction's time limit and was retried endlessly), and updates `sync_state` `opa:bundle`. With several gateways, the first OPA that reports is enough; distinguishing by node is left for M4. Target: under 60 s (10–20 s polling and immediate notice).
+- Contents: Rego policies from `packages/policy` + `data.json`:
 
 ```json
 {
@@ -219,7 +221,7 @@ El trabajo `version.validate` (encolado al enviar y al pedir que se repitan) hac
           "rateLimitPerMinute": 600
         }
       ],
-      "certificates": ["<x5t#S256 de cada certificado vigente>"]
+      "certificates": ["<x5t#S256 of each current certificate>"]
     }
   },
   "config": {
@@ -233,102 +235,102 @@ El trabajo `version.validate` (encolado al enviar y al pedir que se repitan) hac
 }
 ```
 
-- Política `rid.authz` (resumen):
-  1. Extrae el JWT de `Authorization` (ya validado por `openid-connect`; OPA solo lo decodifica) y toma `azp`/`client_id`.
+- `rid.authz` policy (summary):
+  1. Extracts the JWT from `Authorization` (already validated by `openid-connect`; OPA only decodes it) and takes `azp`/`client_id`.
   2. `clients[client_id].status == "active"`.
-  3. Encuentra la operación: método + `pathRegex` de la ruta (`input.route.id`). `input.request.path` es la ruta pública completa, con el prefijo `/{entitySlug}/{apiSlug}/v{major}` (S-1), y `pathRegex` se ancla a ella.
-  4. Existe una suscripción para esa ruta con la operación, la finalidad de `X-RID-Purpose`, vigente.
-  5. Exige `X-RID-End-User` si la suscripción lo pide (`endUserRequired`, fijado al solicitarla por la clasificación) o si la clasificación actual de la ruta es `personal` o `sensitive` (M3-06: una API que pasó a datos personales lo exige también a las suscripciones anteriores). El valor debe ser un identificador, de 1 a 128 caracteres ASCII visibles y sin espacios. Si no lo es, se niega con `end_user_invalid` aunque no se exija, y nunca se calcula su hash. Calcula `X-RID-End-User-Hash = HMAC-SHA-256(valor, sal)` con la sal del despliegue (`RID_END_USER_HASH_SALT`, mínimo 16 caracteres). Sin ella, o en producción con el valor de ejemplo de `.env.example`, el bundle no se sirve. La sal va en el bundle, que solo se sirve por red interna. El valor en claro no llega al proveedor (OPA no lo devuelve) ni a ningún log: el log de acceso y el registro de transparencia solo llevan el hash, y las listas permitidas de Fluent Bit tienen una prueba estática.
-  6. Devuelve `allow`, cabeceras para el upstream (entre ellas `X-RID-Rate-Limit`: el `rateLimitPerMinute` de la suscripción dividido por `config.gatewayNodes` y redondeado hacia arriba, ADR-0020) y, al negar, `status_code` + cuerpo problem+json en `reason` con una razón estable (`no_subscription`, `purpose_not_allowed`, `operation_not_allowed`, `subscription_expired`, `end_user_required`, `end_user_invalid`, `data_subject_required`, `app_suspended`; con mTLS exigido, también `client_certificate_required`, `token_not_bound`, `certificate_mismatch` y `certificate_revoked`, según S-3). Al negar, `headers` son cabeceras de **respuesta**: `Content-Type: application/problem+json` y `X-RID-Deny-Reason: <razón>`, que el log de acceso registra con `$sent_http_x_rid_deny_reason`.
-- `data.json` incluye las rutas de las versiones `published`/`deprecated` y los clientes no eliminados (las aplicaciones suspendidas aparecen con `status: suspended`). Solo lleva las suscripciones `approved` o `active` de versiones servidas. `pathRegex` se ancla a la ruta pública completa, y un parámetro `{x}` equivale a un segmento o a parte de uno (`[^/]+`).
-- Certificado de cliente (M3-02). Se comprueba cuando `config.mtlsRequired` está activo, y siempre que el token esté ligado a un certificado (`cnf.x5t#S256`, RFC 8705 §3). Va justo después de la aplicación suspendida. Orden: `client_certificate_required` (no hay huella verificada), `token_not_bound`, `certificate_mismatch` (la huella no es la del token) y `certificate_revoked` (la huella no está en `clients[id].certificates`, la lista de certificados vigentes de esa aplicación). Revocar o vencer un certificado lo saca de la lista en la siguiente descarga del bundle (10–20 s).
-- Una cabecera repetida cuenta como ausente. Cuando hay más de una suscripción válida, se elige siempre la misma (orden por id). Las razones se evalúan en este orden: cliente, aplicación suspendida, ruta, operación, suscripción a la ruta, operación concedida, finalidad, vigencia y funcionario.
-- Las políticas tienen tests con `opa test` y cobertura ≥ 90 %, exigida en CI (`--threshold 90`).
+  3. Finds the operation: method + `pathRegex` of the route (`input.route.id`). `input.request.path` is the full public path, with the `/{entitySlug}/{apiSlug}/v{major}` prefix (S-1), and `pathRegex` is anchored to it.
+  4. There is a subscription for that route with the operation and the purpose from `X-RID-Purpose`, and it is in force.
+  5. Requires `X-RID-End-User` if the subscription asks for it (`endUserRequired`, set from the classification when it was requested) or if the route's current classification is `personal` or `sensitive` (M3-06: an API that moved to personal data also requires it from earlier subscriptions). The value must be an identifier of 1 to 128 visible ASCII characters with no spaces. If it is not, the call is denied with `end_user_invalid` even when it is not required, and its hash is never computed. It computes `X-RID-End-User-Hash = HMAC-SHA-256(value, salt)` with the deployment's salt (`RID_END_USER_HASH_SALT`, at least 16 characters). Without it, or in production with the sample value from `.env.example`, the bundle is not served. The salt goes in the bundle, which is only served over the internal network. The clear-text value never reaches the provider (OPA does not return it) or any log: the access log and the transparency record only carry the hash, and Fluent Bit's allow lists have a static test.
+  6. Returns `allow`, headers for the upstream (among them `X-RID-Rate-Limit`: the subscription's `rateLimitPerMinute` divided by `config.gatewayNodes` and rounded up, ADR-0020) and, on denial, `status_code` + a problem+json body in `reason` with a stable reason (`no_subscription`, `purpose_not_allowed`, `operation_not_allowed`, `subscription_expired`, `end_user_required`, `end_user_invalid`, `data_subject_required`, `app_suspended`; with mTLS required, also `client_certificate_required`, `token_not_bound`, `certificate_mismatch` and `certificate_revoked`, per S-3). On denial, `headers` are **response** headers: `Content-Type: application/problem+json` and `X-RID-Deny-Reason: <reason>`, which the access log records with `$sent_http_x_rid_deny_reason`.
+- `data.json` includes the routes of `published`/`deprecated` versions and the clients that have not been deleted (suspended applications appear with `status: suspended`). It only carries `approved` or `active` subscriptions of served versions. `pathRegex` is anchored to the full public path, and a `{x}` parameter matches one segment or part of one (`[^/]+`).
+- Client certificate (M3-02). It is checked when `config.mtlsRequired` is on, and whenever the token is bound to a certificate (`cnf.x5t#S256`, RFC 8705 §3). It comes right after the suspended-application check. Order: `client_certificate_required` (no verified fingerprint), `token_not_bound`, `certificate_mismatch` (the fingerprint is not the token's) and `certificate_revoked` (the fingerprint is not in `clients[id].certificates`, the list of that application's current certificates). Revoking or expiring a certificate removes it from the list on the next bundle download (10–20 s).
+- A repeated header counts as absent. When there is more than one valid subscription, the same one is always chosen (ordered by id). Reasons are evaluated in this order: client, suspended application, route, operation, subscription to the route, granted operation, purpose, validity and official.
+- The policies have tests with `opa test` and coverage ≥ 90 %, enforced in CI (`--threshold 90`).
 
 ### 4.3 Keycloak
 
-Reconciliador de aplicaciones: crea/actualiza/deshabilita clientes en `rid-gateway`, rota secretos a pedido, configura `tls_client_auth` y el subject DN esperado cuando hay certificado.
+Application reconciler: creates/updates/disables clients in `rid-gateway`, rotates secrets on request, configures `tls_client_auth` and the expected subject DN when there is a certificate.
 
-- **Rotación del secreto (M3-04).** El realm tiene la política de cliente `rid-secret-rotation` (ejecutor `secret-rotation`, condición `rid.managed = true`, atributo que el reconciliador pone en sus clientes). Keycloak ignora los atributos de secreto rotado si llegan por la Admin API, así que el reconciliador usa el propio mecanismo de Keycloak:
-  1. Con un secreto nuevo pendiente (sellado) y el anterior en `rotating`, compara por hash el secreto actual de Keycloak con el del anterior.
-  2. Si coinciden, lo regenera (`POST client-secret`), y Keycloak pasa el anterior a secreto rotado.
-  3. Luego fija el secreto nuevo con `PUT`, que cambia solo el actual. Si una pasada se interrumpió entre los dos pasos, el anterior ya es el rotado y solo repite el paso 3.
-  4. Sin rotación en curso (revocado, o fin de la ventana), borra el secreto rotado (`DELETE client-secret/rotated`).
+- **Secret rotation (M3-04).** The realm has the client policy `rid-secret-rotation` (executor `secret-rotation`, condition `rid.managed = true`, an attribute the reconciler sets on its clients). Keycloak ignores the rotated-secret attributes if they arrive through the Admin API, so the reconciler uses Keycloak's own mechanism:
+  1. With a new secret pending (sealed) and the previous one in `rotating`, it compares by hash Keycloak's current secret with the previous one.
+  2. If they match, it regenerates it (`POST client-secret`), and Keycloak turns the previous one into the rotated secret.
+  3. Then it sets the new secret with `PUT`, which changes only the current one. If a pass was interrupted between the two steps, the previous one is already the rotated one and only step 3 is repeated.
+  4. With no rotation in progress (revoked, or end of the window), it deletes the rotated secret (`DELETE client-secret/rotated`).
   
-  Los valores solo pasan por la memoria del reconciliador para comparar hashes. La política deja el rotado a lo sumo 30 días; el portal cierra la ventana a los `lifecycle.credentialRotationDays`. En un Keycloak que ya importó el realm, la política se aplica con `node scripts/keycloak-client-policies.mjs`.
+  The values only pass through the reconciler's memory to compare hashes. The policy keeps the rotated secret for at most 30 days; the portal closes the window after `lifecycle.credentialRotationDays`. On a Keycloak that has already imported the realm, the policy is applied with `node scripts/keycloak-client-policies.mjs`.
 
 ### 4.4 step-ca
 
-- Provisioner JWK dedicado al portal. El backend firma un token de un solo uso (OTT) y llama a `/1.0/sign` con el CSR. Implementación con `jose`; sin dependencias propietarias. Detalle (M3-01, `apps/api/src/credentials`):
-  - La clave del provisioner viaja cifrada (JWE, PBES2) en la lista pública de provisioners de la CA. El API la descifra una vez con `RID_STEP_CA_PROVISIONER_PASSWORD`.
-  - El OTT lleva `sub` y `sans` = clientId, `sha` = huella de la raíz, 5 minutos de vida y un `jti` único. El portal pide `notAfter` = `lifecycle.certificateValidityDays`.
-  - El API verifica el TLS de la CA con su raíz: `RID_STEP_CA_ROOT_FILE` o la raíz que sirve la CA fijada por `RID_STEP_CA_ROOT_FINGERPRINT`. Solo en desarrollo, sin ninguna de las dos, confía en la raíz que sirve la CA y registra su huella.
-  - Antes de la CA, el portal revisa el CSR (`pkijs`): un solo bloque PEM, campo de atributos presente, firma propia válida, clave ECDSA P-256/P-384 o RSA 2048-4096, CN = clientId y ningún otro nombre alternativo. Un CSR inválido da 400 con un mensaje estable por causa. Si la CA no responde o rechaza, 503.
-  - El certificado que devuelve la CA debe tener ese sujeto y esa clave, y encadenar hasta la raíz. El portal guarda la cadena (pública), la huella RFC 8705 (`x5t#S256`), el serial y las fechas. Una aplicación tiene un solo certificado activo (índice único parcial); la rotación es M3-04.
-  - Un trabajo periódico (`RID_LIFECYCLE_INTERVAL_SECONDS`) avisa a los desarrolladores de la entidad `lifecycle.certificateExpiryWarningDays` antes del vencimiento (`credential.expiry_notice_queued` → notificación `certificate_expiring`) y marca `expired` los certificados vencidos.
-- Plantillas. `app` (`infra/step-ca/app.tpl`, provisioner `rid-portal`): CN = clientId, el clientId como SAN DNS, uso de clave solo para autenticación de cliente TLS, 90 días. `node` (`infra/step-ca/node.tpl`, provisioner propio `rid-nodes`, M4-02): `CN=rid-node` fijo y el nombre del nodo, `rid-node-<nodeId>`, como único SAN DNS, los dos del OTT. Autenticación de servidor (el gateway llama al nodo) y de cliente (el nodo llama al canal de control). 90 días, renovados por el kit. step-ca exige que el CN del CSR sea el `sub` del OTT; como el kit no sabe su ID antes de enrolarse, el CSR del nodo lleva siempre `CN=rid-node`, sin nombres, y el SAN lo pone el OTT.
-- Revocación: certificados de vida corta + lista de huellas revocadas en el bundle OPA (requiere SPIKE S-3).
+- JWK provisioner dedicated to the portal. The backend signs a one-time token (OTT) and calls `/1.0/sign` with the CSR. Implemented with `jose`; no proprietary dependencies. Detail (M3-01, `apps/api/src/credentials`):
+  - The provisioner key travels encrypted (JWE, PBES2) in the CA's public list of provisioners. The API decrypts it once with `RID_STEP_CA_PROVISIONER_PASSWORD`.
+  - The OTT carries `sub` and `sans` = clientId, `sha` = the root's fingerprint, a 5-minute lifetime and a unique `jti`. The portal asks for `notAfter` = `lifecycle.certificateValidityDays`.
+  - The API verifies the CA's TLS with its root: `RID_STEP_CA_ROOT_FILE`, or the root the CA serves pinned by `RID_STEP_CA_ROOT_FINGERPRINT`. Only in development, with neither of the two, it trusts the root the CA serves and logs its fingerprint.
+  - Before the CA, the portal checks the CSR (`pkijs`): a single PEM block, attributes field present, valid self-signature, ECDSA P-256/P-384 or RSA 2048-4096 key, CN = clientId and no other alternative name. An invalid CSR gives 400 with a stable message per cause. If the CA does not respond or rejects it, 503.
+  - The certificate the CA returns must have that subject and that key, and chain up to the root. The portal stores the chain (public), the RFC 8705 fingerprint (`x5t#S256`), the serial and the dates. An application has a single active certificate (partial unique index); rotation is M3-04.
+  - A periodic job (`RID_LIFECYCLE_INTERVAL_SECONDS`) notifies the entity's developers `lifecycle.certificateExpiryWarningDays` before expiry (`credential.expiry_notice_queued` → `certificate_expiring` notification) and marks expired certificates as `expired`.
+- Templates. `app` (`infra/step-ca/app.tpl`, provisioner `rid-portal`): CN = clientId, the clientId as a DNS SAN, key usage for TLS client authentication only, 90 days. `node` (`infra/step-ca/node.tpl`, its own provisioner `rid-nodes`, M4-02): fixed `CN=rid-node` and the node's name, `rid-node-<nodeId>`, as the only DNS SAN, both from the OTT. Server authentication (the gateway calls the node) and client authentication (the node calls the control channel). 90 days, renewed by the kit. step-ca requires the CSR's CN to be the OTT's `sub`; since the kit does not know its ID before it enrolls, the node's CSR always carries `CN=rid-node`, with no names, and the OTT sets the SAN.
+- Revocation: short-lived certificates + a list of revoked fingerprints in the OPA bundle (requires SPIKE S-3).
 
-## 5. Flujo de una llamada
+## 5. Flow of a call
 
 ```mermaid
 sequenceDiagram
-  participant C as Sistema consumidor
+  participant C as Consumer system
   participant KC as Keycloak (rid-gateway)
   participant GW as APISIX
   participant OPA as OPA
-  participant P as Proveedor (nodo/API/X-Road)
+  participant P as Provider (node/API/X-Road)
   participant FB as Fluent Bit → OpenSearch
   C->>KC: client_credentials (+ mTLS)
   KC-->>C: access_token (5 min, cnf.x5t#S256)
   C->>GW: GET /dnp/sisben/v1/hogares/{id} · Bearer · X-RID-Purpose · X-RID-End-User
-  GW->>GW: mTLS cliente · quitar X-RID-* entrantes · validar JWT
+  GW->>GW: client mTLS · strip incoming X-RID-* · validate JWT
   GW->>OPA: input (request, route)
-  OPA-->>GW: allow + cabeceras de trazabilidad
-  GW->>P: petición + X-RID-* (túnel WireGuard + mTLS)
-  P-->>GW: respuesta
-  GW-->>C: respuesta (no se almacena)
-  GW--)FB: metadatos (sin ruta real, sin query, sin cuerpo)
+  OPA-->>GW: allow + traceability headers
+  GW->>P: request + X-RID-* (WireGuard tunnel + mTLS)
+  P-->>GW: response
+  GW-->>C: response (not stored)
+  GW--)FB: metadata (no real path, no query, no body)
 ```
 
-## 6. Cabeceras de trazabilidad hacia el proveedor
+## 6. Traceability headers to the provider
 
-| Cabecera | Contenido |
+| Header | Content |
 | :-- | :-- |
-| `X-RID-Consumer-Entity` | slug de la entidad consumidora |
-| `X-RID-Consumer-App` | ID de la aplicación |
-| `X-RID-Subscription` | ID de la suscripción que autorizó la llamada |
-| `X-RID-Purpose` | código de finalidad |
-| `X-RID-Operation` | `operationId` resuelto |
-| `X-RID-End-User-Hash` | hash con sal del funcionario final (si aplica) |
-| `X-RID-Subject-Ref` | seudónimo del titular de los datos (HMAC con clave, ADR-0015), si la operación lo declara |
-| `X-Request-Id` | ID de correlación extremo a extremo |
+| `X-RID-Consumer-Entity` | slug of the consumer entity |
+| `X-RID-Consumer-App` | application ID |
+| `X-RID-Subscription` | ID of the subscription that authorized the call |
+| `X-RID-Purpose` | purpose code |
+| `X-RID-Operation` | resolved `operationId` |
+| `X-RID-End-User-Hash` | salted hash of the end official (if applicable) |
+| `X-RID-Subject-Ref` | pseudonym of the data subject (keyed HMAC, ADR-0015), if the operation declares one |
+| `X-Request-Id` | end-to-end correlation ID |
 
-El proveedor sabe quién consulta, para qué y bajo qué autorización: resuelve el problema de "solo veo al gateway". Además, con `features.gatewayAssertion` el gateway las firma por llamada en una aserción JWS (`X-RID-Assertion`) para no repudio (ADR-0024, SPIKE S-6, M6-10):
-- **Clave:** la genera el portal (EC P-256, tabla `gateway_signing_key`, sellada con `RID_SECRETS_KEY`) y la rota cada `lifecycle.assertionKeyRotationDays` (90 por omisión). El reconciliador de APISIX la pone en la metadata de `rid-assertion` antes que las rutas.
-- **JWKS público** (`GET /api/v1/gateway/jwks`, caché de 5 minutos): todas las claves usadas, de la más nueva a la más vieja, para que las aserciones archivadas sigan verificando. Una clave comprometida sale de la lista.
-- **Rotación inmediata:** el operador la pide con `POST /api/v1/admin/gateway-signing-keys/rotate` (`platform_admin`; con `compromised`, la anterior sale del JWKS).
-- **Verificación:** cómo la verifica el proveedor está en la guía de entidades (`docs/guias/entidades.md` §3.2). Los proveedores de prueba lo hacen en cada llamada y registran el resultado.
+The provider knows who is querying, for what purpose and under which authorization: this solves the "I only see the gateway" problem. In addition, with `features.gatewayAssertion` the gateway signs them on each call in a JWS assertion (`X-RID-Assertion`) for non-repudiation (ADR-0024, SPIKE S-6, M6-10):
+- **Key:** the portal generates it (EC P-256, table `gateway_signing_key`, sealed with `RID_SECRETS_KEY`) and rotates it every `lifecycle.assertionKeyRotationDays` (90 by default). The APISIX reconciler puts it in the `rid-assertion` metadata before the routes.
+- **Public JWKS** (`GET /api/v1/gateway/jwks`, 5-minute cache): every key that has been used, from newest to oldest, so that archived assertions keep verifying. A compromised key is removed from the list.
+- **Immediate rotation:** the operator requests it with `POST /api/v1/admin/gateway-signing-keys/rotate` (`platform_admin`; with `compromised`, the previous key is removed from the JWKS).
+- **Verification:** how the provider verifies it is in the entity guide (`docs/guides/entities.md` §3.2). The test providers do it on every call and log the result.
 
-## 7. Datos
+## 7. Data
 
-- **Prisma** con migraciones versionadas. Tablas principales = entidades de `SPEC.md §3` + `outbox`, `sync_state`, `audit_event`, `policy_bundle` (revisiones del bundle de OPA).
-- **Outbox** para que estado de dominio y trabajo de sincronización se confirmen en la misma transacción.
-- **Auditoría encadenada:** `hash = SHA-256(prevHash ‖ JSON canónico del evento)`, con claves ordenadas y los valores tal como vuelven de `jsonb`. `seq` = último + 1 bajo un bloqueo consultivo de la transacción (`pg_advisory_xact_lock`), sin usar la secuencia: así una transacción revertida no deja huecos. El bloqueo serializa las escrituras de auditoría hasta que termina cada transacción. Los eventos anteriores a M1-11 quedan fuera de la cadena, y la verificación los cuenta aparte. Endpoint de verificación de la cadena. Anclaje diario (M2-09): el hash del último evento encadenado de cada día cerrado, en la zona horaria del país, se sella con la TSA (RFC 3161). Se guarda en `audit_anchor`, de solo inserción incluso para el dueño, y se envía por correo a los reguladores. La verificación exige que cada anclaje encuentre su evento con el mismo hash, lo que detecta el corte de la cola. Exportación CSV/JSON con la misma selección de filtros, con su SHA-256 firmado por la clave del operador (JWS EdDSA, verificable con `/transparency/jwks`). Cada exportación queda auditada.
-- La tabla `audit_event` tiene permisos solo de `INSERT`/`SELECT` para el rol de la aplicación (sin `UPDATE`/`DELETE`), y un trigger rechaza `UPDATE`/`DELETE`/`TRUNCATE` incluso para el dueño del esquema.
-- **Roles de base de datos:** el dueño del esquema (`rid`) solo se usa para migraciones; el API corre como `rid_app`, sin DDL. El esquema de pg-boss se crea con una migración de Prisma, así que pg-boss corre sin permisos de DDL.
-- **Documentos:** almacenamiento en volumen local detrás de la interfaz `StorageService` (adaptador S3 compatible a futuro, con un backend OSS como SeaweedFS o Garage). Solo PDF. Antivirus (M6-08): con `RID_CLAMAV_URL`, el API manda cada documento a ClamAV (`clamd`, protocolo INSTREAM) antes de guardarlo; uno infectado se rechaza y, si ClamAV no responde, la subida falla (falla cerrada). En el chart de Helm está activado con dos réplicas.
-  - **Desde M2-01.** `RID_DOCUMENTS_DIR`; las claves son UUID aleatorios que elige el API, nunca nombres del usuario, y se escriben con nombre temporal y renombre. La fila `document` guarda tamaño, tipo y SHA-256, que se vuelve a comprobar en cada descarga.
-  - **Subida:** el cuerpo es el PDF mismo (`application/pdf`); se exige la firma `%PDF-` y un tamaño máximo `RID_DOCUMENT_MAX_BYTES` (10 MiB, 413 si se pasa). Solo esa ruta tiene el límite mayor, y solo para peticiones con `Authorization: Bearer`: sin token, 401 antes de leer el cuerpo. El resto del API sigue en 1 MiB.
-  - **Descarga:** `Content-Disposition: attachment`, `nosniff`, CSP `sandbox` y sin caché. La web la sirve en `/files/...` con el token de la sesión, que nunca llega al navegador.
-  - **Acuerdos de intercambio (M2-07).** Se adjuntan a la solicitud con la misma ruta de subida. La plantilla del acuerdo modelo sale de `documents.agreementTemplate` de la config del país.
-  - **Eliminación por orden judicial.** Es la única eliminación física. Borra los bytes después de confirmar la transacción y deja la fila con su SHA-256 y la referencia a la orden; las descargas responden 410.
-- **Notificaciones (M2-08).** Derivan de la bitácora: la escritura del evento encola `notification.dispatch` en la misma transacción. El worker resuelve destinatarios con el estado actual y guarda una fila por evento y persona (clave única, entrega idempotente). Envía correo según las preferencias, salvo en los avisos de seguridad, que siempre se envían. Los textos no llevan datos de las personas consultadas, solo nombres de APIs, entidades y aplicaciones.
-- **Correo saliente del API** (`RID_SMTP_URL`, Mailpit en desarrollo): solo lo envían workers desde el outbox (p. ej. `invitation.email`), así un correo sale si y solo si el cambio que lo causó se confirmó. Entrega al menos una vez, con reintentos durante horas. Los textos están en `apps/api/src/mail/messages.ts` (es/en) y los nombres del país vienen de la config.
+- **Prisma** with versioned migrations. Main tables = the entities of `SPEC.md §3` + `outbox`, `sync_state`, `audit_event`, `policy_bundle` (OPA bundle revisions).
+- **Outbox** so that domain state and sync work are committed in the same transaction.
+- **Chained audit log:** `hash = SHA-256(prevHash ‖ canonical JSON of the event)`, with sorted keys and the values as they come back from `jsonb`. `seq` = last + 1 under a transaction-level advisory lock (`pg_advisory_xact_lock`), without using the sequence: this way a rolled-back transaction leaves no gaps. The lock serializes audit writes until each transaction ends. Events before M1-11 are outside the chain, and verification counts them separately. Chain verification endpoint. Daily anchoring (M2-09): the hash of the last chained event of each closed day, in the country's time zone, is sealed with the TSA (RFC 3161). It is stored in `audit_anchor`, insert-only even for the owner, and emailed to the regulators. Verification requires each anchor to find its event with the same hash, which detects truncation of the tail. CSV/JSON export with the same filter selection, with its SHA-256 signed with the operator's key (EdDSA JWS, verifiable with `/transparency/jwks`). Every export is audited.
+- The `audit_event` table has only `INSERT`/`SELECT` permissions for the application role (no `UPDATE`/`DELETE`), and a trigger rejects `UPDATE`/`DELETE`/`TRUNCATE` even for the schema owner.
+- **Database roles:** the schema owner (`rid`) is only used for migrations; the API runs as `rid_app`, with no DDL. The pg-boss schema is created with a Prisma migration, so pg-boss runs without DDL permissions.
+- **Documents:** storage on a local volume behind the `StorageService` interface (S3-compatible adapter in the future, with an OSS backend such as SeaweedFS or Garage). PDF only. Antivirus (M6-08): with `RID_CLAMAV_URL`, the API sends every document to ClamAV (`clamd`, INSTREAM protocol) before storing it; an infected one is rejected and, if ClamAV does not respond, the upload fails (fails closed). In the Helm chart it is enabled with two replicas.
+  - **Since M2-01.** `RID_DOCUMENTS_DIR`; keys are random UUIDs that the API chooses, never user-supplied names, and they are written with a temporary name and a rename. The `document` row stores size, type and SHA-256, which is checked again on every download.
+  - **Upload:** the body is the PDF itself (`application/pdf`); the `%PDF-` signature and a maximum size `RID_DOCUMENT_MAX_BYTES` (10 MiB, 413 if exceeded) are required. Only that route has the larger limit, and only for requests with `Authorization: Bearer`: without a token, 401 before reading the body. The rest of the API stays at 1 MiB.
+  - **Download:** `Content-Disposition: attachment`, `nosniff`, CSP `sandbox` and no caching. The web app serves it at `/files/...` with the session's token, which never reaches the browser.
+  - **Data exchange agreements (M2-07).** They are attached to the request with the same upload route. The model agreement template comes from `documents.agreementTemplate` in the country config.
+  - **Deletion by court order.** It is the only physical deletion. It deletes the bytes after the transaction commits and keeps the row with its SHA-256 and the reference to the order; downloads respond 410.
+- **Notifications (M2-08).** They derive from the audit log: writing the event enqueues `notification.dispatch` in the same transaction. The worker resolves recipients with the current state and stores one row per event and person (unique key, idempotent delivery). It sends email according to preferences, except for security notices, which are always sent. The texts carry no data about the people queried, only names of APIs, entities and applications.
+- **Outgoing email from the API** (`RID_SMTP_URL`, Mailpit in development): only workers send it, from the outbox (e.g. `invitation.email`), so an email goes out if and only if the change that caused it was committed. At-least-once delivery, with retries over several hours. The texts are in `apps/api/src/mail/messages.ts` (es/en) and the country's names come from the config.
 
-## 8. Logs de acceso y privacidad
+## 8. Access logs and privacy
 
-`http-logger` de APISIX con `log_format` restringido a:
+APISIX `http-logger` with `log_format` restricted to:
 
 ```
 ts, request_id, route_id, operation (X-RID-Operation), method, status,
@@ -337,187 +339,187 @@ subscription_id, purpose, end_user_hash, bytes_sent, gateway_node,
 deny_reason
 ```
 
-- Variables de APISIX para cada campo: `$http_x_rid_operation`, `$http_x_rid_subscription`, `$http_x_rid_consumer_entity`, `$http_x_rid_consumer_app`, `$http_x_rid_purpose`, `$http_x_rid_end_user_hash` (las cabeceras que puso OPA, visibles en la fase de log según S-1) y `$sent_http_x_rid_deny_reason`. **Nunca** `$uri`, `$request_uri` ni `$upstream_uri`: incluyen la ruta real y la query.
-- **Llamadas negadas (M5-03).** Una negación no llega al proveedor, así que OPA no pone cabeceras de petición. Cuando el cliente es conocido, OPA lo nombra en su respuesta (`X-RID-Consumer-App`, `X-RID-Consumer-Entity`, que el cliente ya sabe). El `log_format` las lee como `deny_consumer_app` y `deny_consumer_entity`, y Fluent Bit las convierte en `consumer_app` y `consumer_entity` y las descarta.
-- **Límite de peticiones (M5-03).** El 429 propio del gateway (`rid-rate-limited`, sin upstream) también lleva `X-RID-Deny-Reason: rate_limited`. En la analítica cuenta como una negación del gateway con su razón; el 429 de un proveedor no la lleva.
-- **Cabeceras de respuesta del proveedor.** `rid-header-guard` quita las `X-RID-*` de toda respuesta que viene de un upstream (`$upstream_status` presente): un proveedor no puede inventar una razón de negación ni un consumidor. `ngx.header` convierte `_` en `-`, así que un nombre con guiones bajos (`X_RID_Deny_Reason`) no se puede quitar. Por eso Fluent Bit descarta `deny_reason` cuando hubo tiempo de upstream: solo el gateway niega.
+- APISIX variables for each field: `$http_x_rid_operation`, `$http_x_rid_subscription`, `$http_x_rid_consumer_entity`, `$http_x_rid_consumer_app`, `$http_x_rid_purpose`, `$http_x_rid_end_user_hash` (the headers OPA set, visible in the log phase according to S-1) and `$sent_http_x_rid_deny_reason`. **Never** `$uri`, `$request_uri` or `$upstream_uri`: they include the real path and the query.
+- **Denied calls (M5-03).** A denial does not reach the provider, so OPA sets no request headers. When the client is known, OPA names it in its response (`X-RID-Consumer-App`, `X-RID-Consumer-Entity`, which the client already knows). The `log_format` reads them as `deny_consumer_app` and `deny_consumer_entity`, and Fluent Bit turns them into `consumer_app` and `consumer_entity` and drops the originals.
+- **Rate limit (M5-03).** The gateway's own 429 (`rid-rate-limited`, with no upstream) also carries `X-RID-Deny-Reason: rate_limited`. In analytics it counts as a gateway denial with its reason; a provider's 429 does not carry it.
+- **Provider response headers.** `rid-header-guard` strips the `X-RID-*` headers from every response that comes from an upstream (`$upstream_status` present): a provider cannot invent a denial reason or a consumer. `ngx.header` turns `_` into `-`, so a name with underscores (`X_RID_Deny_Reason`) cannot be stripped. That is why Fluent Bit drops `deny_reason` when there was upstream time: only the gateway denies.
 
-- **No se registran**: `uri` real, query string, cuerpos, `Authorization`, IP del ciudadano (no hay; los consumidores son sistemas).
-- El access log propio de nginx en APISIX está **desactivado** (`nginx_config.http.enable_access_log: false`), porque escribe la línea de la petición y la URI del upstream.
-- **Error log (M5-01).** Queda en nivel `error`, porque los avisos (cada negación de un plugin) también incluyen la línea de la petición. Un error real ("connect() failed… while connecting to upstream") también la incluye, con la URI del upstream. Por eso nginx manda su error log por syslog a `fluent-bit-errors`, que enmascara todo desde la línea de la petición hasta el final: la URI del upstream, el host y el referrer, salvo el `request_id` hexadecimal de APISIX. Así unas comillas o un nombre de campo falso en la ruta no cortan la máscara. También enmascara cualquier query y toda serie de 6 dígitos o más (`infra/fluent-bit/gateway-errors.lua`). El resultado queda en la salida de ese contenedor, donde lo lee el operador, y nunca llega a OpenSearch. El log en archivo que nginx siempre mantiene va a `/dev/null`. Solo los errores anteriores a leer la configuración van al stderr de APISIX. Hay pruebas de regresión en `tests/infra`.
-- **Fluent Bit (M5-01)** aplica un filtro Lua que descarta cualquier campo fuera de la lista permitida (defensa en profundidad). Además:
-  - da forma al registro: `status` y `bytes_sent` como enteros; `latency_ms` y `upstream_latency_ms` en milisegundos (con varios upstreams, la suma);
-  - comprueba el formato de cada valor y descarta el que no tenga la forma que pone el gateway. Así un cliente no puede meter un número de identificación por una cabecera que elige él: `X-RID-Purpose` tiene que ser un código y `X-Request-Id` un identificador de traza de hasta 128 caracteres.
-- **Logs del API (M6-05, ASVS 16.4.3).** Cada línea pasa por `RidLogger` (`apps/api/src/common/logger.ts`), que enmascara el mensaje y la traza: las queries, toda serie de 6 dígitos o más (los UUID se conservan: nombran registros, no personas), las direcciones de correo y las credenciales de una URL. Un error puede citar una ruta con un número de identificación o la URL de conexión a la base. Con `RID_LOG_FORMAT=json` (el chart de Helm lo fija) cada registro es un objeto JSON por línea en la salida del contenedor. De ahí lo toma el colector de logs del clúster y lo lleva al sistema central del operador, separado del portal. Ese colector no lo instala el chart: es de la plataforma del operador, como el de cualquier otra carga. En texto (por omisión, el piloto) es el formato de Nest, con colores solo en una terminal. Nunca llegan a OpenSearch, que solo tiene los logs de acceso.
-- **OpenSearch.** Índice mensual `rid-access-YYYY.MM`. El API mantiene la plantilla `rid-access` con un reconciliador idempotente, cuyo estado queda en `sync_state`. La plantilla tipa los campos y tiene `dynamic: strict`: un documento con un campo fuera de la lista se rechaza, una tercera barrera. El API también mantiene la política ISM `rid-access-retention` con `retention.accessLogMonths` de la configuración del país: un índice mensual se borra cuando tiene un mes más que la retención, así que cada llamada se conserva entre N y N+1 meses. Los índices creados antes de la plantilla conservan su mapeo dinámico; al desplegar M5 se borran (`DEPLOYMENT.md`).
-- La analítica del portal consulta OpenSearch desde `apps/api` (`RID_OPENSEARCH_URL`); los roles de plataforma ven cualquier entidad. Cada consulta se acota primero en PostgreSQL. Como proveedora, una entidad ve solo las rutas de sus propias versiones (`rid-route-<id>`, o `rid-sandbox-<id>` con `environment=sandbox`, M5-02). Como consumidora, solo sus aplicaciones (M5-03). Los días se agrupan en la zona horaria del país, con un periodo de 30 días por defecto y de un año como máximo. Sin OpenSearch, las pantallas de uso responden 503 `service_unavailable`.
+- **Not logged**: real `uri`, query string, bodies, `Authorization`, citizen IP (there is none; consumers are systems).
+- nginx's own access log in APISIX is **disabled** (`nginx_config.http.enable_access_log: false`), because it writes the request line and the upstream URI.
+- **Error log (M5-01).** It stays at the `error` level, because warnings (every denial by a plugin) also include the request line. A real error ("connect() failed… while connecting to upstream") also includes it, with the upstream URI. That is why nginx sends its error log over syslog to `fluent-bit-errors`, which masks everything from the request line to the end: the upstream URI, the host and the referrer, except APISIX's hexadecimal `request_id`. This way quotes or a fake field name in the path cannot cut the mask short. It also masks any query and any run of 6 or more digits (`infra/fluent-bit/gateway-errors.lua`). The result stays in that container's output, where the operator reads it, and never reaches OpenSearch. The file log that nginx always keeps goes to `/dev/null`. Only errors before the configuration is read go to APISIX's stderr. There are regression tests in `tests/infra`.
+- **Fluent Bit (M5-01)** applies a Lua filter that drops any field outside the allow list (defense in depth). In addition:
+  - it shapes the record: `status` and `bytes_sent` as integers; `latency_ms` and `upstream_latency_ms` in milliseconds (with several upstreams, the sum);
+  - it checks the format of each value and drops any that does not have the shape the gateway sets. This way a client cannot slip an identification number in through a header it chooses: `X-RID-Purpose` has to be a code and `X-Request-Id` a trace identifier of up to 128 characters.
+- **API logs (M6-05, ASVS 16.4.3).** Every line goes through `RidLogger` (`apps/api/src/common/logger.ts`), which masks the message and the stack trace: queries, any run of 6 or more digits (UUIDs are kept: they name records, not people), email addresses and credentials in a URL. An error may quote a path with an identification number or the database connection URL. With `RID_LOG_FORMAT=json` (the Helm chart sets it) each record is one JSON object per line on the container's output. From there the cluster's log collector picks it up and carries it to the operator's central system, separate from the portal. The chart does not install that collector: it belongs to the operator's platform, like the one for any other workload. In text mode (the default, the pilot) it is Nest's format, with colors only in a terminal. API logs never reach OpenSearch, which only holds the access logs.
+- **OpenSearch.** Monthly index `rid-access-YYYY.MM`. The API maintains the `rid-access` template with an idempotent reconciler, whose state is stored in `sync_state`. The template types the fields and has `dynamic: strict`: a document with a field outside the list is rejected, a third barrier. The API also maintains the ISM policy `rid-access-retention` with `retention.accessLogMonths` from the country configuration: a monthly index is deleted when it is one month older than the retention, so each call is kept between N and N+1 months. Indexes created before the template keep their dynamic mapping; they are deleted when M5 is deployed (`DEPLOYMENT.md`).
+- The portal's analytics query OpenSearch from `apps/api` (`RID_OPENSEARCH_URL`); platform roles see any entity. Every query is scoped first in PostgreSQL. As a provider, an entity sees only the routes of its own versions (`rid-route-<id>`, or `rid-sandbox-<id>` with `environment=sandbox`, M5-02). As a consumer, only its applications (M5-03). Days are grouped in the country's time zone, with a 30-day period by default and one year at most. Without OpenSearch, the usage screens respond 503 `service_unavailable`.
 
-## 9. Observabilidad
+## 9. Observability
 
-M5-06. Prometheus, Alertmanager y Grafana corren en el perfil `observability`. La configuración está en `infra/prometheus`, `infra/alertmanager` e `infra/grafana`.
+M5-06. Prometheus, Alertmanager and Grafana run in the `observability` profile. The configuration is in `infra/prometheus`, `infra/alertmanager` and `infra/grafana`.
 
-- **Métricas.** Prometheus recoge tres fuentes:
-  - El plugin `prometheus` de APISIX (puerto interno 9091): `apisix_http_status`, `apisix_http_latency_bucket{type}` y `apisix_etcd_reachable`.
-  - `GET /metrics` del API (fuera de `/api/v1`, con `RID_METRICS_TOKEN`; sin token responde 404). Publica `rid_api_http_request_duration_seconds` por plantilla de ruta, nunca con ids. También publica indicadores que se leen de PostgreSQL en cada recolección: `rid_queue_jobs{queue,state}` (pg-boss), `rid_sync_targets{system,status}`, `rid_opa_bundle_lag_seconds` (cuánto lleva OPA con un bundle anterior al vigente), `rid_nodes{status}` y `rid_certificate_soonest_expiry_seconds{kind}` (gateway, nodos, aplicaciones).
-  - Las métricas de OPA, con su estado de bundles (`status.prometheus: true`: `last_success_bundle_request`).
-- **Alertas** (`infra/prometheus/rules/rid.rules.yml`, probadas con `promtool test rules` en CI y en `tests/infra`):
+- **Metrics.** Prometheus scrapes three sources:
+  - APISIX's `prometheus` plugin (internal port 9091): `apisix_http_status`, `apisix_http_latency_bucket{type}` and `apisix_etcd_reachable`.
+  - The API's `GET /metrics` (outside `/api/v1`, with `RID_METRICS_TOKEN`; without a token it responds 404). It publishes `rid_api_http_request_duration_seconds` by route template, never with ids. It also publishes indicators read from PostgreSQL on every scrape: `rid_queue_jobs{queue,state}` (pg-boss), `rid_sync_targets{system,status}`, `rid_opa_bundle_lag_seconds` (how long OPA has been on a bundle older than the current one), `rid_nodes{status}` and `rid_certificate_soonest_expiry_seconds{kind}` (gateway, nodes, applications).
+  - OPA's metrics, with its bundle status (`status.prometheus: true`: `last_success_bundle_request`).
+- **Alerts** (`infra/prometheus/rules/rid.rules.yml`, tested with `promtool test rules` in CI and in `tests/infra`):
 
-  | Alerta | Condición |
+  | Alert | Condition |
   | :-- | :-- |
-  | `RidGateway5xxRate` | 5xx > 2 % durante 5 min |
-  | `RidGatewayLatencyHigh` | p95 de la petición completa > 200 ms durante 5 min |
-  | `RidTargetDown` | APISIX, el API u OPA sin responder a Prometheus durante 2 min |
-  | `RidOpaBundleBehind` | OPA con más de 2 min de atraso respecto del bundle vigente |
-  | `RidOpaBundleFetchFailing` | OPA sin descargar el bundle desde hace más de 2 min |
-  | `RidReconcileFailing` | objetos de `sync_state` en `error` durante 10 min |
-  | `RidNodeOffline` | nodos fuera de línea durante 5 min |
-  | `RidCertificateExpiring` | certificado del gateway o de un nodo a menos de 14 días; se renuevan solos, así que esto es una renovación que falla |
-  | `RidQueueBacklog` | más de 100 trabajos esperando durante 15 min |
+  | `RidGateway5xxRate` | 5xx > 2 % for 5 min |
+  | `RidGatewayLatencyHigh` | p95 of the full request > 200 ms for 5 min |
+  | `RidTargetDown` | APISIX, the API or OPA not answering Prometheus for 2 min |
+  | `RidOpaBundleBehind` | OPA more than 2 min behind the current bundle |
+  | `RidOpaBundleFetchFailing` | OPA has not downloaded the bundle for more than 2 min |
+  | `RidReconcileFailing` | `sync_state` objects in `error` for 10 min |
+  | `RidNodeOffline` | nodes offline for 5 min |
+  | `RidCertificateExpiring` | gateway or node certificate with less than 14 days left; they renew themselves, so this means a renewal is failing |
+  | `RidQueueBacklog` | more than 100 jobs waiting for 15 min |
 
-- **Alertmanager** agrupa por alerta, sistema y tipo, y avisa por correo al operador: Mailpit en desarrollo y en el piloto, el SMTP del operador en producción.
-- **Grafana** tiene un tablero de operador aprovisionado desde archivo (`RID · Operador`), con gateway, política, sincronización, cola, nodos, certificados y alertas activas. Su login es el propio de Grafana y es AGPL en su propio contenedor. Los colores del tablero siguen los umbrales de las alertas.
-- **Disponibilidad del gateway.** Es el indicador de `SPEC.md §8` y se calcula como `avg_over_time(up{job="apisix"})`: el API la lee de Prometheus con `RID_PROMETHEUS_URL`.
+- **Alertmanager** groups by alert, system and kind, and notifies the operator by email: Mailpit in development and in the pilot, the operator's SMTP in production.
+- **Grafana** has an operator dashboard provisioned from a file (`RID · Operador`), with gateway, policy, sync, queue, nodes, certificates and active alerts. Its login is Grafana's own, and it is AGPL in its own container. The dashboard's colors follow the alert thresholds.
+- **Gateway availability.** It is the indicator from `SPEC.md §8` and is computed as `avg_over_time(up{job="apisix"})`: the API reads it from Prometheus with `RID_PROMETHEUS_URL`.
 
-## 10. Contrato con el kit (nodos)
+## 10. Contract with the kit (nodes)
 
-Versión 1. El documento que el kit consume es `docs/contracts/node-contract-v1.openapi.json`, generado desde el API (un test falla si se desactualiza; `RID_UPDATE_NODE_CONTRACT=1` lo regenera).
+Version 1. The document the kit consumes is `docs/contracts/node-contract-v1.openapi.json`, generated from the API (a test fails if it gets out of date; `RID_UPDATE_NODE_CONTRACT=1` regenerates it).
 
-| Endpoint | Autenticación | Uso |
+| Endpoint | Authentication | Use |
 | :-- | :-- | :-- |
-| `POST /api/v1/nodes/enroll` | token de enrolamiento (en el cuerpo) | Token + CSR (`CN=rid-node`, sin nombres) + clave pública WireGuard + versión del kit + puerto de servicio → `nodeId`, certificado (`DNS:rid-node-<nodeId>`), raíz de la red, URL del canal de control, intervalo de heartbeat y configuración WireGuard (dirección `/32`, clave y endpoint del hub, dirección del hub como única `AllowedIPs`) |
-| `POST /api/v1/nodes/{id}/heartbeat` | mTLS del nodo | Versión, puerto de servicio, servicios expuestos (nombre, ruta, hash del OpenAPI) y salud. Responde el estado y si toca renovar (último tercio de la vida del certificado) |
-| `POST /api/v1/nodes/{id}/renew` | mTLS del nodo (certificado vigente) | CSR nuevo → certificado nuevo. Durante `RID_NODE_RENEWAL_GRACE_HOURS` (24) el certificado reemplazado solo puede repetir esa renovación, con la misma clave, y recibe el certificado vigente: así un nodo que perdió la respuesta se recupera, pero quien tenga la clave reemplazada no puede certificar una propia. No sirve para heartbeat ni config |
-| `GET /api/v1/nodes/{id}/config` | mTLS del nodo | Versiones publicadas que sirve el nodo (ruta pública y `servicePath`), versión mínima del kit (`RID_NODE_MIN_KIT_VERSION`) y avisos |
+| `POST /api/v1/nodes/enroll` | enrollment token (in the body) | Token + CSR (`CN=rid-node`, no names) + WireGuard public key + kit version + service port → `nodeId`, certificate (`DNS:rid-node-<nodeId>`), network root, control channel URL, heartbeat interval and WireGuard configuration (`/32` address, hub key and endpoint, hub address as the only `AllowedIPs`) |
+| `POST /api/v1/nodes/{id}/heartbeat` | node mTLS | Version, service port, exposed services (name, path, OpenAPI hash) and health. Responds with the status and whether it is time to renew (last third of the certificate's lifetime) |
+| `POST /api/v1/nodes/{id}/renew` | node mTLS (current certificate) | New CSR → new certificate. For `RID_NODE_RENEWAL_GRACE_HOURS` (24) the replaced certificate can only repeat that renewal, with the same key, and receives the current certificate: this way a node that lost the response recovers, but whoever holds the replaced key cannot get a certificate of their own. It does not work for heartbeat or config |
+| `GET /api/v1/nodes/{id}/config` | node mTLS | Published versions the node serves (public path and `servicePath`), minimum kit version (`RID_NODE_MIN_KIT_VERSION`) and notices |
 
-**Enrolamiento (M4-02).** El token se valida primero (cualquier rechazo es el mismo 401, sin decir por qué), luego el CSR (como el de las aplicaciones, `apps/api/src/credentials/csr.ts`) y que el hub esté configurado (si no, 503). La CA firma antes de la transacción, que marca el token usado solo si nadie lo usó mientras tanto. Un fallo antes del commit deja el token usable. La dirección del túnel es la siguiente a la más alta ya dada en `RID_WG_SUBNET` (`10.77.0.0/16`; el hub en la primera), con un bloqueo consultivo, y nunca se reutiliza. Una clave WireGuard ya enrolada da 409. Queda en la bitácora `node.enrolled` con la huella, el serial y la dirección, nunca una clave privada.
+**Enrollment (M4-02).** The token is validated first (every rejection is the same 401, without saying why), then the CSR (like the applications' one, `apps/api/src/credentials/csr.ts`) and that the hub is configured (if not, 503). The CA signs before the transaction, which marks the token as used only if nobody used it in the meantime. A failure before the commit leaves the token usable. The tunnel address is the one after the highest already assigned in `RID_WG_SUBNET` (`10.77.0.0/16`; the hub at the first one), under an advisory lock, and it is never reused. A WireGuard key that is already enrolled gives 409. The audit log records `node.enrolled` with the fingerprint, the serial and the address, never a private key.
 
-**Canal de control (M4-02).** El TLS del nodo termina en el gateway, en la ruta `rid-node-control` (`/api/v1/nodes/*`) que mantiene el reconciliador de APISIX:
-- `rid-header-guard` borra toda `X-RID-*` del cliente; `rid-client-cert` pone la huella del certificado verificado en el handshake; `proxy-rewrite` agrega `X-RID-Node-Control` con `RID_NODE_CONTROL_TOKEN` y la envía al API (`RID_GATEWAY_PORTAL_API_URL`).
-- El API cree en la huella solo si llega con ese token (comparación en tiempo constante): sin él, la petición no pasó por el gateway y la cabecera no prueba nada. Con él, la huella debe ser la del certificado vigente del nodo (o la del reemplazado, solo para repetir la renovación), el nodo debe estar enrolado y su entidad activa o suspendida. Si no, 401. Una entidad suspendida no renueva certificados (409).
-- Sin las dos variables, el reconciliador borra la ruta y los nodos no alcanzan el portal.
-- Sin mTLS obligatorio en la red, el objeto SSL igual pide el certificado en estas rutas (§4.1).
+**Control channel (M4-02).** The node's TLS terminates at the gateway, on the `rid-node-control` route (`/api/v1/nodes/*`) maintained by the APISIX reconciler:
+- `rid-header-guard` deletes every `X-RID-*` from the client; `rid-client-cert` sets the fingerprint of the certificate verified in the handshake; `proxy-rewrite` adds `X-RID-Node-Control` with `RID_NODE_CONTROL_TOKEN` and sends the request to the API (`RID_GATEWAY_PORTAL_API_URL`).
+- The API trusts the fingerprint only if it arrives with that token (constant-time comparison): without it, the request did not go through the gateway and the header proves nothing. With it, the fingerprint must be that of the node's current certificate (or of the replaced one, only to repeat the renewal), the node must be enrolled and its entity active or suspended. Otherwise, 401. A suspended entity does not renew certificates (409).
+- Without the two variables, the reconciler deletes the route and the nodes cannot reach the portal.
+- Without mandatory mTLS on the network, the SSL object still requests the certificate on these routes (§4.1).
 
-**Estados (`SPEC.md §4.6`).** El primer heartbeat pasa el nodo a `online` (`node.online`). Un cambio de servicios declarados queda como `node.services_changed`; los heartbeats que no cambian nada no se auditan. Cada `RID_NODE_LIFECYCLE_INTERVAL_SECONDS` (60) un trabajo pasa a `offline` los nodos sin heartbeat por `RID_NODE_OFFLINE_AFTER_SECONDS` (300), también los enrolados que nunca enviaron uno: `node.offline` avisa (`node_offline`, en el portal y por correo) a los `entity_admin` de la entidad y a los `platform_admin`. El siguiente heartbeat lo devuelve a `online`. `entity_admin` o `platform_admin` dan de baja un nodo (`decommissioned`, definitivo): el canal de control deja de aceptar su certificado y se anula el token vigente.
+**States (`SPEC.md §4.6`).** The first heartbeat moves the node to `online` (`node.online`). A change in the declared services is recorded as `node.services_changed`; heartbeats that change nothing are not audited. Every `RID_NODE_LIFECYCLE_INTERVAL_SECONDS` (60) a job moves to `offline` the nodes with no heartbeat for `RID_NODE_OFFLINE_AFTER_SECONDS` (300), including enrolled ones that never sent one: `node.offline` notifies (`node_offline`, in the portal and by email) the entity's `entity_admin`s and the `platform_admin`s. The next heartbeat brings it back to `online`. `entity_admin` or `platform_admin` decommission a node (`decommissioned`, final): the control channel stops accepting its certificate and the current token is voided.
 
-**Hub WireGuard (M4-03, ADR-0023).** Contenedor `wg-hub`: la interfaz `wg0` en la primera dirección de `RID_WG_SUBNET`, un nginx `stream` con `ssl_preread` en el 8443 y un agente HTTP interno (8090, `RID_WG_HUB_AGENT_TOKEN`).
-- El reconciliador del portal (`reconcilers/wireguard`, tema `wireguard.sync` al enrolar, dar de baja o cambiar el puerto, y una pasada por minuto) calcula desde PostgreSQL un peer por nodo `enrolled`, `online` u `offline` de una entidad activa o suspendida (su clave y su `/32`). También calcula una ruta SNI `rid-node-<id>` → `<dirección>:<servicePort>`.
-- Le entrega el estado completo al agente cuando difiere del que reporta, y el agente lo aplica con `wg syncconf` y una recarga de nginx. El resultado queda en `sync_state` (`wg-hub:state`).
-- El agente rechaza claves mal formadas, direcciones fuera de la subred y rutas a algo que no es un peer.
-- El hub no reenvía paquetes (`ip_forward=0`) y descarta todo lo nuevo que llega por `wg0`. Probado con contenedores desechables (`tests/infra/src/wg-hub.int.test.ts`): handshake, enrutamiento por SNI, nombres desconocidos sin destino y nodos sin acceso al hub.
+**WireGuard hub (M4-03, ADR-0023).** `wg-hub` container: the `wg0` interface at the first address of `RID_WG_SUBNET`, an nginx `stream` with `ssl_preread` on 8443 and an internal HTTP agent (8090, `RID_WG_HUB_AGENT_TOKEN`).
+- The portal's reconciler (`reconcilers/wireguard`, topic `wireguard.sync` on enrollment, decommissioning or a port change, and one pass per minute) computes from PostgreSQL one peer per `enrolled`, `online` or `offline` node of an active or suspended entity (its key and its `/32`). It also computes an SNI route `rid-node-<id>` → `<address>:<servicePort>`.
+- It hands the full state to the agent when it differs from what the agent reports, and the agent applies it with `wg syncconf` and an nginx reload. The result is stored in `sync_state` (`wg-hub:state`).
+- The agent rejects malformed keys, addresses outside the subnet and routes to anything that is not a peer.
+- The hub does not forward packets (`ip_forward=0`) and drops anything new that arrives over `wg0`. Tested with throwaway containers (`tests/infra/src/wg-hub.int.test.ts`): handshake, SNI routing, unknown names with no destination and nodes with no access to the hub.
 
-El kit se especifica en otro repositorio; este contrato es la frontera. En desarrollo, `infra/mock-node` (perfil `nodes`) simula un nodo. Es utilería de pruebas (ADR-0011): espera un token, se enrola con `openssl` y `wg`, levanta su túnel, sirve `mock-salud` por mTLS en su dirección del túnel (solo al certificado del gateway para su entidad, `gatewayClientName`) y envía heartbeats. Los servicios de ejemplo siguen en `infra/mock-providers` (ADR-0009).
+The kit is specified in another repository; this contract is the boundary. In development, `infra/mock-node` (`nodes` profile) simulates a node. It is test tooling (ADR-0011): it waits for a token, enrolls with `openssl` and `wg`, brings up its tunnel, serves `mock-salud` over mTLS on its tunnel address (only to the gateway's certificate for its entity, `gatewayClientName`) and sends heartbeats. The sample services remain in `infra/mock-providers` (ADR-0009).
 
-**Camino X-Road (SPIKE S-5, `docs/spikes/S-5.md`):** el gateway usa un Security Server del operador como cliente X-Road (PR-REST `r1`). El upstream apunta al Security Server, la ruta reescribe a `/r1/{serviceId}/…` y fija `X-Road-Client` (subsistema del operador). La identidad del consumidor real viaja en las cabeceras `X-RID-*` (cabeceras definidas por el usuario, que X-Road pasa intactas), y OPA pone `X-Road-UserId` (hash del funcionario) y `X-Road-Issue` (la suscripción). El miembro del `serviceId` debe ser el de la entidad que publica (M4-05).
+**X-Road path (SPIKE S-5, `docs/spikes/S-5.md`):** the gateway uses an operator Security Server as an X-Road client (PR-REST `r1`). The upstream points to the Security Server, the route rewrites to `/r1/{serviceId}/…` and sets `X-Road-Client` (the operator's subsystem). The real consumer's identity travels in the `X-RID-*` headers (user-defined headers, which X-Road passes through untouched), and OPA sets `X-Road-UserId` (the official's hash) and `X-Road-Issue` (the subscription). The member in the `serviceId` must be the publishing entity's (M4-05).
 
-## 11. Despliegue
+## 11. Deployment
 
-**Desarrollo:** `infra/compose/docker-compose.yml` con todos los servicios, datos semilla y realms importados; web y API en el host.
+**Development:** `infra/compose/docker-compose.yml` with all the services, seed data and imported realms; web and API on the host.
 
-**Pilotos y demos:** el mismo archivo más `infra/compose/docker-compose.deploy.yml` (web, API y carpeta en contenedores, sin puertos publicados, detrás de un proxy inverso; `docker-compose.edge.yml` trae uno). Instalador interactivo: `install.sh` (`docs/INSTALL.md`). Detalle por componente en `docs/DEPLOYMENT.md`; puesta en marcha y operación en `docs/OPERATIONS.md`.
+**Pilots and demos:** the same file plus `infra/compose/docker-compose.deploy.yml` (web, API and citizen folder in containers, with no published ports, behind a reverse proxy; `docker-compose.edge.yml` provides one). Interactive installer: `install.sh` (`docs/INSTALL.md`). Per-component detail in `docs/DEPLOYMENT.md`; setup and operation in `docs/OPERATIONS.md`.
 
-**Producción (M6):**
-- Gateway: ≥ 2 nodos APISIX en zonas distintas, OPA local en cada uno, etcd en clúster de 3 con mTLS.
-- Portal: ≥ 2 réplicas de web y api; PostgreSQL con réplica y respaldos continuos (Barman Cloud de CloudNativePG al almacenamiento de objetos del operador; pgBackRest en el piloto con Compose; ADR-0026).
-- Keycloak en clúster con base de datos propia.
-- step-ca con raíz fuera de línea; intermedia con clave en HSM.
-- Helm charts en `infra/helm/`: `rid-platform` (operadores) y `rid` (todo RID). Están escritos y validados de forma estática, pero todavía no se instalaron en ningún clúster (M6-05; `DEPLOYMENT.md §9`).
-  - El gateway es un StatefulSet: cada pod lleva APISIX, su OPA (decisiones solo en `127.0.0.1`), el Fluent Bit de transparencia con su disco y el de errores.
-  - PostgreSQL y Keycloak usan CloudNativePG, con `verify-full`.
-  - Los secretos llegan por componente desde External Secrets.
-  - Las NetworkPolicies replican la segmentación de M6-01.
+**Production (M6):**
+- Gateway: ≥ 2 APISIX nodes in different zones, a local OPA on each, etcd in a 3-member cluster with mTLS.
+- Portal: ≥ 2 replicas of web and api; PostgreSQL with a replica and continuous backups (CloudNativePG's Barman Cloud to the operator's object storage; pgBackRest in the Compose pilot; ADR-0026).
+- Keycloak in a cluster with its own database.
+- step-ca with an offline root; intermediate with its key in an HSM.
+- Helm charts in `infra/helm/`: `rid-platform` (operators) and `rid` (all of RID). They are written and statically validated, but have not yet been installed on any cluster (M6-05; `DEPLOYMENT.md §9`).
+  - The gateway is a StatefulSet: each pod carries APISIX, its OPA (decisions only on `127.0.0.1`), the transparency Fluent Bit with its disk, and the errors one.
+  - PostgreSQL and Keycloak use CloudNativePG, with `verify-full`.
+  - Secrets arrive per component from External Secrets.
+  - The NetworkPolicies replicate the M6-01 segmentation.
 
-## 12. Seguridad
+## 12. Security
 
-- Revisión OWASP ASVS 5.0 nivel 2 con sus correcciones y pendientes: `docs/security/ASVS-L2.md` (M6-01).
-- **Redes (M6-01).**
-  - `gateway`: el plano de control del gateway. APISIX, etcd y OPA, más los componentes de la plataforma que los usan (Keycloak, los Fluent Bit, Prometheus y, en el piloto, el API).
-  - `providers`: los upstreams del gateway (proveedores de prueba, hub de nodos) y el runner de contrato.
-  - `runner` (piloto): el API y el runner de contrato. El API no está en `providers`, así que ningún upstream lo alcanza sin pasar por el proxy.
-  - `default`: la plataforma (base de datos, CA, OpenSearch, correo, portal).
-  - etcd y OPA no tienen autenticación propia en el piloto, por eso solo están en `gateway`: ni los upstreams ni el runner los alcanzan. El gateway no alcanza la base de datos, la CA, OpenSearch ni el correo. La prueba es `tests/infra/src/networks.int.test.ts`.
-- Admin API de APISIX solo en red interna y con clave de administrador. En producción también mTLS de etcd y autenticación de OPA (M6-05).
-- **Claves privadas en etcd** (TLS del gateway, aserciones de S-6). Se cifran con el `data_encryption.keyring` propio del despliegue (`RID_APISIX_KEYRING`), nunca con el de fábrica de APISIX, que es público.
-- **Plugins de APISIX.** APISIX solo carga los que usan las rutas del portal: una ruta que pida otro, como las funciones serverless, se rechaza.
-- El bundle OPA se sirve con token de servicio y por red interna.
-- Secretos por variables de entorno en dev; en producción, OpenBao (MPL-2.0).
+- OWASP ASVS 5.0 level 2 review, with its fixes and open items: `docs/security/ASVS-L2.md` (M6-01).
+- **Networks (M6-01).**
+  - `gateway`: the gateway's control plane. APISIX, etcd and OPA, plus the platform components that use them (Keycloak, the Fluent Bits, Prometheus and, in the pilot, the API).
+  - `providers`: the gateway's upstreams (test providers, node hub) and the contract runner.
+  - `runner` (pilot): the API and the contract runner. The API is not on `providers`, so no upstream can reach it without going through the proxy.
+  - `default`: the platform (database, CA, OpenSearch, mail, portal).
+  - etcd and OPA have no authentication of their own in the pilot, which is why they are only on `gateway`: neither the upstreams nor the runner can reach them. The gateway cannot reach the database, the CA, OpenSearch or the mail server. The test is `tests/infra/src/networks.int.test.ts`.
+- APISIX Admin API on the internal network only, with an admin key. In production, also etcd mTLS and OPA authentication (M6-05).
+- **Private keys in etcd** (gateway TLS, S-6 assertions). They are encrypted with the deployment's own `data_encryption.keyring` (`RID_APISIX_KEYRING`), never with APISIX's factory default, which is public.
+- **APISIX plugins.** APISIX only loads the ones the portal's routes use: a route that asks for another one, such as the serverless functions, is rejected.
+- The OPA bundle is served with a service token and over the internal network.
+- Secrets through environment variables in dev; in production, OpenBao (MPL-2.0).
 - **Web (M3-09).**
-  - CSP con un nonce nuevo por respuesta, que pone el proxy de Next (`src/proxy.ts`, `src/lib/security-headers.ts`). Next lo lee de la CSP de la petición y lo pone en sus scripts.
-    - `script-src 'self' 'nonce-…' 'strict-dynamic'`, sin `unsafe-inline` ni `unsafe-eval` (este último solo en `next dev`).
-    - `style-src` admite estilos en línea: los colores de la marca y los de Scalar. Los estilos no ejecutan código.
-    - `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'` y `connect-src 'self'`.
-    - `form-action` solo permite el propio origen y el de Keycloak, porque el navegador aplica la directiva también a la redirección de inicio y cierre de sesión. Sobre HTTPS se agrega `upgrade-insecure-requests`.
-  - Las rutas que no son páginas (Auth.js, el logo) llevan una CSP que no carga nada. Las descargas de `/files` llevan su `sandbox`.
-  - Toda respuesta lleva HSTS de dos años con `includeSubDomains`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, COOP/CORP `same-origin` y una `Permissions-Policy` cerrada. Sin `X-Powered-By`.
-  - Cookies: las de Auth.js son `HttpOnly`, `SameSite=Lax`, de un solo host y, sobre HTTPS, `Secure` con prefijo `__Secure-` o `__Host-`. Las propias del portal (entidad activa, escalado de sesión) siguen las mismas reglas. CSRF por Auth.js y por las server actions (comprobación de `Origin`).
+  - CSP with a fresh nonce per response, set by the Next proxy (`src/proxy.ts`, `src/lib/security-headers.ts`). Next reads it from the request's CSP and puts it on its scripts.
+    - `script-src 'self' 'nonce-…' 'strict-dynamic'`, without `unsafe-inline` or `unsafe-eval` (the latter only in `next dev`).
+    - `style-src` allows inline styles: the brand colors and Scalar's. Styles do not execute code.
+    - `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'` and `connect-src 'self'`.
+    - `form-action` only allows the portal's own origin and Keycloak's, because the browser also applies the directive to the sign-in and sign-out redirects. Over HTTPS, `upgrade-insecure-requests` is added.
+  - Routes that are not pages (Auth.js, the logo) carry a CSP that loads nothing. Downloads from `/files` carry their `sandbox`.
+  - Every response carries two-year HSTS with `includeSubDomains`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, COOP/CORP `same-origin` and a locked-down `Permissions-Policy`. No `X-Powered-By`.
+  - Cookies: the Auth.js ones are `HttpOnly`, `SameSite=Lax`, host-only and, over HTTPS, `Secure` with a `__Secure-` or `__Host-` prefix. The portal's own cookies (active entity, session step-up) follow the same rules. CSRF through Auth.js and server actions (`Origin` check).
 - **API (M6-01).**
-  - Límite de peticiones antes de leer el cuerpo: por usuario verificado (un token inventado no es una cuota propia) o por dirección, y una cuota estricta en las rutas costosas y en el enrolamiento de nodos. Solo las rutas de control de los servicios de la plataforma, cada una con su credencial, quedan fuera, y se reconocen por plantilla de ruta. El proxy suma un límite por dirección.
-  - `X-Forwarded-For` solo se cree a la dirección del proxy (`RID_TRUST_PROXY`).
-  - Las subidas verifican el token antes de recibir el archivo.
-  - Tamaño máximo de cuerpo, validación zod en todas las entradas y problem+json sin trazas internas.
-  - Cada error de campo lleva `key` y `params` además del `message` en inglés, y la web lo muestra en el idioma del usuario (ADR-0025, M6-02). `params` nunca lleva lo que escribió el usuario.
-  - Cabeceras de seguridad en toda respuesta (`nosniff`, CSP `default-src 'none'`, `no-store` salvo indicación del endpoint, HSTS).
-  - Un evento JSON `request_refused` por cada rechazo (400, 401, 403, 404, 409, 429) con `sub`, IP, plantilla de ruta y código. Nunca la query, el token ni el cuerpo.
-- **Keycloak (M6-01).** Política de contraseñas (12 caracteres mínimo, distinta del usuario y del correo, sin repetir las 5 anteriores), URIs de redirección exactas, eventos de ingreso, cierre, registro y errores, y eventos de administración.
-- **Dependencias.** `pnpm audit --audit-level high` y verificación de licencias en CI. Plazos de corrección en `docs/security/ASVS-L2.md`.
+  - Rate limit before reading the body: per verified user (a forged token is not a quota of its own) or per address, and a strict quota on expensive routes and on node enrollment. Only the control routes of the platform services, each with its own credential, are exempt, and they are recognized by route template. The proxy adds a per-address limit.
+  - `X-Forwarded-For` is only trusted from the proxy's address (`RID_TRUST_PROXY`).
+  - Uploads verify the token before receiving the file.
+  - Maximum body size, zod validation on all inputs and problem+json without internal stack traces.
+  - Each field error carries `key` and `params` in addition to the English `message`, and the web app shows it in the user's language (ADR-0025, M6-02). `params` never carries what the user typed.
+  - Security headers on every response (`nosniff`, CSP `default-src 'none'`, `no-store` unless the endpoint says otherwise, HSTS).
+  - A JSON `request_refused` event for every refusal (400, 401, 403, 404, 409, 429) with `sub`, IP, route template and status code. Never the query, the token or the body.
+- **Keycloak (M6-01).** Password policy (12 characters minimum, different from the username and the email, no reuse of the last 5), exact redirect URIs, login, logout, registration and error events, and admin events.
+- **Dependencies.** `pnpm audit --audit-level high` and license checks in CI. Remediation deadlines in `docs/security/ASVS-L2.md`.
 
-## 13. Transparencia para el titular (ADR-0015, ADR-0016)
+## 13. Transparency for the data subject (ADR-0015, ADR-0016)
 
 ```
-Consumidor ─▶ APISIX ─(opa: X-RID-Subject-Ref = HMAC(clave, país|tipo|número))─▶ Proveedor
-                │ tcp-logger (formato de transparencia, sin ruta ni número)
-                ▼
-            Fluent Bit (búfer en disco, reintentos) ─▶ API: colector ─▶ subject_access_record (solo inserción)
-                                                            │ lotes Merkle + firma JWS + sello TSA RFC 3161
-                                                            ▼
-                                                  transparency_checkpoint ─▶ bitácora (anclaje)
-Carpeta Ciudadana ─(token del ciudadano)─▶ API: /data-subjects/me/accesses, comprobantes, avisos (webhook)
+Consumer ─▶ APISIX ─(opa: X-RID-Subject-Ref = HMAC(key, country|type|number))─▶ Provider
+              │ tcp-logger (transparency format, no path or number)
+              ▼
+          Fluent Bit (disk buffer, retries) ─▶ API: collector ─▶ subject_access_record (insert-only)
+                                                       │ Merkle batches + JWS signature + RFC 3161 TSA timestamp
+                                                       ▼
+                                             transparency_checkpoint ─▶ audit log (anchor)
+Carpeta Ciudadana ─(citizen's token)─▶ API: /data-subjects/me/accesses, receipts, alerts (webhook)
 ```
 
-- **Titular en el OpenAPI.** Se declara con `x-rid-data-subject` en cada operación (MT-01): un parámetro de ruta, un puntero JSON al cuerpo (`in: body`) o `none`. El bundle lleva, por operación, cómo extraerlo de la ruta (expresión con grupos de captura) y el tipo de documento.
-- **Titular en el cuerpo (ADR-0017).** Lo lee el gateway, nunca lo declara el consumidor. El plugin `rid-data-subject` lee el cuerpo en memoria y con tope de 64 KiB, solo en las operaciones declaradas y después de validar el token. Resuelve el puntero y lo pasa a OPA en `X-RID-Body-Subject`. Para que el gateway y el proveedor lean siempre a la misma persona, no entrega titular (y OPA niega) si el cuerpo no se declara JSON (`Content-Type`), si repite un nombre de miembro en un mismo objeto (I-JSON, RFC 7493) o si el número o el tipo contienen `:`.
-- **Falla cerrado.** En una API personal o sensible, una operación sin declaración válida (ausente o en una forma que ya no se acepta) se niega con `data_subject_required`. El lint exige la declaración en esas clasificaciones, así que solo afecta a versiones antiguas.
-- **Seudónimo.** Lo calcula OPA y sale como `X-RID-Subject-Ref`. La clave (`RID_SUBJECT_REF_KEY`) viaja en el bundle, que solo se sirve por la red interna, igual que la sal del funcionario. OPA nunca devuelve `X-RID-Body-Subject`, así que el proveedor no recibe el número por esa vía (en el cuerpo y en la ruta ya lo tiene).
-- **Registros separados de la analítica.** Los logs de analítica (`http-logger`, §8) siguen sin titular. El registro de transparencia usa otro logger y otro camino.
-- **Registro de consultas (MT-03).** Las rutas con alguna operación que declara titular llevan un `tcp-logger` con formato propio (`TRANSPARENCY_LOG_FORMAT`): hora (`$msec`), nodo, `$request_id` de nginx, `X-Request-Id`, ruta, operación, suscripción, finalidad, hash del funcionario, `X-RID-Subject-Ref`, `$status` y `$upstream_status`. Nunca la ruta, la query ni cuerpos.
-  - **Fluent Bit propio** (`fluent-bit-transparency`, perfil base, `infra/fluent-bit/transparency.yaml`): entrada TCP, búfer en disco con suma de verificación y reintentos sin límite hacia el colector. Su filtro Lua separa los lotes de APISIX, deja solo los campos permitidos y descarta las llamadas sin seudónimo o que no llegaron al proveedor.
-  - **Solo llamadas autorizadas.** Cuenta una llamada cuando nginx la reenvió (`$upstream_status` existe; el cliente no puede ponerlo) y trae el seudónimo que devolvió OPA (el gateway borra el que envíe el cliente antes de OPA). Las negadas no llegan al proveedor y no se registran.
-  - **Colector** `POST /api/v1/internal/subject-access`, con su propio token de servicio (`RID_TRANSPARENCY_INGEST_TOKEN`), distinto del de OPA. El token se verifica antes de leer el cuerpo (su límite es de 16 MB, por bloque de Fluent Bit): sin token, 401 sin que el API reciba nada. En producción, `/api/v1/internal/*` no se publica en el ingreso público. Inserta por tandas de 1.000 filas (PostgreSQL acepta hasta 65.535 parámetros por sentencia). Valida cada registro y lo completa desde la suscripción que OPA autorizó: entidad proveedora, API, versión, datos expuestos, entidad y aplicación consumidoras y finalidad. Guarda de dónde salió el titular (`path` o `body`) según la declaración de la operación. Lo que no cuadra (suscripción desconocida, ruta de otra versión, operación sin titular, formato inválido) se descarta y se cuenta sin registrar valores; nunca se rechaza el lote, para que Fluent Bit no reintente el mismo bloque sin fin. Los reintentos no duplican: la clave es el nodo más el `$request_id` de nginx, que el cliente no elige (el `X-Request-Id` sí).
-  - **Tabla `subject_access_record`, solo inserción**: `rid_app` no tiene UPDATE, DELETE ni TRUNCATE, y un disparador lo impide a cualquiera. Solo la función `purge_subject_access_records(meses)` (SECURITY DEFINER) borra lo que pasó la retención `retention.subjectAccessMonths`. La función rechaza una retención menor que el piso de `subject_access_retention`, tabla de una fila que solo escribe el dueño del esquema (60 meses por omisión; el operador la ajusta al mínimo legal del despliegue). Así, quien obtenga las credenciales de `rid_app` no puede acortar la retención. Tampoco puede hacerlo con una tabla temporal del mismo nombre: la función fija `search_path = pg_catalog, public, pg_temp` y nombra cada objeto con su esquema. Cada llamada deja una fila en `subject_access_purge_log`, escrita por la propia función: `rid_app` puede leerla pero no modificarla. El API la llama cada 6 horas, y cada purga que borra algo queda además en la bitácora (`subject_access.purged`). Los identificadores se guardan sin claves foráneas: el registro es evidencia y debe sobrevivir a cambios posteriores.
-  - **Prueba de no fuga.** El e2e consulta un número nuevo y comprueba que no aparece en los logs de APISIX, en los logs ni en el búfer de Fluent Bit, ni en un volcado completo de la base del portal.
-- **Evidencia verificable (MT-04, ADR-0016).** El sellador del API (cada `RID_TRANSPARENCY_SEAL_INTERVAL_SECONDS`, con bloqueo consultivo para que solo un nodo selle) agrupa los registros sin lote, hasta `RID_TRANSPARENCY_BATCH_MAX` por lote.
-  - **Hoja (formato 2).** SHA-256(0x00 ‖ JSON canónico RFC 8785 de `{v, id, occurredAt, digest}`), donde `digest` es el SHA-256 del JSON canónico del registro: identificador, hora, seudónimo, origen del titular, entidades, API, versión, operación, datos expuestos, finalidad, suscripción, hash del funcionario, estado, nodo y `$request_id`. No incluye el `X-Request-Id`, porque lo elige el cliente y no prueba nada. Como la hoja compromete el identificador y la hora, siguen ligados a la raíz firmada aunque la retención purgue el registro: no se puede hacer pasar un borrado anticipado por una purga. El formato es la `v` del punto de control firmado; los primeros lotes (formato 1, la hoja sobre el registro completo) siguen verificándose. Árbol y prueba de inclusión según RFC 9162.
-  - **Punto de control.** `{v, log, seq, treeSize, root, prev, sealedAt}`, donde `prev` es el SHA-256 del JSON canónico del punto anterior. Lo firma el operador como JWS compacto (EdDSA, `typ: rid-checkpoint+jws`, `kid`), con la clave `RID_TRANSPARENCY_SIGNING_JWK`. El punto de control, sus hojas y la entrada `transparency.checkpoint` de la bitácora se escriben en una sola transacción.
-  - **Sello.** La TSA (`RID_TSA_URL`) sella los bytes del JWS: el sello cubre a la vez el punto de control y la firma. El API comprueba cada sello antes de guardarlo (bytes, nonce, firma y cadena publicada por la TSA). Si la TSA no responde, el lote queda pendiente y la ronda siguiente reintenta. En desarrollo la TSA es sigstore timestamp-server con su propia cadena (`infra/tsa`, generada en un volumen); en producción, la TSA acreditada del país.
-  - **Tablas de solo inserción** (`transparency_checkpoint`, `transparency_leaf`, `transparency_timestamp`): ni `rid_app` ni el dueño pueden hacer UPDATE, DELETE o TRUNCATE sin desactivar antes un disparador. Las hojas guardan su hash y la hora de la llamada, así el lote se puede reconstruir después de que la retención purgue los registros.
-  - **API.** Públicos: `GET /transparency/jwks` (claves actuales y retiradas, por `kid`) y `GET /transparency/checkpoints[/:seq]` (solo hashes). Con `audit.read`: `GET /transparency/records/:id/receipt` (409 mientras el registro no tiene lote) y `GET /transparency/verify`, que recalcula cadena, firmas, raíces, sellos y cada registro contra su hoja, y reporta registros alterados, borrados antes de cumplir la retención o insertados en un lote sellado. Además cruza los puntos de control con sus anclajes en la bitácora: un anclaje sin su punto de control delata lotes eliminados, incluso al final de la cadena, y un punto de control sin anclaje delata uno insertado por fuera del sellador. El ciudadano recibe su comprobante en MT-05.
-  - **Verificador abierto.** `packages/transparency-verifier` (librería y CLI `rid-verify-receipt`) verifica un comprobante sin consultar al portal: inclusión, firma contra el JWKS y sello contra la raíz de la TSA que el verificador elige confiar. Ejemplo: `rid-verify-receipt comprobante.json --jwks <url o archivo> --tsa-root <url o archivo>`. Tolera hasta 60 s más la precisión declarada por la TSA entre la hora de la llamada y la del sello, porque el gateway y la TSA tienen relojes distintos y `genTime` suele venir redondeado al segundo.
-  - **Verificación incremental.** `GET /transparency/verify?fromSeq=N` revisa desde el punto de control N, encadenado al hash del N-1. Un monitor que ya verificó lo anterior solo revisa lo nuevo; sin `fromSeq` se revisa el registro completo, que en memoria tarda unos 30 s por cada 80.000 registros.
-  - **Pendiente para producción.** Rotación de la clave de firma: la anterior pasa a `RID_TRANSPARENCY_RETIRED_JWKS`.
-- **Identidad del ciudadano (MT-05).** La da el emisor de identidad digital configurado (`RID_CITIZEN_ISSUER`; en desarrollo, el realm `rid-citizens`, que simula la autenticación digital del país).
-  - **Token aceptado.** Firma RS256 contra el JWKS del emisor, emisor, audiencia `RID_CITIZEN_AUDIENCE` (`rid-transparency-api`), vigencia, y `azp` dentro de `RID_CITIZEN_CLIENTS` (solo las aplicaciones ciudadanas autorizadas, como la Carpeta). Cualquier otro token, incluido uno del portal, recibe 401; un token ciudadano tampoco abre ningún endpoint del portal.
-  - **Seudónimo.** El API toma el tipo y el número de documento de los claims (`RID_CITIZEN_DOCUMENT_TYPE_CLAIM`, `RID_CITIZEN_DOCUMENT_NUMBER_CLAIM`; sin tipo, el primero de `identifiers.person`). Normaliza igual que OPA y calcula el mismo HMAC con `RID_SUBJECT_REF_KEY`. Un vector compartido entre los tests de Rego y los del API amarra las dos implementaciones, y el e2e lo prueba de punta a punta: la ciudadana de la demo ve justo las llamadas que el gateway registró con su número. El API nunca recibe el número como parámetro, no lo guarda, no lo registra en logs y no lo devuelve.
-  - **Realm `rid-citizens`.** Cliente `carpeta-ciudadana`, confidencial, con código + PKCE y sin password grant. El access token lleva solo `sub`, la audiencia y el documento, sin nombre ni correo. El ciudadano no puede editar su documento: el perfil de usuario solo deja editarlo al administrador, y no hay atributos sin declarar.
-  - **API.** `GET /api/v1/data-subjects/me/accesses` lista, de la más reciente a la más antigua y con cursor opaco, quién consultó (entidad y aplicación), qué entidad respondió, qué API, operación y datos expuestos, para qué finalidad, con qué funcionario (su hash, como referencia), el resultado y si ya está sellada. `GET /api/v1/data-subjects/me/accesses/:id/receipt` entrega el comprobante (409 mientras no tiene lote). Si la consulta no es del titular que pregunta, responde 404, sin revelar que existe. En OpenAPI van con el esquema de seguridad `citizenBearer`.
+- **Data subject in the OpenAPI.** It is declared with `x-rid-data-subject` on each operation (MT-01): a path parameter, a JSON pointer into the body (`in: body`) or `none`. The bundle carries, per operation, how to extract it from the path (an expression with capture groups) and the document type.
+- **Data subject in the body (ADR-0017).** The gateway reads it; the consumer never declares it. The `rid-data-subject` plugin reads the body in memory, capped at 64 KiB, only for the declared operations and after validating the token. It resolves the pointer and passes it to OPA in `X-RID-Body-Subject`. So that the gateway and the provider always read the same person, it delivers no data subject (and OPA denies) if the body is not declared as JSON (`Content-Type`), if it repeats a member name in the same object (I-JSON, RFC 7493) or if the number or the type contain `:`.
+- **Fails closed.** In a personal or sensitive API, an operation without a valid declaration (missing or in a form that is no longer accepted) is denied with `data_subject_required`. The lint requires the declaration for those classifications, so this only affects old versions.
+- **Pseudonym.** OPA computes it and it goes out as `X-RID-Subject-Ref`. The key (`RID_SUBJECT_REF_KEY`) travels in the bundle, which is only served over the internal network, just like the official's salt. OPA never returns `X-RID-Body-Subject`, so the provider does not receive the number through that channel (it already has it in the body and in the path).
+- **Records separate from analytics.** The analytics logs (`http-logger`, §8) still carry no data subject. The transparency record uses another logger and another path.
+- **Query record (MT-03).** Routes with any operation that declares a data subject carry a `tcp-logger` with its own format (`TRANSPARENCY_LOG_FORMAT`): time (`$msec`), node, nginx's `$request_id`, `X-Request-Id`, route, operation, subscription, purpose, official's hash, `X-RID-Subject-Ref`, `$status` and `$upstream_status`. Never the path, the query or bodies.
+  - **Its own Fluent Bit** (`fluent-bit-transparency`, base profile, `infra/fluent-bit/transparency.yaml`): TCP input, disk buffer with checksum, and unlimited retries to the collector. Its Lua filter splits APISIX's batches, keeps only the allowed fields and drops calls with no pseudonym or that did not reach the provider.
+  - **Authorized calls only.** A call counts when nginx forwarded it (`$upstream_status` exists; the client cannot set it) and it carries the pseudonym OPA returned (the gateway deletes any the client sends before OPA). Denied calls do not reach the provider and are not recorded.
+  - **Collector** `POST /api/v1/internal/subject-access`, with its own service token (`RID_TRANSPARENCY_INGEST_TOKEN`), different from OPA's. The token is verified before reading the body (its limit is 16 MB, per Fluent Bit chunk): without a token, 401 without the API receiving anything. In production, `/api/v1/internal/*` is not published on the public ingress. It inserts in chunks of 1,000 rows (PostgreSQL accepts up to 65,535 parameters per statement). It validates each record and completes it from the subscription OPA authorized: provider entity, API, version, exposed data, consumer entity and application, and purpose. It stores where the data subject came from (`path` or `body`) according to the operation's declaration. Anything that does not fit (unknown subscription, route of another version, operation without a data subject, invalid format) is dropped and counted without recording values; the batch is never rejected, so that Fluent Bit does not retry the same chunk endlessly. Retries do not create duplicates: the key is the node plus nginx's `$request_id`, which the client does not choose (it does choose `X-Request-Id`).
+  - **`subject_access_record` table, insert-only**: `rid_app` has no UPDATE, DELETE or TRUNCATE, and a trigger prevents them for everyone. Only the function `purge_subject_access_records(months)` (SECURITY DEFINER) deletes what has passed the `retention.subjectAccessMonths` retention. The function rejects a retention lower than the floor in `subject_access_retention`, a one-row table that only the schema owner writes (60 months by default; the operator sets it to the deployment's legal minimum). This way, whoever obtains the `rid_app` credentials cannot shorten the retention. Nor can they do it with a temporary table of the same name: the function sets `search_path = pg_catalog, public, pg_temp` and names each object with its schema. Each call leaves a row in `subject_access_purge_log`, written by the function itself: `rid_app` can read it but not modify it. The API calls it every 6 hours, and every purge that deletes something is also recorded in the audit log (`subject_access.purged`). Identifiers are stored without foreign keys: the record is evidence and must survive later changes.
+  - **No-leak test.** The e2e test queries a new number and checks that it does not appear in the APISIX logs, in the Fluent Bit logs or buffer, or in a full dump of the portal's database.
+- **Verifiable evidence (MT-04, ADR-0016).** The API's sealer (every `RID_TRANSPARENCY_SEAL_INTERVAL_SECONDS`, with an advisory lock so that only one node seals) groups the records that have no batch, up to `RID_TRANSPARENCY_BATCH_MAX` per batch.
+  - **Leaf (format 2).** SHA-256(0x00 ‖ RFC 8785 canonical JSON of `{v, id, occurredAt, digest}`), where `digest` is the SHA-256 of the record's canonical JSON: identifier, time, pseudonym, origin of the data subject, entities, API, version, operation, exposed data, purpose, subscription, official's hash, status, node and `$request_id`. It does not include `X-Request-Id`, because the client chooses it and it proves nothing. Since the leaf commits to the identifier and the time, they stay bound to the signed root even after retention purges the record: an early deletion cannot be passed off as a purge. The format is the `v` of the signed checkpoint; the first batches (format 1, the leaf over the full record) still verify. Tree and inclusion proof according to RFC 9162.
+  - **Checkpoint.** `{v, log, seq, treeSize, root, prev, sealedAt}`, where `prev` is the SHA-256 of the previous checkpoint's canonical JSON. The operator signs it as a compact JWS (EdDSA, `typ: rid-checkpoint+jws`, `kid`), with the key `RID_TRANSPARENCY_SIGNING_JWK`. The checkpoint, its leaves and the `transparency.checkpoint` audit log entry are written in a single transaction.
+  - **Timestamp.** The TSA (`RID_TSA_URL`) timestamps the JWS bytes: the timestamp covers both the checkpoint and the signature. The API checks each timestamp before storing it (bytes, nonce, signature and the chain published by the TSA). If the TSA does not respond, the batch stays pending and the next round retries. In development the TSA is sigstore timestamp-server with its own chain (`infra/tsa`, generated in a volume); in production, the country's accredited TSA.
+  - **Insert-only tables** (`transparency_checkpoint`, `transparency_leaf`, `transparency_timestamp`): neither `rid_app` nor the owner can UPDATE, DELETE or TRUNCATE without first disabling a trigger. The leaves store their hash and the time of the call, so the batch can be rebuilt after retention purges the records.
+  - **API.** Public: `GET /transparency/jwks` (current and retired keys, by `kid`) and `GET /transparency/checkpoints[/:seq]` (hashes only). With `audit.read`: `GET /transparency/records/:id/receipt` (409 while the record has no batch) and `GET /transparency/verify`, which recomputes the chain, signatures, roots, timestamps and every record against its leaf, and reports records that were altered, deleted before the retention was met, or inserted into a sealed batch. It also cross-checks the checkpoints against their anchors in the audit log: an anchor without its checkpoint reveals deleted batches, even at the end of the chain, and a checkpoint without an anchor reveals one inserted outside the sealer. Citizens receive their receipt in MT-05.
+  - **Open verifier.** `packages/transparency-verifier` (library and CLI `rid-verify-receipt`) verifies a receipt without querying the portal: inclusion, signature against the JWKS, and timestamp against the TSA root the verifier chooses to trust. Example: `rid-verify-receipt comprobante.json --jwks <url or file> --tsa-root <url or file>`. It tolerates up to 60 s plus the accuracy declared by the TSA between the time of the call and the time of the timestamp, because the gateway and the TSA have different clocks and `genTime` is usually rounded to the second.
+  - **Incremental verification.** `GET /transparency/verify?fromSeq=N` checks from checkpoint N, chained to the hash of N-1. A monitor that has already verified the earlier part only checks what is new; without `fromSeq` the full record is checked, which in memory takes about 30 s per 80,000 records.
+  - **Pending for production.** Rotation of the signing key: the previous one moves to `RID_TRANSPARENCY_RETIRED_JWKS`.
+- **Citizen identity (MT-05).** It is provided by the configured digital identity issuer (`RID_CITIZEN_ISSUER`; in development, the `rid-citizens` realm, which simulates the country's digital authentication).
+  - **Accepted token.** RS256 signature against the issuer's JWKS, issuer, audience `RID_CITIZEN_AUDIENCE` (`rid-transparency-api`), validity, and `azp` within `RID_CITIZEN_CLIENTS` (only the authorized citizen applications, such as the Carpeta). Any other token, including a portal token, gets 401; a citizen token does not open any portal endpoint either.
+  - **Pseudonym.** The API takes the document type and number from the claims (`RID_CITIZEN_DOCUMENT_TYPE_CLAIM`, `RID_CITIZEN_DOCUMENT_NUMBER_CLAIM`; without a type, the first one in `identifiers.person`). It normalizes the same way OPA does and computes the same HMAC with `RID_SUBJECT_REF_KEY`. A vector shared between the Rego tests and the API tests ties the two implementations together, and the e2e test checks it end to end: the demo citizen sees exactly the calls the gateway recorded with her number. The API never receives the number as a parameter, does not store it, does not log it and does not return it.
+  - **`rid-citizens` realm.** Client `carpeta-ciudadana`, confidential, with code + PKCE and no password grant. The access token carries only `sub`, the audience and the document, with no name or email. Citizens cannot edit their document: the user profile only lets the administrator edit it, and there are no undeclared attributes.
+  - **API.** `GET /api/v1/data-subjects/me/accesses` lists, from newest to oldest and with an opaque cursor, who queried (entity and application), which entity answered, which API, operation and exposed data, for what purpose, through which official (their hash, as a reference), the result and whether it is already sealed. `GET /api/v1/data-subjects/me/accesses/:id/receipt` returns the receipt (409 while it has no batch). If the query does not belong to the data subject asking, it responds 404, without revealing that it exists. In the OpenAPI they carry the `citizenBearer` security scheme.
 
-- **Avisos al titular (MT-06).** El ciudadano elige desde su aplicación ciudadana de qué clasificaciones quiere enterarse (`PUT /api/v1/data-subjects/me/alerts` con `personal` y/o `sensitive`; una lista vacía los apaga). Se guarda por seudónimo y por aplicación (`subject_alert`) con un identificador opaco y aleatorio (UUID v4), que es lo único que identifica a la persona en cada aviso. El cambio queda en la bitácora con la aplicación como actor y sin el seudónimo.
-  - **Encolado.** El colector inserta los registros con `createManyAndReturn` y, en la misma transacción y solo para las filas realmente nuevas, pone un aviso en el outbox (`citizen.alert`) por cada titular que pidió esa clasificación. Así, un reintento de Fluent Bit no avisa dos veces.
-  - **Entrega.** Un worker de pg-boss hace POST a la aplicación ciudadana (`RID_CITIZEN_APPS`: URL del webhook y secreto por `client_id`, configuración del operador). La firma sigue Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature: v1,…`, secreto `whsec_…`), así que la aplicación puede verificarla con cualquier librería del estándar. El `webhook-id` es estable entre reintentos. Si la respuesta no es 2xx, la cola reintenta con espera exponencial (hasta 20 veces, con un máximo de 1 h entre intentos). Antes de enviar, el worker comprueba que el aviso siga activo para esa clasificación.
-  - **Contenido.** `{type: subject_access.created, timestamp, data: {alertId, accessId, occurredAt, classification}}`: sin número de documento, sin datos de contacto, sin nombres. La aplicación notifica a la persona y, cuando esta entra, muestra el detalle con su propio token.
+- **Alerts to the data subject (MT-06).** From their citizen application, citizens choose which classifications they want to hear about (`PUT /api/v1/data-subjects/me/alerts` with `personal` and/or `sensitive`; an empty list turns them off). It is stored per pseudonym and per application (`subject_alert`) with an opaque, random identifier (UUID v4), which is the only thing that identifies the person in each alert. The change is recorded in the audit log with the application as actor and without the pseudonym.
+  - **Enqueueing.** The collector inserts the records with `createManyAndReturn` and, in the same transaction and only for the rows that are actually new, puts an alert in the outbox (`citizen.alert`) for each data subject who asked for that classification. This way a Fluent Bit retry does not alert twice.
+  - **Delivery.** A pg-boss worker POSTs to the citizen application (`RID_CITIZEN_APPS`: webhook URL and secret per `client_id`, operator configuration). The signature follows Standard Webhooks (`webhook-id`, `webhook-timestamp`, `webhook-signature: v1,…`, secret `whsec_…`), so the application can verify it with any library for the standard. The `webhook-id` is stable across retries. If the response is not 2xx, the queue retries with exponential backoff (up to 20 times, with at most 1 h between attempts). Before sending, the worker checks that the alert is still active for that classification.
+  - **Content.** `{type: subject_access.created, timestamp, data: {alertId, accessId, occurredAt, classification}}`: no document number, no contact data, no names. The application notifies the person and, when they sign in, shows the detail with their own token.
 
-- **Carpeta de referencia (MT-07, `infra/mock-citizen-app`).** Una aplicación ciudadana mínima que muestra lo que cualquier carpeta del país tiene que hacer con el portal. Es utilería de demostración, no un producto.
-  - Autentica al ciudadano con la identidad digital (código + PKCE, cliente confidencial `carpeta-ciudadana`) y guarda los tokens en el servidor.
-  - Muestra "¿Quién consultó mis datos?" con la API del titular.
-  - Guarda el correo del ciudadano y la relación entre el identificador opaco del aviso y su usuario: el portal nunca ve el correo. Verifica los webhooks con la librería de referencia de Standard Webhooks y los convierte en correos (Mailpit en desarrollo).
-  - Verifica cada comprobante por su cuenta con `@rid/transparency-verifier`, usando el JWKS del operador y la cadena de la TSA, que toma de donde están publicados. En producción, la carpeta fijaría esa clave por un canal independiente (por ejemplo, la publicación del regulador).
-  - Corre con `pnpm dev` en el puerto 3100. En el despliegue de una sola máquina va en `/carpeta`, y la cadena de certificados de la TSA queda pública en `/tsa/api/v1/timestamp/certchain` para cualquier verificador.
+- **Reference folder (MT-07, `infra/mock-citizen-app`).** A minimal citizen application that shows what any of the country's citizen folders has to do with the portal. It is demo tooling, not a product.
+  - It authenticates the citizen with the digital identity (code + PKCE, confidential client `carpeta-ciudadana`) and keeps the tokens on the server.
+  - It shows "Who queried my data?" using the data subject API.
+  - It stores the citizen's email and the mapping between the alert's opaque identifier and its user: the portal never sees the email. It verifies the webhooks with the Standard Webhooks reference library and turns them into emails (Mailpit in development).
+  - It verifies each receipt on its own with `@rid/transparency-verifier`, using the operator's JWKS and the TSA's chain, which it takes from where they are published. In production, the folder would pin that key through an independent channel (for example, the regulator's publication).
+  - It runs with `pnpm dev` on port 3100. In the single-machine deployment it lives at `/carpeta`, and the TSA's certificate chain is public at `/tsa/api/v1/timestamp/certchain` for any verifier.
 
-## 14. Spikes abiertos
+## 14. Open spikes
 
-| ID | Pregunta | Hito |
+| ID | Question | Milestone |
 | :-- | :-- | :-- |
-| S-1 | Plugin `opa` de APISIX: confirmar que las cabeceras de `send_headers_upstream` también son visibles para `limit-count` y `http-logger` en la misma petición, y cómo retirar `X-RID-End-User` en claro antes del upstream si se decide enviar al proveedor solo el hash | M1 |
-| S-2 | Límite por suscripción con `limit-count` usando la cabecera puesta por OPA; alternativa si no funciona | M3 |
-| S-3 | mTLS de cliente: variable con la huella del certificado en APISIX, comparación con `cnf.x5t#S256` del token y con lista de revocados en OPA | M3 |
-| S-4 | Keycloak: `tls_client_auth` + tokens ligados a certificado en `client_credentials` | M3 |
-| S-5 | X-Road REST: cabeceras para propagar el consumidor real; configuración del gateway como cliente (resuelta, `docs/spikes/S-5.md`) | M4 |
-| S-6 | Aserción firmada del gateway hacia el proveedor (JWS) para no repudio (resuelta, `docs/spikes/S-6.md`, ADR-0024) | M6 |
+| S-1 | APISIX `opa` plugin: confirm that the `send_headers_upstream` headers are also visible to `limit-count` and `http-logger` in the same request, and how to remove the clear-text `X-RID-End-User` before the upstream if it is decided to send only the hash to the provider | M1 |
+| S-2 | Per-subscription limit with `limit-count` using the header set by OPA; alternative if it does not work | M3 |
+| S-3 | Client mTLS: variable with the certificate fingerprint in APISIX, comparison with the token's `cnf.x5t#S256` and with a revocation list in OPA | M3 |
+| S-4 | Keycloak: `tls_client_auth` + certificate-bound tokens in `client_credentials` | M3 |
+| S-5 | X-Road REST: headers to propagate the real consumer; gateway configuration as a client (resolved, `docs/spikes/S-5.md`) | M4 |
+| S-6 | Signed gateway assertion to the provider (JWS) for non-repudiation (resolved, `docs/spikes/S-6.md`, ADR-0024) | M6 |

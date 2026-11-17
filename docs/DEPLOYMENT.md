@@ -1,366 +1,368 @@
-# Despliegue — Portal RID
+# Deployment — RID Portal
 
-Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en curso)
+> Versión en español: [docs/es/DEPLOYMENT.md](es/DEPLOYMENT.md)
 
-Este documento describe **cómo se despliega cada componente** del portal y del gateway: imagen, configuración, puertos, volúmenes, secretos y dependencias. Cómo dejarlo operativo y cómo operarlo día a día está en [`OPERATIONS.md`](OPERATIONS.md). La arquitectura de referencia está en [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Version 0.2 · November 2026 · code state as of M3-01 to M3-04 (M3 in progress)
 
-> **Alcance (ADR-0011).** Aquí solo se despliega el portal + el gateway. El kit de APIs instantáneas que se instala en las entidades es otro producto, con su propio repositorio. `mock-salud`, `mock-socioeconomico` y la carpeta ciudadana (`carpeta`) son utilería de pruebas y demostración.
+This document describes **how each component** of the portal and the gateway **is deployed**: image, configuration, ports, volumes, secrets and dependencies. How to bring it into service and how to run it day to day is in [`OPERATIONS.md`](OPERATIONS.md). The reference architecture is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-## 1. Topologías
+> **Scope (ADR-0011).** Only the portal + the gateway are deployed here. The instant API kit that is installed at the entities is a separate product, with its own repository. `mock-salud`, `mock-socioeconomico` and the citizen folder (`carpeta`) are test and demo props.
 
-| Topología | Archivos | Estado | Uso |
+## 1. Topologies
+
+| Topology | Files | Status | Use |
 | :-- | :-- | :-- | :-- |
-| **Desarrollo local** | `infra/compose/docker-compose.yml`; web y API en el host con `pnpm dev` | Disponible | Programar y probar |
-| **Piloto en una máquina** | `docker-compose.yml` + `docker-compose.deploy.yml`, detrás de un proxy inverso existente o del incluido (`docker-compose.edge.yml`) | Disponible; **instalador interactivo `install.sh`** ([`INSTALL.md`](INSTALL.md)) | Demos, pilotos y bootcamp |
-| **Producción** | Helm charts (`infra/helm/`) con la topología de `ARCHITECTURE.md §11` | **No existe todavía** (M6-05) | Operador nacional |
+| **Local development** | `infra/compose/docker-compose.yml`; web and API on the host with `pnpm dev` | Available | Coding and testing |
+| **Single-machine pilot** | `docker-compose.yml` + `docker-compose.deploy.yml`, behind an existing reverse proxy or the bundled one (`docker-compose.edge.yml`) | Available; **interactive installer `install.sh`** ([`INSTALL.md`](INSTALL.md)) | Demos, pilots and bootcamp |
+| **Production** | Helm charts (`infra/helm/`) with the topology of `ARCHITECTURE.md §11` | **Does not exist yet** (M6-05) | National operator |
 
-El piloto no es un despliegue de producción. Sus límites conocidos están en la §8.
+The pilot is not a production deployment. Its known limits are in §8.
 
-## 2. Requisitos
+## 2. Requirements
 
-| Requisito | Versión | Para qué |
+| Requirement | Version | What for |
 | :-- | :-- | :-- |
-| Docker Engine con Compose v2 | Compose ≥ 2.26 | `!reset` en los puertos y montaje con `subpath` del volumen de step-ca (piloto) |
-| Node.js | ≥ 24 (`engines` en `package.json`) | Desarrollo, `scripts/make-deploy-env.mjs` |
-| pnpm | 11.15.0 (`packageManager`) | Desarrollo |
-| `vm.max_map_count` del host | ≥ 262144 | OpenSearch (perfil `observability`) |
-| Memoria | OpenSearch arranca con `-Xms512m -Xmx512m`; Keycloak, APISIX y los builds de Next.js suman varios GB | — |
+| Docker Engine with Compose v2 | Compose ≥ 2.26 | `!reset` on ports and the `subpath` mount of the step-ca volume (pilot) |
+| Node.js | ≥ 24 (`engines` in `package.json`) | Development, `scripts/make-deploy-env.mjs` |
+| pnpm | 11.15.0 (`packageManager`) | Development |
+| Host `vm.max_map_count` | ≥ 262144 | OpenSearch (`observability` profile) |
+| Memory | OpenSearch starts with `-Xms512m -Xmx512m`; Keycloak, APISIX and the Next.js builds add up to several GB | — |
 
-En Linux, para OpenSearch:
+On Linux, for OpenSearch:
 
 ```bash
 echo 'vm.max_map_count=262144' | sudo tee /etc/sysctl.d/99-rid-opensearch.conf
 sudo sysctl --system
 ```
 
-## 3. Componentes
+## 3. Components
 
-Todos los servicios están en `infra/compose/docker-compose.yml` (proyecto Compose `rid`). En desarrollo, cada puerto publicado se enlaza solo a `127.0.0.1` y se puede mover con su variable `*_PORT` en `.env`. En el piloto no se publica ningún puerto (§5).
+All services are in `infra/compose/docker-compose.yml` (Compose project `rid`). In development, each published port binds only to `127.0.0.1` and can be moved with its `*_PORT` variable in `.env`. In the pilot no port is published (§5).
 
-Los componentes se agrupan en dos planos (`ARCHITECTURE.md §1`):
+The components fall into two planes (`ARCHITECTURE.md §1`):
 
-- **Plano de gobierno:** PostgreSQL, Keycloak, step-ca, la TSA, el API y la web. Deciden quién puede qué y lo traducen a configuración.
-- **Plano de datos:** etcd, APISIX, OPA y los Fluent Bit. Atienden y registran cada llamada entre entidades. Siguen funcionando aunque caiga el plano de gobierno.
+- **Governance plane:** PostgreSQL, Keycloak, step-ca, the TSA, the API and the web. They decide who may do what and translate it into configuration.
+- **Data plane:** etcd, APISIX, OPA and the Fluent Bit instances. They serve and record every call between entities. They keep working even if the governance plane goes down.
 
-Cada subsección empieza por la **función** del componente en el despliegue y sigue con su configuración.
+Each subsection starts with the component's **role** in the deployment and continues with its configuration.
 
-### 3.1 Resumen
+### 3.1 Summary
 
-| Servicio | Imagen | Puerto interno | Puerto dev (host) | Volumen | Perfil | Health check |
+| Service | Image | Internal port | Dev port (host) | Volume | Profile | Health check |
 | :-- | :-- | :-- | :-- | :-- | :-- | :-- |
-| `postgres` | `rid/postgres` (`postgres:18.6-alpine` con pgBackRest, `infra/postgres`) | 5432 | `POSTGRES_PORT` 5432 | `pg-data`; en el piloto también `pgbackrest-repo` y `pg-socket` | base | `pg_isready` |
-| `pgbackrest` | `rid/postgres` | — (sin red) | — | `pg-data`, `pgbackrest-repo`, `pg-socket` | solo piloto (M6-06) | ninguno |
-| `keycloak` | `quay.io/keycloak/keycloak:26.8.0` | 8080 (HTTP), 9000 (gestión) | `KEYCLOAK_PORT` 8080 | — (usa `postgres`) | base | `GET /health/ready` en 9000 |
-| `etcd` | `quay.io/coreos/etcd:v3.6.16` | 2379 | no se publica | `etcd-data` | base | `etcdctl endpoint health` |
-| `apisix` | `apache/apisix:3.19.0-debian` | 9080 (HTTP), 9443 (HTTPS), 9180 (admin), 7085 (estado), 9091 (métricas) | 9080, 9443, 9180 | — (estado en etcd) | base | `GET /status/ready` en 7085 |
-| `opa` | `openpolicyagent/opa:1.21.4-static` | 8181 | `OPA_PORT` 8181 | `opa-data` (último bundle, M6-04) | base | `GET /health` |
+| `postgres` | `rid/postgres` (`postgres:18.6-alpine` with pgBackRest, `infra/postgres`) | 5432 | `POSTGRES_PORT` 5432 | `pg-data`; in the pilot also `pgbackrest-repo` and `pg-socket` | base | `pg_isready` |
+| `pgbackrest` | `rid/postgres` | — (no network) | — | `pg-data`, `pgbackrest-repo`, `pg-socket` | pilot only (M6-06) | none |
+| `keycloak` | `quay.io/keycloak/keycloak:26.8.0` | 8080 (HTTP), 9000 (management) | `KEYCLOAK_PORT` 8080 | — (uses `postgres`) | base | `GET /health/ready` on 9000 |
+| `etcd` | `quay.io/coreos/etcd:v3.6.16` | 2379 | not published | `etcd-data` | base | `etcdctl endpoint health` |
+| `apisix` | `apache/apisix:3.19.0-debian` | 9080 (HTTP), 9443 (HTTPS), 9180 (admin), 7085 (status), 9091 (metrics) | 9080, 9443, 9180 | — (state in etcd) | base | `GET /status/ready` on 7085 |
+| `opa` | `openpolicyagent/opa:1.21.4-static` | 8181 | `OPA_PORT` 8181 | `opa-data` (last bundle, M6-04) | base | `GET /health` |
 | `step-ca` | `smallstep/step-ca:0.30.2` | 9000 | `STEP_CA_PORT` 9000 | `step-ca-data` | base | `step ca health` |
-| `fluent-bit-transparency` | `fluent/fluent-bit:5.1.5-debug` | 5170 (TCP), 2020 (salud) | no se publica | `transparency-buffer` | base | `GET /api/v1/health` en 2020 |
-| `fluent-bit-errors` | `fluent/fluent-bit:5.1.5-debug` | 5140/udp (syslog), 2020 (salud) | no se publica | — | base | `GET /api/v1/health` en 2020 |
-| `tsa-init` | `smallstep/step-ca:0.30.2` | — (tarea única) | — | `tsa-data` | base | termina con código 0 |
-| `tsa` | `ghcr.io/sigstore/timestamp-server:v2.1.4` | 3004 | `RID_TSA_PORT` 3004 | `tsa-data` (lectura) | base | ninguno (imagen distroless) |
+| `fluent-bit-transparency` | `fluent/fluent-bit:5.1.5-debug` | 5170 (TCP), 2020 (health) | not published | `transparency-buffer` | base | `GET /api/v1/health` on 2020 |
+| `fluent-bit-errors` | `fluent/fluent-bit:5.1.5-debug` | 5140/udp (syslog), 2020 (health) | not published | — | base | `GET /api/v1/health` on 2020 |
+| `tsa-init` | `smallstep/step-ca:0.30.2` | — (one-off task) | — | `tsa-data` | base | exits with code 0 |
+| `tsa` | `ghcr.io/sigstore/timestamp-server:v2.1.4` | 3004 | `RID_TSA_PORT` 3004 | `tsa-data` (read-only) | base | none (distroless image) |
 | `mailpit` | `axllent/mailpit:v1.32.0` | 8025 (UI), 1025 (SMTP) | 8025, 1025 | — | base | `mailpit readyz` |
-| `clamav` | `clamav/clamav:1.5.4` | 3310 (clamd) | `CLAMAV_PORT` 3310 | `clamav-data` (firmas) | `antivirus` (M6-08) | `clamdcheck.sh` |
-| `mock-salud`, `mock-socioeconomico` | `rid/mock-providers:dev` (build local) | 8000 | 8101, 8102 | — | base | `GET /health` |
-| `wg-hub` | `rid/wg-hub:dev` (build local, `infra/wg-hub`) | 51820/udp (túnel), 8443 (enrutador SNI), 8090 (agente) | 51820/udp y 8095 (agente) en `127.0.0.1` | `wg-hub-data` | base | `GET /health` en 8090 |
-| `contract-runner` | `rid/contract-runner:dev` (build local, `infra/contract-runner`) | 8096 | `CONTRACT_RUNNER_PORT` 8096 en `127.0.0.1` | — | base | `GET /health` |
-| `mock-node` | `rid/mock-node:dev` (build local, `infra/mock-node`) | 8443 en su dirección del túnel | no se publica | anónimo | `nodes` | — |
-| `opensearch` | `opensearchproject/opensearch:3.9.0` | 9200 | `OPENSEARCH_PORT` 9200 | `opensearch-data` | `observability` | `_cluster/health` amarillo |
-| `fluent-bit` | `fluent/fluent-bit:5.1.5-debug` | 9880 (HTTP), 2020 | no se publica | — | `observability` | `GET /api/v1/health` en 2020 |
-| `prometheus` | `prom/prometheus:v3.15.1` | 9090 | `PROMETHEUS_PORT` 9090 en `127.0.0.1` | `prometheus-data` | `observability` | `GET /-/ready` |
-| `alertmanager` | `prom/alertmanager:v0.34.2` | 9093 | `ALERTMANAGER_PORT` 9093 en `127.0.0.1` | `alertmanager-data` | `observability` | `GET /-/ready` |
-| `grafana` | `grafana/grafana:13.3.0` (AGPL, contenedor propio) | 3000 | `GRAFANA_PORT` 3001 en `127.0.0.1` | `grafana-data` | `observability` | `GET /api/health` |
-| `api` | `rid/portal-api:deploy` (`apps/api/Dockerfile`) | 4000 | — (en dev corre en el host) | `api-documents`, `step-ca-data` (solo `certs/`, lectura) | solo piloto | `GET /api/v1/health` |
-| `web` | `rid/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (en dev corre en el host) | — | solo piloto | `GET /api/auth/providers` |
-| `carpeta` | `rid/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (en dev corre en el host) | `carpeta-data` | solo piloto | — |
+| `clamav` | `clamav/clamav:1.5.4` | 3310 (clamd) | `CLAMAV_PORT` 3310 | `clamav-data` (signatures) | `antivirus` (M6-08) | `clamdcheck.sh` |
+| `mock-salud`, `mock-socioeconomico` | `rid/mock-providers:dev` (local build) | 8000 | 8101, 8102 | — | base | `GET /health` |
+| `wg-hub` | `rid/wg-hub:dev` (local build, `infra/wg-hub`) | 51820/udp (tunnel), 8443 (SNI router), 8090 (agent) | 51820/udp and 8095 (agent) on `127.0.0.1` | `wg-hub-data` | base | `GET /health` on 8090 |
+| `contract-runner` | `rid/contract-runner:dev` (local build, `infra/contract-runner`) | 8096 | `CONTRACT_RUNNER_PORT` 8096 on `127.0.0.1` | — | base | `GET /health` |
+| `mock-node` | `rid/mock-node:dev` (local build, `infra/mock-node`) | 8443 on its tunnel address | not published | anonymous | `nodes` | — |
+| `opensearch` | `opensearchproject/opensearch:3.9.0` | 9200 | `OPENSEARCH_PORT` 9200 | `opensearch-data` | `observability` | `_cluster/health` yellow |
+| `fluent-bit` | `fluent/fluent-bit:5.1.5-debug` | 9880 (HTTP), 2020 | not published | — | `observability` | `GET /api/v1/health` on 2020 |
+| `prometheus` | `prom/prometheus:v3.15.1` | 9090 | `PROMETHEUS_PORT` 9090 on `127.0.0.1` | `prometheus-data` | `observability` | `GET /-/ready` |
+| `alertmanager` | `prom/alertmanager:v0.34.2` | 9093 | `ALERTMANAGER_PORT` 9093 on `127.0.0.1` | `alertmanager-data` | `observability` | `GET /-/ready` |
+| `grafana` | `grafana/grafana:13.3.0` (AGPL, its own container) | 3000 | `GRAFANA_PORT` 3001 on `127.0.0.1` | `grafana-data` | `observability` | `GET /api/health` |
+| `api` | `rid/portal-api:deploy` (`apps/api/Dockerfile`) | 4000 | — (runs on the host in dev) | `api-documents`, `step-ca-data` (only `certs/`, read-only) | pilot only | `GET /api/v1/health` |
+| `web` | `rid/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (runs on the host in dev) | — | pilot only | `GET /api/auth/providers` |
+| `carpeta` | `rid/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (runs on the host in dev) | `carpeta-data` | pilot only | — |
 
-Prometheus, Alertmanager y Grafana **no** están en el Compose todavía (M5-06).
+Prometheus, Alertmanager and Grafana are **not** in the Compose file yet (M5-06).
 
 ### 3.2 PostgreSQL
 
-**Función en el despliegue.** Es la única fuente de verdad del plano de gobierno. Guarda:
+**Role in the deployment.** It is the only source of truth for the governance plane. It stores:
 
-- el estado de dominio: entidades, personas y roles, APIs y versiones, aplicaciones, suscripciones y documentos;
-- la bitácora de auditoría encadenada por hash, con sus anclajes;
-- el outbox y las colas de trabajos en segundo plano (pg-boss; no hay Redis);
-- el registro de transparencia y sus lotes sellados;
-- en una base aparte, los datos de Keycloak.
+- the domain state: entities, people and roles, APIs and versions, applications, subscriptions and documents;
+- the hash-chained audit log, with its anchors;
+- the outbox and the background job queues (pg-boss; there is no Redis);
+- the transparency log and its sealed batches;
+- in a separate database, Keycloak's data.
 
-Lo que hay en APISIX, OPA y en los clientes de Keycloak se calcula desde aquí, así que se puede reconstruir. Si PostgreSQL cae, el portal se detiene, pero el gateway sigue atendiendo con la última configuración.
+What is in APISIX, OPA and the Keycloak clients is computed from here, so it can be rebuilt. If PostgreSQL goes down, the portal stops, but the gateway keeps serving with the last configuration.
 
-- Una sola instancia guarda la base del portal (`POSTGRES_DB`, por defecto `rid`), la de pruebas (`rid_test`) y la de Keycloak (`keycloak`).
-- **Respaldos (M6-06, ADR-0026).** La imagen trae pgBackRest. En el piloto, PostgreSQL archiva su WAL en el repositorio cifrado `pgbackrest-repo` (`PGBACKREST_REPO1_CIPHER_PASS`). El servicio `pgbackrest` toma los respaldos programados: llega a la base por el socket y el volumen de datos, sin red. En desarrollo no se archiva. Procedimiento y restauración en `OPERATIONS.md §6`.
-- **Scripts de inicialización** (`infra/postgres/init`, solo con el volumen vacío):
-  - `01-keycloak.sh`: rol `KEYCLOAK_DB_USER` y base `keycloak`.
-  - `02-app-role.sh`: rol `rid_app` (sin DDL) con la contraseña `RID_APP_DB_PASSWORD`, base `rid_test` y privilegios por defecto para que `rid_app` use todo lo que cree el dueño.
-- **Dos roles del portal:** el dueño del esquema (`POSTGRES_USER`, `rid`) solo corre migraciones (`DATABASE_MIGRATION_URL`); el API corre como `rid_app` (`DATABASE_URL`). Las tablas de auditoría y de transparencia son de solo inserción incluso para el dueño (triggers, `ARCHITECTURE.md §7` y §13).
-- **Migraciones:** Prisma (`apps/api/prisma/migrations`), con `DATABASE_MIGRATION_URL` (`apps/api/prisma.config.ts`). El esquema de la cola pg-boss también es una migración: el API arranca pg-boss sin permisos de DDL (`migrate: false`).
-- Las contraseñas de `.env` solo se usan **la primera vez**. Cambiarlas en `.env` con el volumen ya creado no cambia los roles: hay que hacer `ALTER ROLE ... PASSWORD` y actualizar `.env` a la vez.
+- A single instance holds the portal database (`POSTGRES_DB`, `rid` by default), the test database (`rid_test`) and Keycloak's (`keycloak`).
+- **Backups (M6-06, ADR-0026).** The image ships pgBackRest. In the pilot, PostgreSQL archives its WAL to the encrypted repository `pgbackrest-repo` (`PGBACKREST_REPO1_CIPHER_PASS`). The `pgbackrest` service takes the scheduled backups: it reaches the database through the socket and the data volume, with no network. Nothing is archived in development. Procedure and restore in `OPERATIONS.md §6`.
+- **Init scripts** (`infra/postgres/init`, only with an empty volume):
+  - `01-keycloak.sh`: role `KEYCLOAK_DB_USER` and database `keycloak`.
+  - `02-app-role.sh`: role `rid_app` (no DDL) with password `RID_APP_DB_PASSWORD`, database `rid_test`, and default privileges so that `rid_app` can use everything the owner creates.
+- **Two portal roles:** the schema owner (`POSTGRES_USER`, `rid`) only runs migrations (`DATABASE_MIGRATION_URL`); the API runs as `rid_app` (`DATABASE_URL`). The audit and transparency tables are insert-only even for the owner (triggers, `ARCHITECTURE.md §7` and §13).
+- **Migrations:** Prisma (`apps/api/prisma/migrations`), with `DATABASE_MIGRATION_URL` (`apps/api/prisma.config.ts`). The pg-boss queue schema is also a migration: the API starts pg-boss without DDL permissions (`migrate: false`).
+- The passwords in `.env` are used only **the first time**. Changing them in `.env` once the volume exists does not change the roles: you have to run `ALTER ROLE ... PASSWORD` and update `.env` at the same time.
 
 ### 3.3 Keycloak
 
-**Función en el despliegue.** Es el proveedor de identidad: **autentica, no autoriza**. Los roles viven en PostgreSQL (ADR-0004). Tiene tres realms, uno por tipo de usuario:
+**Role in the deployment.** It is the identity provider: **it authenticates, it does not authorize**. Roles live in PostgreSQL (ADR-0004). It has three realms, one per type of user:
 
-- **`rid-portal`**, para las personas que usan el portal: inicio de sesión OIDC de la web, autorregistro, verificación de correo y recuperación de contraseña.
-- **`rid-gateway`**, para las aplicaciones consumidoras. Emite los tokens `client_credentials` (5 min, `aud = rid-gateway`) que APISIX valida en cada llamada. Sus clientes `rid-app-<uuid>` los crea y mantiene el reconciliador del API, nunca una persona.
-- **`rid-citizens`**, que simula la identidad digital del país para la carpeta ciudadana. En producción se reemplaza por el emisor del país (`RID_CITIZEN_ISSUER`).
+- **`rid-portal`**, for the people who use the portal: the web's OIDC sign-in, self-registration, email verification and password recovery.
+- **`rid-gateway`**, for consumer applications. It issues the `client_credentials` tokens (5 min, `aud = rid-gateway`) that APISIX validates on every call. Its `rid-app-<uuid>` clients are created and maintained by the API's reconciler, never by a person.
+- **`rid-citizens`**, which simulates the country's digital identity for the citizen folder. In production it is replaced by the country's issuer (`RID_CITIZEN_ISSUER`).
 
-Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen tokens nuevos.
+If Keycloak goes down, nobody can sign in and applications cannot get new tokens.
 
-- Corre con `start-dev --import-realm` (también en el piloto: el override no cambia el comando).
-- Importa al arrancar `infra/keycloak/*-realm.json` (`rid-portal`, `rid-gateway`, `rid-citizens`). Los secretos son marcadores `${VARIABLE}` resueltos con el entorno del contenedor: `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`, `RID_WEB_URL`, `RID_CARPETA_URL`, `RID_DEMO_USER_PASSWORD`, `RID_DEMO_TOTP_SECRET`.
-- **La importación no actualiza un realm que ya existe** (`IGNORE_EXISTING`). Un cambio en los JSON, en esos secretos o en las URLs no llega a un Keycloak ya inicializado: se aplica con `kcadm.sh` (ver `OPERATIONS.md §5.3`) o borrando la base de Keycloak.
-- Emisor de los tokens: en desarrollo `KC_HOSTNAME=http://localhost:${KEYCLOAK_PORT}`; en el piloto `${RID_PUBLIC_URL}/auth` con `KC_HTTP_RELATIVE_PATH=/auth` y `KC_PROXY_HEADERS=xforwarded`. `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` deja que los contenedores (APISIX) lo alcancen por nombre de servicio.
-- Administrador inicial: `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD` (`KC_BOOTSTRAP_ADMIN_*`).
-- **Política de cliente `rid-secret-rotation`** en `rid-gateway` (M3-04): en los clientes con el atributo `rid.managed = true`, los que crea el portal, regenerar el secreto deja el anterior como secreto rotado durante la ventana de rotación (a lo sumo 30 días). Llega con el realm en una instalación nueva; en un Keycloak que ya importó el realm se aplica con `node scripts/keycloak-client-policies.mjs` (`OPERATIONS.md §5.3`). Sin ella, rotar un secreto deja de aceptar el anterior en cuanto el reconciliador aplica el nuevo.
-- **Segundo factor (M3-08, ADR-0021)** en `rid-portal`. El flujo `rid-browser` pide la contraseña y, cuando la web pide `acr_values=mfa`, un código TOTP. El API exige ese nivel a los roles de plataforma y a `data_steward`.
-  - Llega con el realm en una instalación nueva. En un Keycloak que ya importó el realm se aplica con `node scripts/keycloak-portal-mfa.mjs` (`OPERATIONS.md §5.3`).
-  - Sin el flujo, Keycloak no puede dar `acr=mfa`, y esos roles reciben 403 `mfa_required` en todo el portal.
-  - Los usuarios semilla con rol crítico traen el código de `RID_DEMO_TOTP_SECRET`. En producción no hay usuarios semilla: cada persona enrola su app la primera vez.
-- **Certificado de cliente de las aplicaciones (M3-10, ADR-0022).** Arranca con el proveedor x509 `nginx` y `trust-proxy-verification` (`--spi-x509cert-lookup--…`, en el compose): lee de `SSL_CLIENT_CERT` el certificado que APISIX ya verificó en la ruta de token del gateway. Por eso ninguna otra vía hacia Keycloak debe dejar pasar esa cabecera ni `ssl-client-verify` (§5.2).
-- Detalle de los tres realms y los usuarios semilla: `infra/keycloak/README.md`.
+- It runs with `start-dev --import-realm` (in the pilot too: the override does not change the command).
+- On startup it imports `infra/keycloak/*-realm.json` (`rid-portal`, `rid-gateway`, `rid-citizens`). The secrets are `${VARIABLE}` placeholders resolved from the container's environment: `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`, `RID_WEB_URL`, `RID_CARPETA_URL`, `RID_DEMO_USER_PASSWORD`, `RID_DEMO_TOTP_SECRET`.
+- **The import does not update a realm that already exists** (`IGNORE_EXISTING`). A change in the JSON files, in those secrets or in the URLs does not reach an already initialized Keycloak: apply it with `kcadm.sh` (see `OPERATIONS.md §5.3`) or by deleting Keycloak's database.
+- Token issuer: in development `KC_HOSTNAME=http://localhost:${KEYCLOAK_PORT}`; in the pilot `${RID_PUBLIC_URL}/auth` with `KC_HTTP_RELATIVE_PATH=/auth` and `KC_PROXY_HEADERS=xforwarded`. `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` lets the containers (APISIX) reach it by service name.
+- Initial administrator: `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD` (`KC_BOOTSTRAP_ADMIN_*`).
+- **Client policy `rid-secret-rotation`** in `rid-gateway` (M3-04): on clients with the attribute `rid.managed = true`, the ones the portal creates, regenerating the secret keeps the previous one as a rotated secret for the rotation window (30 days at most). It ships with the realm on a new installation; on a Keycloak that has already imported the realm, apply it with `node scripts/keycloak-client-policies.mjs` (`OPERATIONS.md §5.3`). Without it, rotating a secret stops accepting the previous one as soon as the reconciler applies the new one.
+- **Second factor (M3-08, ADR-0021)** in `rid-portal`. The `rid-browser` flow asks for the password and, when the web sends `acr_values=mfa`, a TOTP code. The API requires that level for platform roles and for `data_steward`.
+  - It ships with the realm on a new installation. On a Keycloak that has already imported the realm, apply it with `node scripts/keycloak-portal-mfa.mjs` (`OPERATIONS.md §5.3`).
+  - Without the flow, Keycloak cannot issue `acr=mfa`, and those roles get 403 `mfa_required` across the whole portal.
+  - The seed users with a critical role come with the code from `RID_DEMO_TOTP_SECRET`. In production there are no seed users: each person enrolls their app the first time.
+- **Application client certificate (M3-10, ADR-0022).** It starts with the `nginx` x509 provider and `trust-proxy-verification` (`--spi-x509cert-lookup--…`, in the compose file): it reads from `SSL_CLIENT_CERT` the certificate that APISIX has already verified on the gateway's token route. That is why no other path to Keycloak may let that header, or `ssl-client-verify`, through (§5.2).
+- Details of the three realms and the seed users: `infra/keycloak/README.md`.
 
 ### 3.4 etcd + APISIX
 
-**Función de etcd en el despliegue.** Guarda la configuración del gateway: rutas, upstreams, plugins y objetos SSL. El reconciliador del API la escribe por el Admin API de APISIX, y cada nodo de APISIX la lee y aplica los cambios en cuanto ocurren, sin reiniciar. No es una fuente de verdad: si se pierde, el API la reconstruye desde PostgreSQL.
+**Role of etcd in the deployment.** It stores the gateway's configuration: routes, upstreams, plugins and SSL objects. The API's reconciler writes it through APISIX's Admin API, and each APISIX node reads it and applies the changes as soon as they happen, without restarting. It is not a source of truth: if it is lost, the API rebuilds it from PostgreSQL.
 
-**Función de APISIX en el despliegue.** Es el **gateway**, el corazón del plano de datos: toda llamada entre entidades pasa por él. En cada petición:
+**Role of APISIX in the deployment.** It is the **gateway**, the heart of the data plane: every call between entities goes through it. On each request it:
 
-1. valida el token de `rid-gateway`;
-2. borra las cabeceras `X-RID-*` que solo el gateway puede poner;
-3. si la operación lo declara, lee el titular del cuerpo (plugin `rid-data-subject`);
-4. pregunta a OPA si la llamada se permite;
-5. reenvía la petición al proveedor con las cabeceras de trazabilidad que devolvió OPA;
-6. envía los metadatos de la llamada a los dos Fluent Bit: analítica y transparencia.
+1. validates the `rid-gateway` token;
+2. removes the `X-RID-*` headers that only the gateway may set;
+3. if the operation declares it, reads the data subject from the body (`rid-data-subject` plugin);
+4. asks OPA whether the call is allowed;
+5. forwards the request to the provider with the traceability headers that OPA returned;
+6. sends the call's metadata to the two Fluent Bit instances: analytics and transparency.
 
-También termina el TLS del gateway en 9443 con su certificado de servidor y, cuando `features.mtls.required` está activo, exige ahí el certificado de cliente de la aplicación (M3-02). Hacia los proveedores con mTLS presenta el certificado de cliente del gateway de esa entidad (M3-03). No guarda cuerpos de petición ni de respuesta. En el piloto se publica en `/gw`.
+It also terminates the gateway's TLS on 9443 with its server certificate and, when `features.mtls.required` is on, requires the application's client certificate there (M3-02). Towards providers with mTLS it presents the gateway's client certificate for that entity (M3-03). It does not store request or response bodies. In the pilot it is published at `/gw`.
 
-- etcd guarda la configuración de APISIX (prefijo `/apisix`). Un solo nodo, HTTP sin TLS, no se publica.
-- APISIX en modo `traditional` con `config_provider: etcd` (`infra/apisix/config.yaml`, montado de solo lectura). La clave del Admin API llega por `APISIX_ADMIN_KEY`.
-- El Admin API (9180) acepta solo direcciones privadas (`127.0.0.0/24`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) y exige la clave. Nunca se expone al público.
-- Plugins propios en `infra/apisix/plugins` (montados en `/usr/local/apisix/rid`): `rid-data-subject` (ADR-0017) `rid-client-cert` (M3-02: pasa a OPA la huella RFC 8705 del certificado de cliente verificado), `rid-rate-limited` (M3-05: el 429 del límite por suscripción en problem+json) y `rid-header-guard` (M3-07: borra toda cabecera `X-RID-*` del cliente salvo la finalidad y el funcionario). La lista de plugins de `config.yaml` es explícita: un plugin nuevo exige reiniciar APISIX.
-- **Objetos SSL** (los crea el reconciliador, como las rutas):
-  - `rid-ssl-gateway`: certificado de servidor del gateway en los nombres de `RID_GATEWAY_TLS_HOSTS`, emitido por step-ca y renovado por el portal. Con `features.mtls.required`, además `client.ca` con la CA de la red: sin certificado válido, el handshake falla.
-  - `rid-ssl-gateway-client-<entityId>`: certificado de cliente que el gateway presenta a los upstreams con mTLS de esa entidad proveedora, `CN=rid-gateway.<slug>` (prefijo `RID_GATEWAY_CLIENT_NAME`). Uno por proveedor, para que una entidad no pueda llegar a la API mTLS de otra con la identidad del gateway. Cada proveedor debe aceptar solo su nombre.
-- **Upstreams.** Los `direct` verifican el certificado del proveedor y apuntan a las direcciones que el reconciliador resolvió y encontró públicas, con el nombre como Host y SNI (sin DNS rebinding). Los nodos sobre TLS se verifican contra la CA de la red (M3-03).
-- En desarrollo APISIX alcanza el host por `host.docker.internal` (solo para las pruebas de mTLS hacia upstreams); el override del piloto lo quita.
-- **Privacidad:** el access log de nginx está desactivado y el error log en nivel `error` (`ARCHITECTURE.md §8`).
-- **Nadie escribe rutas a mano.** Rutas, upstreams y plugins los crea el reconciliador del API (ADR-0007). Cada ruta lleva `prometheus`, `http-logger` (analítica → `fluent-bit:9880`) y, si alguna operación declara titular, `tcp-logger` (transparencia → `fluent-bit-transparency:5170`).
-- **Estado reconstruible:** si se pierde etcd, el reconciliador completo (cada 5 minutos o al reiniciar el API) recrea todo desde PostgreSQL.
+- etcd stores APISIX's configuration (prefix `/apisix`). A single node, plain HTTP without TLS, not published.
+- APISIX in `traditional` mode with `config_provider: etcd` (`infra/apisix/config.yaml`, mounted read-only). The Admin API key arrives through `APISIX_ADMIN_KEY`.
+- The Admin API (9180) accepts only private addresses (`127.0.0.0/24`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) and requires the key. It is never exposed to the public.
+- Custom plugins in `infra/apisix/plugins` (mounted at `/usr/local/apisix/rid`): `rid-data-subject` (ADR-0017), `rid-client-cert` (M3-02: passes OPA the RFC 8705 fingerprint of the verified client certificate), `rid-rate-limited` (M3-05: the 429 of the per-subscription limit as problem+json) and `rid-header-guard` (M3-07: removes every `X-RID-*` header from the client except the purpose and the official). The plugin list in `config.yaml` is explicit: a new plugin requires restarting APISIX.
+- **SSL objects** (created by the reconciler, like the routes):
+  - `rid-ssl-gateway`: the gateway's server certificate for the names in `RID_GATEWAY_TLS_HOSTS`, issued by step-ca and renewed by the portal. With `features.mtls.required`, also `client.ca` with the network's CA: without a valid certificate, the handshake fails.
+  - `rid-ssl-gateway-client-<entityId>`: the client certificate that the gateway presents to the mTLS upstreams of that provider entity, `CN=rid-gateway.<slug>` (prefix `RID_GATEWAY_CLIENT_NAME`). One per provider, so that one entity cannot reach another's mTLS API with the gateway's identity. Each provider must accept only its own name.
+- **Upstreams.** `direct` upstreams verify the provider's certificate and point to the addresses that the reconciler resolved and found to be public, with the name as Host and SNI (no DNS rebinding). Nodes over TLS are verified against the network's CA (M3-03).
+- In development APISIX reaches the host through `host.docker.internal` (only for the mTLS tests towards upstreams); the pilot override removes it.
+- **Privacy:** the nginx access log is disabled and the error log is at `error` level (`ARCHITECTURE.md §8`).
+- **Nobody writes routes by hand.** Routes, upstreams and plugins are created by the API's reconciler (ADR-0007). Each route carries `prometheus`, `http-logger` (analytics → `fluent-bit:9880`) and, if any operation declares a data subject, `tcp-logger` (transparency → `fluent-bit-transparency:5170`).
+- **Rebuildable state:** if etcd is lost, the full reconciler (every 5 minutes or when the API restarts) recreates everything from PostgreSQL.
 
 ### 3.5 OPA
 
-**Función en el despliegue.** Decide cada llamada: la permite o la niega con una razón estable (`no_subscription`, `purpose_not_allowed`…). Decide solo con los datos del **bundle** que publica el portal:
+**Role in the deployment.** It decides each call: it allows it or denies it with a stable reason (`no_subscription`, `purpose_not_allowed`…). It decides only with the data in the **bundle** that the portal publishes:
 
-- rutas y operaciones;
-- clientes y su estado, con las huellas de sus certificados vigentes (M3-02);
-- suscripciones vigentes con sus operaciones, finalidades y fechas;
-- la sal del funcionario, la clave del seudónimo y si la red exige mTLS (`mtlsRequired`).
+- routes and operations;
+- clients and their status, with the fingerprints of their current certificates (M3-02);
+- current subscriptions with their operations, purposes and dates;
+- the official's salt, the pseudonym key and whether the network requires mTLS (`mtlsRequired`).
 
-Además calcula el hash del funcionario y el seudónimo del titular, y devuelve las cabeceras de trazabilidad que APISIX envía al proveedor. Nunca consulta en línea la base del portal, y por eso el tráfico sobrevive a una caída del portal. Su reporte de estado le indica al portal cuándo una suscripción aprobada ya rige en el gateway, y entonces la suscripción pasa a `active`.
+It also computes the official's hash and the data subject's pseudonym, and returns the traceability headers that APISIX sends to the provider. It never queries the portal's database online, which is why traffic survives a portal outage. Its status report tells the portal when an approved subscription is already in force at the gateway, and the subscription then moves to `active`.
 
-- Config en `infra/opa/config.yaml`: descarga el bundle `rid` de `${OPA_PORTAL_URL}/bundle.tar.gz` con `Bearer ${OPA_BUNDLE_TOKEN}` cada 10–20 s, y reporta la revisión activa a `${OPA_PORTAL_URL}/status`.
-- **Estado: el último bundle, en disco (M6-04).** Va en el volumen `opa-data` (`/var/lib/opa`, `persist: true`), que `opa-init` le entrega al uid 1000. Un OPA que reinicia mientras el portal no responde arranca con ese bundle. Sin ninguno no tiene política y el gateway niega todo (falla cerrado).
-  - El bundle lleva la clave del seudónimo y la sal del funcionario: el volumen es solo de OPA (modo 700) y se respalda o se destruye como un secreto.
-  - Borrar el volumen no daña nada mientras el portal responda: OPA descarga el bundle en la siguiente consulta.
-- Los *decision logs* están desactivados a propósito (la entrada lleva cabeceras con datos en claro).
-- `OPA_PORTAL_URL`: en desarrollo `http://host.docker.internal:4000/api/v1/opa` (el API corre en el host); en el piloto `http://api:4000/api/v1/opa`.
+- Config in `infra/opa/config.yaml`: it downloads the `rid` bundle from `${OPA_PORTAL_URL}/bundle.tar.gz` with `Bearer ${OPA_BUNDLE_TOKEN}` every 10–20 s, and reports the active revision to `${OPA_PORTAL_URL}/status`.
+- **State: the last bundle, on disk (M6-04).** It lives in the `opa-data` volume (`/var/lib/opa`, `persist: true`), which `opa-init` hands over to uid 1000. An OPA that restarts while the portal is not responding starts with that bundle. Without one it has no policy and the gateway denies everything (fails closed).
+  - The bundle carries the pseudonym key and the official's salt: the volume belongs to OPA alone (mode 700) and is backed up or destroyed like a secret.
+  - Deleting the volume does no harm as long as the portal responds: OPA downloads the bundle on the next poll.
+- *Decision logs* are disabled on purpose (the input carries headers with data in clear text).
+- `OPA_PORTAL_URL`: in development `http://host.docker.internal:4000/api/v1/opa` (the API runs on the host); in the pilot `http://api:4000/api/v1/opa`.
 
 ### 3.6 step-ca
 
-**Función en el despliegue.** Es la autoridad certificadora de la red. Firma:
+**Role in the deployment.** It is the network's certificate authority. It signs:
 
-- los certificados de cliente de las aplicaciones consumidoras, a partir de los CSR que las entidades suben al portal (M3-01). Sirven para el mTLS con el gateway y para los tokens ligados al certificado (RFC 8705) cuando `features.mtls.required` está activo;
-- el certificado de servidor TLS del gateway (M3-02);
-- los certificados de cliente del gateway hacia los proveedores con mTLS, uno por entidad (M3-03).
+- the client certificates of consumer applications, from the CSRs that entities upload to the portal (M3-01). They are used for mTLS with the gateway and for certificate-bound tokens (RFC 8705) when `features.mtls.required` is on;
+- the gateway's TLS server certificate (M3-02);
+- the gateway's client certificates towards providers with mTLS, one per entity (M3-03).
 
-También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Solo el API habla con ella: las entidades y los nodos nunca la llaman directamente.
+It also signs the kit nodes' certificates when they enroll and when they renew (M4-02). Only the API talks to it: entities and nodes never call it directly.
 
-- En el primer arranque la imagen inicializa la CA con `DOCKER_STEPCA_INIT_*`: nombre `RID Dev CA`, DNS `localhost,step-ca`, provisioner JWK `rid-portal`, contraseña `STEP_CA_PASSWORD`. **El piloto usa esta misma CA de desarrollo**; la raíz fuera de línea y la intermedia en HSM son de producción (M6).
-- En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `rid-portal` (plantilla `app.tpl`, solo autenticación de cliente, 90 días por defecto, 397 como máximo). También crea, si no existe, el provisioner `rid-gateway-tls` con la contraseña de la CA (plantilla `gateway.tpl`, solo autenticación de servidor, 90 días) y el provisioner `rid-nodes` de los nodos del kit (plantilla `node.tpl`, autenticación de servidor y de cliente, 90 días, M4-02). Luego inicia la CA. Es idempotente: una CA existente recibe un provisioner nuevo al reiniciar el contenedor.
-- El portal genera las claves de los certificados del gateway y las guarda selladas con `RID_SECRETS_KEY` (tabla `gateway_certificate`). Los renueva en el último tercio de su vida, en la pasada completa del reconciliador de APISIX.
-- El estado (raíz, intermedia, claves, `secrets/password`) vive en `step-ca-data`. **Perder ese volumen invalida todos los certificados emitidos.**
-- El API firma los CSR con los provisioners (`RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER`, `RID_STEP_CA_GATEWAY_PROVISIONER`, `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD` para los dos) y verifica el TLS de la CA con `RID_STEP_CA_ROOT_FILE` o `RID_STEP_CA_ROOT_FINGERPRINT`. Con `NODE_ENV=production` (imágenes del piloto) una de las dos es **obligatoria**; sin ninguna, solo en desarrollo, confía en la raíz que sirve la CA.
+- On first start the image initializes the CA with `DOCKER_STEPCA_INIT_*`: name `RID Dev CA`, DNS `localhost,step-ca`, JWK provisioner `rid-portal`, password `STEP_CA_PASSWORD`. **The pilot uses this same development CA**; the offline root and the HSM-backed intermediate are for production (M6).
+- On every start, `infra/step-ca/configure.sh` adjusts the `rid-portal` provisioner (template `app.tpl`, client authentication only, 90 days by default, 397 at most). It also creates, if it does not exist, the `rid-gateway-tls` provisioner with the CA's password (template `gateway.tpl`, server authentication only, 90 days) and the `rid-nodes` provisioner for the kit nodes (template `node.tpl`, server and client authentication, 90 days, M4-02). Then it starts the CA. It is idempotent: an existing CA gets a new provisioner when the container restarts.
+- The portal generates the keys for the gateway's certificates and stores them sealed with `RID_SECRETS_KEY` (table `gateway_certificate`). It renews them in the last third of their lifetime, during the APISIX reconciler's full pass.
+- The state (root, intermediate, keys, `secrets/password`) lives in `step-ca-data`. **Losing that volume invalidates every certificate issued.**
+- The API signs CSRs with the provisioners (`RID_STEP_CA_URL`, `RID_STEP_CA_PROVISIONER`, `RID_STEP_CA_GATEWAY_PROVISIONER`, `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD` for both) and verifies the CA's TLS with `RID_STEP_CA_ROOT_FILE` or `RID_STEP_CA_ROOT_FINGERPRINT`. With `NODE_ENV=production` (pilot images) one of the two is **required**; with neither, in development only, it trusts the root that the CA serves.
 
-### 3.7 Registro de transparencia: Fluent Bit + TSA
+### 3.7 Transparency log: Fluent Bit + TSA
 
-**Función de `fluent-bit-transparency` en el despliegue.** Lleva del gateway al portal el registro de cada llamada **autorizada** que tocó datos de una persona: quién consultó, para qué, con qué suscripción y el seudónimo del titular, nunca la ruta ni el número de documento. Deja solo los campos permitidos y descarta las llamadas sin seudónimo o que no llegaron al proveedor. Con su búfer en disco no se pierden registros si el API está caído. Sin este servicio, el ciudadano no ve quién consultó sus datos (ADR-0015).
+**Role of `fluent-bit-transparency` in the deployment.** It carries from the gateway to the portal the record of every **authorized** call that touched a person's data: who queried, for what purpose, under which subscription, and the data subject's pseudonym, never the path or the ID number. It keeps only the allowed fields and discards calls without a pseudonym or that did not reach the provider. With its disk buffer, no records are lost if the API is down. Without this service, citizens cannot see who queried their data (ADR-0015).
 
-**Función de `tsa-init` en el despliegue.** Es una tarea que corre una sola vez: genera la cadena de certificados de la TSA de desarrollo y termina.
+**Role of `tsa-init` in the deployment.** It is a task that runs only once: it generates the certificate chain of the development TSA and exits.
 
-**Función de `tsa` en el despliegue.** Es la autoridad de sellado de tiempo (RFC 3161), independiente de la clave del operador. Sella dos cosas: los puntos de control del registro de transparencia y el anclaje diario de la bitácora de auditoría. Con el sello cualquiera puede probar que esos datos existían en ese momento y que no se reescribieron después (ADR-0016). Su cadena pública permite que terceros (la carpeta, `rid-verify-receipt`) verifiquen los sellos sin confiar en el portal.
+**Role of `tsa` in the deployment.** It is the time-stamping authority (RFC 3161), independent of the operator's key. It stamps two things: the checkpoints of the transparency log and the daily anchor of the audit log. With the stamp anyone can prove that the data existed at that moment and was not rewritten afterwards (ADR-0016). Its public chain lets third parties (the citizen folder, `rid-verify-receipt`) verify the stamps without trusting the portal.
 
-- `fluent-bit-transparency` (`infra/fluent-bit/transparency.yaml`): entrada TCP 5170 en JSON, filtro Lua `transparency.lua`, salida HTTP a `${RID_TRANSPARENCY_COLLECTOR_HOST}:${RID_TRANSPARENCY_COLLECTOR_PORT}/api/v1/internal/subject-access` con `Bearer ${RID_TRANSPARENCY_INGEST_TOKEN}`. Búfer en disco (`transparency-buffer`, hasta 1 GB) y reintentos sin límite: si el API cae, los registros esperan.
-- `tsa-init` crea una sola vez la cadena de la TSA de desarrollo en `tsa-data` (`infra/tsa/init.sh`). `tsa` es sigstore timestamp-server con esa clave. En producción se usa la TSA acreditada del país (`RID_TSA_URL`).
-- La cadena de la TSA es pública: `GET /api/v1/timestamp/certchain`.
+- `fluent-bit-transparency` (`infra/fluent-bit/transparency.yaml`): TCP input 5170 in JSON, Lua filter `transparency.lua`, HTTP output to `${RID_TRANSPARENCY_COLLECTOR_HOST}:${RID_TRANSPARENCY_COLLECTOR_PORT}/api/v1/internal/subject-access` with `Bearer ${RID_TRANSPARENCY_INGEST_TOKEN}`. Disk buffer (`transparency-buffer`, up to 1 GB) and unlimited retries: if the API goes down, the records wait.
+- `tsa-init` creates the development TSA's chain once, in `tsa-data` (`infra/tsa/init.sh`). `tsa` is sigstore timestamp-server with that key. In production the country's accredited TSA is used (`RID_TSA_URL`).
+- The TSA chain is public: `GET /api/v1/timestamp/certchain`.
 
-**Función de `fluent-bit-errors` en el despliegue (M5-01).** Recibe el error log de nginx en APISIX por syslog. Un error real, por ejemplo un proveedor que no responde, trae la línea de la petición y la URI del upstream, con el número de identificación en la ruta. Este servicio las enmascara (`infra/fluent-bit/gateway-errors.lua`) y escribe el resultado en su salida: **el operador lee los errores del gateway con `docker logs rid-fluent-bit-errors-1`, no en APISIX**. APISIX depende de él para arrancar, porque nginx resuelve el nombre del servidor syslog al leer su configuración. Si este servicio se cae, los errores se pierden (UDP) y el tráfico no se afecta.
+**Role of `fluent-bit-errors` in the deployment (M5-01).** It receives the nginx error log from APISIX over syslog. A real error, for example a provider that does not respond, carries the request line and the upstream URI, with the ID number in the path. This service masks them (`infra/fluent-bit/gateway-errors.lua`) and writes the result to its output: **the operator reads the gateway's errors with `docker logs rid-fluent-bit-errors-1`, not in APISIX**. APISIX depends on it to start, because nginx resolves the syslog server's name when it reads its configuration. If this service goes down, errors are lost (UDP) and traffic is not affected.
 
-### 3.8 Analítica: Fluent Bit + OpenSearch (perfil `observability`)
+### 3.8 Analytics: Fluent Bit + OpenSearch (`observability` profile)
 
-**Función de `fluent-bit` en el despliegue.** Es la segunda barrera de privacidad del log de acceso. Recibe del `http-logger` de APISIX los metadatos de **todas** las llamadas, también las negadas con su razón. Descarta cualquier campo fuera de la lista permitida y todo valor sin la forma que pone el gateway. Convierte números y latencias y escribe el resto en OpenSearch.
+**Role of `fluent-bit` in the deployment.** It is the second privacy barrier for the access log. It receives from APISIX's `http-logger` the metadata of **all** calls, including denied ones with their reason. It discards any field outside the allowlist and any value without the shape that the gateway gives it. It converts numbers and latencies and writes the rest to OpenSearch.
 
-**Función de `opensearch` en el despliegue.** Guarda los logs de acceso para la analítica de uso: llamadas por consumidor, por finalidad y por operación, latencias y razones de negación. Lo consultan las pantallas de uso y los indicadores (M5-02 a M5-05). Se puede prescindir de él: sin él esas pantallas dicen que la analítica no está disponible, y el tráfico, la auditoría y el registro de transparencia siguen igual.
+**Role of `opensearch` in the deployment.** It stores the access logs for usage analytics: calls per consumer, per purpose and per operation, latencies and denial reasons. The usage screens and the indicators query it (M5-02 to M5-05). It can be left out: without it those screens say that analytics is not available, and traffic, the audit log and the transparency log carry on unchanged.
 
-- `fluent-bit` (`infra/fluent-bit/fluent-bit.yaml`): entrada HTTP 9880, filtro `allowlist.lua`, salida a OpenSearch, índice `rid-access-YYYY.MM`.
-- OpenSearch en modo un solo nodo **sin plugin de seguridad** (`DISABLE_SECURITY_PLUGIN=true`), solo dentro de la red de Compose. El API lo alcanza en `RID_OPENSEARCH_URL` (`http://opensearch:9200` en el piloto); con el plugin de seguridad, `RID_OPENSEARCH_AUTH=usuario:clave`.
-- El API mantiene la plantilla de índice `rid-access` (campos tipados, `dynamic: strict`) y la política de retención ISM `rid-access-retention` (`retention.accessLogMonths` del país, más un mes). Lo hace al arrancar y cada hora, y el estado queda en `sync_state` (`opensearch:*`). No hay que crearlas a mano.
-- **Al desplegar M5 sobre un OpenSearch que ya tenía datos:** los índices `rid-access-*` anteriores tienen un mapeo dinámico (números como texto) que la plantilla no cambia. En el piloto se borran: `curl -X DELETE 'http://opensearch:9200/rid-access-*'`, desde un contenedor de la red. Son logs de la demo.
-- `pnpm infra:up:core` levanta todo sin este perfil. Las rutas siguen enviando a `fluent-bit:9880`; sin ese servicio, esos logs se pierden y el tráfico no se afecta.
+- `fluent-bit` (`infra/fluent-bit/fluent-bit.yaml`): HTTP input 9880, `allowlist.lua` filter, output to OpenSearch, index `rid-access-YYYY.MM`.
+- OpenSearch in single-node mode **without the security plugin** (`DISABLE_SECURITY_PLUGIN=true`), only inside the Compose network. The API reaches it at `RID_OPENSEARCH_URL` (`http://opensearch:9200` in the pilot); with the security plugin, `RID_OPENSEARCH_AUTH=user:password`.
+- The API maintains the `rid-access` index template (typed fields, `dynamic: strict`) and the ISM retention policy `rid-access-retention` (the country's `retention.accessLogMonths`, plus one month). It does so on startup and every hour, and the state is kept in `sync_state` (`opensearch:*`). You do not need to create them by hand.
+- **When deploying M5 on an OpenSearch that already had data:** the earlier `rid-access-*` indices have a dynamic mapping (numbers as text) that the template does not change. In the pilot they are deleted: `curl -X DELETE 'http://opensearch:9200/rid-access-*'`, from a container on the network. They are demo logs.
+- `pnpm infra:up:core` brings everything up without this profile. Routes keep sending to `fluent-bit:9880`; without that service, those logs are lost and traffic is not affected.
 
-### 3.8.1 Métricas y alertas: Prometheus, Alertmanager y Grafana (perfil `observability`, M5-06)
+### 3.8.1 Metrics and alerts: Prometheus, Alertmanager and Grafana (`observability` profile, M5-06)
 
-**Función de `prometheus` en el despliegue.** Recoge las métricas de APISIX, del API (`GET /metrics` con `RID_METRICS_TOKEN`) y de OPA, y evalúa las alertas de `ARCHITECTURE.md §9`. También da al API la disponibilidad del gateway, que es uno de los indicadores de la red. Sin él no hay alertas y ese indicador queda "sin datos"; el tráfico no se afecta.
+**Role of `prometheus` in the deployment.** It collects the metrics of APISIX, the API (`GET /metrics` with `RID_METRICS_TOKEN`) and OPA, and evaluates the alerts of `ARCHITECTURE.md §9`. It also gives the API the gateway's availability, which is one of the network's indicators. Without it there are no alerts and that indicator shows "no data"; traffic is not affected.
 
-**Función de `alertmanager` en el despliegue.** Agrupa las alertas y las manda por correo al operador. En desarrollo y en el piloto llegan a Mailpit (`operaciones@rid.example`). En producción se monta un `alertmanager.yml` propio con el SMTP y la dirección del operador.
+**Role of `alertmanager` in the deployment.** It groups the alerts and emails them to the operator. In development and in the pilot they arrive in Mailpit (`operaciones@rid.example`). In production you mount your own `alertmanager.yml` with the operator's SMTP and address.
 
-**Función de `grafana` en el despliegue.** Muestra el tablero del operador (`RID · Operador`), aprovisionado desde `infra/grafana`, sin edición en la interfaz: los cambios van por el repositorio. Su usuario es `admin`, con `GRAFANA_ADMIN_PASSWORD`. En el piloto queda detrás del proxy en `/grafana` (`GRAFANA_ROOT_URL`, `GRAFANA_SERVE_FROM_SUB_PATH=true`).
+**Role of `grafana` in the deployment.** It shows the operator's dashboard (`RID · Operador`), provisioned from `infra/grafana`, with no editing in the UI: changes go through the repository. Its user is `admin`, with `GRAFANA_ADMIN_PASSWORD`. In the pilot it sits behind the proxy at `/grafana` (`GRAFANA_ROOT_URL`, `GRAFANA_SERVE_FROM_SUB_PATH=true`).
 
-- Prometheus no expande variables en su configuración. Su entrada escribe `RID_METRICS_TOKEN` en el archivo que lee su trabajo `api` (`credentials_file`). En desarrollo, `api` apunta al API del host (`extra_hosts`); en el piloto, al contenedor.
-- Retención de métricas: `PROMETHEUS_RETENTION` (30 días por defecto).
+- Prometheus does not expand variables in its configuration. Its entrypoint writes `RID_METRICS_TOKEN` into the file that its `api` job reads (`credentials_file`). In development, `api` points to the API on the host (`extra_hosts`); in the pilot, to the container.
+- Metrics retention: `PROMETHEUS_RETENTION` (30 days by default).
 
 ### 3.9 Mailpit
 
-**Función en el despliegue.** Hace de servidor de correo de pruebas: captura todo el correo saliente sin entregarlo a nadie y lo muestra en una bandeja web. Eso incluye las invitaciones, las notificaciones del portal, los anclajes enviados a los reguladores, los correos de verificación y recuperación de Keycloak y los avisos de la carpeta ciudadana. Ocupa el lugar del SMTP real del operador.
+**Role in the deployment.** It acts as a test mail server: it captures all outgoing mail without delivering it to anyone and shows it in a web inbox. That includes invitations, portal notifications, the anchors sent to regulators, Keycloak's verification and recovery emails, and the citizen folder's alerts. It stands in for the operator's real SMTP.
 
-- Recibe todo el correo de desarrollo y del piloto (SMTP 1025): el del API (`RID_SMTP_URL`), el de Keycloak (verificación y recuperación) y el de la carpeta.
-- En el piloto se sirve en `/mail` (`MP_WEBROOT`) detrás de usuario y contraseña (`MP_UI_AUTH=${MAILPIT_UI_AUTH}`): Keycloak envía allí los enlaces de recuperación de contraseña, así que una bandeja abierta permitiría tomar cualquier cuenta.
-- En producción se reemplaza por el SMTP real del operador (`RID_SMTP_URL`, `RID_MAIL_FROM`).
+- It receives all mail in development and in the pilot (SMTP 1025): the API's (`RID_SMTP_URL`), Keycloak's (verification and recovery) and the citizen folder's.
+- In the pilot it is served at `/mail` (`MP_WEBROOT`) behind a username and password (`MP_UI_AUTH=${MAILPIT_UI_AUTH}`): Keycloak sends password recovery links there, so an open inbox would allow taking over any account.
+- In production it is replaced by the operator's real SMTP (`RID_SMTP_URL`, `RID_MAIL_FROM`).
 
-### 3.9.1 Antivirus: ClamAV (perfil `antivirus`, M6-08)
+### 3.9.1 Antivirus: ClamAV (`antivirus` profile, M6-08)
 
-**Función en el despliegue.** Revisa cada documento que se sube (designaciones, acuerdos, anexos) antes de guardarlo (ASVS 5.4.3). Es `clamd` en su propio contenedor (GPL-2.0, nunca enlazado: regla 1). Su `freshclam` actualiza las firmas desde internet.
+**Role in the deployment.** It scans every uploaded document (designations, agreements, annexes) before it is stored (ASVS 5.4.3). It is `clamd` in its own container (GPL-2.0, never linked: rule 1). Its `freshclam` updates the signatures from the internet.
 
-- Se activa con el perfil `antivirus` y `RID_CLAMAV_URL` en el API (`tcp://clamav:3310` en el piloto; `install.sh` lo pregunta).
-- El API le manda el documento por el protocolo INSTREAM de clamd, después de comprobar que es un PDF y antes de escribirlo:
-  - si clamd encuentra algo, el documento no se guarda y el usuario ve un error en el campo; el log del API registra la firma y el SHA-256 del archivo, nunca el nombre ni el contenido;
-  - si clamd no responde, la subida falla (503) y el documento no se guarda (falla cerrada).
-- El primer arranque descarga las firmas (unos minutos) y usa ~1,2 GB de memoria.
-- Sin `RID_CLAMAV_URL` no hay revisión: los documentos solo se comprueban como PDF.
+- It is enabled with the `antivirus` profile and `RID_CLAMAV_URL` in the API (`tcp://clamav:3310` in the pilot; `install.sh` asks for it).
+- The API sends it the document over clamd's INSTREAM protocol, after checking that it is a PDF and before writing it:
+  - if clamd finds something, the document is not stored and the user sees an error on the field; the API log records the signature and the file's SHA-256, never the name or the content;
+  - if clamd does not respond, the upload fails (503) and the document is not stored (fails closed).
+- The first start downloads the signatures (a few minutes) and uses ~1.2 GB of memory.
+- Without `RID_CLAMAV_URL` there is no scanning: documents are only checked as PDFs.
 
-### 3.10 API del portal (`apps/api`)
+### 3.10 Portal API (`apps/api`)
 
-**Función en el despliegue.** Es el centro del plano de gobierno, y el único componente que escribe en APISIX, Keycloak (`rid-gateway`) y step-ca. Tiene dos caras:
+**Role in the deployment.** It is the center of the governance plane, and the only component that writes to APISIX, Keycloak (`rid-gateway`) and step-ca. It has two sides:
 
-- **REST (`/api/v1`).** Atiende a la web y a los sistemas. Aplica los flujos de publicación, solicitud y aprobación. Verifica rol y pertenencia a la entidad en cada endpoint y registra cada cambio en la bitácora.
-- **Trabajos en segundo plano.** Traducen el estado de PostgreSQL a configuración: rutas, upstreams y objetos SSL de APISIX, clientes de Keycloak (con la rotación de secretos) y bundle de OPA. También firman certificados con step-ca, reciben y sellan el registro de transparencia (firma del operador más sello de la TSA), envían correos y webhooks, y vencen suscripciones, versiones, certificados y ventanas de rotación de credenciales.
+- **REST (`/api/v1`).** It serves the web and other systems. It applies the publication, request and approval flows. It checks the role and the entity membership on every endpoint and records every change in the audit log.
+- **Background jobs.** They translate the PostgreSQL state into configuration: APISIX routes, upstreams and SSL objects, Keycloak clients (with secret rotation) and the OPA bundle. They also sign certificates with step-ca, receive and seal the transparency log (operator signature plus TSA stamp), send emails and webhooks, and expire subscriptions, versions, certificates and credential rotation windows.
 
-Además sirve la API del titular que consume la carpeta ciudadana.
+It also serves the data subject API that the citizen folder consumes.
 
-- Imagen: `apps/api/Dockerfile`, construida desde la raíz del repo (`COPY . .`). **La configuración del país (`config/country/*.yaml`) queda dentro de la imagen**: un cambio en el YAML exige reconstruir.
-- Al arrancar: `prisma migrate deploy` (migraciones como dueño) → el seed (`dist/seed/main.js`) si `RID_ALLOW_SEED=true` → `node dist/main.js` en `API_PORT` (4000). Si la configuración del país es inválida o falta `RID_COUNTRY`, termina con código 1.
-- Corre como usuario `node`. Documentos en `/var/lib/rid/documents` (`RID_DOCUMENTS_DIR`, volumen `api-documents`).
-- **Trabajos en segundo plano en el mismo proceso** (`OPERATIONS.md §3`). `RID_WORKER=off` arranca el API sin ellos (pruebas, réplicas de solo lectura).
-- Expone `/api/v1/*`. Rutas que **nunca** van al ingreso público: `/api/v1/internal/*` (colector de transparencia) y `/api/v1/opa/*` (bundle y estado de OPA).
+- Image: `apps/api/Dockerfile`, built from the repo root (`COPY . .`). **The country configuration (`config/country/*.yaml`) is baked into the image**: a change in the YAML requires a rebuild.
+- On startup: `prisma migrate deploy` (migrations as owner) → the seed (`dist/seed/main.js`) if `RID_ALLOW_SEED=true` → `node dist/main.js` on `API_PORT` (4000). If the country configuration is invalid or `RID_COUNTRY` is missing, it exits with code 1.
+- It runs as user `node`. Documents in `/var/lib/rid/documents` (`RID_DOCUMENTS_DIR`, volume `api-documents`).
+- **Background jobs in the same process** (`OPERATIONS.md §3`). `RID_WORKER=off` starts the API without them (tests, read-only replicas).
+- It exposes `/api/v1/*`. Routes that **never** go to the public ingress: `/api/v1/internal/*` (transparency collector) and `/api/v1/opa/*` (OPA bundle and status).
 
-### 3.11 Web del portal (`apps/web`)
+### 3.11 Portal web (`apps/web`)
 
-**Función en el despliegue.** Es la interfaz de las personas. Por un lado, el portal de desarrolladores: catálogo, documentación interactiva, aplicaciones y solicitudes de acceso. Por otro, las consolas de cada rol: publicador, responsable de datos, administrador de entidad, operador, regulador y auditoría. Inicia sesión con Keycloak (`rid-portal`) y llama al API con el token del usuario, guardado en la cookie cifrada de Auth.js. No tiene base de datos propia, y la autorización la decide siempre el API.
+**Role in the deployment.** It is the interface for people. On one side, the developer portal: catalog, interactive documentation, applications and access requests. On the other, the consoles for each role: publisher, data steward, entity administrator, operator, regulator and audit. It signs in with Keycloak (`rid-portal`) and calls the API with the user's token, stored in Auth.js's encrypted cookie. It has no database of its own, and authorization is always decided by the API.
 
-- Imagen: `apps/web/Dockerfile`. Se compila con secretos de relleno; los reales llegan en tiempo de ejecución.
-- Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `RID_PORTAL_WEB_CLIENT_ID`, `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_API_URL` (interno, `http://api:4000`), `RID_WEB_URL`, `RID_GATEWAY_PUBLIC_URL`, opcional `RID_AUTH_REFRESH_BEFORE_SECONDS` y `RID_SESSION_IDLE_SECONDS` (el `ssoSessionIdleTimeout` del realm, 1800 por omisión: la web avisa dos minutos antes de que la sesión termine por inactividad y ofrece seguir, WCAG 2.2.1; si se cambia uno, se cambia el otro). En el piloto, `AUTH_TRUST_HOST=true` (está detrás del proxy).
-- Corre con `next start` en 3000.
-- **Cabeceras de seguridad (M3-09).** La web pone ella misma la CSP con nonce, HSTS y el resto de las cabeceras (`ARCHITECTURE.md §12`). El proxy de delante no debe quitarlas ni reemplazarlas; tampoco debe agregar otra `Content-Security-Policy`, porque el navegador aplicaría las dos.
-  - HSTS va siempre, con `includeSubDomains`: publica la web en un nombre cuyos subdominios también se sirvan por HTTPS.
-  - Si Keycloak está en otro origen, `KEYCLOAK_URL` lo autoriza en `form-action`.
+- Image: `apps/web/Dockerfile`. It is built with placeholder secrets; the real ones arrive at runtime.
+- Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `RID_PORTAL_WEB_CLIENT_ID`, `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_API_URL` (internal, `http://api:4000`), `RID_WEB_URL`, `RID_GATEWAY_PUBLIC_URL`, optionally `RID_AUTH_REFRESH_BEFORE_SECONDS` and `RID_SESSION_IDLE_SECONDS` (the realm's `ssoSessionIdleTimeout`, 1800 by default: the web warns two minutes before the session ends from inactivity and offers to continue, WCAG 2.2.1; if you change one, change the other). In the pilot, `AUTH_TRUST_HOST=true` (it is behind the proxy).
+- It runs with `next start` on 3000.
+- **Security headers (M3-09).** The web sets the nonce-based CSP, HSTS and the other headers itself (`ARCHITECTURE.md §12`). The proxy in front must not remove or replace them; nor must it add another `Content-Security-Policy`, because the browser would apply both.
+  - HSTS is always sent, with `includeSubDomains`: publish the web on a name whose subdomains are also served over HTTPS.
+  - If Keycloak is on another origin, `KEYCLOAK_URL` authorizes it in `form-action`.
 
-### 3.12 Carpeta ciudadana de referencia (`infra/mock-citizen-app`)
+### 3.12 Reference citizen folder (`infra/mock-citizen-app`)
 
-**Función en el despliegue.** En las demos hace el papel de la aplicación ciudadana del país. El ciudadano:
+**Role in the deployment.** In demos it plays the part of the country's citizen application. The citizen:
 
-- entra con la identidad digital simulada (`rid-citizens`);
-- ve quién consultó sus datos, para qué y con qué resultado;
-- recibe avisos por correo cuando lo consultan (webhooks firmados del portal);
-- verifica cada comprobante por su cuenta, sin confiar en el portal.
+- signs in with the simulated digital identity (`rid-citizens`);
+- sees who queried their data, for what purpose and with what result;
+- gets email alerts when they are queried (signed webhooks from the portal);
+- verifies each receipt independently, without trusting the portal.
 
-Muestra lo que debe implementar una carpeta real; no es un producto.
+It shows what a real citizen folder must implement; it is not a product.
 
-- Utilería de demostración (MT-07). Su URL pública (`RID_CARPETA_URL`) fija la ruta base: en el piloto, `/carpeta`.
-- Variables principales: `RID_CARPETA_URL`, `RID_CITIZEN_ISSUER`, `RID_CARPETA_CLIENT_SECRET`, `CITIZEN_APP_WEBHOOK_SECRET` (obligatoria), `CITIZEN_APP_PORTAL_API_URL`, `CITIZEN_APP_JWKS_URL`, `CITIZEN_APP_TSA_ROOT_URL`, `CITIZEN_APP_SMTP_HOST/PORT`, `CITIZEN_APP_DATA_FILE`.
-- Guarda correos de ciudadanos y vínculos de avisos en `carpeta-data` (`alerts.json`).
+- Demo prop (MT-07). Its public URL (`RID_CARPETA_URL`) sets the base path: in the pilot, `/carpeta`.
+- Main variables: `RID_CARPETA_URL`, `RID_CITIZEN_ISSUER`, `RID_CARPETA_CLIENT_SECRET`, `CITIZEN_APP_WEBHOOK_SECRET` (required), `CITIZEN_APP_PORTAL_API_URL`, `CITIZEN_APP_JWKS_URL`, `CITIZEN_APP_TSA_ROOT_URL`, `CITIZEN_APP_SMTP_HOST/PORT`, `CITIZEN_APP_DATA_FILE`.
+- It stores citizens' email addresses and alert links in `carpeta-data` (`alerts.json`).
 
-### 3.13 Proveedores de prueba (`infra/mock-providers`)
+### 3.13 Test providers (`infra/mock-providers`)
 
-**Función en el despliegue.** `mock-salud` y `mock-socioeconomico` simulan los servicios de dos entidades proveedoras (y, con `carga-*` en `RID_DEV_NODES`, las APIs sintéticas de la prueba de carga, M6-03) con datos sintéticos (ADR-0009). Ocupan el lugar de los nodos del kit hasta M4: el reconciliador apunta los upstreams a ellos según `RID_DEV_NODES` (`slug=host:puerto`; con `https://host:puerto`, el gateway les habla con mTLS como a un nodo enrolado). Registran en su log las cabeceras `X-RID-*` que reciben, y así la demo muestra qué le llega al proveedor. En producción no existen: los upstreams son nodos del kit, APIs existentes de las entidades o un Security Server de X-Road.
+**Role in the deployment.** `mock-salud` and `mock-socioeconomico` simulate the services of two provider entities (and, with `carga-*` in `RID_DEV_NODES`, the synthetic APIs of the load test, M6-03) with synthetic data (ADR-0009). They stand in for the kit nodes until M4: the reconciler points the upstreams at them according to `RID_DEV_NODES` (`slug=host:port`; with `https://host:port`, the gateway talks to them over mTLS as it would to an enrolled node). They log the `X-RID-*` headers they receive, so the demo shows what reaches the provider. They do not exist in production: the upstreams are kit nodes, existing entity APIs or an X-Road Security Server.
 
-- Una sola imagen (`rid/mock-providers:dev`); `PROVIDER` elige el servicio y sus datos (`salud` o `socioeconomico`), con su OpenAPI en `infra/mock-providers/<proveedor>/openapi.yaml`.
-- Escuchan en 8000 dentro de la red de Compose; en desarrollo se publican en 8101 y 8102.
-- Verifican la aserción firmada del gateway (`X-RID-Assertion`, M6-10) como lo haría un proveedor real, con el JWKS de `RID_GATEWAY_JWKS_URL`: en desarrollo, el API del host (`MOCK_GATEWAY_JWKS_URL`); en el piloto, la URL pública del portal. Registran el resultado (`verified`, `absent` o `invalid: <motivo>`) y la demo lo comprueba. Con `MOCK_ASSERTION_REQUIRED=true` rechazan (401) la llamada sin una aserción válida.
+- A single image (`rid/mock-providers:dev`); `PROVIDER` chooses the service and its data (`salud` or `socioeconomico`), with its OpenAPI in `infra/mock-providers/<provider>/openapi.yaml`.
+- They listen on 8000 inside the Compose network; in development they are published on 8101 and 8102.
+- They verify the gateway's signed assertion (`X-RID-Assertion`, M6-10) as a real provider would, with the JWKS from `RID_GATEWAY_JWKS_URL`: in development, the API on the host (`MOCK_GATEWAY_JWKS_URL`); in the pilot, the portal's public URL. They log the result (`verified`, `absent` or `invalid: <reason>`) and the demo checks it. With `MOCK_ASSERTION_REQUIRED=true` they reject (401) a call without a valid assertion.
 
-### 3.14 Hub WireGuard (`infra/wg-hub`, M4-03, ADR-0023)
+### 3.14 WireGuard hub (`infra/wg-hub`, M4-03, ADR-0023)
 
-**Función en el despliegue.** Es el extremo central de los túneles de los nodos del kit, que corren en las redes de las entidades, detrás de su firewall. El gateway llama a un nodo a través del hub: APISIX abre TLS hacia `wg-hub:8443` con el nombre del nodo (`rid-node-<id>`) como SNI, y el nginx `stream` del hub pasa la conexión, sin abrirla, a la dirección del nodo dentro del túnel. El TLS es de punta a punta entre el gateway y el nodo. Sin el hub, las versiones servidas por nodos no responden.
+**Role in the deployment.** It is the central end of the tunnels from the kit nodes, which run in the entities' networks, behind their firewall. The gateway calls a node through the hub: APISIX opens TLS towards `wg-hub:8443` with the node's name (`rid-node-<id>`) as SNI, and the hub's nginx `stream` passes the connection, without opening it, to the node's address inside the tunnel. TLS is end to end between the gateway and the node. Without the hub, the versions served by nodes do not respond.
 
-- Al arrancar, el agente (`hub-agent.mjs`) levanta `wg0` en la primera dirección de `RID_WG_SUBNET` con `RID_WG_HUB_PRIVATE_KEY`. Usa WireGuard del kernel si el host lo tiene; si no, `wireguard-go`.
-- El contenedor necesita `NET_ADMIN` y `/dev/net/tun`. Corre con `net.ipv4.ip_forward=0`: el hub no reenvía paquetes, y su firewall descarta todo lo nuevo que llega por `wg0`. Un nodo no alcanza otros nodos, el hub ni la plataforma.
-- El agente (puerto 8090, `RID_WG_HUB_AGENT_TOKEN`, solo red interna) recibe del reconciliador del portal el estado completo (peers y rutas SNI) y lo aplica con `wg syncconf` y una recarga de nginx. Guarda el último estado en `wg-hub-data`, así un reinicio vuelve a servir a los nodos antes de la siguiente pasada.
-- Los nodos llegan al hub por UDP 51820 desde internet. En el piloto, `docker-compose.deploy.yml` publica ese puerto (`WG_HUB_UDP_PORT`), y `RID_WG_HUB_ENDPOINT` es el nombre público con ese puerto. El firewall del host debe dejarlo pasar.
-- La clave privada del hub está en `.env` (`make-deploy-env.mjs` la genera). Cambiarla obliga a reenrolar todos los nodos, porque la clave pública va en su configuración.
-- `mock-node` (perfil `nodes`) es un nodo simulado para pruebas: espera un token en `/var/lib/mock-node/token`, se enrola, se une al hub y sirve `mock-salud` por mTLS. No es el kit (ADR-0011).
+- On startup, the agent (`hub-agent.mjs`) brings up `wg0` on the first address of `RID_WG_SUBNET` with `RID_WG_HUB_PRIVATE_KEY`. It uses kernel WireGuard if the host has it; otherwise, `wireguard-go`.
+- The container needs `NET_ADMIN` and `/dev/net/tun`. It runs with `net.ipv4.ip_forward=0`: the hub does not forward packets, and its firewall drops everything new that arrives through `wg0`. A node cannot reach other nodes, the hub or the platform.
+- The agent (port 8090, `RID_WG_HUB_AGENT_TOKEN`, internal network only) receives the full state (peers and SNI routes) from the portal's reconciler and applies it with `wg syncconf` and an nginx reload. It keeps the last state in `wg-hub-data`, so a restart serves the nodes again before the next pass.
+- Nodes reach the hub over UDP 51820 from the internet. In the pilot, `docker-compose.deploy.yml` publishes that port (`WG_HUB_UDP_PORT`), and `RID_WG_HUB_ENDPOINT` is the public name with that port. The host firewall must let it through.
+- The hub's private key is in `.env` (`make-deploy-env.mjs` generates it). Changing it forces you to re-enroll every node, because the public key is part of their configuration.
+- `mock-node` (`nodes` profile) is a simulated node for testing: it waits for a token in `/var/lib/mock-node/token`, enrolls, joins the hub and serves `mock-salud` over mTLS. It is not the kit (ADR-0011).
 
-## 4. Variables de entorno
+## 4. Environment variables
 
-La referencia completa, comentada, es `.env.example`. Todos los servicios leen el mismo `.env` de la raíz (Compose con `--env-file .env`; en el piloto también `env_file` para `api`, `web` y `carpeta`).
+The complete, commented reference is `.env.example`. All services read the same `.env` at the root (Compose with `--env-file .env`; in the pilot also `env_file` for `api`, `web` and `carpeta`).
 
-### 4.1 Secretos que no se pueden cambiar a la ligera
+### 4.1 Secrets you cannot change lightly
 
-| Variable | Qué pasa si cambia |
+| Variable | What happens if it changes |
 | :-- | :-- |
-| `RID_SUBJECT_REF_KEY` (≥ 32 caracteres) | Cambia el seudónimo de cada titular: se pierde el vínculo entre un ciudadano y sus registros anteriores |
-| `RID_END_USER_HASH_SALT` (≥ 16 caracteres) | Cambian todos los hashes de funcionario |
-| `RID_TRANSPARENCY_SIGNING_JWK` | Los comprobantes anteriores solo verifican si la clave pública vieja pasa a `RID_TRANSPARENCY_RETIRED_JWKS` |
-| `RID_SECRETS_KEY` (32 bytes base64). Se rota con `RID_SECRETS_KEYS_PREVIOUS` y `secrets:reseal` (`OPERATIONS.md §5.6`), nunca reemplazándola sin más | Si se reemplaza sin rotar, no se pueden abrir los secretos de cliente sellados que el reconciliador de Keycloak aún no aplicó, ni las claves de los certificados del gateway (`gateway_certificate`): el reconciliador de APISIX falla hasta que se emitan certificados nuevos |
-| `POSTGRES_PASSWORD`, `RID_APP_DB_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Solo se aplican al crear el volumen (§3.2) |
-| `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET` | Solo se aplican al importar el realm (§3.3) |
-| `STEP_CA_PASSWORD` | Cifra las claves de la CA y de los provisioners `rid-portal` y `rid-gateway-tls` ya creadas |
-| `AUTH_SECRET` | Cierra todas las sesiones de la web |
-| `RID_APISIX_KEYRING` (16 caracteres) | APISIX no puede leer las claves privadas que cifró con el anterior (TLS del gateway, aserciones). Para rotarlo, se agrega el nuevo **primero** en `data_encryption.keyring` dejando el anterior detrás, hasta que el reconciliador reescriba esos objetos |
+| `RID_SUBJECT_REF_KEY` (≥ 32 characters) | Every data subject's pseudonym changes: the link between a citizen and their earlier records is lost |
+| `RID_END_USER_HASH_SALT` (≥ 16 characters) | All official hashes change |
+| `RID_TRANSPARENCY_SIGNING_JWK` | Earlier receipts only verify if the old public key is moved to `RID_TRANSPARENCY_RETIRED_JWKS` |
+| `RID_SECRETS_KEY` (32 bytes, base64). It is rotated with `RID_SECRETS_KEYS_PREVIOUS` and `secrets:reseal` (`OPERATIONS.md §5.6`), never simply replaced | If it is replaced without rotating, the sealed client secrets that the Keycloak reconciler has not applied yet cannot be opened, nor can the keys of the gateway's certificates (`gateway_certificate`): the APISIX reconciler fails until new certificates are issued |
+| `POSTGRES_PASSWORD`, `RID_APP_DB_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Only applied when the volume is created (§3.2) |
+| `RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET` | Only applied when the realm is imported (§3.3) |
+| `STEP_CA_PASSWORD` | It encrypts the already created keys of the CA and of the `rid-portal` and `rid-gateway-tls` provisioners |
+| `AUTH_SECRET` | Ends every web session |
+| `RID_APISIX_KEYRING` (16 characters) | APISIX cannot read the private keys it encrypted with the previous one (gateway TLS, assertions). To rotate it, add the new one **first** in `data_encryption.keyring`, keeping the previous one after it, until the reconciler rewrites those objects |
 
-Si falta `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`, o son cortas, o (con `NODE_ENV=production`) son los valores de ejemplo de `.env.example`, el API no puede construir el bundle de OPA y el gateway niega todo. Cada despliegue tiene las suyas (`make-deploy-env.mjs` las genera al azar): así el mismo funcionario o titular no tiene el mismo hash en dos redes (M3-06).
+If `RID_SUBJECT_REF_KEY` or `RID_END_USER_HASH_SALT` is missing, too short, or (with `NODE_ENV=production`) one of the sample values from `.env.example`, the API cannot build the OPA bundle and the gateway denies everything. Each deployment has its own (`make-deploy-env.mjs` generates them at random): that way the same official or data subject does not have the same hash in two networks (M3-06).
 
-Seguridad del API (M6-01):
-- `RID_TRUST_PROXY`: quién puede fijar `X-Forwarded-For`, la dirección del llamante en los límites y en los eventos de seguridad.
-  - La dirección del proxy o su red, separadas por comas (`172.30.0.2`). En el piloto es la dirección de Traefik en la red `edge`: `docker inspect -f '{{(index .NetworkSettings.Networks "lab-router_default").IPAddress}}' <contenedor-de-traefik>`. Si Traefik cambia de dirección al reiniciarse, se fija con `ipv4_address` en su Compose.
-  - La red completa solo si en ella no hay más contenedores que el proxy y el portal: cualquier otro podría elegir con qué dirección se registra y se limita.
-  - Un número confía en ese número de saltos, venga de donde venga: solo donde nada más que el proxy alcanza el API.
-  - Vacío (lo que genera `make-deploy-env.mjs` si no se le pasa): nadie. Los llamantes sin sesión comparten entonces la cuota de la dirección del proxy.
-- `RID_LOG_FORMAT`: `text` (por omisión) o `json`, un objeto por línea para un colector de logs (el chart de Helm fija `json`). Las líneas van enmascaradas en los dos formatos (`ARCHITECTURE.md §8`).
-- `RID_RATE_LIMIT_PER_MINUTE` (600 por usuario verificado, o por dirección sin un token válido) y `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 en subidas, versiones nuevas, solicitudes de alta, invitaciones y enrolamiento de nodos).
+API security (M6-01):
+- `RID_TRUST_PROXY`: who may set `X-Forwarded-For`, the caller's address in the limits and in the security events.
+  - The proxy's address or its network, comma-separated (`172.30.0.2`). In the pilot it is Traefik's address on the `edge` network: `docker inspect -f '{{(index .NetworkSettings.Networks "lab-router_default").IPAddress}}' <traefik-container>`. If Traefik changes address when it restarts, pin it with `ipv4_address` in its Compose file.
+  - The whole network only if it holds no containers other than the proxy and the portal: any other one could choose the address under which it is recorded and limited.
+  - A number trusts that many hops, wherever they come from: only where nothing but the proxy can reach the API.
+  - Empty (what `make-deploy-env.mjs` generates if you pass nothing): nobody. Callers without a session then share the proxy address's quota.
+- `RID_LOG_FORMAT`: `text` (default) or `json`, one object per line for a log collector (the Helm chart sets `json`). Lines are masked in both formats (`ARCHITECTURE.md §8`).
+- `RID_RATE_LIMIT_PER_MINUTE` (600 per verified user, or per address without a valid token) and `RID_RATE_LIMIT_STRICT_PER_MINUTE` (30 on uploads, new versions, onboarding requests, invitations and node enrollment).
 
-**Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`. El API no está en `providers`: comparte con el runner de contrato la red `runner`, solo de ellos dos. Ver `ARCHITECTURE.md §12`.
+**Compose networks (M6-01).** `default` is the platform, `gateway` is gateway control (etcd and OPA only there) and `providers` holds the upstreams and the contract runner. In the pilot APISIX is not on `default`. The API is not on `providers`: it shares the `runner` network with the contract runner, for the two of them only. See `ARCHITECTURE.md §12`.
 
-**Desplegar M6-04 sobre un piloto existente.** `up -d` crea el volumen `opa-data`, corre `opa-init` y recrea OPA: durante unos segundos no hay OPA y el gateway niega (falla cerrado).
+**Deploying M6-04 on an existing pilot.** `up -d` creates the `opa-data` volume, runs `opa-init` and recreates OPA: for a few seconds there is no OPA and the gateway denies (fails closed).
 
-**Desplegar M6-03 sobre un piloto existente.** Las rutas pasan a consultar `rid/authz/decision`, que solo existe en el bundle nuevo de OPA. Hasta que OPA lo descarga (10–20 s después de arrancar el API nuevo), las llamadas se niegan, como en el paso 6 de M3. Conviene hacerlo en una ventana de poco tráfico.
+**Deploying M6-03 on an existing pilot.** Routes switch to querying `rid/authz/decision`, which exists only in the new OPA bundle. Until OPA downloads it (10–20 s after the new API starts), calls are denied, as in step 6 of M3. It is best done in a low-traffic window.
 
-**Desplegar M6-01 sobre un piloto existente:**
-1. Agregar `RID_APISIX_KEYRING` (16 caracteres al azar) y `RID_TRUST_PROXY` (la dirección de Traefik, arriba) al `.env`.
-2. Recrear todo con `up -d`: cambian las redes.
-3. Aplicar al realm `rid-portal` ya importado la política de contraseñas, las URIs exactas y los eventos (con `kcadm`, como en §3.3), y las URIs exactas al realm `rid-citizens`.
-4. Si el Traefik es propio, agregar los límites `rid-rate-api` y `rid-rate-auth` de `infra/edge/rid.yml.template`.
+**Deploying M6-01 on an existing pilot:**
+1. Add `RID_APISIX_KEYRING` (16 random characters) and `RID_TRUST_PROXY` (Traefik's address, above) to `.env`.
+2. Recreate everything with `up -d`: the networks change.
+3. Apply the password policy, the exact URIs and the events to the already imported `rid-portal` realm (with `kcadm`, as in §3.3), and the exact URIs to the `rid-citizens` realm.
+4. If you run your own Traefik, add the `rid-rate-api` and `rid-rate-auth` limits from `infra/edge/rid.yml.template`.
 
-Analítica (M5): `RID_OPENSEARCH_URL` (OpenSearch como lo alcanza el API) y opcional `RID_OPENSEARCH_AUTH`.
+Analytics (M5): `RID_OPENSEARCH_URL` (OpenSearch as the API reaches it) and, optionally, `RID_OPENSEARCH_AUTH`.
 
-Métricas y alertas (M5-06):
-- `RID_METRICS_TOKEN`, el token con que Prometheus lee `/metrics` del API; sin él, el endpoint no existe.
-- `RID_PROMETHEUS_URL`, Prometheus como lo alcanza el API, para la disponibilidad del gateway.
-- `GRAFANA_ADMIN_PASSWORD`, y en el piloto `GRAFANA_ROOT_URL` y `GRAFANA_SERVE_FROM_SUB_PATH`.
+Metrics and alerts (M5-06):
+- `RID_METRICS_TOKEN`, the token Prometheus uses to read the API's `/metrics`; without it, the endpoint does not exist.
+- `RID_PROMETHEUS_URL`, Prometheus as the API reaches it, for the gateway's availability.
+- `GRAFANA_ADMIN_PASSWORD`, and in the pilot `GRAFANA_ROOT_URL` and `GRAFANA_SERVE_FROM_SUB_PATH`.
 
-`make-deploy-env` las genera.
+`make-deploy-env` generates them.
 
-Validaciones al enviar a revisión (M4-06): `RID_VALIDATION_TOKEN` (las rutas de verificación de APISIX solo existen con él), `RID_GATEWAY_INTERNAL_URL` (APISIX como lo alcanza el API), `RID_CONTRACT_RUNNER_URL` y `RID_CONTRACT_RUNNER_TOKEN` (el runner de Schemathesis), `RID_CONTRACT_RUNNER_GATEWAY_URL` (APISIX como lo alcanza el runner) y opcionales `RID_CONTRACT_MAX_EXAMPLES` (20) y `RID_CONTRACT_TIMEOUT_SECONDS` (120). Sin el token, la healthcheck falla y el operador no puede aprobar; sin el runner, la prueba de contrato se omite.
+Validations on submission for review (M4-06): `RID_VALIDATION_TOKEN` (APISIX's verification routes exist only with it), `RID_GATEWAY_INTERNAL_URL` (APISIX as the API reaches it), `RID_CONTRACT_RUNNER_URL` and `RID_CONTRACT_RUNNER_TOKEN` (the Schemathesis runner), `RID_CONTRACT_RUNNER_GATEWAY_URL` (APISIX as the runner reaches it) and, optionally, `RID_CONTRACT_MAX_EXAMPLES` (20) and `RID_CONTRACT_TIMEOUT_SECONDS` (120). Without the token, the health check fails and the operator cannot approve; without the runner, the contract test is skipped.
 
-X-Road (M4-05, `ARCHITECTURE.md §4.1`): `RID_XROAD_SECURITY_SERVER_URL` (el Security Server del operador, como lo alcanza APISIX), `RID_XROAD_CLIENT` (el subsistema del operador, `INSTANCIA/CLASE/MIEMBRO/SUBSISTEMA`) y `RID_XROAD_SECURITY_SERVER_CA` (ruta del PEM que verifica el certificado TLS interno del Security Server). Sin las dos primeras, las versiones `xroad` no tienen ruta. Sobre HTTPS, el operador registra en su Security Server el certificado `CN=<RID_GATEWAY_CLIENT_NAME>.xroad` del gateway (objeto SSL `rid-ssl-gateway-xroad`).
+X-Road (M4-05, `ARCHITECTURE.md §4.1`): `RID_XROAD_SECURITY_SERVER_URL` (the operator's Security Server, as APISIX reaches it), `RID_XROAD_CLIENT` (the operator's subsystem, `INSTANCE/CLASS/MEMBER/SUBSYSTEM`) and `RID_XROAD_SECURITY_SERVER_CA` (path to the PEM that verifies the Security Server's internal TLS certificate). Without the first two, `xroad` versions have no route. Over HTTPS, the operator registers the gateway's `CN=<RID_GATEWAY_CLIENT_NAME>.xroad` certificate (SSL object `rid-ssl-gateway-xroad`) in its Security Server.
 
-Nodos del kit (M4-02, `ARCHITECTURE.md §10`): `RID_NODE_CONTROL_TOKEN` (lo agrega la ruta de control del gateway; sin él y sin `RID_GATEWAY_PORTAL_API_URL` no hay ruta de control), `RID_NODE_CONTROL_URL` (URL del canal de control que se le da al nodo, por defecto `RID_GATEWAY_PUBLIC_URL`), `RID_WG_SUBNET`, `RID_WG_HUB_PUBLIC_KEY` y `RID_WG_HUB_ENDPOINT` (sin estos dos, el enrolamiento da 503), `RID_WG_HUB_AGENT_URL` y `RID_WG_HUB_AGENT_TOKEN` (el agente del hub; sin ellos, el reconciliador no da de alta peers), `RID_GATEWAY_WG_HUB` (el enrutador SNI del hub como lo alcanza APISIX, `wg-hub:8443`; M4-04), y opcionales `RID_NODE_ENROLLMENT_TTL_HOURS` (72), `RID_NODE_HEARTBEAT_SECONDS` (60), `RID_NODE_OFFLINE_AFTER_SECONDS` (300), `RID_NODE_CERT_VALIDITY_HOURS` (2160), `RID_NODE_RENEWAL_GRACE_HOURS` (24) y `RID_NODE_MIN_KIT_VERSION`.
+Kit nodes (M4-02, `ARCHITECTURE.md §10`): `RID_NODE_CONTROL_TOKEN` (added by the gateway's control route; without it and without `RID_GATEWAY_PORTAL_API_URL` there is no control route), `RID_NODE_CONTROL_URL` (URL of the control channel given to the node, `RID_GATEWAY_PUBLIC_URL` by default), `RID_WG_SUBNET`, `RID_WG_HUB_PUBLIC_KEY` and `RID_WG_HUB_ENDPOINT` (without these two, enrollment returns 503), `RID_WG_HUB_AGENT_URL` and `RID_WG_HUB_AGENT_TOKEN` (the hub's agent; without them, the reconciler does not register peers), `RID_GATEWAY_WG_HUB` (the hub's SNI router as APISIX reaches it, `wg-hub:8443`; M4-04), and, optionally, `RID_NODE_ENROLLMENT_TTL_HOURS` (72), `RID_NODE_HEARTBEAT_SECONDS` (60), `RID_NODE_OFFLINE_AFTER_SECONDS` (300), `RID_NODE_CERT_VALIDITY_HOURS` (2160), `RID_NODE_RENEWAL_GRACE_HOURS` (24) and `RID_NODE_MIN_KIT_VERSION`.
 
-Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX atienden el tráfico, 1 por defecto: cada nodo cuenta las peticiones por su lado y el bundle le da a cada uno su parte del límite de la suscripción, ADR-0020; un valor inválido deja a OPA sin bundle), `RID_GATEWAY_TLS_HOSTS` (nombres del certificado de servidor del gateway, por defecto `localhost`; en el piloto, el nombre propio del gateway de M3-10) y `RID_GATEWAY_CLIENT_NAME` (prefijo del certificado de cliente hacia los proveedores, por defecto `rid-gateway`). La ventana de rotación de credenciales es `lifecycle.credentialRotationDays` en la configuración del país (7 días por defecto).
+Other gateway variables (M3): `RID_GATEWAY_NODES` (how many APISIX nodes serve the traffic, 1 by default: each node counts requests on its own and the bundle gives each one its share of the subscription's limit, ADR-0020; an invalid value leaves OPA without a bundle), `RID_GATEWAY_TLS_HOSTS` (names on the gateway's server certificate, `localhost` by default; in the pilot, the gateway's own name from M3-10) and `RID_GATEWAY_CLIENT_NAME` (prefix of the client certificate towards providers, `rid-gateway` by default). The credential rotation window is `lifecycle.credentialRotationDays` in the country configuration (7 days by default).
 
-### 4.2 Lo que cambia entre desarrollo y piloto
+### 4.2 What differs between development and pilot
 
-`scripts/make-deploy-env.mjs` las escribe; en desarrollo valen los valores de `.env.example`.
+`scripts/make-deploy-env.mjs` writes them; in development the values from `.env.example` apply.
 
-| Variable | Desarrollo | Piloto |
+| Variable | Development | Pilot |
 | :-- | :-- | :-- |
 | `DATABASE_URL`, `DATABASE_MIGRATION_URL` | `@localhost:5432` | `@postgres:5432` |
 | `KEYCLOAK_URL` | `http://localhost:8080` | `${RID_PUBLIC_URL}/auth` |
@@ -371,50 +373,50 @@ Otras variables del gateway (M3): `RID_GATEWAY_NODES` (cuántos nodos de APISIX 
 | `RID_TRANSPARENCY_COLLECTOR_HOST` | `host.docker.internal` | `api` |
 | `RID_TSA_URL` | `http://localhost:3004` | `http://tsa:3004` |
 | `RID_STEP_CA_URL` | `https://localhost:9000` | `https://step-ca:9000` |
-| `RID_STEP_CA_ROOT_FILE` | vacío | `/var/lib/rid/step-ca/root_ca.crt` |
+| `RID_STEP_CA_ROOT_FILE` | empty | `/var/lib/rid/step-ca/root_ca.crt` |
 | `RID_WEB_URL`, `AUTH_URL` | `http://localhost:3000` | `${RID_PUBLIC_URL}` |
-| `RID_GATEWAY_PUBLIC_URL` | `https://localhost:9443` | `https://<nombre del gateway>` con mTLS (`--gateway-host`); `${RID_PUBLIC_URL}/gw` sin mTLS |
+| `RID_GATEWAY_PUBLIC_URL` | `https://localhost:9443` | `https://<gateway name>` with mTLS (`--gateway-host`); `${RID_PUBLIC_URL}/gw` without mTLS |
 | `RID_CITIZEN_ISSUER` | `http://localhost:8080/realms/rid-citizens` | `${RID_PUBLIC_URL}/auth/realms/rid-citizens` |
 | `RID_CARPETA_URL` | `http://localhost:3100` | `${RID_PUBLIC_URL}/carpeta` |
 | `RID_CITIZEN_APPS` (webhook) | `http://localhost:3100/api/rid/alerts` | `http://carpeta:3100/carpeta/api/rid/alerts` |
-| `RID_DEMO_USER_PASSWORD` | `rid-demo-password` (12 caracteres o más: la política de contraseñas del realm, M6-01) | aleatoria, salvo `--demo-password` |
-| `RID_DEMO_TOTP_SECRET` | `rid-demo-totp-secret` | aleatoria (`pnpm demo:otp` da el código) |
-| `RID_GATEWAY_PORTAL_API_URL` (ruta de control de los nodos) | `http://host.docker.internal:4000` | `http://api:4000` |
-| `RID_NODE_CONTROL_TOKEN` | valor de desarrollo | aleatorio |
-| `RID_WG_HUB_PRIVATE_KEY`, `RID_WG_HUB_PUBLIC_KEY` | par de desarrollo | par aleatorio |
-| `RID_WG_HUB_ENDPOINT` | `wg-hub:51820` | `<nombre del gateway>:51820` |
-| `MAILPIT_UI_AUTH`, `TRAEFIK_NETWORK`, `RID_PUBLIC_URL` | — | solo piloto |
+| `RID_DEMO_USER_PASSWORD` | `rid-demo-password` (12 characters or more: the realm's password policy, M6-01) | random, unless `--demo-password` |
+| `RID_DEMO_TOTP_SECRET` | `rid-demo-totp-secret` | random (`pnpm demo:otp` gives the code) |
+| `RID_GATEWAY_PORTAL_API_URL` (node control route) | `http://host.docker.internal:4000` | `http://api:4000` |
+| `RID_NODE_CONTROL_TOKEN` | development value | random |
+| `RID_WG_HUB_PRIVATE_KEY`, `RID_WG_HUB_PUBLIC_KEY` | development pair | random pair |
+| `RID_WG_HUB_ENDPOINT` | `wg-hub:51820` | `<gateway name>:51820` |
+| `MAILPIT_UI_AUTH`, `TRAEFIK_NETWORK`, `RID_PUBLIC_URL` | — | pilot only |
 
-El API usa `KEYCLOAK_URL` para validar los tokens y para el Admin API de `rid-gateway`: en el piloto llega a Keycloak por la URL pública, a través del proxy.
+The API uses `KEYCLOAK_URL` to validate tokens and for the `rid-gateway` Admin API: in the pilot it reaches Keycloak through the public URL, via the proxy.
 
-## 5. Piloto en una máquina
+## 5. Single-machine pilot
 
-La forma recomendada de instalar el piloto es `sudo ./install.sh` ([`INSTALL.md`](INSTALL.md)): hace las preguntas, escribe `.env` con `make-deploy-env.mjs`, pone el proxy y arranca todo. Esta sección describe lo que hay debajo, para quien lo hace a mano o tiene su propio proxy.
+The recommended way to install the pilot is `sudo ./install.sh` ([`INSTALL.md`](INSTALL.md)): it asks the questions, writes `.env` with `make-deploy-env.mjs`, sets up the proxy and starts everything. This section describes what lies underneath, for anyone who does it by hand or has their own proxy.
 
-**Proxy incluido (`docker-compose.edge.yml`).** Para un servidor sin proxy propio: Traefik en 80 y 443 con las rutas de §5.2, generadas por `install.sh` desde `infra/edge/rid.yml.template` en `infra/edge/dynamic/rid.yml`. Termina HTTPS en el nombre del portal (Let's Encrypt, o un certificado propio en `infra/edge/certs/`) y pasa el TLS del nombre del gateway intacto a APISIX. En la red `rid-edge` toma los dos nombres públicos como alias (`RID_PORTAL_HOST`, `RID_GATEWAY_HOST`), así el API y la web llegan a Keycloak por la URL pública sin salir del servidor. No lleva log de accesos.
+**Bundled proxy (`docker-compose.edge.yml`).** For a server without a proxy of its own: Traefik on 80 and 443 with the routes of §5.2, generated by `install.sh` from `infra/edge/rid.yml.template` into `infra/edge/dynamic/rid.yml`. It terminates HTTPS on the portal's name (Let's Encrypt, or your own certificate in `infra/edge/certs/`) and passes the TLS of the gateway's name through to APISIX untouched. On the `rid-edge` network it takes the two public names as aliases (`RID_PORTAL_HOST`, `RID_GATEWAY_HOST`), so the API and the web reach Keycloak through the public URL without leaving the server. It keeps no access log.
 
-### 5.1 Qué hace el override `docker-compose.deploy.yml`
+### 5.1 What the `docker-compose.deploy.yml` override does
 
-- Quita todos los puertos publicados (`ports: !reset []`) y pone `restart: unless-stopped`.
-- Agrega `api`, `web` y `carpeta` como contenedores. El API aplica migraciones y el seed al arrancar (`RID_ALLOW_SEED=true`) y envía correo a `smtp://mailpit:1025`.
-- Une al proxy, por la red externa `${TRAEFIK_NETWORK}` (por defecto `lab-router_default`), solo los servicios que se publican, con alias fijos: `rid-portal-web`, `rid-portal-api`, `rid-keycloak`, `rid-apisix`, `rid-mailpit`, `rid-carpeta`, `rid-tsa`.
-- Keycloak con `start_period` de 300 s: en una máquina compartida tarda minutos en arrancar.
+- It removes all published ports (`ports: !reset []`) and sets `restart: unless-stopped`.
+- It adds `api`, `web` and `carpeta` as containers. The API applies migrations and the seed on startup (`RID_ALLOW_SEED=true`) and sends mail to `smtp://mailpit:1025`.
+- It attaches to the proxy, through the external network `${TRAEFIK_NETWORK}` (`lab-router_default` by default), only the services that are published, with fixed aliases: `rid-portal-web`, `rid-portal-api`, `rid-keycloak`, `rid-apisix`, `rid-mailpit`, `rid-carpeta`, `rid-tsa`.
+- Keycloak with a `start_period` of 300 s: on a shared machine it takes minutes to start.
 
-### 5.2 Rutas del proxy inverso (un solo nombre público)
+### 5.2 Reverse proxy routes (a single public name)
 
-| Ruta pública | Destino | Prefijo |
+| Public path | Target | Prefix |
 | :-- | :-- | :-- |
-| `/` | `rid-portal-web:3000` | se conserva |
-| `/api/v1` | `rid-portal-api:4000` | se conserva; **excepto** `/api/v1/internal` y `/api/v1/opa`, que no se publican |
-| `/auth` | `rid-keycloak:8080` | se conserva (`KC_HTTP_RELATIVE_PATH=/auth`) |
-| `/gw` | `rid-apisix:9080` | **se quita** `/gw` |
-| `/mail` | `rid-mailpit:8025` | se conserva (`MP_WEBROOT=/mail`) |
-| `/carpeta` | `rid-carpeta:3100` | se conserva (ruta base de `RID_CARPETA_URL`) |
-| `/tsa/api/v1/timestamp/certchain` | `rid-tsa:3004` | **se quita** `/tsa`; nada más de la TSA se publica |
+| `/` | `rid-portal-web:3000` | kept |
+| `/api/v1` | `rid-portal-api:4000` | kept; **except** `/api/v1/internal` and `/api/v1/opa`, which are not published |
+| `/auth` | `rid-keycloak:8080` | kept (`KC_HTTP_RELATIVE_PATH=/auth`) |
+| `/gw` | `rid-apisix:9080` | `/gw` **is stripped** |
+| `/mail` | `rid-mailpit:8025` | kept (`MP_WEBROOT=/mail`) |
+| `/carpeta` | `rid-carpeta:3100` | kept (base path of `RID_CARPETA_URL`) |
+| `/tsa/api/v1/timestamp/certchain` | `rid-tsa:3004` | `/tsa` **is stripped**; nothing else of the TSA is published |
 
-`/api/auth/*` (Auth.js) es de la web: por eso la regla del API es `/api/v1`, no `/api`.
+`/api/auth/*` (Auth.js) belongs to the web: that is why the API rule is `/api/v1`, not `/api`.
 
-Ejemplo para Traefik (proveedor de archivo). No está en el repo; ajústalo a tu proxy y a tu resolutor de certificados:
+Example for Traefik (file provider). It is not in the repo; adapt it to your proxy and your certificate resolver:
 
 ```yaml
 http:
@@ -439,13 +441,13 @@ http:
     rid-tsa:      { loadBalancer: { servers: [{ url: 'http://rid-tsa:3004' }] } }
 ```
 
-Traefik da más prioridad a la regla más larga, así que `/api/v1`, `/auth`, etc. ganan sobre `/`.
+Traefik gives higher priority to the longer rule, so `/api/v1`, `/auth`, etc. win over `/`.
 
-**mTLS (M3-10, `features.mtls.required`).** El TLS del gateway debe terminar en APISIX (SPIKE S-3): detrás de un proxy que termina TLS, `/gw` no puede pasar el certificado del cliente. Hacen falta tres cosas:
+**mTLS (M3-10, `features.mtls.required`).** The gateway's TLS must terminate at APISIX (SPIKE S-3): behind a proxy that terminates TLS, `/gw` cannot pass on the client certificate. Three things are needed:
 
-1. **Un nombre propio para el gateway**, por ejemplo `gw.example.org`, con paso directo TLS hacia el 9443 de APISIX. APISIX presenta allí su certificado de servidor, emitido por step-ca para `RID_GATEWAY_TLS_HOSTS`. En `.env`: `RID_GATEWAY_PUBLIC_URL=https://gw.example.org` y `RID_GATEWAY_TLS_HOSTS=gw.example.org` (`make-deploy-env.mjs --gateway-host gw.example.org`). Las aplicaciones piden ahí también su token: `https://gw.example.org/oauth/token`.
-2. **Que `/auth` borre `SSL_CLIENT_CERT` y `ssl-client-verify`** antes de llegar a Keycloak. Keycloak cree en esas cabeceras (S-4), y solo la ruta de token del gateway puede ponerlas (ADR-0022).
-3. Que el puerto 9443 de APISIX esté en la red del proxy. Ya lo está, por el alias `rid-apisix`.
+1. **A name of its own for the gateway**, for example `gw.example.org`, with TLS passthrough to APISIX's port 9443. There APISIX presents its server certificate, issued by step-ca for `RID_GATEWAY_TLS_HOSTS`. In `.env`: `RID_GATEWAY_PUBLIC_URL=https://gw.example.org` and `RID_GATEWAY_TLS_HOSTS=gw.example.org` (`make-deploy-env.mjs --gateway-host gw.example.org`). Applications also request their token there: `https://gw.example.org/oauth/token`.
+2. **`/auth` must strip `SSL_CLIENT_CERT` and `ssl-client-verify`** before the request reaches Keycloak. Keycloak trusts those headers (S-4), and only the gateway's token route may set them (ADR-0022).
+3. APISIX's port 9443 must be on the proxy's network. It already is, through the `rid-apisix` alias.
 
 ```yaml
 tcp:
@@ -464,200 +466,199 @@ http:
     rid-auth: { rule: 'Host(`portal.example.org`) && PathPrefix(`/auth`)', service: rid-keycloak, middlewares: [rid-no-client-cert-headers], tls: { certResolver: le } }
 ```
 
-El router TCP necesita que el punto de entrada `websecure` (443) de Traefik sea el mismo de los routers HTTP: Traefik resuelve primero los TCP por SNI. El certificado de `gw.example.org` no lo pide Traefik: lo presenta APISIX. Las aplicaciones confían en él con la raíz de la red (`/api/v1/pki/ca`).
+The TCP router needs Traefik's `websecure` entry point (443) to be the same one as the HTTP routers: Traefik resolves the TCP routers first, by SNI. Traefik does not request the certificate for `gw.example.org`: APISIX presents it. Applications trust it through the network's root (`/api/v1/pki/ca`).
 
-
-### 5.3 Primer despliegue
+### 5.3 First deployment
 
 ```bash
 git clone <repo> && cd <repo>
-node scripts/make-deploy-env.mjs https://portal.example.org --gateway-host gw.example.org [--traefik-network <red>] [--demo-password <pw>]
-# → escribe .env (modo 600) con secretos aleatorios, una clave de firma nueva y los nombres internos.
-#   Se niega a sobrescribir un .env existente.
+node scripts/make-deploy-env.mjs https://portal.example.org --gateway-host gw.example.org [--traefik-network <network>] [--demo-password <pw>]
+# → writes .env (mode 600) with random secrets, a new signing key and the internal names.
+#   It refuses to overwrite an existing .env.
 docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
   --env-file .env --profile observability up -d --build
 ```
 
-- El build de `api` y `web` tarda varios minutos; Keycloak, uno o dos más.
-- Configura el proxy (§5.2) y luego sigue `OPERATIONS.md §2`.
-- Guarda una copia del `.env` fuera de la máquina: sin él no se pueden recuperar ni verificar los datos (§4.1).
+- The `api` and `web` builds take several minutes; Keycloak, one or two more.
+- Configure the proxy (§5.2) and then follow `OPERATIONS.md §2`.
+- Keep a copy of `.env` off the machine: without it the data can be neither recovered nor verified (§4.1).
 
-### 5.4 Actualización
+### 5.4 Updating
 
 ```bash
-# 1. Respaldo si la versión trae migraciones (OPERATIONS.md §6): sudo ./install.sh backup
-# 2. Código nuevo
+# 1. Backup if the release brings migrations (OPERATIONS.md §6): sudo ./install.sh backup
+# 2. New code
 git pull --ff-only
-# 3. Reconstruir y reiniciar (todo, o solo los servicios que cambiaron)
+# 3. Rebuild and restart (everything, or only the services that changed)
 docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
   --env-file .env --profile observability up -d --build [api web carpeta]
 ```
 
-- Las migraciones se aplican solas al arrancar el API.
-- Revisa en las notas de la historia (`BACKLOG.md`) si la versión pide pasos manuales: cambios de realm de Keycloak (no se reimportan, §3.3), variables nuevas en `.env` (`make-deploy-env.mjs` no edita un `.env` existente) o volúmenes nuevos.
-- **Al pasar a M3 (M3-01 a M3-04)**, sobre un piloto anterior:
-  1. Agregar a `.env`: `RID_STEP_CA_URL=https://step-ca:9000`, `RID_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`), `RID_STEP_CA_ROOT_FILE=/var/lib/rid/step-ca/root_ca.crt` y, si cambian sus valores por defecto, `RID_GATEWAY_TLS_HOSTS` y `RID_GATEWAY_CLIENT_NAME`.
-  2. Recrear `step-ca` (crea el provisioner `rid-gateway-tls`) y `apisix` (carga `rid-client-cert`) antes que el API.
-  3. Aplicar la política de rotación al realm existente: `node scripts/keycloak-client-policies.mjs` con `KEYCLOAK_URL` y el administrador de `master` (`OPERATIONS.md §5.3`).
-  4. **M3-08 (segundo factor).** Agregar a `.env` un `RID_DEMO_TOTP_SECRET` aleatorio, por ejemplo con `openssl rand -hex 20`. Luego aplicar el flujo y los códigos de demo al realm existente: `node scripts/keycloak-portal-mfa.mjs --demo-otp`. Hazlo antes de arrancar el API nuevo: desde ese momento, los usuarios con rol crítico necesitan el código.
+- Migrations are applied automatically when the API starts.
+- Check the story notes (`BACKLOG.md`) for manual steps the release requires: Keycloak realm changes (they are not re-imported, §3.3), new variables in `.env` (`make-deploy-env.mjs` does not edit an existing `.env`) or new volumes.
+- **When moving to M3 (M3-01 to M3-04)**, on an earlier pilot:
+  1. Add to `.env`: `RID_STEP_CA_URL=https://step-ca:9000`, `RID_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`), `RID_STEP_CA_ROOT_FILE=/var/lib/rid/step-ca/root_ca.crt` and, if their defaults change, `RID_GATEWAY_TLS_HOSTS` and `RID_GATEWAY_CLIENT_NAME`.
+  2. Recreate `step-ca` (it creates the `rid-gateway-tls` provisioner) and `apisix` (it loads `rid-client-cert`) before the API.
+  3. Apply the rotation policy to the existing realm: `node scripts/keycloak-client-policies.mjs` with `KEYCLOAK_URL` and the `master` administrator (`OPERATIONS.md §5.3`).
+  4. **M3-08 (second factor).** Add a random `RID_DEMO_TOTP_SECRET` to `.env`, for example with `openssl rand -hex 20`. Then apply the flow and the demo codes to the existing realm: `node scripts/keycloak-portal-mfa.mjs --demo-otp`. Do this before starting the new API: from then on, users with a critical role need the code.
   5. **M3-10 (mTLS).**
-     - DNS del nombre del gateway hacia la máquina.
-     - Router TCP con paso directo y middleware en `/auth`, como en el ejemplo de §5.2.
-     - En `.env`: `RID_GATEWAY_PUBLIC_URL=https://<nombre>` y `RID_GATEWAY_TLS_HOSTS=<nombre>`.
-     - Recrear `keycloak` (arranca con el proveedor x509 `nginx`), luego `apisix` y el API. El API reemite el certificado de servidor del gateway para el nombre nuevo, agrega `client.ca` al objeto SSL, crea la ruta `rid-oauth-token` y liga los tokens de cada aplicación al certificado.
-     - Desde ese momento, una aplicación sin certificado vigente no puede llamar: cada desarrollador emite el suyo desde la ficha de su aplicación (M3-01).
-  6. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-RID-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
-- **Al pasar a M6-06 (respaldos con pgBackRest)**, sobre un piloto anterior: agregar a `.env` `PGBACKREST_REPO1_CIPHER_PASS` (32 caracteres al azar) y guardar una copia fuera del servidor. `install.sh` lo hace solo si falta, al instalar o actualizar. Si la actualización la corre el `install.sh` anterior, Compose se detiene pidiendo la variable: basta volver a ejecutar `sudo ./install.sh update`. Al arrancar, PostgreSQL se reinicia con el archivado activo y `pgbackrest` toma el primer respaldo completo.
-- Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
+     - DNS for the gateway's name pointing to the machine.
+     - TCP router with passthrough and middleware on `/auth`, as in the example in §5.2.
+     - In `.env`: `RID_GATEWAY_PUBLIC_URL=https://<name>` and `RID_GATEWAY_TLS_HOSTS=<name>`.
+     - Recreate `keycloak` (it starts with the `nginx` x509 provider), then `apisix` and the API. The API reissues the gateway's server certificate for the new name, adds `client.ca` to the SSL object, creates the `rid-oauth-token` route and binds each application's tokens to its certificate.
+     - From then on, an application without a valid certificate cannot call: each developer issues their own from their application's page (M3-01).
+  6. With M3-05, during the first 10–20 s after the new API starts, allowed calls may return 500: the routes already carry `limit-count` and OPA still has the previous bundle, without `X-RID-Rate-Limit`. It fixes itself with the next bundle download. If that cannot be tolerated, do the update in a maintenance window.
+- **When moving to M6-06 (backups with pgBackRest)**, on an earlier pilot: add `PGBACKREST_REPO1_CIPHER_PASS` (32 random characters) to `.env` and keep a copy off the server. `install.sh` does this by itself if it is missing, on install or update. If the update is run by the previous `install.sh`, Compose stops and asks for the variable: just run `sudo ./install.sh update` again. On startup, PostgreSQL restarts with archiving on and `pgbackrest` takes the first full backup.
+- A change in `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` or `infra/step-ca/*` is mounted from the repo: restarting that service is enough (`up -d <service>` or `restart <service>`).
 
-## 6. Desarrollo local
+## 6. Local development
 
 ```bash
 cp .env.example .env
 pnpm install
-pnpm infra:up            # o infra:up:core (sin OpenSearch ni el Fluent Bit de analítica)
+pnpm infra:up            # or infra:up:core (without OpenSearch or the analytics Fluent Bit)
 pnpm db:migrate && pnpm db:seed
-pnpm dev                 # web 3000 + api 4000 + carpeta ciudadana 3100
+pnpm dev                 # web 3000 + api 4000 + citizen folder 3100
 ```
 
-| Comando | Qué hace |
+| Command | What it does |
 | :-- | :-- |
-| `pnpm infra:up` / `infra:up:core` | Levanta los servicios y espera su health check (hasta 180 s) |
-| `pnpm infra:ps` / `infra:logs` | Estado y logs |
-| `pnpm infra:down` | Detiene, conserva datos |
-| `pnpm infra:reset` | Detiene y **borra** volúmenes (base de datos, CA, TSA, índices, búfer) |
+| `pnpm infra:up` / `infra:up:core` | Brings the services up and waits for their health check (up to 180 s) |
+| `pnpm infra:ps` / `infra:logs` | Status and logs |
+| `pnpm infra:down` | Stops, keeps data |
+| `pnpm infra:reset` | Stops and **deletes** volumes (database, CA, TSA, indices, buffer) |
 
-En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.docker.internal`.
+In development OPA and `fluent-bit-transparency` reach the API on the host through `host.docker.internal`.
 
 ## 7. CI
 
 `.github/workflows/ci.yml`:
 
-| Trabajo | Qué corre |
+| Job | What it runs |
 | :-- | :-- |
-| Lint, typecheck, test, licencias | `pnpm format:check`, `typecheck`, `lint`, `test`, `license:check` |
-| Integración del API | `docker compose up -d --wait postgres etcd apisix tsa step-ca` y `pnpm --filter @rid/api test:integration`; luego `test:dist` sobre el build |
-| Políticas OPA | `opa check --strict`, `opa test`, cobertura ≥ 90 % |
+| Lint, typecheck, test, licenses | `pnpm format:check`, `typecheck`, `lint`, `test`, `license:check` |
+| API integration | `docker compose up -d --wait postgres etcd apisix tsa step-ca` and `pnpm --filter @rid/api test:integration`; then `test:dist` on the build |
+| OPA policies | `opa check --strict`, `opa test`, coverage ≥ 90 % |
 
-## 8. Límites del piloto frente a producción
+## 8. Pilot limits compared with production
 
-| Tema | Piloto (hoy) | Producción (objetivo, `ARCHITECTURE.md §11`) |
+| Topic | Pilot (today) | Production (target, `ARCHITECTURE.md §11`) |
 | :-- | :-- | :-- |
-| Datos iniciales | Siempre carga el seed: entidades ficticias y usuarios de demo, incluidos administradores de plataforma | Sin datos de demo. **Falta** un mecanismo para dar el primer `platform_admin` sin el seed (los roles de plataforma hoy solo los da el seed) |
-| Keycloak | `start-dev`, misma instancia de PostgreSQL | Clúster en modo producción, base propia |
-| CA | CA de desarrollo en un volumen | Raíz fuera de línea, intermedia en HSM |
-| TSA | sigstore con clave en archivo | TSA acreditada del país |
-| etcd | Un nodo, sin TLS | Clúster de 3 con mTLS |
-| OpenSearch | Sin seguridad, sin retención | Plugin de seguridad, política de retención |
-| Correo | Mailpit | SMTP del operador |
-| Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
-| Alta disponibilidad | Ninguna | ≥ 2 nodos de APISIX con OPA local, ≥ 2 réplicas de web y API, PostgreSQL con réplica |
-| Métricas y alertas | No hay Prometheus; APISIX expone métricas en 9091 sin que nadie las lea | Prometheus + Alertmanager (M5-06) |
-| Respaldos | pgBackRest: WAL continuo y respaldos diarios en un repositorio cifrado del mismo servidor; la copia fuera de él es manual (`install.sh backup`) | Barman Cloud al almacenamiento de objetos del operador (M6-06) |
-| mTLS de aplicaciones | Desactivado (`features.mtls.required: false`, ADR-0010) | Obligatorio desde M3-10 |
+| Initial data | Always loads the seed: fictitious entities and demo users, including platform administrators | No demo data. **Missing:** a mechanism to grant the first `platform_admin` without the seed (today platform roles are only granted by the seed) |
+| Keycloak | `start-dev`, same PostgreSQL instance | Cluster in production mode, its own database |
+| CA | Development CA in a volume | Offline root, intermediate in an HSM |
+| TSA | sigstore with a key in a file | The country's accredited TSA |
+| etcd | One node, no TLS | Cluster of 3 with mTLS |
+| OpenSearch | No security, no retention | Security plugin, retention policy |
+| Mail | Mailpit | The operator's SMTP |
+| Secrets | `.env` on disk | Secrets manager (OpenBao) |
+| High availability | None | ≥ 2 APISIX nodes with local OPA, ≥ 2 web and API replicas, PostgreSQL with a replica |
+| Metrics and alerts | No Prometheus; APISIX exposes metrics on 9091 that nobody reads | Prometheus + Alertmanager (M5-06) |
+| Backups | pgBackRest: continuous WAL and daily backups in an encrypted repository on the same server; the off-server copy is manual (`install.sh backup`) | Barman Cloud to the operator's object storage (M6-06) |
+| Application mTLS | Disabled (`features.mtls.required: false`, ADR-0010) | Mandatory from M3-10 |
 
-## 9. Kubernetes: charts de Helm (M6-05, en curso)
+## 9. Kubernetes: Helm charts (M6-05, in progress)
 
-> **Estado (2026-11-16).** Los charts están completos y validados de forma estática: `helm lint`, más `helm template` y kubeconform estricto contra Kubernetes 1.31 (116 recursos válidos). Las imágenes se construyeron y escanearon en local, sin hallazgos altos ni críticos. **Todavía no se instalaron en ningún clúster.** `pnpm helm:kind` lo hará en kind cuando se decida, y es de esperar que haya ajustes en esa primera instalación.
+> **Status (2026-11-16).** The charts are complete and statically validated: `helm lint`, plus `helm template` and strict kubeconform against Kubernetes 1.31 (116 valid resources). The images were built and scanned locally, with no high or critical findings. **They have not been installed on any cluster yet.** `pnpm helm:kind` will do it on kind when that is decided, and adjustments are to be expected in that first installation.
 
-### 9.1 Los dos charts
+### 9.1 The two charts
 
-| Chart | Qué instala | Cuándo |
+| Chart | What it installs | When |
 | :-- | :-- | :-- |
-| `infra/helm/rid-platform` | Los operadores del clúster: CloudNativePG 0.29.1 (PostgreSQL con réplicas) con su plugin Barman Cloud 0.8.1 (respaldos, M6-06), External Secrets 2.14.0 (secretos desde OpenBao u otro almacén) y cert-manager v1.21.3 | Una vez por clúster, antes de `rid`, en el namespace `rid-platform` |
-| `infra/helm/rid` | Todo RID: web y API, el gateway (APISIX con su OPA y los Fluent Bit de transparencia y de errores en cada pod), etcd con mTLS, Keycloak, las dos bases de datos, step-ca, el hub de nodos, el runner de contrato, el pipeline de acceso, OpenSearch con su plugin de seguridad, Prometheus con Alertmanager, Grafana, la PKI interna (cert-manager) y las NetworkPolicies de entrada y de salida | Un `helm install` |
+| `infra/helm/rid-platform` | The cluster operators: CloudNativePG 0.29.1 (PostgreSQL with replicas) with its Barman Cloud plugin 0.8.1 (backups, M6-06), External Secrets 2.14.0 (secrets from OpenBao or another store) and cert-manager v1.21.3 | Once per cluster, before `rid`, in the `rid-platform` namespace |
+| `infra/helm/rid` | All of RID: web and API, the gateway (APISIX with its OPA and the transparency and error Fluent Bits in each pod), etcd with mTLS, Keycloak, the two databases, step-ca, the node hub, the contract runner, the access pipeline, OpenSearch with its security plugin, Prometheus with Alertmanager, Grafana, the internal PKI (cert-manager) and the ingress and egress NetworkPolicies | One `helm install` |
 
-Son dos porque Helm no puede crear un operador y sus recursos en la misma instalación: los recursos (un `Cluster` de base de datos, un `ExternalSecret`) llegan al webhook del operador antes de que este responda.
+There are two because Helm cannot create an operator and its resources in the same installation: the resources (a database `Cluster`, an `ExternalSecret`) reach the operator's webhook before it responds.
 
-**Prerrequisitos del clúster:**
-- **Traefik como ingress**: `ingress.className`. ingress-nginx está retirado. Con otro controlador, este debe quitar `SSL_CLIENT_CERT` y `ssl-client-verify` de toda petición al host público.
-- **Una StorageClass con `ReadWriteMany`** para los documentos subidos (`api.documents`). Las demás piezas usan `ReadWriteOnce`.
-- **Un balanceador de red (`LoadBalancer`)** para el gateway, que termina el mTLS de las aplicaciones (no pasa por el ingress), y para el UDP del hub de nodos.
-- **OpenBao** (o cualquier almacén de External Secrets) con un `ClusterSecretStore`: `secrets.externalSecrets.secretStoreRef`.
-- **Un almacenamiento de objetos S3-compatible fuera del clúster** para los respaldos de las bases (`postgres.backup`): un bucket propio, con cifrado, y una clave de acceso que solo escriba en él.
-- **Un colector de logs del clúster** (un DaemonSet de Fluent Bit, Vector u otro) que lleve la salida de los contenedores al sistema central del operador. Ahí llegan los logs del API, en JSON enmascarado (`ARCHITECTURE.md §8`), y el error log enmascarado del gateway. El chart no lo instala: es de la plataforma, como para cualquier otra carga.
-- **Un CNI que aplique NetworkPolicies** (Calico, Cilium). Sin él, las políticas del chart no tienen efecto.
+**Cluster prerequisites:**
+- **Traefik as ingress**: `ingress.className`. ingress-nginx is retired. With another controller, it must strip `SSL_CLIENT_CERT` and `ssl-client-verify` from every request to the public host.
+- **A StorageClass with `ReadWriteMany`** for uploaded documents (`api.documents`). The other pieces use `ReadWriteOnce`.
+- **A network load balancer (`LoadBalancer`)** for the gateway, which terminates the applications' mTLS (it does not go through the ingress), and for the node hub's UDP.
+- **OpenBao** (or any External Secrets store) with a `ClusterSecretStore`: `secrets.externalSecrets.secretStoreRef`.
+- **S3-compatible object storage outside the cluster** for the database backups (`postgres.backup`): a dedicated bucket, with encryption, and an access key that can only write to it.
+- **A cluster log collector** (a Fluent Bit DaemonSet, Vector or another) that ships the containers' output to the operator's central system. The API logs arrive there, as masked JSON (`ARCHITECTURE.md §8`), along with the gateway's masked error log. The chart does not install it: it belongs to the platform, as for any other workload.
+- **A CNI that enforces NetworkPolicies** (Calico, Cilium). Without one, the chart's policies have no effect.
 
-### 9.2 Secretos
+### 9.2 Secrets
 
-Cada componente tiene su Secret `rid-<componente>`, solo con las claves que usa. Con `secrets.mode: externalSecrets`, todas son propiedades de una sola entrada del almacén (`secrets.externalSecrets.remoteKey`, por omisión `rid/platform`). External Secrets arma los Secrets y además deriva las URL de conexión y los Secrets `basic-auth` de CloudNativePG a partir de las contraseñas, para que nunca se guarde un mismo valor dos veces. Con `secrets.mode: existing`, el operador crea esos Secrets con esos nombres. La lista exacta de claves está en `templates/_helpers.tpl` (`rid.secrets`), y son las mismas de `.env.example`, salvo:
-- `DB_OWNER_PASSWORD` y `DB_APP_PASSWORD`, de las que se derivan `DATABASE_MIGRATION_URL` y `DATABASE_URL`;
-- `KEYCLOAK_SMTP_USER` y `KEYCLOAK_SMTP_PASSWORD`, para el correo del realm;
-- `ALERTMANAGER_SMTP_PASSWORD`, la del servidor de correo de las alertas (`prometheus.alertmanager.config.global`);
-- `DB_BACKUP_ACCESS_KEY_ID` y `DB_BACKUP_SECRET_ACCESS_KEY`, la clave de acceso al almacenamiento de los respaldos;
-- `RID_SECRETS_KEYS_PREVIOUS`, vacía salvo mientras se rota `RID_SECRETS_KEY` (`OPERATIONS.md §5.6`);
-- `OPENSEARCH_INTERNAL_USERS_YML`, el `internal_users.yml` del plugin de seguridad de OpenSearch con tres usuarios: `admin`, `rid-logs` (Fluent Bit: `OPENSEARCH_USER` y `OPENSEARCH_PASSWORD`) y `rid-api` (el portal: `RID_OPENSEARCH_AUTH`, `usuario:contraseña`). Lleva solo los hashes bcrypt, hechos con `plugins/opensearch-security/tools/hash.sh` de la imagen de OpenSearch. El índice de seguridad se crea desde él en el primer arranque; cambios posteriores van con `securityadmin.sh` y el certificado `rid-opensearch-admin`.
+Each component has its own Secret `rid-<component>`, with only the keys it uses. With `secrets.mode: externalSecrets`, all of them are properties of a single store entry (`secrets.externalSecrets.remoteKey`, `rid/platform` by default). External Secrets assembles the Secrets and also derives the connection URLs and CloudNativePG's `basic-auth` Secrets from the passwords, so that the same value is never stored twice. With `secrets.mode: existing`, the operator creates those Secrets under those names. The exact list of keys is in `templates/_helpers.tpl` (`rid.secrets`), and they are the same as in `.env.example`, except:
+- `DB_OWNER_PASSWORD` and `DB_APP_PASSWORD`, from which `DATABASE_MIGRATION_URL` and `DATABASE_URL` are derived;
+- `KEYCLOAK_SMTP_USER` and `KEYCLOAK_SMTP_PASSWORD`, for the realm's mail;
+- `ALERTMANAGER_SMTP_PASSWORD`, the password of the mail server for alerts (`prometheus.alertmanager.config.global`);
+- `DB_BACKUP_ACCESS_KEY_ID` and `DB_BACKUP_SECRET_ACCESS_KEY`, the access key for the backup storage;
+- `RID_SECRETS_KEYS_PREVIOUS`, empty except while `RID_SECRETS_KEY` is being rotated (`OPERATIONS.md §5.6`);
+- `OPENSEARCH_INTERNAL_USERS_YML`, the `internal_users.yml` of OpenSearch's security plugin with three users: `admin`, `rid-logs` (Fluent Bit: `OPENSEARCH_USER` and `OPENSEARCH_PASSWORD`) and `rid-api` (the portal: `RID_OPENSEARCH_AUTH`, `user:password`). It carries only the bcrypt hashes, made with `plugins/opensearch-security/tools/hash.sh` from the OpenSearch image. The security index is created from it on first start; later changes go through `securityadmin.sh` and the `rid-opensearch-admin` certificate.
 
-`GRAFANA_ADMIN_PASSWORD` es la de `.env.example`; el usuario es `admin`.
+`GRAFANA_ADMIN_PASSWORD` is the one from `.env.example`; the user is `admin`.
 
-Las URL de conexión usan `sslmode=verify-full` con el certificado de la CA de cada base de datos. Nunca se monta su clave.
+The connection URLs use `sslmode=verify-full` with the certificate of each database's CA. Its key is never mounted.
 
-**Rotación.** Se cambia el valor en el almacén y External Secrets actualiza el Secret dentro de `refreshInterval`. Los pods leen sus secretos al arrancar: hay que reiniciarlos (`kubectl rollout restart`) o dejar que lo haga Reloader. El orden de cada rotación es el de OPERATIONS §5.6.
+**Rotation.** Change the value in the store and External Secrets updates the Secret within `refreshInterval`. Pods read their secrets on startup: you have to restart them (`kubectl rollout restart`) or let Reloader do it. The order of each rotation is the one in OPERATIONS §5.6.
 
-### 9.3 Primera instalación
+### 9.3 First installation
 
-0. **`rid-platform`.** Si trae cert-manager (lo normal), la primera vez se instala con `--set plugin-barman-cloud.enabled=false` y enseguida se actualiza sin esa opción: el plugin de respaldos emite sus certificados con cert-manager, que debe estar corriendo antes. Si el clúster ya tiene cert-manager (`cert-manager.enabled=false`), basta una instalación.
-1. **La CA de la red.** La raíz se crea fuera del clúster, fuera de línea. El Secret `stepCa.pkiSecret` lleva `root_ca.crt`, `intermediate_ca.crt` e `intermediate_ca_key` (cifrada con `RID_STEP_CA_PROVISIONER_PASSWORD`). `stepCa.rootFingerprint` es la huella de la raíz, que el API fija. En cada arranque, step-ca toma la raíz y la intermedia del Secret; en el primero, además, escribe su `ca.json` y los tres provisioners del portal, como `infra/step-ca/configure.sh`. Rotar la intermedia es reemplazarla en el Secret y reiniciar (`RUNBOOK.md §3.2`).
-2. **Keycloak.** Importa los realms de producción: los de desarrollo sin sus personas (`pnpm helm:sync` solo deja las cuentas de servicio de los clientes) y con el SMTP de `keycloak.smtp`. Arranca con un administrador temporal (`keycloak.bootstrapAdmin`), que se reemplaza por uno propio con segundo factor.
-3. **El primer `platform_admin`.** Producción no tiene seed. `api.bootstrapAdminEmail` (`RID_BOOTSTRAP_ADMIN_EMAIL`) le da el rol a quien entra primero con esa dirección, verificada por Keycloak, mientras la red no tiene ninguno. Queda auditado. Después se borra el valor, y el resto de los roles se da desde la consola.
-4. **Migraciones.** Corren en un contenedor de inicio del API con las credenciales del dueño del esquema, que solo llegan a ese contenedor. Prisma toma un bloqueo, así que dos réplicas no migran a la vez.
+0. **`rid-platform`.** If it includes cert-manager (the usual case), the first time it is installed with `--set plugin-barman-cloud.enabled=false` and immediately upgraded without that option: the backup plugin issues its certificates with cert-manager, which must be running first. If the cluster already has cert-manager (`cert-manager.enabled=false`), a single installation is enough.
+1. **The network's CA.** The root is created outside the cluster, offline. The `stepCa.pkiSecret` Secret holds `root_ca.crt`, `intermediate_ca.crt` and `intermediate_ca_key` (encrypted with `RID_STEP_CA_PROVISIONER_PASSWORD`). `stepCa.rootFingerprint` is the root's fingerprint, which the API pins. On every start, step-ca takes the root and the intermediate from the Secret; on the first start it also writes its `ca.json` and the portal's three provisioners, like `infra/step-ca/configure.sh`. Rotating the intermediate means replacing it in the Secret and restarting (`RUNBOOK.md §3.2`).
+2. **Keycloak.** It imports the production realms: the development ones without their personas (`pnpm helm:sync` keeps only the clients' service accounts) and with the SMTP from `keycloak.smtp`. It starts with a temporary administrator (`keycloak.bootstrapAdmin`), which is replaced by a proper one with a second factor.
+3. **The first `platform_admin`.** Production has no seed. `api.bootstrapAdminEmail` (`RID_BOOTSTRAP_ADMIN_EMAIL`) grants the role to whoever signs in first with that address, verified by Keycloak, while the network has none. It is audited. Afterwards the value is removed, and the other roles are granted from the console.
+4. **Migrations.** They run in an init container of the API with the schema owner's credentials, which reach only that container. Prisma takes a lock, so two replicas do not migrate at the same time.
 
-### 9.4 Archivos compartidos con Compose
+### 9.4 Files shared with Compose
 
-Helm solo lee archivos dentro del chart. `pnpm helm:sync` copia a `infra/helm/rid/files/` lo que el chart comparte con Compose:
-- los plugins de APISIX;
-- los filtros y configuraciones de Fluent Bit;
-- las reglas de Prometheus y el tablero de Grafana;
-- la configuración de OPA y las plantillas de step-ca;
-- los realms, en su forma de producción.
+Helm only reads files inside the chart. `pnpm helm:sync` copies into `infra/helm/rid/files/` what the chart shares with Compose:
+- the APISIX plugins;
+- the Fluent Bit filters and configurations;
+- the Prometheus rules and the Grafana dashboard;
+- the OPA configuration and the step-ca templates;
+- the realms, in their production form.
 
-`tests/infra` falla si una copia no coincide con su fuente. Las configuraciones cuyo host cambia en Kubernetes (la de APISIX, la del pipeline de acceso) son plantillas del chart. Si cambia la fuente, se cambia también la plantilla.
+`tests/infra` fails if a copy does not match its source. The configurations whose host changes in Kubernetes (APISIX's, the access pipeline's) are chart templates. If the source changes, the template changes too.
 
-### 9.5 Valores que fija cada despliegue
+### 9.5 Values that each deployment sets
 
-Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
-- `stepCa.rootFingerprint` y `stepCa.pkiSecret` (§9.3);
-- `postgres.backup.destinationPath` (`s3://<bucket>/<ruta>`) y, con un almacenamiento propio del operador, `endpointURL` y `endpointCASecret`. Sin `destinationPath` el chart no se instala; los respaldos solo se desactivan a propósito (`postgres.backup.enabled=false`, como en kind);
-- `keycloak.smtp` (servidor y remitente del realm) y `prometheus.alertmanager.config` (servidor, remitente y destinatarios de las alertas);
-- `antivirus.replicas` (2 por omisión: con el antivirus activado, una subida falla si ClamAV no responde) y sus recursos;
-- `grafana."grafana.ini".server.root_url`: `<publicUrl>/grafana/`. Sin él, Grafana redirige a `localhost`;
-- `networkPolicy`: el namespace del ingress (`ingressControllerNamespace`), y las redes privadas que el gateway (`gatewayExtraEgressCidrs`: proveedores dentro de la red del operador, un Security Server de X-Road) o el API y Keycloak (`servicesEgressCidrs`: el correo, la TSA) deban alcanzar. Por omisión solo salen a direcciones públicas.
+Besides `country`, `publicUrl`, `gatewayHost` and `gatewayPublicUrl`:
+- `stepCa.rootFingerprint` and `stepCa.pkiSecret` (§9.3);
+- `postgres.backup.destinationPath` (`s3://<bucket>/<path>`) and, with the operator's own storage, `endpointURL` and `endpointCASecret`. Without `destinationPath` the chart does not install; backups are only disabled on purpose (`postgres.backup.enabled=false`, as in kind);
+- `keycloak.smtp` (the realm's server and sender) and `prometheus.alertmanager.config` (server, sender and recipients of the alerts);
+- `antivirus.replicas` (2 by default: with antivirus enabled, an upload fails if ClamAV does not respond) and its resources;
+- `grafana."grafana.ini".server.root_url`: `<publicUrl>/grafana/`. Without it, Grafana redirects to `localhost`;
+- `networkPolicy`: the ingress namespace (`ingressControllerNamespace`), and the private networks that the gateway (`gatewayExtraEgressCidrs`: providers inside the operator's network, an X-Road Security Server) or the API and Keycloak (`servicesEgressCidrs`: mail, the TSA) need to reach. By default they only go out to public addresses.
 
-### 9.6 Imágenes
+### 9.6 Images
 
-`.github/workflows/images.yml` construye las cuatro imágenes propias del chart: `rid-portal-api`, `rid-portal-web`, `rid-wg-hub` y `rid-contract-runner`.
-- **SBOM.** Guarda un SBOM CycloneDX de cada una como artefacto de la ejecución, por 90 días.
-- **Escaneo.** Las escanea con Trivy (0.76.1, fijado por digest). Una vulnerabilidad alta o crítica con arreglo disponible detiene la publicación. Una excepción aceptada va en `.trivyignore`, con su razón y fecha de vencimiento.
-- **Publicación.** Con una etiqueta `vX.Y.Z` publica en `ghcr.io/centre-for-dpi/<imagen>:X.Y.Z` (el `appVersion` del chart), con las atestaciones de SBOM y de procedencia de BuildKit. A mano (`workflow_dispatch`) solo construye y escanea, salvo que se marque `publish`.
-- **Acciones fijadas.** Las acciones de terceros están fijadas por commit.
+`.github/workflows/images.yml` builds the chart's four own images: `rid-portal-api`, `rid-portal-web`, `rid-wg-hub` and `rid-contract-runner`.
+- **SBOM.** It keeps a CycloneDX SBOM of each one as a run artifact, for 90 days.
+- **Scanning.** It scans them with Trivy (0.76.1, pinned by digest). A high or critical vulnerability with a fix available stops the release. An accepted exception goes in `.trivyignore`, with its reason and expiry date.
+- **Publishing.** With a `vX.Y.Z` tag it publishes to `ghcr.io/centre-for-dpi/<image>:X.Y.Z` (the chart's `appVersion`), with BuildKit's SBOM and provenance attestations. Run by hand (`workflow_dispatch`) it only builds and scans, unless `publish` is checked.
+- **Pinned actions.** Third-party actions are pinned by commit.
 
-**v0.1.0 (2026-11-17).** Primera publicación: `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, también como `latest`, escaneadas sin hallazgos altos ni críticos, con su SBOM y procedencia. El paquete hereda la visibilidad del repositorio (privado): el clúster necesita un `imagePullSecrets` con acceso a ghcr.io hasta que se publiquen como públicas.
+**v0.1.0 (2026-11-17).** First release: `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, also as `latest`, scanned with no high or critical findings, with their SBOM and provenance. The package inherits the repository's visibility (private): the cluster needs an `imagePullSecrets` with access to ghcr.io until they are published as public.
 
-Las imágenes del API y de la web son de varias etapas. La de ejecución lleva solo las dependencias de producción (`pnpm deploy --prod`) y los archivos del repositorio que lee el proceso: la configuración del país y, en el API, las políticas de OPA y el realm del seed del piloto. No lleva gestor de paquetes. El contenedor de migraciones corre `node_modules/.bin/prisma migrate deploy`.
+The API and web images are multi-stage. The runtime stage carries only the production dependencies (`pnpm deploy --prod`) and the repository files that the process reads: the country configuration and, in the API, the OPA policies and the pilot's seed realm. It has no package manager. The migrations container runs `node_modules/.bin/prisma migrate deploy`.
 
-### 9.7 Pendiente en M6-05
+### 9.7 Pending in M6-05
 
-- **Instalar** en kind (`pnpm helm:kind`) y luego en el entorno tipo producción del operador. El chart nunca se ha instalado.
+- **Install** on kind (`pnpm helm:kind`) and then in the operator's production-like environment. The chart has never been installed.
 
-## 10. Un país nuevo (M6-09)
+## 10. A new country (M6-09)
 
-El código no cambia de un país a otro (regla 6 de CLAUDE.md). Lo propio de cada país está en:
+The code does not change from one country to another (rule 6 of CLAUDE.md). What is specific to each country lives in:
 
-| Qué | Dónde |
+| What | Where |
 | :-- | :-- |
-| Nombre, idioma de fechas y números, zona horaria, autoridades, marco legal, tipos de documento, sectores, finalidades, reglas (`features`), plazos, retención, plantilla de acuerdo y marca | `config/country/<código>.yaml`, copiado de `config/country/example.yaml`. El esquema (`packages/config/src/schema.ts`) rechaza claves desconocidas y valores inválidos, y el API no arranca con un archivo inválido |
-| Textos de la interfaz | `apps/web/messages/es.json` y `en.json`: completos en los dos idiomas. Los textos del país en el YAML aceptan uno o los dos idiomas |
-| Identidad ciudadana | El realm del país reemplaza a `rid-citizens`. Su token trae el tipo y el número de documento en los claims de `RID_CITIZEN_DOCUMENT_TYPE_CLAIM` y `RID_CITIZEN_DOCUMENT_NUMBER_CLAIM`, con los tipos de `identifiers.person` |
-| Selección del país | `RID_COUNTRY=<código>` (y `RID_CONFIG_DIR` si los archivos no están en `config/country`), en el API y en la web |
+| Name, date and number language, time zone, authorities, legal framework, document types, sectors, purposes, rules (`features`), deadlines, retention, agreement template and branding | `config/country/<code>.yaml`, copied from `config/country/example.yaml`. The schema (`packages/config/src/schema.ts`) rejects unknown keys and invalid values, and the API does not start with an invalid file |
+| Interface texts | `apps/web/messages/es.json` and `en.json`: complete in both languages. The country texts in the YAML accept one or both languages |
+| Citizen identity | The country's realm replaces `rid-citizens`. Its token carries the document type and number in the claims named by `RID_CITIZEN_DOCUMENT_TYPE_CLAIM` and `RID_CITIZEN_DOCUMENT_NUMBER_CLAIM`, with the types from `identifiers.person` |
+| Country selection | `RID_COUNTRY=<code>` (and `RID_CONFIG_DIR` if the files are not in `config/country`), in the API and in the web |
 
-**Idioma por omisión.** La web abre en español y sirve el inglés bajo `/en` (regla 7 de CLAUDE.md). Para un país cuyo idioma principal es el inglés, el idioma por omisión es `defaultLocale` en `apps/web/src/i18n/routing.ts`: cambiarlo cambia también las URL de cierre de sesión que el realm acepta (`post.logout.redirect.uris`).
+**Default language.** The web opens in Spanish and serves English under `/en` (rule 7 of CLAUDE.md). For a country whose main language is English, the default language is `defaultLocale` in `apps/web/src/i18n/routing.ts`: changing it also changes the logout URLs that the realm accepts (`post.logout.redirect.uris`).
 
-**Prueba:** `pnpm example:country` (`scripts/example-country.mjs`):
-1. Convierte `example.yaml` en el país XX.
-2. Levanta un stack propio: el proyecto Compose `ridxx`, con todos los puertos desplazados en 10000 y sus volúmenes. El de desarrollo no se toca.
-3. Arranca el portal con ese país.
-4. Comprueba la web en los dos idiomas con la marca del país.
-5. Corre la demo de `DEMO.md` de punta a punta, con el sector, las finalidades y el tipo de documento de XX.
-6. Borra lo que creó (`--keep` lo conserva para mirar).
+**Test:** `pnpm example:country` (`scripts/example-country.mjs`):
+1. Turns `example.yaml` into country XX.
+2. Brings up a separate stack: the Compose project `ridxx`, with every port shifted by 10000 and its own volumes. The development stack is not touched.
+3. Starts the portal with that country.
+4. Checks the web in both languages with the country's branding.
+5. Runs the demo from `DEMO.md` end to end, with XX's sector, purposes and document type.
+6. Deletes what it created (`--keep` keeps it for inspection).
 
-La demo (`pnpm demo`) toma esos datos de la configuración del país, así que también sirve para el despliegue de cualquier país.
+The demo (`pnpm demo`) takes that data from the country configuration, so it also works for any country's deployment.

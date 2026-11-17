@@ -1,34 +1,36 @@
-# Guion de demo — Hito M1 (fin de noviembre)
+# Demo script — Milestone M1 (end of November)
 
-Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todos los datos son ficticios.
+> Versión en español: [docs/es/DEMO.md](es/DEMO.md)
 
-**Ensayo automático:** `pnpm demo` ejecuta los 10 pasos contra el stack local con los mismos personajes. Cada uno inicia sesión en Keycloak como lo haría en la web. El script narra cada paso y termina con código 1 si algo no se comporta como dice este guion. Para poder repetirse, usa una API propia por corrida (`/salud/afiliacion-<corrida>/v1`). El recorrido completo por la UI está en `apps/web/e2e/demo.spec.ts`.
+Duration: 15 minutes. Everything runs locally with `pnpm infra:up && pnpm dev`. All data is fictitious.
 
-## Personajes (usuarios semilla en Keycloak, contraseña `rid-demo-password` solo en desarrollo, o la de `RID_DEMO_USER_PASSWORD`)
+**Automated rehearsal:** `pnpm demo` runs the 10 steps against the local stack with the same characters. Each one signs in to Keycloak the way they would on the web. The script narrates each step and exits with code 1 if anything does not behave as this script says. So that it can be repeated, it uses its own API on each run (`/salud/afiliacion-<run>/v1`). The full walkthrough through the UI is in `apps/web/e2e/demo.spec.ts`.
 
-| Usuario | Entidad | Rol |
+## Characters (seed users in Keycloak, password `rid-demo-password` in development only, or the one in `RID_DEMO_USER_PASSWORD`)
+
+| User | Entity | Role |
 | :-- | :-- | :-- |
-| `ana.operadora` | Operador (AND) | `platform_reviewer` |
-| `pedro.publicador` | Entidad de Salud (ficticia) | `api_publisher` |
-| `lucia.datos` | Entidad de Salud (ficticia) | `data_steward` |
-| `carlos.dev` | Entidad de Programas Sociales (ficticia) | `app_developer` |
-| `marta.regulador` | Regulador (MinTIC) | `regulator` |
-| `ciudadana.demo` | Titular de los datos (CC 1000000001), en la Carpeta de referencia; realm `rid-citizens` | — |
+| `ana.operadora` | Operator (AND) | `platform_reviewer` |
+| `pedro.publicador` | Health entity (fictitious) | `api_publisher` |
+| `lucia.datos` | Health entity (fictitious) | `data_steward` |
+| `carlos.dev` | Social Programs entity (fictitious) | `app_developer` |
+| `marta.regulador` | Regulator (MinTIC) | `regulator` |
+| `ciudadana.demo` | Data subject (CC 1000000001), in the reference citizen folder; realm `rid-citizens` | — |
 
-**Segundo factor (M3-08).** `ana.operadora`, `lucia.datos` y `marta.regulador`, como todo rol de plataforma y `data_steward`, entran con la contraseña y después con un código de un solo uso. `pnpm demo:otp` imprime el código vigente. Para mostrarlo con un teléfono, agrega en una app autenticadora la clave que imprime el mismo comando (TOTP, SHA-1, 6 dígitos, 30 s). Cada código sirve una sola vez; si ya se usó, espera al siguiente.
+**Second factor (M3-08).** `ana.operadora`, `lucia.datos` and `marta.regulador`, like every platform role and `data_steward`, sign in with the password and then with a one-time code. `pnpm demo:otp` prints the current code. To show it on a phone, add the key that the same command prints to an authenticator app (TOTP, SHA-1, 6 digits, 30 s). Each code works only once; if it has already been used, wait for the next one.
 
-## Pasos
+## Steps
 
-1. **Publicar** (pedro.publicador): crear la API "Consulta de afiliación", identificador en la URL `afiliacion`, subir `infra/mock-providers/salud/openapi.yaml`, upstream = nodo de prueba con ruta del servicio `/salud` (en desarrollo, el mock de salud según `RID_DEV_NODES`), clasificación `personal`, finalidad permitida `eligibility_check`. Enviar a revisión.
-2. **Revisar** (ana.operadora): ver ficha y campos expuestos, aprobar. Mostrar que la ruta aparece en APISIX en segundos, sin intervención manual: una llamada sin token al puerto HTTP del gateway local (`http://localhost:9080/salud/afiliacion/v1/afiliados/1000000001`) da `401`.
-3. **Descubrir** (carlos.dev): buscar en el catálogo, ver documentación interactiva.
-4. **Credenciales** (carlos.dev): crear la aplicación "Validador de subsidios" y copiar el secreto (se muestra una sola vez). Esperar a que la ficha diga "Lista".
-   - La red exige mTLS (M3-10). En "Certificado de cliente (mTLS)", generar la clave y la CSR con el comando que muestra la ficha. La clave no sale del servidor de carlos. Pegar la CSR y descargar el certificado.
-   - Descargar también la raíz de la red desde la guía de integración (`rid-network-ca.pem`).
-   - Con token pero sin suscripción, la llamada da `403 no_subscription`.
-5. **Solicitar** (carlos.dev): pedir acceso con finalidad `eligibility_check` y detalle "Verificar afiliación al asignar el subsidio X".
-6. **Aprobar** (lucia.datos): ver la solicitud en su bandeja, aprobar con vigencia de 6 meses. La ficha de carlos pasa de "Aprobada (activándose)" a "Activa" cuando OPA descarga el bundle (segundos).
-7. **Llamar** (terminal):
+1. **Publish** (pedro.publicador): create the API "Consulta de afiliación", URL identifier `afiliacion`, upload `infra/mock-providers/salud/openapi.yaml`, upstream = test node with service path `/salud` (in development, the health mock per `RID_DEV_NODES`), classification `personal`, allowed purpose `eligibility_check`. Submit for review.
+2. **Review** (ana.operadora): look at the API page and the exposed fields, approve. Show that the route appears in APISIX within seconds, with no manual intervention: a call without a token to the local gateway's HTTP port (`http://localhost:9080/salud/afiliacion/v1/afiliados/1000000001`) returns `401`.
+3. **Discover** (carlos.dev): search the catalog, look at the interactive documentation.
+4. **Credentials** (carlos.dev): create the application "Validador de subsidios" and copy the secret (it is shown only once). Wait until the application page says "Ready".
+   - The network requires mTLS (M3-10). Under "Client certificate (mTLS)", generate the private key and the CSR with the command the page shows. The private key never leaves carlos's server. Paste the CSR and download the certificate.
+   - Also download the network root from the integration guide (`rid-network-ca.pem`).
+   - With a token but no subscription, the call returns `403 no_subscription`.
+5. **Request** (carlos.dev): request access with purpose `eligibility_check` and the detail "Verificar afiliación al asignar el subsidio X".
+6. **Approve** (lucia.datos): see the request in her inbox, approve it with a 6-month validity. carlos's page goes from "Approved (activating)" to "Active" when OPA downloads the bundle (seconds).
+7. **Call** (terminal):
    ```bash
    TLS="--cert $CLIENT_ID.pem --key $CLIENT_ID.key --cacert rid-network-ca.pem"
    TOKEN=$(curl -s $TLS -d grant_type=client_credentials -u "$CLIENT_ID:$CLIENT_SECRET" \
@@ -37,26 +39,26 @@ Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todo
      -H "Authorization: Bearer $TOKEN" -H "X-RID-Purpose: eligibility_check" \
      -H "X-RID-End-User: funcionario-42"
    ```
-   El token se pide al gateway y queda ligado al certificado (`cnf.x5t#S256` en el token: se ve en jwt.io o con `cut -d. -f2 <<<"$TOKEN" | base64 -d`). Sin `--cert` no hay sesión TLS con el gateway. Con el token y el certificado de otra aplicación, la respuesta es `403 certificate_mismatch`.
+   The token is requested from the gateway and is bound to the certificate (`cnf.x5t#S256` in the token: you can see it on jwt.io or with `cut -d. -f2 <<<"$TOKEN" | base64 -d`). Without `--cert` there is no TLS session with the gateway. With the token and another application's certificate, the response is `403 certificate_mismatch`.
 
-   Respuesta 200. La API es de datos personales, así que el gateway exige identificar al funcionario (`X-RID-End-User`); sin esa cabecera responde `403 end_user_required`. Mostrar en el mock del proveedor las cabeceras `X-RID-*` recibidas: `docker logs rid-mock-salud-1 --since 1m`. Llegan la suscripción, la operación, la entidad y la aplicación que puso el gateway, y solo el hash del funcionario, nunca su identificación en claro.
-8. **Finalidad incorrecta**: repetir con `X-RID-Purpose: benefit_targeting` → `403 purpose_not_allowed`. La respuesta es problem+json y lleva la razón en `X-RID-Deny-Reason`.
-9. **Revocar** (lucia.datos): revocar la suscripción con un motivo; repetir la llamada en un bucle y ver cómo pasa a `403 no_subscription` en menos de 60 s (en local, unos 10–20 s):
+   Response 200. The API carries personal data, so the gateway requires the official to be identified (`X-RID-End-User`); without that header it responds `403 end_user_required`. Show the `X-RID-*` headers received in the provider mock: `docker logs rid-mock-salud-1 --since 1m`. The subscription, the operation, the entity and the application set by the gateway arrive, and only the hash of the official, never their identification in clear text.
+8. **Wrong purpose**: repeat with `X-RID-Purpose: benefit_targeting` → `403 purpose_not_allowed`. The response is problem+json and carries the reason in `X-RID-Deny-Reason`.
+9. **Revoke** (lucia.datos): revoke the subscription with a reason; repeat the call in a loop and watch it change to `403 no_subscription` in under 60 s (locally, about 10–20 s):
    ```bash
    while true; do curl -s $TLS -o /dev/null -w "%{http_code} " https://localhost:9443/salud/afiliacion/v1/afiliados/1000000001      -H "Authorization: Bearer $TOKEN" -H "X-RID-Purpose: eligibility_check" -H "X-RID-End-User: funcionario-42"; sleep 1; done
    ```
-   **Revocar el certificado** (carlos.dev, M3-10): en la ficha de la aplicación, "Revocar el certificado" con un motivo. Con el mismo bucle, la respuesta pasa a `403 certificate_revoked` en menos de 60 s. El certificado sigue siendo de la CA, así que el handshake pasa, pero ya no es válido para la aplicación.
-10. **Auditar** (marta.regulador): en "Auditoría", abrir la suscripción desde los eventos recientes y mostrar su línea de tiempo: solicitada, aprobada, activa en el gateway, revocada, con quién y por qué. Luego pulsar "Verificar integridad" para mostrar que la cadena de hash está íntegra.
-11. **¿Quién consultó mis datos?** (ciudadana.demo, en la Carpeta de referencia, `http://localhost:3100`). Para mostrar el aviso, hacer la primera parte antes del paso 7.
-    - Ingresar con la identidad digital simulada (`ciudadana.demo`, documento CC 1000000001, el mismo que consulta el paso 7).
-    - En "Avisos", marcar "Datos personales" y escribir un correo. El portal no conoce ese correo: solo guarda la elección y un identificador opaco.
-    - Tras el paso 7, Mailpit (`http://localhost:8025`) muestra el aviso "Una entidad consultó tus datos", sin datos de la persona ni de la consulta.
-    - En "¿Quién consultó mis datos?" aparece la consulta: Programas Sociales, qué API y qué datos, para "Verificación de requisitos de un trámite", con el funcionario como referencia.
-    - Cuando deja de decir "En sellado" (unos segundos), pulsar "Verificar". La Carpeta comprueba por su cuenta la firma del operador, la inclusión en el lote sellado y el sello de tiempo de la TSA, sin confiar en el portal. El comprobante se puede descargar y verificar también con `rid-verify-receipt`.
+   **Revoke the certificate** (carlos.dev, M3-10): on the application page, "Revoke the certificate" with a reason. With the same loop, the response changes to `403 certificate_revoked` in under 60 s. The certificate is still from the CA, so the handshake succeeds, but it is no longer valid for the application.
+10. **Audit** (marta.regulador): in "Audit", open the subscription from the recent events and show its timeline: requested, approved, active on the gateway, revoked, by whom and why. Then click "Verify integrity" to show that the hash chain is intact.
+11. **Who accessed my data?** (ciudadana.demo, in the reference citizen folder, `http://localhost:3100`). To show the notice, do the first part before step 7.
+    - Sign in with the simulated digital identity (`ciudadana.demo`, document CC 1000000001, the same one queried in step 7).
+    - Under "Notices", check "Personal data" and enter an email address. The portal does not know that address: it only stores the choice and an opaque identifier.
+    - After step 7, Mailpit (`http://localhost:8025`) shows the notice "An entity accessed your data", with no data about the person or the query.
+    - The query appears under "Who accessed my data?": Social Programs, which API and which data, for "Verificación de requisitos de un trámite", with the official as a reference.
+    - When it no longer says "Being sealed" (a few seconds), click "Verify". The citizen folder checks on its own the operator's signature, the inclusion in the sealed batch and the TSA timestamp, without trusting the portal. The receipt can also be downloaded and verified with `rid-verify-receipt`.
 
-## Mensajes clave para la audiencia
+## Key messages for the audience
 
-- La entidad proveedora decide quién accede a sus datos y para qué.
-- El gateway no guarda lo que responde; solo quién consultó, qué operación y con qué finalidad.
-- Revocar es inmediato y queda auditado.
-- Todo es open source y reutilizable.
+- The provider entity decides who accesses its data and for what.
+- The gateway does not store what it returns; only who queried, which operation and for what purpose.
+- Revoking is immediate and is audited.
+- Everything is open source and reusable.

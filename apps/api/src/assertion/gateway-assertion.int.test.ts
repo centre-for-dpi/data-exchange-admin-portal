@@ -22,7 +22,7 @@ const sha256 = (value: string | Buffer) => createHash('sha256').update(value).di
 
 type Jwks = ReturnType<typeof gatewayJwksSchema.parse>;
 
-/** What a provider does with X-RID-Assertion (docs/guias/entidades.md): verify, then read. */
+/** What a provider does with X-RID-Assertion (docs/guides/entities.md): verify, then read. */
 function verifyAssertion(token: string, jwks: Jwks) {
   const [h = '', c = '', s = ''] = token.split('.');
   const header = JSON.parse(Buffer.from(h, 'base64url').toString()) as { kid: string; alg: string };

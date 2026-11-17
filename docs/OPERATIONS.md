@@ -1,397 +1,399 @@
-# Guía de operación — Portal RID
+# Operations guide — RID Portal
 
-Versión 0.2 · noviembre 2026 · estado del código con M3-01 a M3-04 (M3 en curso)
+> Versión en español: [docs/es/OPERATIONS.md](es/OPERATIONS.md)
 
-Qué hace cada componente al arrancar, qué tiene que hacer o correr el operador para dejarlo operativo, cómo comprobar que funciona y qué revisar en el día a día. Cómo se despliega cada pieza está en [`DEPLOYMENT.md`](DEPLOYMENT.md). El alta de entidades, la respuesta a incidentes, la rotación de la CA intermedia y la revocación masiva de certificados están en el runbook del operador ([`RUNBOOK.md`](RUNBOOK.md)).
+Version 0.2 · November 2026 · code as of M3-01 to M3-04 (M3 in progress)
 
-## 0. Convenciones
+What each component does at startup, what the operator has to do or run to make it operational, how to check that it works and what to review day to day. How each piece is deployed is in [`DEPLOYMENT.md`](DEPLOYMENT.md). Entity onboarding, incident response, intermediate CA rotation and mass certificate revocation are in the operator runbook ([`RUNBOOK.md`](RUNBOOK.md)).
 
-En el piloto todos los comandos se corren en la raíz del clon, con este atajo:
+## 0. Conventions
+
+On the pilot, all commands are run at the root of the clone, with this shortcut:
 
 ```bash
 alias dc='docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml --env-file .env --profile observability'
 ```
 
-En desarrollo, el equivalente es `docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability` (o `pnpm infra:ps` / `pnpm infra:logs`), y el API corre en el host (`pnpm dev`), así que los comandos `dc exec api ...` se reemplazan por llamadas a `localhost`.
+In development, the equivalent is `docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability` (or `pnpm infra:ps` / `pnpm infra:logs`), and the API runs on the host (`pnpm dev`), so the `dc exec api ...` commands are replaced by calls to `localhost`.
 
-Los servicios internos no tienen puertos publicados en el piloto. Para hablar con ellos se usa el contenedor `api`, que tiene `wget` y está en la misma red:
+Internal services have no published ports on the pilot. To talk to them, use the `api` container, which has `wget` and is on the same network:
 
 ```bash
 dc exec api wget -qO- http://opa:8181/health
 ```
 
-## 1. Mapa de dependencias y orden de arranque
+## 1. Dependency map and startup order
 
 ```
 postgres ──▶ keycloak ─────────────┐
 etcd ──────▶ apisix ───────────────┤
 step-ca ───────────────────────────┼──▶ api ──▶ web
 tsa-init ──▶ tsa ──────────────────┘      └───▶ carpeta
-opa ················ descarga el bundle de api (reintenta solo)
-fluent-bit-transparency ··· envía registros a api (búfer en disco mientras api no responde)
-opensearch ──▶ fluent-bit ··· recibe logs de analítica de apisix
-mailpit ··· recibe el correo de api, keycloak y carpeta
+opa ················ downloads the bundle from api (retries on its own)
+fluent-bit-transparency ··· sends records to api (disk buffer while api does not respond)
+opensearch ──▶ fluent-bit ··· receives analytics logs from apisix
+mailpit ··· receives email from api, keycloak and carpeta
 ```
 
-Compose respeta este orden con `depends_on` y health checks: `api` espera a `postgres`, `step-ca`, `keycloak` y `apisix` sanos y a que `tsa` haya arrancado; `web` y `carpeta` esperan a `api` sano. OPA y los Fluent Bit no dependen del API: reintentan hasta que responde.
+Compose follows this order with `depends_on` and health checks: `api` waits for `postgres`, `step-ca`, `keycloak` and `apisix` to be healthy and for `tsa` to have started; `web` and `carpeta` wait for `api` to be healthy. OPA and the Fluent Bits do not depend on the API: they retry until it responds.
 
-**Plano de datos vs. plano de gobierno.** Si `api`, `web` o `keycloak` caen, el gateway sigue atendiendo con la última configuración de etcd y el último bundle de OPA. Sin Keycloak no se emiten tokens nuevos, y la validación de los vigentes depende de que APISIX tenga en caché las claves (JWKS) del realm; no está probado todavía (M6-04). Si cae `apisix`, `etcd` u `opa`, se corta el tráfico.
+**Data plane vs. governance plane.** If `api`, `web` or `keycloak` go down, the gateway keeps serving with the last etcd configuration and the last OPA bundle. Without Keycloak no new tokens are issued, and validating the current ones depends on APISIX having the realm's keys (JWKS) cached; this is not tested yet (M6-04). If `apisix`, `etcd` or `opa` go down, traffic stops.
 
-## 2. Puesta en marcha (día 0)
+## 2. Go-live (day 0)
 
-### 2.1 Qué hace cada componente solo y qué hay que hacer
+### 2.1 What each component does on its own and what you have to do
 
-| Componente | Lo hace solo al arrancar | Lo tiene que hacer el operador | Cómo comprobarlo |
+| Component | Does on its own at startup | What the operator has to do | How to check it |
 | :-- | :-- | :-- | :-- |
-| `postgres` | Con el volumen vacío: roles `rid_app` y `keycloak`, bases `keycloak` y `rid_test` (`infra/postgres/init`) | Nada. Las contraseñas de `.env` se fijan aquí y solo aquí | `dc exec postgres pg_isready` |
-| `keycloak` | Importa los realms `rid-portal`, `rid-gateway` y `rid-citizens` si no existen, con los secretos de `.env` | Nada en un despliegue nuevo. En uno existente, aplicar los cambios de realm que pida la versión (§5.3), entre ellos la política de rotación de secretos de M3-04 y el segundo factor de M3-08 | `curl -fsS $RID_PUBLIC_URL/auth/realms/rid-portal/.well-known/openid-configuration` |
-| `etcd` | — | Nada | `dc ps etcd` (healthy) |
-| `apisix` | Lee `infra/apisix/config.yaml`; sin rutas ni objetos SSL hasta que el API reconcilie | **Nada a mano**: rutas, upstreams y objetos SSL los crea el API | `dc ps apisix` (healthy); §2.2 |
-| `step-ca` | Primera vez: crea la CA y el provisioner `rid-portal`. Siempre: `configure.sh` fija plantillas y duraciones, y crea `rid-gateway-tls` si falta | Guardar la huella de la raíz si otro sistema la necesita (§5.4) | `dc exec step-ca step ca health --ca-url=https://localhost:9000 --root=/home/step/certs/root_ca.crt` |
-| `tsa-init` / `tsa` | `tsa-init` crea una vez la cadena de la TSA; `tsa` firma sellos | Nada | `curl -fsS $RID_PUBLIC_URL/tsa/api/v1/timestamp/certchain` devuelve PEM |
-| `opa` | Pide el bundle al API cada 10–20 s; niega todo hasta tenerlo | Nada | `dc exec api wget -qO- 'http://opa:8181/health?bundles'` responde `{}` (200) solo con el bundle activo |
-| `fluent-bit-transparency` | Escucha en 5170; envía al colector del API con reintentos | Nada | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/health` |
-| `opensearch` / `fluent-bit` | Índices `rid-access-YYYY.MM` al llegar el primer log | En el host, `vm.max_map_count` (DEPLOYMENT §2) | `dc ps opensearch fluent-bit` (healthy) |
-| `mailpit` | — | Guardar el usuario de `MAILPIT_UI_AUTH` | Abrir `$RID_PUBLIC_URL/mail` |
-| `api` | Migraciones (`prisma migrate deploy`), seed idempotente (`RID_ALLOW_SEED=true`), arranque de los trabajos en segundo plano y **reconciliación completa inmediata** de APISIX y Keycloak | Revisar el log del primer arranque | `dc logs api` muestra `Portal API listening on 4000 (country <código>)`; `curl -fsS $RID_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
-| `web` | — | Nada | Abrir `$RID_PUBLIC_URL` e iniciar sesión |
-| `carpeta` | — | Nada | Abrir `$RID_PUBLIC_URL/carpeta` |
-| Proxy inverso | — | Configurar las rutas de DEPLOYMENT §5.2 **sin** `/api/v1/internal` ni `/api/v1/opa` | `curl -i $RID_PUBLIC_URL/api/v1/opa/bundle.tar.gz` **no** debe llegar al API (404 del proxy o de la web) |
+| `postgres` | With an empty volume: roles `rid_app` and `keycloak`, databases `keycloak` and `rid_test` (`infra/postgres/init`) | Nothing. The passwords in `.env` are set here and only here | `dc exec postgres pg_isready` |
+| `keycloak` | Imports the realms `rid-portal`, `rid-gateway` and `rid-citizens` if they do not exist, with the secrets from `.env` | Nothing on a new deployment. On an existing one, apply the realm changes the version calls for (§5.3), among them the secret rotation policy of M3-04 and the second factor of M3-08 | `curl -fsS $RID_PUBLIC_URL/auth/realms/rid-portal/.well-known/openid-configuration` |
+| `etcd` | — | Nothing | `dc ps etcd` (healthy) |
+| `apisix` | Reads `infra/apisix/config.yaml`; no routes or SSL objects until the API reconciles | **Nothing by hand**: routes, upstreams and SSL objects are created by the API | `dc ps apisix` (healthy); §2.2 |
+| `step-ca` | First time: creates the CA and the `rid-portal` provisioner. Always: `configure.sh` sets templates and durations, and creates `rid-gateway-tls` if it is missing | Save the root fingerprint if another system needs it (§5.4) | `dc exec step-ca step ca health --ca-url=https://localhost:9000 --root=/home/step/certs/root_ca.crt` |
+| `tsa-init` / `tsa` | `tsa-init` creates the TSA chain once; `tsa` signs timestamps | Nothing | `curl -fsS $RID_PUBLIC_URL/tsa/api/v1/timestamp/certchain` returns PEM |
+| `opa` | Requests the bundle from the API every 10–20 s; denies everything until it has it | Nothing | `dc exec api wget -qO- 'http://opa:8181/health?bundles'` responds `{}` (200) only with the bundle active |
+| `fluent-bit-transparency` | Listens on 5170; sends to the API collector with retries | Nothing | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/health` |
+| `opensearch` / `fluent-bit` | `rid-access-YYYY.MM` indexes when the first log arrives | On the host, `vm.max_map_count` (DEPLOYMENT §2) | `dc ps opensearch fluent-bit` (healthy) |
+| `mailpit` | — | Save the `MAILPIT_UI_AUTH` user | Open `$RID_PUBLIC_URL/mail` |
+| `api` | Migrations (`prisma migrate deploy`), idempotent seed (`RID_ALLOW_SEED=true`), start of the background jobs and an **immediate full reconciliation** of APISIX and Keycloak | Review the log of the first start | `dc logs api` shows `Portal API listening on 4000 (country <code>)`; `curl -fsS $RID_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
+| `web` | — | Nothing | Open `$RID_PUBLIC_URL` and sign in |
+| `carpeta` | — | Nothing | Open `$RID_PUBLIC_URL/carpeta` |
+| Reverse proxy | — | Configure the routes from DEPLOYMENT §5.2 **without** `/api/v1/internal` or `/api/v1/opa` | `curl -i $RID_PUBLIC_URL/api/v1/opa/bundle.tar.gz` must **not** reach the API (404 from the proxy or the web) |
 
-Estado general de un vistazo: `dc ps` (todos `running`, y `healthy` los que tienen health check; `tsa-init` en `exited (0)`).
+Overall status at a glance: `dc ps` (all `running`, and `healthy` those that have a health check; `tsa-init` in `exited (0)`).
 
-### 2.2 Comprobación de punta a punta
+### 2.2 End-to-end check
 
-1. **Gateway sin token.** Con una API publicada, `curl -i $RID_GATEWAY_PUBLIC_URL/<ruta>` responde `401`. Sin ninguna API publicada, APISIX responde `404`.
-2. **Rutas reconciliadas.**
+1. **Gateway without a token.** With a published API, `curl -i $RID_GATEWAY_PUBLIC_URL/<route>` responds `401`. With no API published, APISIX responds `404`.
+2. **Reconciled routes.**
    ```bash
    dc exec api sh -c 'wget -qO- --header "X-API-KEY: $APISIX_ADMIN_KEY" http://apisix:9180/apisix/admin/routes'
    ```
-   Cada versión publicada tiene una ruta `rid-route-<apiVersionId>`. Con `.../apisix/admin/ssls` se ven `rid-ssl-gateway` (TLS del gateway) y un `rid-ssl-gateway-client-<entityId>` por cada proveedor con upstreams mTLS.
-3. **Ensayo de la demo completo** (`scripts/demo.mjs`, los 11 pasos de `DEMO.md`). En el piloto se corre en la misma máquina, porque lee los logs del mock con `docker logs`:
+   Each published version has a route `rid-route-<apiVersionId>`. With `.../apisix/admin/ssls` you can see `rid-ssl-gateway` (the gateway's TLS) and one `rid-ssl-gateway-client-<entityId>` per provider with mTLS upstreams.
+3. **Full demo rehearsal** (`scripts/demo.mjs`, the 11 steps of `DEMO.md`). On the pilot it is run on the same machine, because it reads the mock's logs with `docker logs`:
    ```bash
-   # una vez: compilar el verificador abierto (paso 11)
-   pnpm --filter @rid/transparency-verifier build      # o dentro de un contenedor node:24
+   # once: build the open verifier (step 11)
+   pnpm --filter @rid/transparency-verifier build      # or inside a node:24 container
    set -a; . ./.env; set +a
    RID_API_URL=$RID_PUBLIC_URL \
    CITIZEN_APP_TSA_ROOT_URL=$RID_PUBLIC_URL/tsa/api/v1/timestamp/certchain \
    node scripts/demo.mjs
    ```
-   Termina con código 0 si todo se comporta como dice el guion. Crea una API propia por corrida, así que se puede repetir.
+   It exits with code 0 if everything behaves as the script says. It creates its own API on each run, so it can be repeated.
 
-### 2.3 Configuración funcional
+### 2.3 Functional configuration
 
-| Qué | Dónde | Cuándo se aplica |
+| What | Where | When it takes effect |
 | :-- | :-- | :-- |
-| País: autoridades, tipos de documento, sectores, finalidades, textos, `features`, vigencias, retención | `config/country/<código>.yaml` (`RID_COUNTRY`); se valida al arrancar | Va dentro de las imágenes: **reconstruir** `api` y `web`. Las finalidades se cargan o refrescan con el seed |
-| Finalidades adicionales | Consola del operador → Finalidades (`purpose.manage`) | Inmediato |
-| Entidades | El solicitante se registra y pide el alta de su entidad; un `platform_reviewer` o `platform_admin` la aprueba (`entity_review.decide`) y el solicitante queda como `entity_admin`. El `platform_admin` también puede crearlas desde la consola (`entity_admin.create`) y suspenderlas, reactivarlas o darlas de baja (`entity_admin.decide`) | Inmediato |
-| Personas de una entidad | El `entity_admin` invita por correo y asigna roles (ADR-0018) | Inmediato; los roles se leen en cada petición |
-| Roles de plataforma | **Hoy solo los asigna el seed** a los usuarios semilla del realm (`infra/keycloak/README.md`) | Ver la advertencia siguiente |
-| Autorregistro | Realm `rid-portal`: `registrationAllowed` y `verifyEmail` | Ya activo en realms nuevos; en uno existente, §5.3 |
+| Country: authorities, document types, sectors, purposes, texts, `features`, validity periods, retention | `config/country/<code>.yaml` (`RID_COUNTRY`); validated at startup | It is baked into the images: **rebuild** `api` and `web`. Purposes are loaded or refreshed with the seed |
+| Additional purposes | Operator console → Purposes (`purpose.manage`) | Immediately |
+| Entities | The requester registers and requests onboarding for their entity; a `platform_reviewer` or `platform_admin` approves it (`entity_review.decide`) and the requester becomes `entity_admin`. The `platform_admin` can also create them from the console (`entity_admin.create`) and suspend, reactivate or offboard them (`entity_admin.decide`) | Immediately |
+| People in an entity | The `entity_admin` invites them by email and assigns roles (ADR-0018) | Immediately; roles are read on every request |
+| Platform roles | **Today only the seed assigns them**, to the realm's seed users (`infra/keycloak/README.md`) | See the following warning |
+| Self-registration | Realm `rid-portal`: `registrationAllowed` and `verifyEmail` | Already active on new realms; on an existing one, §5.3 |
 
-> **Advertencia.** No existe todavía una forma de dar el primer `platform_admin` de un despliegue real sin el seed de demo, que además crea entidades ficticias. Mientras no exista, un piloto es un entorno de demostración, no de producción (`DEPLOYMENT.md §8`).
+> **Warning.** There is not yet a way to create the first `platform_admin` of a real deployment without the demo seed, which also creates fictitious entities. Until there is, a pilot is a demonstration environment, not a production one (`DEPLOYMENT.md §8`).
 
-## 3. Procesos en segundo plano del API
+## 3. API background processes
 
-Todos corren dentro del proceso `api`. Con `RID_WORKER=off` no corre ninguno.
+They all run inside the `api` process. With `RID_WORKER=off`, none of them runs.
 
-| Proceso | Frecuencia | Qué hace | Si falla |
+| Process | Frequency | What it does | If it fails |
 | :-- | :-- | :-- | :-- |
-| Relevo del outbox | 1 s | Pasa las filas de `outbox` a colas de pg-boss | Las filas quedan sin `published_at` y se reintentan |
-| `gateway.sync` | Al cambiar una versión de API | Reconciliador de APISIX: rutas, upstreams y plugins de esa versión | pg-boss reintenta; el error queda en `sync_state` |
-| Reconciliación completa APISIX | Al arrancar y cada 5 min | Asegura el TLS del gateway (y renueva su certificado), recalcula todas las versiones servidas, con los certificados de cliente del gateway que necesiten, y borra huérfanos | Se registra por versión y por objeto SSL; la siguiente pasada corrige |
-| `keycloak.sync` | Al cambiar una aplicación o sus secretos | Reconciliador de Keycloak: clientes `rid-app-<uuid>` en `rid-gateway`, secretos y su rotación (secreto rotado durante la ventana) | Igual que APISIX |
-| Reconciliación completa Keycloak | Al arrancar y cada 5 min | Corrige la deriva de todos los clientes | — |
-| `policy.sync` | Al cambiar suscripciones, versiones o certificados de aplicación | Actualiza el estado de sincronización de OPA; el bundle se genera cuando OPA lo pide | Las suscripciones quedan "Aprobada (activándose)" hasta que OPA reporta la revisión |
-| `notification.dispatch` | Por evento de auditoría que notifica | Avisos en el portal y por correo | Reintentos de pg-boss |
-| `invitation.email` | Por invitación | Correo de invitación | Reintentos durante horas |
-| `audit.anchor_email` | Por anclaje | Correo del anclaje diario a los reguladores | Reintentos |
-| `citizen.alert` | Por registro nuevo con aviso pedido | Webhook firmado a la aplicación ciudadana (`RID_CITIZEN_APPS`) | Hasta 20 reintentos con espera exponencial (máx. 1 h) |
-| Ciclo de vida de suscripciones | `RID_LIFECYCLE_INTERVAL_SECONDS` (300 s) | Marca `expired` las vencidas y avisa de la renovación | — |
-| Ciclo de vida de versiones | Igual | Retira las versiones deprecadas cuya fecha de retiro pasó (ADR-0019) | — |
-| Ciclo de vida de credenciales | Igual | Avisa antes del vencimiento de los certificados y los marca `expired`; cierra las ventanas de rotación vencidas (la credencial anterior pasa a `expired`) | — |
-| Anclaje de la bitácora | `RID_AUDIT_ANCHOR_INTERVAL_SECONDS` (3600 s) | Sella con la TSA el último evento de cada día cerrado (zona del país) | Si la TSA no responde, reintenta en la siguiente ronda. Bloqueo consultivo: un solo nodo ancla |
-| Sellado de transparencia | `RID_TRANSPARENCY_SEAL_INTERVAL_SECONDS` (10 s) | Agrupa registros en lotes Merkle (hasta `RID_TRANSPARENCY_BATCH_MAX`), firma y sella con la TSA | El lote queda pendiente y se reintenta. Un solo nodo sella |
-| Purga de transparencia | Cada 6 h | Borra los registros que pasaron `retention.subjectAccessMonths` (nunca menos que el piso de la base) | — |
+| Outbox relay | 1 s | Moves the `outbox` rows to pg-boss queues | The rows stay without `published_at` and are retried |
+| `gateway.sync` | When an API version changes | APISIX reconciler: routes, upstreams and plugins of that version | pg-boss retries; the error is stored in `sync_state` |
+| Full APISIX reconciliation | At startup and every 5 min | Ensures the gateway's TLS (and renews its certificate), recomputes all served versions, with the gateway client certificates they need, and deletes orphans | Recorded per version and per SSL object; the next pass corrects it |
+| `keycloak.sync` | When an application or its secrets change | Keycloak reconciler: `rid-app-<uuid>` clients in `rid-gateway`, secrets and their rotation (rotated secret during the window) | Same as APISIX |
+| Full Keycloak reconciliation | At startup and every 5 min | Corrects drift in all clients | — |
+| `policy.sync` | When subscriptions, versions or application certificates change | Updates OPA's sync state; the bundle is generated when OPA requests it | Subscriptions stay "Approved (activating)" until OPA reports the revision |
+| `notification.dispatch` | Per audit event that triggers a notification | Notices in the portal and by email | pg-boss retries |
+| `invitation.email` | Per invitation | Invitation email | Retries for hours |
+| `audit.anchor_email` | Per anchor | Email of the daily anchor to the regulators | Retries |
+| `citizen.alert` | Per new record with a notice requested | Signed webhook to the citizen application (`RID_CITIZEN_APPS`) | Up to 20 retries with exponential backoff (max. 1 h) |
+| Subscription lifecycle | `RID_LIFECYCLE_INTERVAL_SECONDS` (300 s) | Marks expired ones as `expired` and sends renewal notices | — |
+| Version lifecycle | Same | Retires deprecated versions whose retirement date has passed (ADR-0019) | — |
+| Credential lifecycle | Same | Sends notices before certificates expire and marks them `expired`; closes expired rotation windows (the previous credential becomes `expired`) | — |
+| Audit log anchoring | `RID_AUDIT_ANCHOR_INTERVAL_SECONDS` (3600 s) | Timestamps with the TSA the last event of each closed day (country time zone) | If the TSA does not respond, it retries on the next round. Advisory lock: only one node anchors |
+| Transparency sealing | `RID_TRANSPARENCY_SEAL_INTERVAL_SECONDS` (10 s) | Groups records into Merkle batches (up to `RID_TRANSPARENCY_BATCH_MAX`), signs and timestamps them with the TSA | The batch stays pending and is retried. Only one node seals |
+| Transparency purge | Every 6 h | Deletes records older than `retention.subjectAccessMonths` (never less than the database floor) | — |
 
-## 4. Rutina de operación
+## 4. Operating routine
 
-### 4.1 Comprobaciones diarias
+### 4.1 Daily checks
 
-| Qué | Cómo | Esperado |
+| What | How | Expected |
 | :-- | :-- | :-- |
-| Servicios | `dc ps` | Todo `running`/`healthy` |
-| Sincronización con el gateway | SQL 1 (§4.2) | Sin filas en `error` ni `drift`; `pending` solo unos segundos |
-| Outbox | SQL 2 | Sin filas pendientes de más de un minuto |
-| Bundle de OPA | `dc exec api wget -qO- 'http://opa:8181/health?bundles'` | 200 |
-| Cadena de auditoría | Consola → Auditoría → "Verificar integridad", o `GET /api/v1/audit/verify` (`audit.read`) | Cadena íntegra; cada día cerrado con su anclaje |
-| Registro de transparencia | `GET /api/v1/transparency/verify` (`audit.read`); `?fromSeq=N` para revisar solo lo nuevo | Sin registros alterados, borrados antes de tiempo ni insertados |
-| Búfer de Fluent Bit | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/metrics` | Sin reintentos acumulados |
-| Disco | `docker system df -v` | Volúmenes `rid_*` con margen |
+| Services | `dc ps` | Everything `running`/`healthy` |
+| Gateway sync | SQL 1 (§4.2) | No rows in `error` or `drift`; `pending` only for a few seconds |
+| Outbox | SQL 2 | No rows pending for more than a minute |
+| OPA bundle | `dc exec api wget -qO- 'http://opa:8181/health?bundles'` | 200 |
+| Audit chain | Console → Audit → "Verify integrity", or `GET /api/v1/audit/verify` (`audit.read`) | Chain intact; each closed day with its anchor |
+| Transparency log | `GET /api/v1/transparency/verify` (`audit.read`); `?fromSeq=N` to review only what is new | No records tampered with, deleted early or inserted |
+| Fluent Bit buffer | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/metrics` | No accumulated retries |
+| Disk | `docker system df -v` | `rid_*` volumes with headroom |
 
-Desde M5-06 las alertas de `ARCHITECTURE.md §9` llegan por correo al operador (Alertmanager), y el tablero `RID · Operador` de Grafana resume el estado. Esta lista queda para la revisión manual y para cuando falte el perfil `observability`. La sincronización también se ve en `/operator/sync` (M5-07).
+Since M5-06, the alerts in `ARCHITECTURE.md §9` reach the operator by email (Alertmanager), and the Grafana dashboard `RID · Operador` summarizes the status. This list remains for manual review and for when the `observability` profile is missing. Sync is also visible at `/operator/sync` (M5-07).
 
-| Alerta | Primera acción |
+| Alert | First action |
 | :-- | :-- |
-| `RidGateway5xxRate` | `dc logs fluent-bit-errors` (errores del gateway, enmascarados); el uso del proveedor afectado (`/my-apis/usage`) |
-| `RidGatewayLatencyHigh` | El panel de latencia: si sube la petición completa pero no la del gateway, es el proveedor |
-| `RidTargetDown` | `dc ps` y los logs del servicio |
-| `RidOpaBundleBehind`, `RidOpaBundleFetchFailing` | `dc logs opa`; que OPA alcance `OPA_PORTAL_URL` con su token |
-| `RidReconcileFailing` | `/operator/sync`, filtro "con problemas": el último error y reintentar |
-| `RidNodeOffline` | `/operator/nodes`; la entidad dueña del nodo recibe su propio aviso |
-| `RidCertificateExpiring` | La renovación automática falló: logs del API y `dc ps step-ca` |
-| `RidQueueBacklog` | Logs del API; SQL 2 (§4.2) |
+| `RidGateway5xxRate` | `dc logs fluent-bit-errors` (gateway errors, masked); the affected provider's usage (`/my-apis/usage`) |
+| `RidGatewayLatencyHigh` | The latency panel: if the full request goes up but the gateway's share does not, it is the provider |
+| `RidTargetDown` | `dc ps` and the service's logs |
+| `RidOpaBundleBehind`, `RidOpaBundleFetchFailing` | `dc logs opa`; that OPA reaches `OPA_PORTAL_URL` with its token |
+| `RidReconcileFailing` | `/operator/sync`, filter "With problems": the last error, and retry |
+| `RidNodeOffline` | `/operator/nodes`; the entity that owns the node gets its own notice |
+| `RidCertificateExpiring` | Automatic renewal failed: API logs and `dc ps step-ca` |
+| `RidQueueBacklog` | API logs; SQL 2 (§4.2) |
 
-### 4.2 Consultas de diagnóstico
+### 4.2 Diagnostic queries
 
-Con el dueño del esquema (solo lectura de hecho; no modificar datos a mano):
+With the schema owner (read-only in practice; do not modify data by hand):
 
 ```bash
 dc exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 ```
 
 ```sql
--- 1. Objetos fuera de sincronía (apisix | keycloak | opa)
+-- 1. Objects out of sync (apisix | keycloak | opa)
 SELECT target, system, status, attempts, last_error, updated_at
 FROM sync_state WHERE status <> 'in_sync' ORDER BY updated_at;
 
--- 2. Mensajes del outbox sin relevar
+-- 2. Outbox messages not yet relayed
 SELECT topic, aggregate, attempts, last_error, created_at
 FROM outbox WHERE published_at IS NULL ORDER BY created_at LIMIT 50;
 
--- 3. Últimas revisiones del bundle de OPA
+-- 3. Latest OPA bundle revisions
 SELECT revision, cardinality(subscription_ids) AS subscriptions, created_at
 FROM policy_bundle ORDER BY created_at DESC LIMIT 5;
 
--- 4. Últimos anclajes y puntos de control
+-- 4. Latest anchors and checkpoints
 SELECT * FROM audit_anchor ORDER BY 1 DESC LIMIT 3;
 SELECT seq, tree_size, sealed_at FROM transparency_checkpoint ORDER BY seq DESC LIMIT 3;
 ```
 
 ### 4.3 Logs
 
-| Servicio | Comando | Notas |
+| Service | Command | Notes |
 | :-- | :-- | :-- |
-| API | `dc logs -f api` | Errores de reconciliación, de la CA, de la TSA |
-| OPA | `dc logs opa` | Descarga del bundle (`--log-format=json`); sin decision logs a propósito |
-| APISIX | `dc logs apisix` | Solo el arranque. Sin access log (privacidad), y sus errores van a `fluent-bit-errors` |
-| Rechazos del API | `dc logs api \| grep request_refused` | Una línea JSON por cada 400/401/403/404/409/429: `sub`, IP, ruta y código (M6-01). Una racha de 403/404 de un mismo `sub` o IP es un sondeo |
-| Ingresos y administración de Keycloak | `dc logs keycloak \| grep -E "type=(LOGIN\|LOGOUT\|REGISTER)"` | Eventos del realm `rid-portal` (M6-01); 90 días en la base de Keycloak |
-| Errores del gateway | `dc logs fluent-bit-errors` | El error log de nginx, con la línea de la petición, la URI del upstream y los números enmascarados (M5-01) |
-| Keycloak | `dc logs keycloak` | Arranque e importación de realms |
+| API | `dc logs -f api` | Reconciliation, CA and TSA errors |
+| OPA | `dc logs opa` | Bundle download (`--log-format=json`); no decision logs, on purpose |
+| APISIX | `dc logs apisix` | Startup only. No access log (privacy), and its errors go to `fluent-bit-errors` |
+| API refusals | `dc logs api \| grep request_refused` | One JSON line per 400/401/403/404/409/429: `sub`, IP, route and code (M6-01). A streak of 403/404 from the same `sub` or IP is probing |
+| Keycloak sign-ins and administration | `dc logs keycloak \| grep -E "type=(LOGIN\|LOGOUT\|REGISTER)"` | Events of the `rid-portal` realm (M6-01); 90 days in the Keycloak database |
+| Gateway errors | `dc logs fluent-bit-errors` | The nginx error log, with the request line, the upstream URI and numbers masked (M5-01) |
+| Keycloak | `dc logs keycloak` | Startup and realm import |
 
-Los logs no contienen cuerpos, rutas reales ni query strings, y no deben contenerlos. Si se ve un número de documento en un log, es un incidente de privacidad (regla 2 de `CLAUDE.md`).
+Logs do not contain bodies, real paths or query strings, and must not contain them. If you see a document number in a log, it is a privacy incident (rule 2 of `CLAUDE.md`).
 
-## 5. Tareas puntuales
+## 5. One-off tasks
 
-### 5.1 Reiniciar un componente
+### 5.1 Restarting a component
 
-| Componente | Impacto mientras está caído | Al volver |
+| Component | Impact while it is down | When it comes back |
 | :-- | :-- | :-- |
-| `api` | No hay portal; el gateway sigue con la última configuración; los registros de transparencia esperan en el búfer de Fluent Bit | Migraciones, reconciliación completa, vacía el outbox |
-| `web` | No hay portal; el API sigue | — |
-| `keycloak` | No se puede iniciar sesión ni emitir tokens de aplicación. La validación de los tokens vigentes (5 min) depende de la caché de JWKS de APISIX (sin probar, M6-04) | — |
-| `apisix` | Sin tráfico | Lee la configuración de etcd |
-| `etcd` | APISIX sigue con lo que tiene en memoria, sin cambios nuevos | — |
-| `opa` | Sin tráfico (el gateway no puede decidir) | Descarga el bundle en 10–20 s |
-| `step-ca` | No se emiten certificados (503 en el portal) | — |
-| `tsa` | No se sellan lotes ni anclajes (quedan pendientes) | Se sellan en la siguiente ronda |
-| `fluent-bit-transparency` | APISIX reintenta el envío | Reenvía lo del búfer en disco |
-| `postgres` | Todo el plano de gobierno cae; el tráfico sigue | — |
+| `api` | No portal; the gateway keeps the last configuration; transparency records wait in the Fluent Bit buffer | Migrations, full reconciliation, drains the outbox |
+| `web` | No portal; the API keeps running | — |
+| `keycloak` | Nobody can sign in and no application tokens can be issued. Validating current tokens (5 min) depends on APISIX's JWKS cache (untested, M6-04) | — |
+| `apisix` | No traffic | Reads the configuration from etcd |
+| `etcd` | APISIX keeps what it has in memory, with no new changes | — |
+| `opa` | No traffic (the gateway cannot decide) | Downloads the bundle in 10–20 s |
+| `step-ca` | No certificates are issued (503 in the portal) | — |
+| `tsa` | No batches or anchors are sealed (they stay pending) | They are sealed on the next round |
+| `fluent-bit-transparency` | APISIX retries sending | Resends what is in the disk buffer |
+| `postgres` | The whole governance plane goes down; traffic continues | — |
 
 ```bash
-dc restart <servicio>        # o: dc up -d <servicio> si cambió su configuración
+dc restart <service>        # or: dc up -d <service> if its configuration changed
 ```
 
-### 5.2 Forzar la reconciliación
+### 5.2 Forcing reconciliation
 
-En la consola de sincronización (`/operator/sync`, M5-07), un `platform_admin` reintenta un objeto: se encola el trabajo de su reconciliador. La consola también muestra la deriva que se encontró, es decir, cambios hechos fuera del portal que el reconciliador deshizo. Reiniciar el API lanza una reconciliación completa de APISIX y Keycloak; si no, la pasada periódica corre cada 5 minutos. **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte (regla 5).
+In the sync console (`/operator/sync`, M5-07), a `platform_admin` retries an object: its reconciler's job is queued. The console also shows the drift that was found, that is, changes made outside the portal that the reconciler undid. Restarting the API triggers a full reconciliation of APISIX and Keycloak; otherwise, the periodic pass runs every 5 minutes. APISIX and Keycloak are **never** corrected by hand: the reconciler reverts it (rule 5).
 
-### 5.2.1 Tráfico sintético para demos
+### 5.2.1 Synthetic traffic for demos
 
-`pnpm traffic:simulate [--from AAAA-MM-DD] [--days 30] [--scale 1] [--seed 42]` genera un mes de llamadas simuladas de las suscripciones activas de producción, para mostrar los indicadores, el uso y el mapa de intercambios sin tráfico real. Las llamadas tienen patrón de días hábiles y horario de oficina, negaciones con su razón y errores del proveedor.
+`pnpm traffic:simulate [--from YYYY-MM-DD] [--days 30] [--scale 1] [--seed 42]` generates a month of simulated calls from the active production subscriptions, to show the indicators, the usage and the exchange map without real traffic. The calls follow a business-day and office-hours pattern, with denials and their reasons, and provider errors.
 
-- **Dónde quedan.** Escribe documentos con la forma del log de acceso en `rid-access-synthetic-AAAA.MM`, con `gateway_node: synthetic`. Nunca hacen llamadas reales ni llevan datos personales.
-- **Borrarlo.** `--clear` borra todo; `--tag` lo separa (las pruebas usan uno propio).
-- **Restricción.** Solo desarrollo y demos: en producción exige `RID_ALLOW_SYNTHETIC_TRAFFIC=true`. En el piloto se corre dentro del contenedor del API.
+- **Where they go.** It writes documents shaped like the access log into `rid-access-synthetic-YYYY.MM`, with `gateway_node: synthetic`. They never make real calls or carry personal data.
+- **Deleting it.** `--clear` deletes everything; `--tag` keeps it separate (the tests use their own).
+- **Restriction.** Development and demos only: in production it requires `RID_ALLOW_SYNTHETIC_TRAFFIC=true`. On the pilot it is run inside the API container.
 
-### 5.2.2 Prueba de carga del gateway (M6-03)
+### 5.2.2 Gateway load test (M6-03)
 
-Mide si el gateway sostiene la carga de SPEC §9: 500 peticiones/s, con un p95 de la latencia que agrega el gateway (sin el proveedor) menor de 50 ms. Resultados, hallazgos y dimensionamiento en `docs/performance/M6-03.md`.
+Measures whether the gateway sustains the load in SPEC §9: 500 requests/s, with a p95 of the latency the gateway adds (excluding the provider) under 50 ms. Results, findings and sizing in `docs/performance/M6-03.md`.
 
-1. **La red a escala.** `pnpm load:seed` crea, si no existen, 200 entidades, 1.000 APIs publicadas, 200 aplicaciones y 5.000 suscripciones. Son sintéticas (prefijo `carga-`) y auditadas como cualquier cambio. Tarda unos 2 minutos, y los reconciliadores tardan unos minutos más en crear las rutas, los clientes y los datos de OPA.
-   - Sus APIs usan el servicio de prueba: `RID_DEV_NODES` lleva `carga-*=mock-salud:8000`.
-   - En un entorno con `NODE_ENV=production` hace falta `RID_ALLOW_LOAD_SEED=true`. Nunca sobre los datos de una red real: las entidades sintéticas aparecerían en el catálogo, los indicadores y la bitácora.
-2. **La prueba.** `pnpm load:test [--rate 500] [--duration 5m] [--warmup 30s] [--seed]`:
-   - prepara, como la demo, una API publicada y una aplicación con certificado y suscripción aprobada;
-   - lanza k6 (`grafana/k6:2.3.0`, en su propio contenedor) contra `RID_GATEWAY_PUBLIC_URL` con mTLS;
-   - lee en Prometheus (`RID_PROMETHEUS_PUBLIC_URL`, por omisión `http://localhost:9090`) la latencia que APISIX mide para su ruta.
-   Sale con 1 si no se cumple. `RID_LOAD_DEBUG=1` muestra las primeras fallas de cada usuario virtual de k6.
-3. **Dónde correrla.** k6 necesita CPU propia: en la misma máquina que el gateway compite con él y el resultado mide la máquina, no el gateway. El criterio se valida en el entorno tipo producción del cierre de M6.
+1. **The network at scale.** `pnpm load:seed` creates, if they do not exist, 200 entities, 1,000 published APIs, 200 applications and 5,000 subscriptions. They are synthetic (prefix `carga-`) and audited like any other change. It takes about 2 minutes, and the reconcilers take a few more minutes to create the routes, the clients and the OPA data.
+   - Their APIs use the test service: `RID_DEV_NODES` includes `carga-*=mock-salud:8000`.
+   - In an environment with `NODE_ENV=production`, `RID_ALLOW_LOAD_SEED=true` is required. Never on the data of a real network: the synthetic entities would appear in the catalog, the indicators and the audit log.
+2. **The test.** `pnpm load:test [--rate 500] [--duration 5m] [--warmup 30s] [--seed]`:
+   - prepares, like the demo, a published API and an application with a certificate and an approved subscription;
+   - launches k6 (`grafana/k6:2.3.0`, in its own container) against `RID_GATEWAY_PUBLIC_URL` with mTLS;
+   - reads in Prometheus (`RID_PROMETHEUS_PUBLIC_URL`, by default `http://localhost:9090`) the latency that APISIX measures for its route.
+   It exits with 1 if the target is not met. `RID_LOAD_DEBUG=1` shows the first failures of each k6 virtual user.
+3. **Where to run it.** k6 needs its own CPU: on the same machine as the gateway it competes with it, and the result measures the machine, not the gateway. The criterion is validated in the production-like environment at the close of M6.
 
-### 5.2.3 Prueba de resiliencia (M6-04)
+### 5.2.3 Resilience test (M6-04)
 
-`pnpm resilience:test [--outage 45s] [--portal-container rid-api-1]` comprueba contra el stack que el gateway funciona sin el portal:
+`pnpm resilience:test [--outage 45s] [--portal-container rid-api-1]` checks against the stack that the gateway works without the portal:
 
-1. Prepara una aplicación con una suscripción activa, como la demo.
-2. Detiene el portal y, durante la caída, alterna llamadas permitidas y negadas.
-3. Reinicia OPA y APISIX sin el portal.
-4. Lo devuelve y comprueba que el registro de transparencia tiene todas las llamadas de la caída y que una revocación vuelve a llegar al gateway.
+1. Prepares an application with an active subscription, like the demo.
+2. Stops the portal and, during the outage, alternates allowed and denied calls.
+3. Restarts OPA and APISIX without the portal.
+4. Brings it back and checks that the transparency log has every call from the outage and that a revocation reaches the gateway again.
 
-Resultado en `docs/performance/M6-04.md`.
+Result in `docs/performance/M6-04.md`.
 
-- **Piloto.** Detiene y arranca el contenedor del API. Durante la prueba el portal no responde a nadie: es una caída real.
-- **Desarrollo.** El API corre en el host. El script levanta el suyo desde `apps/api/dist` (construirlo antes) y pide que `pnpm dev` esté detenido.
+- **Pilot.** It stops and starts the API container. During the test the portal does not respond to anyone: it is a real outage.
+- **Development.** The API runs on the host. The script starts its own from `apps/api/dist` (build it first) and requires `pnpm dev` to be stopped.
 
-**Qué esperar en una caída real del portal.** El tráfico sigue con lo último que OPA tenía. Las alertas `RidTargetDown` (el API no responde a Prometheus) y `RidOpaBundleFetchFailing` (más de 2 min sin bundle) avisan al operador. Lo que se apruebe o revoque en el portal no llega al gateway hasta que vuelva. Para cortar ya una aplicación comprometida sin el portal, se detiene su cliente en Keycloak: sin token nuevo, sus llamadas se niegan cuando vence el que tiene (5 minutos).
+**What to expect in a real portal outage.** Traffic continues with the last state OPA had. The alerts `RidTargetDown` (the API does not respond to Prometheus) and `RidOpaBundleFetchFailing` (more than 2 min without a bundle) notify the operator. Whatever is approved or revoked in the portal does not reach the gateway until it comes back. To cut off a compromised application right away without the portal, disable its client in Keycloak: without a new token, its calls are denied when the one it has expires (5 minutes).
 
-### 5.3 Cambios en un realm de Keycloak existente
+### 5.3 Changes to an existing Keycloak realm
 
-La importación no toca realms que ya existen. Los cambios se aplican con `kcadm.sh`:
+The import does not touch realms that already exist. Changes are applied with `kcadm.sh`:
 
 ```bash
 dc exec keycloak sh -c '/opt/keycloak/bin/kcadm.sh config credentials \
   --server http://localhost:8080/auth --realm master \
   --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"'
-# ejemplo (M2-01): autorregistro con verificación de correo
+# example (M2-01): self-registration with email verification
 dc exec keycloak /opt/keycloak/bin/kcadm.sh update realms/rid-portal \
   -s registrationAllowed=true -s verifyEmail=true
 ```
 
-En desarrollo el servidor es `http://localhost:8080` (sin `/auth`).
+In development the server is `http://localhost:8080` (without `/auth`).
 
-**Política de rotación de secretos (M3-04).** Se aplica desde el JSON del realm, sin borrar datos, con un script idempotente:
-
-```bash
-set -a; . ./.env; set +a
-node scripts/keycloak-client-policies.mjs     # KEYCLOAK_URL y el administrador de master
-```
-
-En el piloto, `KEYCLOAK_URL` es la URL pública (`$RID_PUBLIC_URL/auth`). Comprobación: en la consola de Keycloak, realm `rid-gateway` → Client policies, aparece `rid-secret-rotation` activa.
-
-**Segundo factor (M3-08, ADR-0021).** El flujo de login `rid-browser` y el mapa de niveles se aplican también desde el JSON, con un script idempotente:
+**Secret rotation policy (M3-04).** It is applied from the realm JSON, without deleting data, with an idempotent script:
 
 ```bash
 set -a; . ./.env; set +a
-node scripts/keycloak-portal-mfa.mjs              # flujo, mapa acr y política OTP
-node scripts/keycloak-portal-mfa.mjs --demo-otp   # además, los códigos de los usuarios de demo
+node scripts/keycloak-client-policies.mjs     # KEYCLOAK_URL and the master administrator
 ```
 
-- `--demo-otp` es solo para desarrollo y el piloto. Reimporta desde el JSON, con el mismo id, cada usuario semilla con rol crítico que aún no tenga código: vuelve a poner la contraseña de `RID_DEMO_USER_PASSWORD` y el código de `RID_DEMO_TOTP_SECRET`.
-- Comprobación: en la consola de Keycloak, realm `rid-portal` → Authentication, `rid-browser` está ligado al navegador. `pnpm demo:otp` imprime el código vigente de los usuarios de demo y la clave para una app autenticadora.
-- **Aviso de credencial.** Keycloak le escribe al dueño de la cuenta cuando se pone o se quita una contraseña o un segundo factor, y guarda esos eventos 90 días (realm `rid-portal` → Events). Si alguien dice que no enroló el segundo factor que recibió en el aviso, trátalo como un incidente: deshabilita la cuenta en Keycloak, borra la credencial OTP y restablece la contraseña antes de volver a habilitarla.
-- **Segundo factor perdido.** El administrador de Keycloak borra la credencial OTP de la persona (Users → la persona → Credentials). La próxima vez que el portal pida el código, Keycloak le pide enrolar una app nueva. Comprueba antes la identidad de quien lo pide, por un canal distinto del correo de la cuenta.
+On the pilot, `KEYCLOAK_URL` is the public URL (`$RID_PUBLIC_URL/auth`). Check: in the Keycloak console, realm `rid-gateway` → Client policies, `rid-secret-rotation` appears as active.
 
-### 5.4 Huella de la raíz de la CA
+**Second factor (M3-08, ADR-0021).** The `rid-browser` login flow and the level map are also applied from the JSON, with an idempotent script:
+
+```bash
+set -a; . ./.env; set +a
+node scripts/keycloak-portal-mfa.mjs              # flow, acr map and OTP policy
+node scripts/keycloak-portal-mfa.mjs --demo-otp   # also the demo users' codes
+```
+
+- `--demo-otp` is for development and the pilot only. It reimports from the JSON, with the same id, each seed user with a critical role that does not yet have a code: it sets the password from `RID_DEMO_USER_PASSWORD` and the code from `RID_DEMO_TOTP_SECRET` again.
+- Check: in the Keycloak console, realm `rid-portal` → Authentication, `rid-browser` is bound to the browser flow. `pnpm demo:otp` prints the current code for the demo users and the key for an authenticator app.
+- **Credential notice.** Keycloak writes to the account owner when a password or a second factor is set or removed, and keeps those events for 90 days (realm `rid-portal` → Events). If someone says they did not enroll the second factor mentioned in the notice, treat it as an incident: disable the account in Keycloak, delete the OTP credential and reset the password before enabling it again.
+- **Lost second factor.** The Keycloak administrator deletes the person's OTP credential (Users → the person → Credentials). The next time the portal asks for the code, Keycloak asks them to enroll a new app. First verify the identity of whoever asks for it, through a channel other than the account's email.
+
+### 5.4 CA root fingerprint
 
 ```bash
 dc exec step-ca step certificate fingerprint certs/root_ca.crt
 ```
 
-Es el valor de `RID_STEP_CA_ROOT_FINGERPRINT` para un API que no monta el volumen de la CA.
+This is the value of `RID_STEP_CA_ROOT_FINGERPRINT` for an API that does not mount the CA volume.
 
-### 5.5 Credenciales de las aplicaciones
+### 5.5 Application credentials
 
-La rotación y la revocación de los secretos y certificados de las aplicaciones las hacen sus desarrolladores desde la ficha de la aplicación (M3-04); el operador no interviene.
+Rotating and revoking the applications' secrets and certificates is done by their developers from the application page (M3-04); the operator does not step in.
 
-- Durante una rotación, el secreto o certificado anterior sigue funcionando `lifecycle.credentialRotationDays`.
-- Revocar un certificado lo saca del gateway con la siguiente descarga del bundle (10–20 s).
-- Revocar un secreto lo saca de Keycloak cuando corre el reconciliador (`keycloak.sync`, segundos).
-- Si una revocación no surte efecto, revisar SQL 1 (§4.2) con `system = 'keycloak'` u `'opa'`.
+- During a rotation, the previous secret or certificate keeps working for `lifecycle.credentialRotationDays`.
+- Revoking a certificate removes it from the gateway with the next bundle download (10–20 s).
+- Revoking a secret removes it from Keycloak when the reconciler runs (`keycloak.sync`, seconds).
+- If a revocation does not take effect, check SQL 1 (§4.2) with `system = 'keycloak'` or `'opa'`.
 
-### 5.6 Rotación de secretos de la plataforma
+### 5.6 Rotating platform secrets
 
-| Secreto | Cómo rotarlo hoy |
+| Secret | How to rotate it today |
 | :-- | :-- |
-| `APISIX_ADMIN_KEY`, `OPA_BUNDLE_TOKEN`, `RID_TRANSPARENCY_INGEST_TOKEN` | Cambiar en `.env` y recrear a la vez los servicios que lo usan (`apisix` + `api`; `opa` + `api`; `fluent-bit-transparency` + `api`) |
-| `AUTH_SECRET` | Cambiar y recrear `web`: todas las sesiones se cierran |
-| Secretos de clientes de Keycloak (`RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`) | Cambiar el secreto del cliente en Keycloak (consola o `kcadm`) **y** en `.env`, y recrear `web`, `api` o `carpeta` |
-| Contraseñas de PostgreSQL | `ALTER ROLE ... PASSWORD` **y** `.env` (con sus URLs), y recrear los servicios |
-| `RID_TRANSPARENCY_SIGNING_JWK` | Clave nueva con otro `kid`; la pública anterior va a `RID_TRANSPARENCY_RETIRED_JWKS`. Procedimiento completo pendiente para producción |
-| Certificados del gateway (servidor y clientes hacia proveedores) | Los renueva solo el reconciliador de APISIX; para forzarlo, reiniciar el API tras borrar la fila de `gateway_certificate` correspondiente |
-| `RID_SECRETS_KEY` (sella los secretos de cliente pendientes y las claves privadas del gateway) | 1. Generar la nueva (32 bytes base64), ponerla en `RID_SECRETS_KEY` y pasar la anterior a `RID_SECRETS_KEYS_PREVIOUS`. 2. Recrear el API (`dc up -d api`): lo nuevo se sella con la nueva y lo anterior se sigue abriendo. 3. Resellar: `dc exec api node dist/secrets/main.js` (en desarrollo, `pnpm --filter @rid/api secrets:reseal`). Es idempotente y deja `secrets.resealed` en la bitácora. 4. Vaciar `RID_SECRETS_KEYS_PREVIOUS` y recrear el API. Si el resellado encuentra un valor que ninguna clave abre, se detiene sin cambiar nada más: falta una clave anterior |
-| Clave de firma de la aserción del gateway (M6-10) | La rota sola el portal cada `lifecycle.assertionKeyRotationDays` (90 días); la anterior sigue en el JWKS. Para rotarla ya: `POST /api/v1/admin/gateway-signing-keys/rotate` como `platform_admin`; con `"compromised": true` la anterior sale del JWKS (`RUNBOOK.md §2.2`) |
-| `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | **No se rotan**: rompen el vínculo con los registros anteriores (`DEPLOYMENT.md §4.1`) |
-| CA intermedia | `RUNBOOK.md §3` |
+| `APISIX_ADMIN_KEY`, `OPA_BUNDLE_TOKEN`, `RID_TRANSPARENCY_INGEST_TOKEN` | Change it in `.env` and recreate the services that use it at the same time (`apisix` + `api`; `opa` + `api`; `fluent-bit-transparency` + `api`) |
+| `AUTH_SECRET` | Change it and recreate `web`: all sessions are closed |
+| Keycloak client secrets (`RID_PORTAL_WEB_CLIENT_SECRET`, `RID_GATEWAY_PROVISIONER_SECRET`, `RID_CARPETA_CLIENT_SECRET`) | Change the client secret in Keycloak (console or `kcadm`) **and** in `.env`, and recreate `web`, `api` or `carpeta` |
+| PostgreSQL passwords | `ALTER ROLE ... PASSWORD` **and** `.env` (with its URLs), and recreate the services |
+| `RID_TRANSPARENCY_SIGNING_JWK` | New key with a different `kid`; the old public key goes to `RID_TRANSPARENCY_RETIRED_JWKS`. Full procedure for production still pending |
+| Gateway certificates (server, and clients towards providers) | The APISIX reconciler renews them on its own; to force it, restart the API after deleting the matching `gateway_certificate` row |
+| `RID_SECRETS_KEY` (seals pending client secrets and the gateway's private keys) | 1. Generate the new one (32 bytes base64), put it in `RID_SECRETS_KEY` and move the old one to `RID_SECRETS_KEYS_PREVIOUS`. 2. Recreate the API (`dc up -d api`): new values are sealed with the new key and old ones can still be opened. 3. Reseal: `dc exec api node dist/secrets/main.js` (in development, `pnpm --filter @rid/api secrets:reseal`). It is idempotent and leaves `secrets.resealed` in the audit log. 4. Empty `RID_SECRETS_KEYS_PREVIOUS` and recreate the API. If the reseal finds a value that no key opens, it stops without changing anything else: a previous key is missing |
+| Gateway assertion signing key (M6-10) | The portal rotates it on its own every `lifecycle.assertionKeyRotationDays` (90 days); the previous one stays in the JWKS. To rotate it now: `POST /api/v1/admin/gateway-signing-keys/rotate` as `platform_admin`; with `"compromised": true` the previous one is removed from the JWKS (`RUNBOOK.md §2.2`) |
+| `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | **Not rotated**: they break the link with earlier records (`DEPLOYMENT.md §4.1`) |
+| Intermediate CA | `RUNBOOK.md §3` |
 
-## 6. Respaldos
+## 6. Backups
 
-Las bases `rid` y `keycloak` se respaldan con pgBackRest en el piloto y con Barman Cloud en Kubernetes (ADR-0026). Las dos permiten volver a cualquier instante de la retención, no solo al último respaldo.
+The `rid` and `keycloak` databases are backed up with pgBackRest on the pilot and with Barman Cloud on Kubernetes (ADR-0026). Both let you go back to any instant within the retention period, not just to the last backup.
 
-### 6.1 Piloto (Compose): pgBackRest
+### 6.1 Pilot (Compose): pgBackRest
 
-- **Continuo.** PostgreSQL archiva cada segmento de WAL en el repositorio `pgbackrest-repo`, al menos cada 5 minutos: se pierden como mucho 5 minutos de cambios. El repositorio va cifrado (AES-256) con `PGBACKREST_REPO1_CIPHER_PASS`.
-- **Programado.** El servicio `pgbackrest` toma un respaldo completo los domingos y uno diferencial los demás días, a las 02:00 UTC (`RID_BACKUP_FULL_DAY`, `RID_BACKUP_HOUR`). Conserva cuatro completos: se puede volver a cualquier instante del último mes.
-- **Estado:** `dc exec pgbackrest pgbackrest --stanza=rid info` muestra los respaldos y el rango de WAL archivado. `dc logs pgbackrest` muestra cada respaldo. Si `info` dice algo distinto de `status: ok`, o el último respaldo tiene más de dos días, hay que revisarlo.
+- **Continuous.** PostgreSQL archives every WAL segment to the `pgbackrest-repo` repository, at least every 5 minutes: at most 5 minutes of changes are lost. The repository is encrypted (AES-256) with `PGBACKREST_REPO1_CIPHER_PASS`.
+- **Scheduled.** The `pgbackrest` service takes a full backup on Sundays and a differential one on the other days, at 02:00 UTC (`RID_BACKUP_FULL_DAY`, `RID_BACKUP_HOUR`). It keeps four full backups: you can go back to any instant in the last month.
+- **Status:** `dc exec pgbackrest pgbackrest --stanza=rid info` shows the backups and the range of archived WAL. `dc logs pgbackrest` shows each backup. If `info` says anything other than `status: ok`, or the last backup is more than two days old, it needs looking into.
 
-**La clave `PGBACKREST_REPO1_CIPHER_PASS` se guarda fuera del servidor**, con la copia del `.env`. Sin ella no se puede restaurar ningún respaldo.
+**The `PGBACKREST_REPO1_CIPHER_PASS` key is kept off the server**, with the copy of `.env`. Without it, no backup can be restored.
 
-**El repositorio vive en el mismo servidor.** No protege de la pérdida del disco ni de la máquina. `sudo ./install.sh backup` copia todo a `backups/<fecha>/`, para llevarlo fuera del servidor:
-- un respaldo completo de pgBackRest y el repositorio entero (`pgbackrest-repo.tgz`, ya cifrado);
-- los volcados lógicos `rid.dump` y `keycloak.dump`, que sirven para restaurar en otra versión de PostgreSQL o en otra plataforma (del piloto a Kubernetes);
-- los volúmenes y el `.env` (tabla de abajo).
+**The repository lives on the same server.** It does not protect against losing the disk or the machine. `sudo ./install.sh backup` copies everything to `backups/<date>/`, so it can be taken off the server:
+- a full pgBackRest backup and the entire repository (`pgbackrest-repo.tgz`, already encrypted);
+- the logical dumps `rid.dump` and `keycloak.dump`, which can be used to restore on another PostgreSQL version or another platform (from the pilot to Kubernetes);
+- the volumes and `.env` (table below).
 
-Hazlo antes de cada actualización y con regularidad.
+Do it before every update and on a regular basis.
 
-**Restaurar la base** (`sudo ./install.sh restore`):
+**Restoring the database** (`sudo ./install.sh restore`):
 
-| Caso | Comando |
+| Case | Command |
 | :-- | :-- |
-| Volver al último estado archivado (el volumen de datos se dañó o se perdió) | `sudo ./install.sh restore` |
-| Volver a un instante (un borrado o una migración que salió mal) | `sudo ./install.sh restore "2026-11-20 14:30:00-05"` |
+| Go back to the last archived state (the data volume was damaged or lost) | `sudo ./install.sh restore` |
+| Go back to an instant (a deletion or a migration that went wrong) | `sudo ./install.sh restore "2026-11-20 14:30:00-05"` |
 
-El comando:
-1. muestra los respaldos;
-2. pide confirmación;
-3. detiene todo y restaura la base con `pgbackrest --delta restore`, que solo reescribe lo que cambió;
-4. arranca de nuevo y toma un respaldo completo en la nueva línea de tiempo.
+The command:
+1. shows the backups;
+2. asks for confirmation;
+3. stops everything and restores the database with `pgbackrest --delta restore`, which only rewrites what changed;
+4. starts again and takes a full backup on the new timeline.
 
-Lo escrito después del instante elegido se pierde. Después de restaurar:
-- revisa la cadena de auditoría (Consola → Auditoría → "Verificar integridad");
-- revisa que nada quede fuera de sincronía con el gateway (§4.2). Los reconciliadores llevan APISIX, OPA y Keycloak al estado de la base restaurada.
+Whatever was written after the chosen instant is lost. After restoring:
+- check the audit chain (Console → Audit → "Verify integrity");
+- check that nothing is out of sync with the gateway (§4.2). The reconcilers bring APISIX, OPA and Keycloak to the state of the restored database.
 
-**Si se perdió el servidor:** instala el portal en otro (`INSTALL.md`) con el `.env` guardado. Antes del primer arranque, restaura el volumen `pgbackrest-repo` desde `pgbackrest-repo.tgz` y los demás volúmenes desde sus `.tgz`. Luego ejecuta `sudo ./install.sh restore`.
+**If the server was lost:** install the portal on another one (`INSTALL.md`) with the saved `.env`. Before the first start, restore the `pgbackrest-repo` volume from `pgbackrest-repo.tgz` and the other volumes from their `.tgz` files. Then run `sudo ./install.sh restore`.
 
-**La prueba del procedimiento:** `pnpm restore:test`, también en CI. Usa la misma imagen y los mismos comandos, en contenedores aparte. Prueba la pérdida del volumen de datos, la recuperación a un instante, un respaldo después de restaurar y que el repositorio no se lee sin su clave.
+**Testing the procedure:** `pnpm restore:test`, also in CI. It uses the same image and the same commands, in separate containers. It tests losing the data volume, point-in-time recovery, a backup after restoring, and that the repository cannot be read without its key.
 
-**Otros datos** que `install.sh backup` guarda aparte:
+**Other data** that `install.sh backup` saves separately:
 
-| Qué | Por qué | Cómo se restaura |
+| What | Why | How to restore it |
 | :-- | :-- | :-- |
-| Volumen `step-ca-data` | Claves de la CA: sin él, todos los certificados quedan huérfanos | `docker run --rm -v rid_step-ca-data:/v -v "$PWD":/b alpine tar xzf /b/step-ca-data.tgz -C /v`, con el servicio detenido |
-| Volumen `tsa-data` | Cadena y clave de la TSA de desarrollo (los sellos ya emitidos se verifican con la cadena) | Igual, con `rid_tsa-data` |
-| Volumen `api-documents` | Documentos subidos (designaciones, acuerdos) | Igual, con `rid_api-documents` |
-| `.env` | Claves sin las que los datos no se pueden verificar, seudonimizar igual ni restaurar | Copia cifrada fuera de la máquina |
+| `step-ca-data` volume | The CA's keys: without it, every certificate is orphaned | `docker run --rm -v rid_step-ca-data:/v -v "$PWD":/b alpine tar xzf /b/step-ca-data.tgz -C /v`, with the service stopped |
+| `tsa-data` volume | Chain and key of the development TSA (timestamps already issued are verified with the chain) | Same, with `rid_tsa-data` |
+| `api-documents` volume | Uploaded documents (designations, agreements) | Same, with `rid_api-documents` |
+| `.env` | Keys without which the data cannot be verified, pseudonymized the same way or restored | Encrypted copy off the machine |
 
-No hace falta respaldar `etcd-data` (se reconstruye desde PostgreSQL), OPA (guarda solo una copia del bundle) ni `opensearch-data` (analítica, se puede perder). `transparency-buffer` solo tiene lo que aún no llegó al API.
+There is no need to back up `etcd-data` (it is rebuilt from PostgreSQL), OPA (it only keeps a copy of the bundle) or `opensearch-data` (analytics, can be lost). `transparency-buffer` only holds what has not yet reached the API.
 
 ### 6.2 Kubernetes: Barman Cloud
 
-El chart `rid` archiva el WAL y toma un respaldo base diario de las dos bases (`rid-db` y `rid-keycloak-db`) en el almacenamiento S3-compatible del operador (`postgres.backup`, `DEPLOYMENT.md §9.5`). La retención es de 30 días por omisión.
-- **Estado:** `kubectl get backups,scheduledbackups -n rid`, y en cada `Cluster` las condiciones `ContinuousArchiving` y `LastBackupSucceeded` (`kubectl cnpg status rid-db`).
-- **Restaurar:** se crea un `Cluster` nuevo con `bootstrap.recovery`, con el `ObjectStore` `rid-db-backup` como origen (plugin `barman-cloud.cloudnative-pg.io`, `serverName` = nombre del cluster original). Para volver a un instante, se agrega `recoveryTarget.targetTime`. Luego se apunta el API (o Keycloak) al cluster nuevo.
-- **Prueba:** el procedimiento no está probado en un clúster: el chart no se ha instalado (M6-05). Se prueba en la primera instalación, contra el almacenamiento real del operador.
+The `rid` chart archives the WAL and takes a daily base backup of both databases (`rid-db` and `rid-keycloak-db`) to the operator's S3-compatible storage (`postgres.backup`, `DEPLOYMENT.md §9.5`). Retention is 30 days by default.
+- **Status:** `kubectl get backups,scheduledbackups -n rid`, and on each `Cluster` the `ContinuousArchiving` and `LastBackupSucceeded` conditions (`kubectl cnpg status rid-db`).
+- **Restore:** create a new `Cluster` with `bootstrap.recovery`, with the `rid-db-backup` `ObjectStore` as the source (plugin `barman-cloud.cloudnative-pg.io`, `serverName` = name of the original cluster). To go back to an instant, add `recoveryTarget.targetTime`. Then point the API (or Keycloak) to the new cluster.
+- **Test:** the procedure has not been tested on a cluster: the chart has not been installed (M6-05). It is tested on the first installation, against the operator's real storage.
 
-## 7. Problemas frecuentes
+## 7. Common problems
 
-| Síntoma | Causa probable | Qué hacer |
+| Symptom | Probable cause | What to do |
 | :-- | :-- | :-- |
-| El gateway responde `403` a todo, incluso con suscripción | OPA sin bundle: el API no puede construirlo (falta, es corta o es el valor de ejemplo `RID_SUBJECT_REF_KEY` o `RID_END_USER_HASH_SALT`) o OPA no alcanza `OPA_PORTAL_URL` | `dc logs opa`, `dc logs api`; revisar esas variables y `OPA_BUNDLE_TOKEN` |
-| Suscripción "Aprobada (activándose)" que no pasa a "Activa" | OPA no descargó ni reportó la revisión nueva | `health?bundles` de OPA; SQL 1 con `system = 'opa'` |
-| API publicada que no aparece en el gateway (`404`) | Error del reconciliador de APISIX | SQL 1 con `system = 'apisix'`; `dc logs api`; revisar `APISIX_ADMIN_URL` y `APISIX_ADMIN_KEY` |
-| La aplicación no pasa a "Lista" | Error del reconciliador de Keycloak | SQL 1 con `system = 'keycloak'`; revisar `KEYCLOAK_URL` y `RID_GATEWAY_PROVISIONER_SECRET` (debe coincidir con el del realm) |
-| `api` termina al arrancar con un mensaje de configuración | `RID_COUNTRY` sin valor o YAML del país inválido | Corregir el YAML y reconstruir la imagen |
-| `api` no arranca: error de migración | Migración fallida o base inaccesible como dueño | `dc logs api`; `dc exec api node_modules/.bin/prisma migrate status` |
-| Subir un documento falla con 503 ("el antivirus no respondió") | `RID_CLAMAV_URL` está puesto y ClamAV no responde: arrancando (descarga firmas unos minutos), caído o sin memoria | `dc ps clamav`, `dc logs clamav`; esperar a que esté sano. Sin antivirus, quitar `RID_CLAMAV_URL` y recrear el API (los documentos solo se comprobarán como PDF) |
-| No se emiten certificados (503) | step-ca caído, contraseña del provisioner distinta, o raíz no configurada con `NODE_ENV=production` | `dc logs api` (mensajes `step-ca: ...`); `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD`; `RID_STEP_CA_ROOT_FILE` |
-| `sync_state` en error para `apisix:ssl:...` | step-ca no responde, falta el provisioner `rid-gateway-tls` (step-ca sin recrear) o cambió `RID_SECRETS_KEY` | `dc logs api`; `dc up -d step-ca`; §5.6 |
-| Upstream `direct` que responde 502 | El gateway ahora verifica el certificado del proveedor (vencido, autofirmado o de otro nombre), o el proveedor con mTLS no acepta `CN=rid-gateway.<slug>` | Pedir al proveedor un certificado público válido para su nombre, o que confíe en la CA de la red y en ese nombre |
-| Una aplicación recibe 429 `rate_limited` antes de su límite | Con varios nodos del gateway, el límite se reparte entre ellos (`RID_GATEWAY_NODES`) y el balanceo no es parejo (ADR-0020) | Revisar que `RID_GATEWAY_NODES` sea el número real de nodos; balancear por hash del origen |
-| El gateway responde 500 a llamadas permitidas | `limit-count` sin un límite entero positivo (bundle viejo de OPA, sin `X-RID-Rate-Limit`) | `health?bundles` de OPA; que el API sirva el bundle actual |
-| Al rotar un secreto, el anterior deja de funcionar enseguida | Falta la política de rotación en el realm `rid-gateway` existente | §5.3 |
-| El ciudadano no ve sus consultas | Registros detenidos en Fluent Bit (token o host del colector) o la operación no declara titular | `dc logs fluent-bit-transparency`; `RID_TRANSPARENCY_INGEST_TOKEN` y `RID_TRANSPARENCY_COLLECTOR_HOST` |
-| Consultas que siguen "En sellado" | TSA no responde o falta `RID_TRANSPARENCY_SIGNING_JWK` | `dc logs api`; `dc ps tsa` |
-| Inicio de sesión en bucle o error de emisor | `KC_HOSTNAME`, `KEYCLOAK_URL` o `AUTH_URL` no coinciden con la URL pública | Revisar `RID_PUBLIC_URL` y las URLs derivadas (`DEPLOYMENT.md §4.2`) |
-| Un cambio en un realm JSON no se ve | La importación ignora realms existentes | §5.3 |
-| OpenSearch no arranca | `vm.max_map_count` bajo o poca memoria | `DEPLOYMENT.md §2` |
+| The gateway responds `403` to everything, even with a subscription | OPA without a bundle: the API cannot build it (`RID_SUBJECT_REF_KEY` or `RID_END_USER_HASH_SALT` is missing, too short or the example value) or OPA cannot reach `OPA_PORTAL_URL` | `dc logs opa`, `dc logs api`; check those variables and `OPA_BUNDLE_TOKEN` |
+| Subscription "Approved (activating)" that does not become "Active" | OPA did not download or report the new revision | OPA's `health?bundles`; SQL 1 with `system = 'opa'` |
+| Published API that does not appear on the gateway (`404`) | APISIX reconciler error | SQL 1 with `system = 'apisix'`; `dc logs api`; check `APISIX_ADMIN_URL` and `APISIX_ADMIN_KEY` |
+| The application does not become "Ready" | Keycloak reconciler error | SQL 1 with `system = 'keycloak'`; check `KEYCLOAK_URL` and `RID_GATEWAY_PROVISIONER_SECRET` (it must match the realm's) |
+| `api` exits at startup with a configuration message | `RID_COUNTRY` has no value or the country YAML is invalid | Fix the YAML and rebuild the image |
+| `api` does not start: migration error | Failed migration, or the database is not reachable as owner | `dc logs api`; `dc exec api node_modules/.bin/prisma migrate status` |
+| Uploading a document fails with 503 ("the antivirus did not respond") | `RID_CLAMAV_URL` is set and ClamAV does not respond: starting up (it downloads signatures for a few minutes), down or out of memory | `dc ps clamav`, `dc logs clamav`; wait until it is healthy. Without antivirus, remove `RID_CLAMAV_URL` and recreate the API (documents will only be checked as PDF) |
+| Certificates are not issued (503) | step-ca down, different provisioner password, or root not configured with `NODE_ENV=production` | `dc logs api` (`step-ca: ...` messages); `RID_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD`; `RID_STEP_CA_ROOT_FILE` |
+| `sync_state` in error for `apisix:ssl:...` | step-ca does not respond, the `rid-gateway-tls` provisioner is missing (step-ca not recreated) or `RID_SECRETS_KEY` changed | `dc logs api`; `dc up -d step-ca`; §5.6 |
+| `direct` upstream that responds 502 | The gateway now verifies the provider's certificate (expired, self-signed or for another name), or the provider with mTLS does not accept `CN=rid-gateway.<slug>` | Ask the provider for a valid public certificate for its name, or to trust the network CA and that name |
+| An application gets 429 `rate_limited` before its limit | With several gateway nodes, the limit is split between them (`RID_GATEWAY_NODES`) and load balancing is uneven (ADR-0020) | Check that `RID_GATEWAY_NODES` is the real number of nodes; balance by source hash |
+| The gateway responds 500 to allowed calls | `limit-count` without a positive integer limit (old OPA bundle, without `X-RID-Rate-Limit`) | OPA's `health?bundles`; that the API serves the current bundle |
+| When a secret is rotated, the old one stops working right away | The rotation policy is missing from the existing `rid-gateway` realm | §5.3 |
+| The citizen does not see their queries | Records stuck in Fluent Bit (collector token or host) or the operation does not declare a data subject | `dc logs fluent-bit-transparency`; `RID_TRANSPARENCY_INGEST_TOKEN` and `RID_TRANSPARENCY_COLLECTOR_HOST` |
+| Queries that stay "Being sealed" | The TSA does not respond or `RID_TRANSPARENCY_SIGNING_JWK` is missing | `dc logs api`; `dc ps tsa` |
+| Sign-in loops or issuer error | `KC_HOSTNAME`, `KEYCLOAK_URL` or `AUTH_URL` do not match the public URL | Check `RID_PUBLIC_URL` and the derived URLs (`DEPLOYMENT.md §4.2`) |
+| A change in a realm JSON does not show up | The import ignores existing realms | §5.3 |
+| OpenSearch does not start | `vm.max_map_count` too low or too little memory | `DEPLOYMENT.md §2` |

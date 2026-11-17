@@ -1,22 +1,22 @@
-# step-ca (desarrollo)
+# step-ca (development)
 
-La CA de desarrollo se inicializa sola en el primer arranque con las variables `DOCKER_STEPCA_INIT_*` de `infra/compose/docker-compose.yml`:
+The development CA initializes itself on first start with the `DOCKER_STEPCA_INIT_*` variables in `infra/compose/docker-compose.yml`:
 
-- Nombre: `RID Dev CA`; nombres DNS: `localhost`, `step-ca`.
-- Provisioner JWK `rid-portal`: con él el API firma los CSR de las aplicaciones (M3-01).
-- Contraseña de las claves y del provisioner: `STEP_CA_PASSWORD` de `.env` (el API la recibe en `RID_STEP_CA_PROVISIONER_PASSWORD`).
+- Name: `RID Dev CA`; DNS names: `localhost`, `step-ca`.
+- JWK provisioner `rid-portal`: the API uses it to sign the applications' CSRs (M3-01).
+- Password for the keys and the provisioner: `STEP_CA_PASSWORD` from `.env` (the API receives it in `RID_STEP_CA_PROVISIONER_PASSWORD`).
 
-En cada arranque, `configure.sh` ajusta el provisioner del portal antes de iniciar la CA:
+On every start, `configure.sh` adjusts the portal's provisioner before starting the CA:
 
-- plantilla `app.tpl`: el sujeto es solo `CN=<clientId>` (el del token), el clientId va como SAN DNS y el uso de clave es solo autenticación de cliente TLS;
-- vigencia: 90 días por defecto y 397 como máximo. El portal pide `lifecycle.certificateValidityDays`.
-- provisioner `rid-gateway-tls` (M3-02), que `configure.sh` crea si no existe, con la contraseña de la CA: emite el certificado de servidor TLS del gateway con la plantilla `gateway.tpl` (los nombres de `RID_GATEWAY_TLS_HOSTS`, solo autenticación de servidor, 90 días). El portal genera la clave, lo pide y lo renueva en el último tercio de su vida.
+- `app.tpl` template: the subject is only `CN=<clientId>` (the one in the token), the clientId goes in as a DNS SAN and the key usage is TLS client authentication only;
+- validity: 90 days by default and 397 at most. The portal requests `lifecycle.certificateValidityDays`.
+- provisioner `rid-gateway-tls` (M3-02), which `configure.sh` creates if it does not exist, with the CA password: it issues the gateway's TLS server certificate with the `gateway.tpl` template (the names in `RID_GATEWAY_TLS_HOSTS`, server authentication only, 90 days). The portal generates the private key, requests the certificate and renews it in the last third of its lifetime.
 
-En el despliegue de una sola máquina, el contenedor del API monta solo `certs/` del volumen (no las claves) y verifica el TLS de la CA con `RID_STEP_CA_ROOT_FILE`. Fuera de esa máquina se fija la raíz con `RID_STEP_CA_ROOT_FINGERPRINT`.
+In the single-machine deployment, the API container mounts only `certs/` from the volume (not the keys) and verifies the CA's TLS with `RID_STEP_CA_ROOT_FILE`. Outside that machine, the root is pinned with `RID_STEP_CA_ROOT_FINGERPRINT`.
 
-El estado (raíz, intermedia, claves) vive en el volumen `step-ca-data`. `pnpm infra:reset` lo borra y la CA se regenera.
+The state (root, intermediate, keys) lives in the `step-ca-data` volume. `pnpm infra:reset` deletes it and the CA is regenerated.
 
-Huella de la raíz (para clientes que la necesiten):
+Root fingerprint (for clients that need it):
 
 ```bash
 docker compose -f infra/compose/docker-compose.yml exec step-ca step certificate fingerprint certs/root_ca.crt

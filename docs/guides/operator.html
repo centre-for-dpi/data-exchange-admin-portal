@@ -1,0 +1,1089 @@
+<meta charset="utf-8">
+<title>RID operator guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a sticky contents rail beside one reading column; the two planes of the network carry
+   their own hue (governance = indigo, data = teal) through every diagram, chip and card. */
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --ink: #15202b;
+  --muted: #586575;
+  --line: #d8dee6;
+  --gov: #3a4cc0;
+  --gov-tint: #eceffd;
+  --data: #0a7569;
+  --data-tint: #e2f3f0;
+  --ok: #1d7139;
+  --ok-tint: #e5f4ea;
+  --warn: #9a5200;
+  --warn-tint: #fdf1e1;
+  --bad: #b0222b;
+  --bad-tint: #fcebed;
+  --code-bg: #edf0f4;
+  --font-display: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --step: 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1319; --surface: #151c24; --ink: #e5eaf0; --muted: #9ba8b6; --line: #2a3541;
+    --gov: #95a3f7; --gov-tint: #1b2142; --data: #52cfbd; --data-tint: #0d2925;
+    --ok: #6fd18e; --ok-tint: #11291a; --warn: #f1b45c; --warn-tint: #2d210f;
+    --bad: #ff8c92; --bad-tint: #321619; --code-bg: #1c2530; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1319; --surface: #151c24; --ink: #e5eaf0; --muted: #9ba8b6; --line: #2a3541;
+  --gov: #95a3f7; --gov-tint: #1b2142; --data: #52cfbd; --data-tint: #0d2925;
+  --ok: #6fd18e; --ok-tint: #11291a; --warn: #f1b45c; --warn-tint: #2d210f;
+  --bad: #ff8c92; --bad-tint: #321619; --code-bg: #1c2530; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { font-size: 16px; scroll-padding-top: 72px; }
+html.big { font-size: 19px; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 1rem; line-height: 1.6; margin: 0;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+table { font-size: inherit; }
+a { color: var(--gov); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible { outline: 3px solid var(--gov); outline-offset: 2px; border-radius: 4px; }
+code, kbd, pre { font-family: var(--font-mono); font-size: 0.88em; }
+:not(pre) > code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.topbar-inner { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 12px; min-height: 56px; }
+.brand { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.01em; display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 26px; height: 26px; flex: none; }
+.brand small { font-weight: 500; color: var(--muted); font-family: var(--font-body); }
+.topbar .spacer { flex: 1; }
+.tool {
+  font: inherit; font-size: 0.85rem; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer;
+}
+.tool[aria-pressed="true"] { background: var(--gov); border-color: var(--gov); color: var(--surface); }
+
+.hero {
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 28px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.hero-inner { max-width: 1180px; margin: 0 auto; display: grid; gap: 14px; }
+.eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.7rem); font-weight: 700; max-width: 22ch; }
+.lede { font-size: 1.12rem; max-width: 64ch; color: var(--muted); margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.9rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 600; }
+
+.shell {
+  max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 80px;
+}
+.toc { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; font-size: 0.9rem; }
+.toc p { margin: 18px 0 6px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+.toc p:first-child { margin-top: 0; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.toc a { display: block; padding: 4px 10px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; }
+.toc a:hover { color: var(--ink); }
+.toc a.active { color: var(--ink); border-left-color: var(--gov); font-weight: 600; }
+.toc-mobile { display: none; }
+
+main { min-width: 0; display: grid; gap: 64px; }
+section { display: grid; gap: 18px; min-width: 0; }
+section > p, section > ul, .prose { max-width: 70ch; margin: 0; }
+.part {
+  font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--muted); border-top: 2px solid var(--ink); padding-top: 10px; font-weight: 600;
+}
+h2 { font-size: 1.65rem; font-weight: 700; }
+h2 .num { color: var(--muted); font-weight: 500; margin-right: 0.35em; font-variant-numeric: tabular-nums; }
+h3 { font-size: 1.2rem; font-weight: 600; }
+ul.ticks { padding-left: 1.2em; display: grid; gap: 8px; }
+
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.principle { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.principle b { font-family: var(--font-display); font-size: 1.02rem; }
+.principle span { color: var(--muted); font-size: 0.93rem; }
+
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.figscroll { overflow-x: auto; }
+figure svg { display: block; width: 100%; height: auto; min-width: 640px; color: var(--ink); }
+figcaption { font-size: 0.9rem; color: var(--muted); max-width: 80ch; }
+
+/* SVG classes, themed through the page tokens */
+.d-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.2; }
+.d-gov { fill: var(--gov-tint); stroke: var(--gov); stroke-width: 1.2; }
+.d-data { fill: var(--data-tint); stroke: var(--data); stroke-width: 1.2; }
+.d-panel-gov { fill: var(--gov-tint); fill-opacity: 0.45; stroke: var(--gov); stroke-dasharray: 5 4; }
+.d-panel-data { fill: var(--data-tint); fill-opacity: 0.45; stroke: var(--data); stroke-dasharray: 5 4; }
+.d-edge { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+.d-ent { fill: var(--bg); stroke: var(--muted); stroke-dasharray: 3 3; }
+.d-line { stroke: var(--ink); stroke-width: 1.3; fill: none; }
+.d-thin { stroke: var(--muted); stroke-width: 1; fill: none; }
+.d-dash { stroke: var(--ink); stroke-width: 1.3; fill: none; stroke-dasharray: 5 4; }
+.d-strong { stroke: var(--data); stroke-width: 2.6; fill: none; }
+.d-life { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 4; }
+.d-t { fill: var(--ink); font-family: var(--font-body); font-size: 13px; }
+.d-tb { fill: var(--ink); font-family: var(--font-display); font-size: 14px; font-weight: 600; }
+.d-ts { fill: var(--muted); font-family: var(--font-body); font-size: 11.5px; }
+.d-lab { fill: var(--ink); font-family: var(--font-mono); font-size: 11.5px; }
+.d-cap { fill: var(--muted); font-family: var(--font-display); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
+.d-capgov { fill: var(--gov); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.d-capdata { fill: var(--data); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.d-ah { fill: var(--ink); }
+.d-ahd { fill: var(--data); }
+.d-ahm { fill: var(--muted); }
+
+/* Tables */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table.t { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+table.t th, table.t td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+table.t tr:last-child td { border-bottom: 0; }
+table.t th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; background: var(--bg); }
+table.t td:first-child { font-weight: 600; white-space: nowrap; }
+table.t td.wrap { white-space: normal; }
+
+/* Role cards */
+.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.role { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.role header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; justify-content: space-between; }
+.role code { font-weight: 500; }
+.role .who { font-size: 0.82rem; color: var(--muted); }
+.role p { margin: 0; font-size: 0.93rem; }
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.tag.mfa { background: var(--warn-tint); color: var(--warn); }
+.tag.gov { background: var(--gov-tint); color: var(--gov); }
+.tag.data { background: var(--data-tint); color: var(--data); }
+.tag.ok { background: var(--ok-tint); color: var(--ok); }
+.tag.warn { background: var(--warn-tint); color: var(--warn); }
+.tag.bad { background: var(--bad-tint); color: var(--bad); }
+.tag.plain { background: var(--code-bg); color: var(--muted); }
+
+/* Component cards */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.85rem; color: var(--muted); align-items: center; }
+.comps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.comp {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid;
+  gap: 10px; align-content: start; min-width: 0;
+}
+.comp.g { border-top: 3px solid var(--gov); }
+.comp.d { border-top: 3px solid var(--data); }
+.comp.e { border-top: 3px solid var(--ink); }
+.comp h4 { font-size: 1.08rem; }
+.comp .tech { font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono); }
+.comp p { margin: 0; font-size: 0.93rem; }
+.comp dl { margin: 0; display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: 6px 10px; font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 10px; }
+.comp dt { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 2px; }
+.comp dd { margin: 0; display: grid; gap: 4px; justify-items: start; }
+
+.comp ul.ticks { margin: 0; font-size: 0.93rem; gap: 4px; }
+/* State pipelines */
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.st { font-family: var(--font-mono); font-size: 0.84rem; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); white-space: nowrap; }
+.st.opt { border-style: dashed; color: var(--muted); }
+.st.goal { border-color: var(--ok); color: var(--ok); background: var(--ok-tint); font-weight: 500; }
+.st.end { border-color: var(--muted); color: var(--muted); }
+.arrow { color: var(--muted); font-size: 0.9rem; }
+.flowcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; }
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 10px; max-width: 72ch; }
+ol.steps > li::before {
+  content: counter(s); font-family: var(--font-display); font-weight: 700; width: 1.75rem; height: 1.75rem;
+  border-radius: 50%; display: grid; place-items: center; background: var(--code-bg); font-size: 0.88rem;
+}
+
+/* Guarantees */
+.guar { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.guar div { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 6px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.guar b { font-family: var(--font-display); }
+.guar span { font-size: 0.92rem; color: var(--muted); }
+
+/* Spec sheet */
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.spec div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.spec .k { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.spec .v { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.spec .s { font-size: 0.85rem; color: var(--muted); }
+.ports { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.port { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.port .pn { font-family: var(--font-mono); font-size: 1.15rem; font-weight: 500; }
+.port span { font-size: 0.9rem; color: var(--muted); }
+
+/* Checklist */
+.check { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; display: grid; }
+.check label { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); gap: 10px; padding: 8px 16px; cursor: pointer; align-items: start; }
+.check input { width: 1.05rem; height: 1.05rem; margin-top: 0.25em; accent-color: var(--ok); }
+.check input:checked + span { color: var(--muted); text-decoration: line-through; }
+
+/* Code */
+.code { position: relative; background: var(--code-bg); border-radius: 8px; border: 1px solid var(--line); min-width: 0; }
+.code pre { margin: 0; padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.code .copy { position: absolute; top: 8px; right: 8px; }
+.copy { font: inherit; font-size: 0.75rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 3px 9px; border-radius: 5px; cursor: pointer; }
+.cmds { display: grid; gap: 8px; }
+.cmd { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.cmd code { background: none; padding: 0; font-size: 0.9rem; font-weight: 500; }
+.cmd span { grid-column: 1 / -1; font-size: 0.9rem; color: var(--muted); }
+
+/* Install stepper */
+.qs { display: grid; gap: 10px; counter-reset: q; }
+.q { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.q .qn { font-family: var(--font-display); font-weight: 700; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; display: grid; align-content: start; gap: 2px; }
+.q .qn b { font-size: 1.6rem; color: var(--ink); line-height: 1; }
+.q h4 { font-size: 1.02rem; margin-bottom: 4px; }
+.q p { margin: 0; font-size: 0.93rem; }
+.q .auto { color: var(--muted); }
+.opts { display: grid; gap: 6px; margin-top: 8px; }
+.opts div { font-size: 0.9rem; display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: 6px; }
+.opts kbd { font-weight: 600; background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; text-align: center; height: 1.5rem; line-height: 1.45rem; }
+
+.callout { border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; max-width: 80ch; }
+.callout.warn { background: var(--warn-tint); border: 1px solid var(--warn); }
+.callout.info { background: var(--gov-tint); border: 1px solid var(--gov); }
+.callout b { font-family: var(--font-display); }
+.callout p { margin: 0; }
+
+details.faq { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+details.faq + details.faq { margin-top: -8px; }
+details.faq summary { cursor: pointer; padding: 12px 16px; font-weight: 600; list-style-position: outside; }
+details.faq p { margin: 0; padding: 0 16px 14px; max-width: 72ch; color: var(--muted); }
+details.faq[open] summary { color: var(--gov); }
+
+.vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .toc { display: none; }
+  .toc-mobile { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  .toc-mobile summary { cursor: pointer; font-weight: 600; }
+  .toc-mobile ol { margin: 8px 0 0; padding-left: 1.2em; display: grid; gap: 4px; }
+  .brand small { display: none; }
+}
+@media (max-width: 520px) {
+  .q { grid-template-columns: minmax(0, 1fr); }
+  .q .qn { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 8px; }
+  .comp dl { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 26 26" aria-hidden="true">
+        <circle cx="5" cy="13" r="3.2" fill="var(--gov)"></circle>
+        <circle cx="21" cy="5.5" r="3.2" fill="var(--data)"></circle>
+        <circle cx="21" cy="20.5" r="3.2" fill="var(--data)"></circle>
+        <path d="M8 13 H13 M13 13 L18 7 M13 13 L18 19" stroke="var(--ink)" stroke-width="1.6" fill="none"></path>
+      </svg>
+      <span>Data Exchange Network <small>· guide for the operator and the regulator</small></span>
+    </div>
+    <span class="spacer"></span>
+    <button class="tool" id="bigtext" type="button" aria-pressed="false" title="Larger text for projecting">Presentation mode</button>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">Architecture and deployment session · Tuesday, November 17, 2026</span>
+    <h1>How the platform works and how it is installed</h1>
+    <p class="lede">What each piece of the Data Exchange Network is, why it is there and who runs it. At the end, the installation of the central infrastructure on the operator's server, step by step.</p>
+    <div class="meta">
+      <span><b>For</b> the operator (AND) and the regulator (MinTIC)</span>
+      <span><b>Version</b> 1.2 · November 2026</span>
+      <span><b>Code</b> with milestone M6 (hardening) closed</span>
+      <span><b>Topology</b> single-server pilot</span>
+      <span><a href="../es/guides/operator.html" hreflang="es" lang="es">Versión en español</a></span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <p>Part I · The platform</p>
+    <ol>
+      <li><a href="#red">1. The network on one page</a></li>
+      <li><a href="#roles">2. Who does what</a></li>
+      <li><a href="#arquitectura">3. Two planes</a></li>
+      <li><a href="#componentes">4. The components</a></li>
+      <li><a href="#flujos">5. How everything flows</a></li>
+      <li><a href="#seguridad">6. Security and privacy</a></li>
+    </ol>
+    <p>Part II · Installation</p>
+    <ol>
+      <li><a href="#requisitos">7. Server requirements</a></li>
+      <li><a href="#instalar">8. Install</a></li>
+      <li><a href="#resultado">9. What gets installed</a></li>
+      <li><a href="#custodia">10. Custody of secrets</a></li>
+    </ol>
+    <p>Part III · Operations</p>
+    <ol>
+      <li><a href="#operacion">11. Day to day</a></li>
+      <li><a href="#problemas">12. Common problems</a></li>
+      <li><a href="#produccion">13. Pilot and production</a></li>
+      <li><a href="#preguntas">14. Questions that come up</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <details class="toc-mobile">
+      <summary>Contents</summary>
+      <ol>
+        <li><a href="#red">The network on one page</a></li>
+        <li><a href="#roles">Who does what</a></li>
+        <li><a href="#arquitectura">Two planes</a></li>
+        <li><a href="#componentes">The components</a></li>
+        <li><a href="#flujos">How everything flows</a></li>
+        <li><a href="#seguridad">Security and privacy</a></li>
+        <li><a href="#requisitos">Server requirements</a></li>
+        <li><a href="#instalar">Install</a></li>
+        <li><a href="#resultado">What gets installed</a></li>
+        <li><a href="#custodia">Custody of secrets</a></li>
+        <li><a href="#operacion">Day to day</a></li>
+        <li><a href="#problemas">Common problems</a></li>
+        <li><a href="#produccion">Pilot and production</a></li>
+        <li><a href="#preguntas">Questions that come up</a></li>
+      </ol>
+    </details>
+
+    <!-- ============================ PART I ============================ -->
+    <section id="red">
+      <div class="part">Part I · The platform</div>
+      <h2><span class="num">1</span>The network on one page</h2>
+      <p>The Data Exchange Network lets a public entity <b>query another entity's data</b> without copying it, with <b>explicit permission</b>, for a <b>declared purpose</b> and leaving <b>a trace of every request</b>.</p>
+      <div class="principles">
+        <div class="principle"><b>The data stays at each entity</b><span>The central gateway only passes the request and the response through. It does not store content, neither in a database nor in logs.</span></div>
+        <div class="principle"><b>Nobody gets in without permission</b><span>Each access is a subscription: an application, to an API, for a purpose, approved by the data steward of the entity that owns the data.</span></div>
+        <div class="principle"><b>Everything is audited</b><span>Every change goes into a hash-chained audit log that a timestamping authority seals daily.</span></div>
+        <div class="principle"><b>Citizens see who queried them</b><span>What for and when, with a receipt that anyone can verify without trusting the portal.</span></div>
+        <div class="principle"><b>Only free software</b><span>OSI-approved licenses: no license costs and no vendor lock-in.</span></div>
+        <div class="principle"><b>Reusable in another country</b><span>Everything specific to Colombia (authorities, documents, sectors, legal framework) is in <code>config/country/co.yaml</code>.</span></div>
+      </div>
+    </section>
+
+    <section id="roles">
+      <h2><span class="num">2</span>Who does what</h2>
+      <figure>
+        <div class="figscroll">
+          <svg viewBox="0 0 900 335" role="img" aria-label="The provider entity registers its API with the operator, which publishes it and passes sensitive cases to the regulator. The consumer requests access from the provider by declaring a purpose, and its requests go through the gateway. Citizens see in the transparency log who queried them.">
+            <defs>
+              <marker id="r-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ah"></path></marker>
+              <marker id="r-ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahd"></path></marker>
+            </defs>
+            <rect x="20" y="22" width="150" height="56" rx="8" class="d-box"></rect>
+            <text x="95" y="46" text-anchor="middle" class="d-tb">Citizen</text>
+            <text x="95" y="64" text-anchor="middle" class="d-ts">sees who queried them</text>
+            <rect x="270" y="22" width="190" height="56" rx="8" class="d-gov"></rect>
+            <text x="365" y="46" text-anchor="middle" class="d-tb">Operator (AND)</text>
+            <text x="365" y="64" text-anchor="middle" class="d-ts">runs, reviews and publishes</text>
+            <rect x="560" y="22" width="190" height="56" rx="8" class="d-gov"></rect>
+            <text x="655" y="46" text-anchor="middle" class="d-tb">Regulator (MinTIC)</text>
+            <text x="655" y="64" text-anchor="middle" class="d-ts">supervises, approves sensitive data</text>
+            <line x1="270" y1="50" x2="172" y2="50" class="d-line" marker-end="url(#r-ah)"></line>
+            <text x="221" y="42" text-anchor="middle" class="d-ts">transparency</text>
+            <line x1="460" y1="50" x2="558" y2="50" class="d-line" marker-end="url(#r-ah)"></line>
+            <text x="509" y="42" text-anchor="middle" class="d-ts">if sensitive</text>
+
+            <rect x="20" y="160" width="220" height="60" rx="8" class="d-box"></rect>
+            <text x="130" y="185" text-anchor="middle" class="d-tb">Consumer entity</text>
+            <text x="130" y="204" text-anchor="middle" class="d-ts">creates applications, requests access</text>
+            <rect x="370" y="165" width="160" height="50" rx="8" class="d-data"></rect>
+            <text x="450" y="195" text-anchor="middle" class="d-tb">Gateway</text>
+            <rect x="660" y="160" width="220" height="60" rx="8" class="d-box"></rect>
+            <text x="770" y="185" text-anchor="middle" class="d-tb">Provider entity</text>
+            <text x="770" y="204" text-anchor="middle" class="d-ts">publishes APIs, approves access</text>
+
+            <line x1="240" y1="190" x2="368" y2="190" class="d-strong" marker-end="url(#r-ahd)"></line>
+            <line x1="530" y1="190" x2="658" y2="190" class="d-strong" marker-end="url(#r-ahd)"></line>
+            <text x="304" y="180" text-anchor="middle" class="d-ts">request</text>
+            <text x="594" y="180" text-anchor="middle" class="d-ts">request</text>
+
+            <line x1="720" y1="160" x2="405" y2="81" class="d-line" marker-end="url(#r-ah)"></line>
+            <text x="612" y="112" text-anchor="middle" class="d-ts">registers the API</text>
+
+            <path d="M130 220 Q450 330 770 220" class="d-dash" marker-end="url(#r-ah)"></path>
+            <text x="450" y="300" text-anchor="middle" class="d-t">requests access by declaring a purpose</text>
+            <text x="450" y="318" text-anchor="middle" class="d-ts">the provider's data steward approves it</text>
+          </svg>
+        </div>
+        <figcaption>The thick line is the traffic: it always goes through the gateway. The others are governance decisions, made in the portal.</figcaption>
+      </figure>
+
+      <div class="roles">
+        <div class="role"><header><code>platform_admin</code><span class="tag mfa">2nd factor</span></header><span class="who">AND technical team</span><p>Everything operational: approve entities, publish, manage nodes, suspend.</p></div>
+        <div class="role"><header><code>platform_reviewer</code><span class="tag mfa">2nd factor</span></header><span class="who">AND analysts</span><p>Review entity registrations and API publications.</p></div>
+        <div class="role"><header><code>regulator</code><span class="tag mfa">2nd factor</span></header><span class="who">MinTIC</span><p>See everything read-only; approve publications of and access to <b>sensitive</b> data; indicators; audit.</p></div>
+        <div class="role"><header><code>auditor</code><span class="tag mfa">2nd factor</span></header><span class="who">Oversight bodies</span><p>Read-only access to the audit.</p></div>
+        <div class="role"><header><code>entity_admin</code></header><span class="who">Each entity</span><p>Its people and their roles, its kit nodes.</p></div>
+        <div class="role"><header><code>api_publisher</code></header><span class="who">Each entity</span><p>Register its APIs and submit them for review.</p></div>
+        <div class="role"><header><code>data_steward</code><span class="tag mfa">2nd factor</span></header><span class="who">Each entity's data steward</span><p>Approve, reject, suspend and revoke access to its APIs.</p></div>
+        <div class="role"><header><code>app_developer</code></header><span class="who">Each entity</span><p>Create applications, credentials and access requests.</p></div>
+      </div>
+      <p>The second factor is a TOTP code from an authenticator app. Nobody approves what they themselves requested: the portal separates duties.</p>
+    </section>
+
+    <section id="arquitectura">
+      <h2><span class="num">3</span>Architecture: two planes</h2>
+      <p>The <b style="color:var(--gov)">governance plane</b> decides who can do what and turns that into configuration. The <b style="color:var(--data)">data plane</b> serves each call with the latest configuration and the latest policy it received. <b>If the portal goes down, traffic between entities keeps flowing.</b></p>
+      <figure>
+        <div class="figscroll">
+          <svg viewBox="0 0 1000 690" role="img" aria-label="Architecture. Traefik receives everything on port 443: for the portal name it terminates HTTPS and routes to the web, the API and Keycloak; for the gateway name it passes the TLS through to APISIX without opening it. The API configures APISIX, creates clients in Keycloak, signs with step-ca, seals with the TSA, scans documents with ClamAV (optional) and stores data in PostgreSQL, which pgBackRest backs up continuously. OPA downloads the policy from the API, and APISIX asks it on every call. APISIX reaches the kit's nodes through the WireGuard hub and existing APIs over HTTPS. Fluent Bit carries the metadata to the API's transparency log and to OpenSearch.">
+            <defs>
+              <marker id="a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ah"></path></marker>
+              <marker id="a-ahm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahm"></path></marker>
+              <marker id="a-ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahd"></path></marker>
+            </defs>
+            <!-- actors -->
+            <rect x="120" y="12" width="260" height="46" rx="8" class="d-box"></rect>
+            <text x="250" y="32" text-anchor="middle" class="d-tb">People</text>
+            <text x="250" y="49" text-anchor="middle" class="d-ts">browser · HTTPS</text>
+            <rect x="600" y="12" width="300" height="46" rx="8" class="d-box"></rect>
+            <text x="750" y="32" text-anchor="middle" class="d-tb">Entities' systems</text>
+            <text x="750" y="49" text-anchor="middle" class="d-ts">client certificate (mTLS)</text>
+            <line x1="250" y1="58" x2="250" y2="92" class="d-line" marker-end="url(#a-ah)"></line>
+            <line x1="750" y1="58" x2="750" y2="92" class="d-strong" marker-end="url(#a-ahd)"></line>
+            <!-- edge -->
+            <text x="44" y="86" class="d-cap">ENTRY · TRAEFIK · 443/TCP</text>
+            <rect x="40" y="94" width="920" height="50" rx="6" class="d-edge"></rect>
+            <line x1="500" y1="100" x2="500" y2="138" class="d-thin" stroke-dasharray="3 3"></line>
+            <text x="270" y="115" text-anchor="middle" class="d-tb">portal name</text>
+            <text x="270" y="133" text-anchor="middle" class="d-ts">terminates HTTPS and routes by path</text>
+            <text x="730" y="115" text-anchor="middle" class="d-tb">gateway name</text>
+            <text x="730" y="133" text-anchor="middle" class="d-ts">passes TLS through unopened (SNI)</text>
+            <!-- panels -->
+            <rect x="40" y="178" width="450" height="412" rx="10" class="d-panel-gov"></rect>
+            <text x="56" y="200" class="d-capgov">GOVERNANCE PLANE</text>
+            <rect x="510" y="178" width="450" height="412" rx="10" class="d-panel-data"></rect>
+            <text x="526" y="200" class="d-capdata">DATA PLANE</text>
+            <!-- governance layer B -->
+            <rect x="60" y="222" width="140" height="46" rx="6" class="d-gov"></rect>
+            <text x="130" y="242" text-anchor="middle" class="d-tb">Web portal</text>
+            <text x="130" y="259" text-anchor="middle" class="d-ts">Next.js</text>
+            <rect x="300" y="222" width="170" height="46" rx="6" class="d-gov"></rect>
+            <text x="385" y="242" text-anchor="middle" class="d-tb">Keycloak</text>
+            <text x="385" y="259" text-anchor="middle" class="d-ts">identity · 3 realms</text>
+            <line x1="130" y1="144" x2="130" y2="220" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="138" y="186" class="d-lab">/</text>
+            <line x1="385" y1="144" x2="385" y2="220" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="393" y="186" class="d-lab">/auth</text>
+            <line x1="250" y1="144" x2="250" y2="320" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="258" y="186" class="d-lab">/api/v1</text>
+            <!-- governance layer C -->
+            <rect x="160" y="322" width="250" height="50" rx="6" class="d-gov" stroke-width="2"></rect>
+            <text x="285" y="343" text-anchor="middle" class="d-tb">Portal API</text>
+            <text x="285" y="361" text-anchor="middle" class="d-ts">workflows · reconcilers · audit</text>
+            <line x1="150" y1="268" x2="200" y2="319" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="160" y="302" text-anchor="end" class="d-ts">uses the API</text>
+            <line x1="372" y1="322" x2="382" y2="270" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="392" y="300" class="d-ts">OAuth clients</text>
+            <rect x="55" y="326" width="82" height="42" rx="6" class="d-gov" stroke-dasharray="4 3"></rect>
+            <text x="96" y="344" text-anchor="middle" class="d-tb">ClamAV</text>
+            <text x="96" y="360" text-anchor="middle" class="d-ts">optional</text>
+            <line x1="160" y1="347" x2="139" y2="347" class="d-thin" marker-end="url(#a-ahm)"></line>
+            <!-- governance layer D -->
+            <rect x="55" y="430" width="100" height="48" rx="6" class="d-gov"></rect>
+            <text x="105" y="450" text-anchor="middle" class="d-tb">PostgreSQL</text>
+            <text x="105" y="467" text-anchor="middle" class="d-ts">source of truth</text>
+            <rect x="165" y="430" width="100" height="48" rx="6" class="d-gov"></rect>
+            <text x="215" y="450" text-anchor="middle" class="d-tb">step-ca</text>
+            <text x="215" y="467" text-anchor="middle" class="d-ts">network CA</text>
+            <rect x="275" y="430" width="100" height="48" rx="6" class="d-gov"></rect>
+            <text x="325" y="450" text-anchor="middle" class="d-tb">TSA</text>
+            <text x="325" y="467" text-anchor="middle" class="d-ts">timestamping</text>
+            <rect x="385" y="430" width="90" height="48" rx="6" class="d-gov"></rect>
+            <text x="430" y="450" text-anchor="middle" class="d-tb">Email</text>
+            <text x="430" y="467" text-anchor="middle" class="d-ts">Mailpit</text>
+            <line x1="200" y1="372" x2="110" y2="428" class="d-thin" marker-end="url(#a-ahm)"></line>
+            <line x1="240" y1="372" x2="218" y2="428" class="d-thin" marker-end="url(#a-ahm)"></line>
+            <line x1="310" y1="372" x2="324" y2="428" class="d-thin" marker-end="url(#a-ahm)"></line>
+            <line x1="380" y1="372" x2="428" y2="428" class="d-thin" marker-end="url(#a-ahm)"></line>
+            <rect x="55" y="505" width="100" height="42" rx="6" class="d-gov"></rect>
+            <text x="105" y="523" text-anchor="middle" class="d-tb">pgBackRest</text>
+            <text x="105" y="539" text-anchor="middle" class="d-ts">encrypted backup</text>
+            <line x1="105" y1="478" x2="105" y2="503" class="d-thin" marker-end="url(#a-ahm)"></line>
+            <text x="112" y="495" class="d-ts">archives every change</text>
+            <text x="56" y="574" class="d-ts">Only the API talks to them and to ClamAV.</text>
+            <!-- data layer B/C -->
+            <rect x="600" y="222" width="280" height="46" rx="6" class="d-data" stroke-width="2"></rect>
+            <text x="740" y="242" text-anchor="middle" class="d-tb">APISIX + etcd</text>
+            <text x="740" y="259" text-anchor="middle" class="d-ts">gateway · mTLS · token · limits</text>
+            <line x1="740" y1="144" x2="740" y2="220" class="d-strong" marker-end="url(#a-ahd)"></line>
+            <text x="748" y="186" class="d-ts">end-to-end mTLS</text>
+            <rect x="650" y="322" width="180" height="50" rx="6" class="d-data"></rect>
+            <text x="740" y="343" text-anchor="middle" class="d-tb">OPA</text>
+            <text x="740" y="361" text-anchor="middle" class="d-ts">decides each call</text>
+            <line x1="740" y1="268" x2="740" y2="320" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="748" y="300" class="d-ts">allowed?</text>
+            <!-- cross-plane -->
+            <line x1="650" y1="338" x2="412" y2="338" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="530" y="331" text-anchor="middle" class="d-ts">pulls the policy every 10–20 s</text>
+            <line x1="410" y1="326" x2="598" y2="262" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="548" y="306" text-anchor="middle" class="d-ts">configures</text>
+            <text x="548" y="319" text-anchor="middle" class="d-ts">(reconciler)</text>
+            <!-- data layer D -->
+            <rect x="530" y="430" width="150" height="48" rx="6" class="d-data"></rect>
+            <text x="605" y="450" text-anchor="middle" class="d-tb">WireGuard hub</text>
+            <text x="605" y="467" text-anchor="middle" class="d-ts">tunnels from the nodes</text>
+            <rect x="790" y="430" width="150" height="48" rx="6" class="d-data"></rect>
+            <text x="865" y="450" text-anchor="middle" class="d-tb">Fluent Bit</text>
+            <text x="865" y="467" text-anchor="middle" class="d-ts">metadata only</text>
+            <line x1="630" y1="268" x2="607" y2="428" class="d-strong" marker-end="url(#a-ahd)"></line>
+            <text x="612" y="400" text-anchor="end" class="d-ts">to the nodes</text>
+            <line x1="860" y1="268" x2="865" y2="428" class="d-line" marker-end="url(#a-ah)"></line>
+            <text x="872" y="400" class="d-ts">metadata</text>
+            <polyline points="820,478 820,505 485,505 485,362 412,362" class="d-line" marker-end="url(#a-ah)"></polyline>
+            <text x="700" y="521" class="d-ts">transparency log</text>
+            <rect x="800" y="532" width="150" height="44" rx="6" class="d-data"></rect>
+            <text x="875" y="551" text-anchor="middle" class="d-tb">OpenSearch</text>
+            <text x="875" y="567" text-anchor="middle" class="d-ts">analytics (optional)</text>
+            <line x1="910" y1="478" x2="910" y2="530" class="d-line" marker-end="url(#a-ah)"></line>
+            <!-- providers -->
+            <rect x="520" y="625" width="190" height="50" rx="8" class="d-ent"></rect>
+            <text x="615" y="646" text-anchor="middle" class="d-tb">Kit node</text>
+            <text x="615" y="664" text-anchor="middle" class="d-ts">inside the entity's network</text>
+            <rect x="760" y="625" width="200" height="50" rx="8" class="d-ent"></rect>
+            <text x="860" y="646" text-anchor="middle" class="d-tb">Provider API</text>
+            <text x="860" y="664" text-anchor="middle" class="d-ts">the entity's existing service</text>
+            <line x1="605" y1="623" x2="605" y2="480" class="d-strong" marker-end="url(#a-ahd)"></line>
+            <text x="597" y="612" text-anchor="end" class="d-ts">the node opens the tunnel · 51820/udp</text>
+            <polyline points="880,245 982,245 982,650 962,650" class="d-strong" marker-end="url(#a-ahd)"></polyline>
+            <text x="972" y="612" text-anchor="end" class="d-ts">HTTPS to the provider</text>
+          </svg>
+        </div>
+        <figcaption>In green, the path of a request between entities; it never touches the portal. The API configures the gateway and OPA downloads the policy from the API: the data plane does not query the portal's database online. Prometheus, Alertmanager and Grafana (optional) measure the gateway, the API and OPA. With a dotted line, the optional part of the governance plane: ClamAV scans every document before it is stored.</figcaption>
+      </figure>
+      <div class="callout info">
+        <b>The portal never configures the gateway "by hand"</b>
+        <p>A <i>reconciler</i> works out from the database how APISIX, Keycloak, OPA and the hub should be set up, and adjusts them. It is idempotent: if something drifts or gets lost, the next pass (every 5 minutes, or when the API restarts) repairs it. That is why nobody fixes APISIX or Keycloak by hand.</p>
+      </div>
+    </section>
+
+    <section id="componentes">
+      <h2><span class="num">4</span>The components, one by one</h2>
+      <p>For each one: what it does, what happens if it goes down and what it stores. In the pilot, they all run as containers on the same server.</p>
+      <div class="legend">
+        <span>If it goes down:</span>
+        <span class="tag ok">traffic keeps flowing</span>
+        <span class="tag warn">traffic keeps flowing, no changes</span>
+        <span class="tag bad">traffic stops</span>
+        <span class="tag plain">backed up</span>
+      </div>
+
+      <h3>Entry</h3>
+      <div class="comps">
+        <article class="comp e">
+          <div><h4>Traefik</h4><span class="tech">bundled proxy · 443 and 80</span></div>
+          <p>Receives everything on 443. For the portal name it terminates HTTPS (Let's Encrypt or your own certificate) and routes by path: <code>/</code> web, <code>/api/v1</code> API, <code>/auth</code> Keycloak. For the gateway name it <b>does not open the TLS</b>: it passes it untouched to APISIX, so that mTLS is end to end. It rate-limits requests by source address and never exposes <code>/api/v1/internal</code> or <code>/api/v1/opa</code>.</p>
+          <dl><dt>If down</dt><dd><span class="tag bad">nobody gets in</span>Neither people nor systems.</dd><dt>Stores</dt><dd>The Let's Encrypt certificate. No access log, for privacy.</dd></dl>
+        </article>
+      </div>
+
+      <h3 style="color:var(--gov)">Governance plane</h3>
+      <div class="comps">
+        <article class="comp g">
+          <div><h4>Web portal</h4><span class="tech">Next.js</span></div>
+          <p>The interface for everyone: catalog, interactive documentation, consoles for the operator, the regulator, the entity and the audit. It does not decide permissions: the API does.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>No portal.</dd><dt>Stores</dt><dd>Nothing.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>Portal API</h4><span class="tech">NestJS</span></div>
+          <p>The brain. It runs the workflows (registration, publication, request, approval), checks role and entity on <b>every</b> request, and records every change in the audit log. In the background it reconciles APISIX, Keycloak, OPA and the hub; signs certificates; seals; sends emails; expires subscriptions and certificates; rotates every 90 days the key the gateway uses to sign its assertions, and publishes the public keys (JWKS).</p>
+          <dl><dt>If down</dt><dd><span class="tag warn">traffic keeps flowing, no changes</span>It keeps going with the latest published policy.</dd><dt>Stores</dt><dd>Nothing of its own: everything is in PostgreSQL.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>PostgreSQL</h4><span class="tech">database</span></div>
+          <p><b>Single source of truth:</b> entities, people and roles, APIs, applications, subscriptions, audit log, transparency log and job queues. The audit log is insert-only, even for the database owner.</p>
+          <dl><dt>If down</dt><dd><span class="tag warn">traffic keeps flowing, no changes</span>The governance plane stops.</dd><dt>Stores</dt><dd><span class="tag plain">backed up</span>Everything.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>pgBackRest</h4><span class="tech">database backups</span></div>
+          <p>Archives every PostgreSQL change within a few minutes (at most 5 minutes of loss), takes a full backup each week and a differential one each day, and keeps four weeks. The repository is <b>encrypted</b>. It can return to the latest state or to an exact point in time, with a restore tested in CI.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>New changes wait to be archived.</dd><dt>Stores</dt><dd><span class="tag plain">backed up</span>The encrypted repository. It is copied off the server.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>Keycloak</h4><span class="tech">identity · OpenID Connect</span></div>
+          <p>It <b>authenticates, it does not authorize</b>: roles live in PostgreSQL. Three realms: <code>rid-portal</code> (people, with a second factor), <code>rid-gateway</code> (the entities' applications; the portal creates their clients) and <code>rid-citizens</code> (simulated citizen identity; in production, the country's own).</p>
+          <dl><dt>If down</dt><dd><span class="tag bad">no new tokens</span>Nobody can sign in. Tokens last 5 minutes: after that, calls fail.</dd><dt>Stores</dt><dd>Users and clients, in PostgreSQL.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>step-ca</h4><span class="tech">the network's certificate authority</span></div>
+          <p>Signs the applications' certificates (from the CSR the entity uploads: the private key never leaves the entity), the gateway's and the nodes'. Only the API talks to it.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>No certificates are issued; current ones keep working.</dd><dt>Stores</dt><dd><span class="tag plain">backed up</span>The CA keys. Losing them invalidates every certificate.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>TSA</h4><span class="tech">RFC 3161 timestamping</span></div>
+          <p>Seals the audit log's daily anchor and the transparency log's batches: it proves they existed at that moment and that nobody rewrote them.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>Seals are queued and applied when it comes back.</dd><dt>Stores</dt><dd>Its key. In production, the country's accredited TSA is used.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>Email</h4><span class="tech">Mailpit in the pilot</span></div>
+          <p>Captures all email (invitations, notifications, account verification, anchors to the regulator, alerts) and shows it at <code>/mail</code>, behind a password. In production, the operator's SMTP.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>No emails go out.</dd><dt>Stores</dt><dd>The pilot's emails.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>ClamAV</h4><span class="tech">antivirus · optional</span></div>
+          <p>Scans every uploaded document (appointments, data exchange agreements) before storing it. An infected one is rejected; the log keeps the virus signature and the hash, never the name or the content. It updates its signatures from the internet.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>Documents cannot be uploaded: it fails closed.</dd><dt>Stores</dt><dd>Its virus signatures.</dd></dl>
+        </article>
+      </div>
+
+      <h3 style="color:var(--data)">Data plane</h3>
+      <div class="comps">
+        <article class="comp d">
+          <div><h4>APISIX</h4><span class="tech">gateway</span></div>
+          <p>Every call between entities goes through here. It requires the application's certificate (mTLS), validates the token, strips the headers only the gateway may set, asks OPA, applies the subscription's limit, and forwards to the provider with the traceability headers and a <b>signed assertion</b> of the call. <b>It does not store bodies.</b></p>
+          <dl><dt>If down</dt><dd><span class="tag bad">traffic stops</span></dd><dt>Stores</dt><dd>Nothing; its configuration is in etcd.</dd></dl>
+        </article>
+        <article class="comp d">
+          <div><h4>etcd</h4><span class="tech">gateway configuration</span></div>
+          <p>The gateway's routes, upstreams and certificates. It is rebuilt from PostgreSQL.</p>
+          <dl><dt>If down</dt><dd><span class="tag warn">traffic keeps flowing, no changes</span>APISIX keeps going with what it has in memory.</dd><dt>Stores</dt><dd>Rebuildable configuration.</dd></dl>
+        </article>
+        <article class="comp d">
+          <div><h4>OPA</h4><span class="tech">Open Policy Agent</span></div>
+          <p><b>Decides each call</b> with the policy the portal publishes: current subscriptions, purposes, operations and certificate fingerprints. It answers "yes" or "no, for this reason" (<code>no_subscription</code>, <code>purpose_not_allowed</code>…). Without a policy, it <b>denies everything</b>: it fails closed.</p>
+          <dl><dt>If down</dt><dd><span class="tag bad">traffic stops</span></dd><dt>Stores</dt><dd>The latest policy, on disk: if it restarts without the portal, it keeps deciding with it. It refreshes it every 10–20 s.</dd></dl>
+        </article>
+        <article class="comp d">
+          <div><h4>WireGuard hub</h4><span class="tech">51820/udp</span></div>
+          <p>The central end of the encrypted tunnels that the <b>kit's nodes</b> open from each entity's network, from the inside out: the entity opens no inbound ports. A node cannot reach other nodes or the platform.</p>
+          <dl><dt>If down</dt><dd><span class="tag bad">node APIs go down</span>Existing APIs keep working.</dd><dt>Stores</dt><dd>The latest state of the tunnels.</dd></dl>
+        </article>
+        <article class="comp d">
+          <div><h4>Fluent Bit · transparency</h4><span class="tech">from the gateway to the portal</span></div>
+          <p>Carries the record of every <b>authorized</b> request for a person's data: who, what for, under which subscription, and the data subject's <b>pseudonym</b>, never their document number.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>Records wait in its on-disk buffer.</dd><dt>Stores</dt><dd>Temporary buffer.</dd></dl>
+        </article>
+        <article class="comp d">
+          <div><h4>Fluent Bit · analytics and OpenSearch</h4><span class="tech">optional</span></div>
+          <p>A second privacy barrier: it only lets allowed metadata through (no real path, no query string, no body) and stores it for the usage indicators.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>That metadata is lost.</dd><dt>Stores</dt><dd>Usage metadata, expendable.</dd></dl>
+        </article>
+        <article class="comp d">
+          <div><h4>Prometheus, Alertmanager and Grafana</h4><span class="tech">optional · /grafana</span></div>
+          <p>They measure the gateway, the API and OPA. Nine alerts email the operator: many 5xx responses, high latency, service down, stale policy, failed reconciliation, nodes offline, certificates about to expire and a backed-up queue.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>No alerts.</dd><dt>Stores</dt><dd>30 days of metrics.</dd></dl>
+        </article>
+        <article class="comp d">
+          <div><h4>Contract runner</h4><span class="tech">Schemathesis</span></div>
+          <p>When an entity submits an API for review, it tests the API's OpenAPI contract against the sandbox. The operator only approves once the checks pass.</p>
+          <dl><dt>If down</dt><dd><span class="tag ok">traffic keeps flowing</span>Contracts are not tested.</dd><dt>Stores</dt><dd>Nothing.</dd></dl>
+        </article>
+      </div>
+
+      <h3>Pilot tooling (does not go to production)</h3>
+      <ul class="ticks">
+        <li><b>Test providers</b> (<code>mock-salud</code>, <code>mock-socioeconomico</code>): they simulate two entities with synthetic data.</li>
+        <li><b>Reference citizen folder</b> (<code>/carpeta</code>): shows what the country's real citizen folder must implement.</li>
+        <li><b>Seed data:</b> three fictitious entities and the demo users.</li>
+      </ul>
+    </section>
+
+    <section id="flujos">
+      <h2><span class="num">5</span>How everything flows</h2>
+
+      <div class="flowcard">
+        <h3>Publishing an API</h3>
+        <div class="flow" aria-label="States of an API">
+          <span class="st">draft</span><span class="arrow">→</span>
+          <span class="st">in review</span><span class="arrow">→</span>
+          <span class="st">approved by the operator</span><span class="arrow">→</span>
+          <span class="st opt">approved by the regulator · if sensitive</span><span class="arrow">→</span>
+          <span class="st goal">published</span>
+        </div>
+        <ol class="steps">
+          <li><span>The entity's publisher uploads the OpenAPI contract and states where the service lives, which data it exposes, the legal basis and the allowed purposes.</span></li>
+          <li><span>When it is submitted for review, the portal tests connectivity through the gateway and the contract against the sandbox.</span></li>
+          <li><span>The AND reviews the API's details and data minimization. If the classification is <b>sensitive</b>, MinTIC approves too.</span></li>
+          <li><span>Once published, the route appears in the gateway within seconds, <b>closed</b>: with no subscriptions, nobody gets in.</span></li>
+        </ol>
+      </div>
+
+      <div class="flowcard">
+        <h3>Requesting and granting access</h3>
+        <div class="flow" aria-label="States of a subscription">
+          <span class="st">pending provider</span><span class="arrow">→</span>
+          <span class="st opt">pending regulator</span><span class="arrow">→</span>
+          <span class="st">approved</span><span class="arrow">→</span>
+          <span class="st goal">active</span><span class="arrow">→</span>
+          <span class="st end">suspended</span><span class="st end">revoked</span><span class="st end">expired</span>
+        </div>
+        <ol class="steps">
+          <li><span>The consumer's developer creates an application: it gets a secret (shown only once) and uploads its CSR to obtain its certificate.</span></li>
+          <li><span>They request access: API, operations, <b>purpose</b> from the catalog, details, legal basis, validity period and data exchange agreement.</span></li>
+          <li><span>The provider's data steward approves (and can reduce operations, limit or validity period), rejects, or asks for more information.</span></li>
+          <li><span>Within 60 seconds OPA has the new policy and the subscription becomes <b>active</b>. Suspending or revoking also takes effect within 60 seconds.</span></li>
+        </ol>
+      </div>
+
+      <figure>
+        <h3>A call, end to end</h3>
+        <div class="figscroll">
+          <svg viewBox="0 0 1000 500" role="img" aria-label="The consumer system requests a token from the gateway with its certificate and its secret; Keycloak issues it, bound to the certificate, for 5 minutes. It then calls the gateway with the certificate, the token, the purpose and the official. The gateway asks OPA; if OPA allows it, the gateway forwards the request to the provider with the traceability headers and a signed assertion, and the response comes back without being stored.">
+            <defs>
+              <marker id="s-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ah"></path></marker>
+              <marker id="s-ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahd"></path></marker>
+            </defs>
+            <rect x="30" y="14" width="150" height="44" rx="6" class="d-box"></rect>
+            <text x="105" y="41" text-anchor="middle" class="d-tb">Consumer system</text>
+            <rect x="255" y="14" width="150" height="44" rx="6" class="d-data"></rect>
+            <text x="330" y="41" text-anchor="middle" class="d-tb">Gateway (APISIX)</text>
+            <rect x="455" y="14" width="130" height="44" rx="6" class="d-gov"></rect>
+            <text x="520" y="41" text-anchor="middle" class="d-tb">Keycloak</text>
+            <rect x="635" y="14" width="130" height="44" rx="6" class="d-data"></rect>
+            <text x="700" y="41" text-anchor="middle" class="d-tb">OPA</text>
+            <rect x="825" y="14" width="150" height="44" rx="6" class="d-box"></rect>
+            <text x="900" y="41" text-anchor="middle" class="d-tb">Provider</text>
+            <line x1="105" y1="58" x2="105" y2="490" class="d-life"></line>
+            <line x1="330" y1="58" x2="330" y2="490" class="d-life"></line>
+            <line x1="520" y1="58" x2="520" y2="490" class="d-life"></line>
+            <line x1="700" y1="58" x2="700" y2="490" class="d-life"></line>
+            <line x1="900" y1="58" x2="900" y2="490" class="d-life"></line>
+
+            <text x="40" y="95" class="d-cap">1 · TOKEN</text>
+            <line x1="105" y1="112" x2="328" y2="112" class="d-line" marker-end="url(#s-ah)"></line>
+            <text x="217" y="105" text-anchor="middle" class="d-lab">POST /oauth/token</text>
+            <text x="217" y="128" text-anchor="middle" class="d-ts">certificate + secret</text>
+            <line x1="330" y1="150" x2="518" y2="150" class="d-line" marker-end="url(#s-ah)"></line>
+            <text x="425" y="143" text-anchor="middle" class="d-ts">with the verified certificate</text>
+            <line x1="520" y1="185" x2="107" y2="185" class="d-dash" marker-end="url(#s-ah)"></line>
+            <text x="312" y="178" text-anchor="middle" class="d-ts">5-minute token, bound to the certificate</text>
+
+            <text x="40" y="228" class="d-cap">2 · REQUEST</text>
+            <line x1="105" y1="248" x2="328" y2="248" class="d-strong" marker-end="url(#s-ahd)"></line>
+            <text x="217" y="241" text-anchor="middle" class="d-lab">GET /salud/afiliacion/v1/…</text>
+            <text x="217" y="264" text-anchor="middle" class="d-ts">certificate + token</text>
+            <text x="217" y="279" text-anchor="middle" class="d-ts">X-RID-Purpose · X-RID-End-User</text>
+            <line x1="330" y1="300" x2="698" y2="300" class="d-line" marker-end="url(#s-ah)"></line>
+            <text x="515" y="293" text-anchor="middle" class="d-ts">allowed? (subscription, purpose, operation, certificate)</text>
+            <line x1="700" y1="335" x2="332" y2="335" class="d-dash" marker-end="url(#s-ah)"></line>
+            <text x="515" y="328" text-anchor="middle" class="d-ts">yes + traceability headers · or 403 with its reason</text>
+            <line x1="330" y1="375" x2="898" y2="375" class="d-strong" marker-end="url(#s-ahd)"></line>
+            <text x="615" y="368" text-anchor="middle" class="d-ts">request + who, what for, under which subscription</text>
+            <text x="615" y="391" text-anchor="middle" class="d-ts">+ assertion signed by the gateway (X-RID-Assertion)</text>
+            <line x1="900" y1="415" x2="332" y2="415" class="d-dash" marker-end="url(#s-ah)"></line>
+            <text x="615" y="408" text-anchor="middle" class="d-ts">response</text>
+            <line x1="330" y1="455" x2="107" y2="455" class="d-strong" marker-end="url(#s-ahd)"></line>
+            <text x="217" y="448" text-anchor="middle" class="d-ts">response (not stored)</text>
+          </svg>
+        </div>
+        <figcaption>With each request, the provider receives the consumer entity and application, the subscription, the purpose, the operation and the official's hash: it no longer sees "only the gateway". With the signed assertion (one JWS per call, bound to the method, the URI and the body) it can also check, using the public keys at <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>, that the request went through the gateway and was not altered. A stolen token is useless without the certificate's private key.</figcaption>
+      </figure>
+
+      <div class="flowcard">
+        <h3>Accountability to citizens</h3>
+        <p class="prose">Every authorized request for a person's data is recorded in the transparency log with the data subject's pseudonym. Every 10 seconds the records are grouped into batches signed by the operator and sealed by the TSA. From their folder, citizens see who queried them and what for, receive notifications, and download a receipt that <b>anyone can verify without trusting the portal</b>, with the open verifier <code>rid-verify-receipt</code>.</p>
+      </div>
+    </section>
+
+    <section id="seguridad">
+      <h2><span class="num">6</span>Security and privacy</h2>
+      <p>What the platform guarantees, and how.</p>
+      <div class="guar">
+        <div><b>Only identified systems reach the gateway</b><span>Mandatory mTLS with certificates from the network's CA; 5-minute tokens bound to the certificate.</span></div>
+        <div><b>Only approved access</b><span>OPA decides each call with the current subscriptions, and fails closed.</span></div>
+        <div><b>Content is not stored</b><span>Neither the gateway nor the logs store bodies. Paths and query strings are masked, with two barriers: APISIX and Fluent Bit.</span></div>
+        <div><b>The data subject is not exposed</b><span>Only a keyed pseudonym (HMAC), in the transparency log; never in the analytics.</span></div>
+        <div><b>Nobody rewrites history</b><span>Hash-chained, insert-only audit log, with a daily anchor sealed by the TSA and sent to the regulator.</span></div>
+        <div><b>Protected accounts</b><span>Second factor for critical roles, request rate limits, and the owner is notified when a credential changes.</span></div>
+        <div><b>Server-side authorization</b><span>Every endpoint checks role and entity. The full matrix is in <code>AUTHZ.md</code>, and tests verify it.</span></div>
+        <div><b>Isolated entities</b><span>Each provider using mTLS accepts only the gateway certificate issued for it; a node cannot reach other nodes.</span></div>
+        <div><b>The provider knows the request is legitimate</b><span>An assertion signed by the gateway on every call (ES256), bound to the request and to that provider, verifiable with a public JWKS. A forged header from the client is discarded.</span></div>
+        <div><b>Reviewed against standards</b><span>OWASP ASVS level 2, chapter by chapter (<code>docs/security/ASVS-L2.md</code>), and WCAG 2.1 AA on all 42 screens, in Spanish and in English (<code>docs/accessibility</code>).</span></div>
+      </div>
+    </section>
+
+    <!-- ============================ PART II ============================ -->
+    <section id="requisitos">
+      <div class="part">Part II · Installing the operator's infrastructure</div>
+      <h2><span class="num">7</span>Server requirements</h2>
+      <p>A single Linux server running the whole central platform: this is the pilot topology, for go-live, the bootcamp and demos. Production with high availability (Helm charts) is a separate exercise.</p>
+      <div class="spec">
+        <div><span class="k">vCPU</span><span class="v">4–8</span><span class="s">minimum 4</span></div>
+        <div><span class="k">RAM</span><span class="v">16 GB</span><span class="s">minimum 8 GB, without observability</span></div>
+        <div><span class="k">SSD disk</span><span class="v">100 GB</span><span class="s">minimum 60 GB</span></div>
+        <div><span class="k">System</span><span class="v">Ubuntu 24.04</span><span class="s">or 22.04, Debian 12, RHEL/Rocky 9 · kernel ≥ 5.6 · x86_64 or arm64</span></div>
+      </div>
+      <details class="faq">
+        <summary>Where these numbers come from</summary>
+        <p>At rest, the full stack uses about 2.3 GB of RAM (Keycloak ~650 MB, OpenSearch ~670 MB, APISIX ~190 MB, API ~150 MB, web ~120 MB, the rest under 70 MB each). The antivirus, if enabled, adds ~1.2 GB. The real peak is building the portal and API images during installation and on every update: 3–4 GB more for 10–20 minutes. The images take ~15 GB, and the build cache grows with each update (it reached 17 GB in the pilot). Kernel ≥ 5.6 includes WireGuard; without it, the hub uses <code>wireguard-go</code>, which works but performs worse.</p>
+      </details>
+
+      <h3>Network and DNS</h3>
+      <div class="ports">
+        <div class="port"><span class="pn">443/tcp</span><span>Portal and gateway on a single port, told apart by name (SNI).</span></div>
+        <div class="port"><span class="pn">80/tcp</span><span>Only for Let's Encrypt and the redirect to HTTPS.</span></div>
+        <div class="port"><span class="pn">51820/udp</span><span>WireGuard tunnels from the kit's nodes.</span></div>
+      </div>
+      <div class="tablewrap">
+        <table class="t">
+          <thead><tr><th>What</th><th>Details</th></tr></thead>
+          <tbody>
+            <tr><td>Fixed public IP</td><td class="wrap">Entities and their systems reach it from the internet.</td></tr>
+            <tr><td>Portal name</td><td class="wrap">A record, e.g. <code>rid.and.gov.co</code>: people, web portal, portal API and sign-in.</td></tr>
+            <tr><td>Gateway name</td><td class="wrap">A record, e.g. <code>gw.rid.and.gov.co</code>: system-to-system traffic, with mTLS.</td></tr>
+            <tr><td>Outbound during install</td><td class="wrap">HTTPS to Docker Hub, quay.io, ghcr.io, the npm registry and PyPI.</td></tr>
+            <tr><td>Portal certificate</td><td class="wrap">Automatic Let's Encrypt, or your own from a recognized public CA (PEM with the full chain and the private key).</td></tr>
+            <tr><td>Gateway certificate</td><td class="wrap">No need to request one: the network's CA (step-ca) issues it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>No other service may be listening on 80 or 443. If the server already runs Traefik, the installer can join it.</p>
+
+      <h3>Before you start</h3>
+      <div class="check" id="pre">
+        <label><input type="checkbox" id="pre-1"><span>VPS created, with <code>root</code> or <code>sudo</code> access over SSH.</span></label>
+        <label><input type="checkbox" id="pre-2"><span>Both DNS records created and propagated: <code>getent hosts &lt;name&gt;</code> returns the server's IP.</span></label>
+        <label><input type="checkbox" id="pre-3"><span>Ports 80/tcp, 443/tcp and 51820/udp open in the cloud provider's firewall.</span></label>
+        <label><input type="checkbox" id="pre-4"><span><code>git</code> installed and the repository cloned on the server.</span></label>
+      </div>
+    </section>
+
+    <section id="instalar">
+      <h2><span class="num">8</span>Install</h2>
+      <div class="code"><button class="copy" type="button">Copy</button><pre><code>git clone &lt;repository-url&gt; rid &amp;&amp; cd rid
+sudo ./install.sh</code></pre></div>
+      <p>The script checks the server, asks the questions in steps 2 to 6, shows a summary and asks for confirmation before touching anything. It then builds and starts everything (10–20 minutes the first time) and checks that it works. If Docker is missing, it offers to install it.</p>
+
+      <div class="qs">
+        <div class="q"><div class="qn">Step<b>1</b></div><div><h4>Server check</h4><p class="auto">No questions. System, CPU, RAM, disk, Docker and Compose ≥ 2.26, <code>/dev/net/tun</code>, free ports and DNS. It stops if anything essential is missing.</p></div></div>
+        <div class="q"><div class="qn">Step<b>2</b></div><div><h4>Country</h4><p>The code of <code>config/country/&lt;code&gt;.yaml</code>. For Colombia, <code>co</code>.</p></div></div>
+        <div class="q"><div class="qn">Step<b>3</b></div><div><h4>Portal and gateway names</h4><p>Just the name, without <code>https://</code>. The gateway's defaults to <code>gw.&lt;portal&gt;</code> and must be different from the portal's.</p></div></div>
+        <div class="q"><div class="qn">Step<b>4</b></div><div><h4>Entry proxy and portal certificate</h4>
+          <div class="opts">
+            <div><kbd>1</kbd><span><b>Bundled proxy</b> (recommended): the installer puts Traefik on 80/443.</span></div>
+            <div><kbd>2</kbd><span><b>I already have Traefik</b>: it joins its Docker network, and the operator configures the routes.</span></div>
+          </div>
+          <div class="opts">
+            <div><kbd>1</kbd><span><b>Let's Encrypt</b>: optional contact email; port 80 must be reachable.</span></div>
+            <div><kbd>2</kbd><span><b>Your own certificate</b>: paths to the certificate (full chain) and to the private key, in PEM. It must come from a recognized public CA, because the API and the web also call the portal by its name.</span></div>
+          </div></div></div>
+        <div class="q"><div class="qn">Step<b>5</b></div><div><h4>Observability and antivirus</h4>
+          <p>Two yes-or-no questions:</p>
+          <ul class="ticks">
+            <li><b>Observability</b> (OpenSearch, Prometheus, Alertmanager, Grafana): usage indicators, email alerts and the operator's dashboard. Yes, if the server has 16 GB. You can do without it: it does not affect traffic, the audit or transparency.</li>
+            <li><b>Document antivirus</b> (ClamAV): scans every uploaded document before storing it. Yes, if the server has 8 GB. It adds ~1.2 GB of RAM and downloads its signatures from the internet.</li>
+          </ul></div></div>
+        <div class="q"><div class="qn">Step<b>6</b></div><div><h4>Demo users' password</h4><p>12 characters or more (Keycloak's password policy). Pressing Enter generates a random one. Choose one yourself if you are going to share it at the bootcamp.</p></div></div>
+        <div class="q"><div class="qn">Step<b>7</b></div><div><h4>Secrets</h4><p class="auto">No questions. It writes <code>.env</code> (mode 600) with all the secrets, randomly generated: databases, signing keys, pseudonym key, WireGuard hub key, backup encryption key, internal tokens.</p></div></div>
+        <div class="q"><div class="qn">Step<b>8</b></div><div><h4>Server preparation</h4><p class="auto">No questions. It creates the Docker network and sets <code>vm.max_map_count</code> for OpenSearch. If it detects <code>ufw</code> or <code>firewalld</code>, it offers to open the ports.</p></div></div>
+        <div class="q"><div class="qn">Step<b>9</b></div><div><h4>Build and start</h4><p class="auto">No questions. It waits until every service is healthy.</p></div></div>
+        <div class="q"><div class="qn">Step<b>10</b></div><div><h4>Checks</h4><p class="auto">That the API responds; that the OPA policy is <b>not</b> publicly exposed; that Keycloak responds; that OPA already has a policy; that the gateway presents the network's certificate.</p></div></div>
+      </div>
+
+      <div class="callout warn">
+        <b>Keep <code>.env</code> off the server, encrypted</b>
+        <p>Without it, the data cannot be recovered and receipts already issued cannot be verified. Running <code>./install.sh</code> again never regenerates it: it reuses its secrets and answers.</p>
+      </div>
+    </section>
+
+    <section id="resultado">
+      <h2><span class="num">9</span>What gets installed</h2>
+      <div class="tablewrap">
+        <table class="t">
+          <thead><tr><th>Address</th><th>What it is</th><th>Who uses it</th></tr></thead>
+          <tbody>
+            <tr><td><code>https://&lt;portal&gt;</code></td><td class="wrap">Portal: catalog, consoles for the operator, the regulator and the entities</td><td>People</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/api/v1</code></td><td class="wrap">Portal API</td><td>The web, integrations</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/auth</code></td><td class="wrap">Keycloak: sign-in and second factor; administration at <code>/auth/admin/</code></td><td>People, operator</td></tr>
+            <tr><td><code>https://&lt;gateway&gt;</code></td><td class="wrap"><b>Gateway</b>: traffic between entities with mTLS, tokens at <code>/oauth/token</code>, the nodes' control channel</td><td>Systems</td></tr>
+            <tr><td><code>&lt;gateway&gt;:51820/udp</code></td><td class="wrap">WireGuard hub: tunnels from the kit's nodes</td><td>Nodes</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/mail</code></td><td class="wrap">Test mailbox: all the pilot's email arrives here, behind a username and password</td><td>Operator</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/grafana/</code></td><td class="wrap">The operator's dashboard, with its own <code>admin</code> user (with observability)</td><td>Operator</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/api/v1/gateway/jwks</code></td><td class="wrap">Public keys that providers use to verify the gateway assertion</td><td>Providers</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/carpeta</code></td><td class="wrap">Reference citizen folder (transparency demo)</td><td>Demos</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The other services (PostgreSQL, pgBackRest, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, ClamAV, the contract runner and the test providers) are not exposed.</p>
+
+      <h3>End-to-end check</h3>
+      <ol class="steps">
+        <li><span><code>sudo ./install.sh status</code>: every service <code>healthy</code>; <code>tsa-init</code> ends with <code>exited (0)</code>.</span></li>
+        <li><span><code>sudo ./install.sh credentials</code>, then sign in to the portal as <code>ana.operadora</code>. <code>sudo ./install.sh otp</code> gives the second-factor code.</span></li>
+        <li><span>The gateway requires a client certificate: <code>curl -v https://&lt;gateway&gt;/</code> ends with a "certificate required" TLS error.</span></li>
+        <li><span>The full walkthrough in <code>DEMO.md</code>: publish, review, request, approve, call.</span></li>
+      </ol>
+      <div class="callout info">
+        <b>Demo data and the first administrator</b>
+        <p>The pilot always loads three fictitious entities and the demo users. That is how the first <code>platform_admin</code> (<code>pablo.plataforma</code>) exists. Real entities are registered from the portal; the fictitious ones are for practice. In production there are no seed users: the first <code>platform_admin</code> is whoever signs in first with the address in <code>RID_BOOTSTRAP_ADMIN_EMAIL</code>, verified by Keycloak, while the network has none. This is audited, and the value is deleted afterwards.</p>
+      </div>
+    </section>
+
+    <section id="custodia">
+      <h2><span class="num">10</span>Custody of secrets</h2>
+      <p>When the installation finishes, an encrypted copy of <code>.env</code> goes to the custodian, the credentials go to the right people, and the demo users' second factor is enrolled on the phone of whoever will use them.</p>
+      <div class="tablewrap">
+        <table class="t">
+          <thead><tr><th>Secret</th><th>Why it matters</th><th>Suggested custodian</th></tr></thead>
+          <tbody>
+            <tr><td>The full <code>.env</code></td><td class="wrap">Without it, the data cannot be recovered and receipts cannot be verified</td><td class="wrap">AND, encrypted copy off the server</td></tr>
+            <tr><td><code>RID_SUBJECT_REF_KEY</code><br><code>RID_END_USER_HASH_SALT</code></td><td class="wrap">They define the pseudonyms; <b>they are not rotated</b></td><td>AND</td></tr>
+            <tr><td>The step-ca volume</td><td class="wrap">The network CA's keys</td><td class="wrap">AND, encrypted backup</td></tr>
+            <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Encrypts the database backups: without it, none of them can be restored</td><td class="wrap">AND, copy off the server, next to the <code>.env</code></td></tr>
+            <tr><td><code>RID_SECRETS_KEY</code></td><td class="wrap">Seals the clients' secrets and the key the gateway signs with</td><td class="wrap">AND, inside the <code>.env</code></td></tr>
+            <tr><td>Keycloak administrator</td><td class="wrap">Control over identities</td><td class="wrap">AND, two people</td></tr>
+            <tr><td><code>regulator</code> users</td><td class="wrap">Oversight</td><td>MinTIC</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================ PART III ============================ -->
+    <section id="operacion">
+      <div class="part">Part III · Operations</div>
+      <h2><span class="num">11</span>Day to day</h2>
+      <div class="cmds">
+        <div class="cmd"><code>sudo ./install.sh status</code><button class="copy" type="button">Copy</button><span>Status of the containers and the installation checks.</span></div>
+        <div class="cmd"><code>sudo ./install.sh credentials</code><button class="copy" type="button">Copy</button><span>Demo users, Keycloak administrator, test mailbox and Grafana.</span></div>
+        <div class="cmd"><code>sudo ./install.sh otp</code><button class="copy" type="button">Copy</button><span>Current second-factor code for the demo users with a critical role.</span></div>
+        <div class="cmd"><code>sudo ./install.sh logs api</code><button class="copy" type="button">Copy</button><span>Logs for one service (<code>api</code>, <code>apisix</code>, <code>keycloak</code>, <code>edge</code>…), or for all of them with no argument.</span></div>
+        <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copy</button><span>Full backup and a copy in <code>backups/&lt;date&gt;/</code>: dumps of <code>rid</code> and <code>keycloak</code>, the (encrypted) backup repository, the volumes for the CA, the TSA, documents and the citizen folder, and <code>.env</code>. The files go off the server. Daily backups already run on their own.</span></div>
+        <div class="cmd"><code>sudo ./install.sh restore</code><button class="copy" type="button">Copy</button><span>Restores the database to the latest archived state; with a point in time (<code>"2026-11-20 14:30:00-05"</code>), to that moment. It stops and starts everything.</span></div>
+        <div class="cmd"><code>sudo ./install.sh update</code><button class="copy" type="button">Copy</button><span>Backup, <code>git pull --ff-only</code>, rebuild and restart.</span></div>
+        <div class="cmd"><code>sudo ./install.sh stop</code><button class="copy" type="button">Copy</button><span>Stops everything without losing data; <code>start</code> starts it again.</span></div>
+      </div>
+      <ul class="ticks">
+        <li><b>Every day:</b> healthy services, nothing out of sync with the gateway (Operator console → Gateway sync), an intact audit chain (Console → Audit → "Verify integrity") and an intact transparency log.</li>
+        <li><b>Alerts:</b> with observability enabled, they arrive by email (in the pilot, at <code>/mail</code>). The dashboard is at <code>/grafana/</code>.</li>
+        <li><b>Operator runbook</b> (<code>docs/RUNBOOK.md</code>): registering an entity up to its first published API, suspension and offboarding; incidents with severities and a procedure for each case; rotation of the intermediate CA, planned and emergency; mass certificate revocation.</li>
+        <li><b>Mass certificate revocation:</b> Console → "Mass certificate revocation", only <code>platform_admin</code> with a second factor. It filters by entity, by issue date and by intermediate, shows a preview, and revokes only if the set has not changed. Each certificate stops working within 60 seconds and the developers receive a notification. It cannot be undone.</li>
+        <li><b>Gateway signing key:</b> the portal rotates it on its own every 90 days; the previous one stays in the JWKS so that archived assertions keep verifying. If it is compromised, rotate it immediately as compromised (<code>POST /api/v1/admin/gateway-signing-keys/rotate</code>) and notify the providers (runbook §2.2).</li>
+        <li><b>When updating</b> a pilot installed before automatic backups existed, <code>update</code> adds the backup encryption key to the <code>.env</code> and says so: save the copy of <code>.env</code> again.</li>
+        <li><b>Never</b> fix APISIX or Keycloak by hand: the reconciler reverts it. If something does not add up, check "Gateway sync" in the operator console and retry from there.</li>
+      </ul>
+    </section>
+
+    <section id="problemas">
+      <h2><span class="num">12</span>Common installation problems</h2>
+      <div class="tablewrap">
+        <table class="t">
+          <thead><tr><th>Symptom</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td class="wrap">"Ports in use"</td><td class="wrap">Another service is using 80/443 (<code>ss -ltnp</code>). Stop it, or choose "I already have Traefik" in step 4.</td></tr>
+            <tr><td class="wrap">Invalid certificate on the portal</td><td class="wrap">Let's Encrypt could not validate: the portal's DNS does not point here, or port 80 is closed. Fix it and wait, because Traefik retries on its own. <code>sudo ./install.sh logs edge</code>.</td></tr>
+            <tr><td class="wrap">A service does not become healthy</td><td class="wrap"><code>sudo ./install.sh logs &lt;service&gt;</code>. Keycloak can take up to 5 minutes on a small machine. Run <code>sudo ./install.sh</code> again.</td></tr>
+            <tr><td class="wrap">OpenSearch keeps restarting</td><td class="wrap">Not enough memory, or <code>vm.max_map_count</code>. Reinstall without observability or add RAM.</td></tr>
+            <tr><td class="wrap">Keycloak does not import its realm (demo users)</td><td class="wrap">The password is shorter than 12 characters: the realm's policy rejects it on import. The installer no longer accepts it; in a hand-written <code>.env</code>, change it.</td></tr>
+            <tr><td class="wrap">Uploading a document returns "service unavailable"</td><td class="wrap">The antivirus is not responding (it fails closed). On first start it downloads its signatures, which takes a few minutes: <code>sudo ./install.sh logs clamav</code>.</td></tr>
+            <tr><td class="wrap">Sign-in loop</td><td class="wrap">The portal name does not match the one in <code>.env</code> (<code>RID_PUBLIC_URL</code>).</td></tr>
+            <tr><td class="wrap">Nodes do not connect</td><td class="wrap">51820/udp is closed in the cloud firewall, or the gateway's DNS does not point here.</td></tr>
+            <tr><td class="wrap"><code>.env</code> was lost</td><td class="wrap">Without a copy there is no recovery: reinstall from scratch, deleting the <code>rid_*</code> volumes.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="produccion">
+      <h2><span class="num">13</span>Pilot today, production later</h2>
+      <div class="tablewrap">
+        <table class="t">
+          <thead><tr><th>Topic</th><th>Pilot (this installation)</th><th>Production</th></tr></thead>
+          <tbody>
+            <tr><td>Topology</td><td class="wrap">One server, with Docker Compose</td><td class="wrap">Kubernetes with the Helm charts in <code>infra/helm</code>: ≥ 2 gateway nodes in different zones, portal and API replicas, a 3-member etcd, PostgreSQL with a replica, ingress and egress NetworkPolicies</td></tr>
+            <tr><td>Internal traffic</td><td class="wrap">Separate Docker networks (gateway, providers, everything else)</td><td class="wrap">In addition, TLS between components with an internal PKI (cert-manager)</td></tr>
+            <tr><td>Images</td><td class="wrap">Built on the server</td><td class="wrap">Published, versioned images, with their SBOM and vulnerability scanning (Trivy)</td></tr>
+            <tr><td>CA</td><td class="wrap">Development CA on a volume</td><td class="wrap">Offline root, intermediate in an HSM</td></tr>
+            <tr><td>Timestamping</td><td class="wrap">Development TSA</td><td class="wrap">The country's accredited TSA</td></tr>
+            <tr><td>Email</td><td class="wrap">Mailpit</td><td class="wrap">The operator's SMTP</td></tr>
+            <tr><td>Secrets</td><td class="wrap"><code>.env</code> on disk</td><td class="wrap">Secrets manager (OpenBao)</td></tr>
+            <tr><td>Citizen identity</td><td class="wrap">Simulated (<code>rid-citizens</code>)</td><td class="wrap">The country's own</td></tr>
+            <tr><td>Initial data</td><td class="wrap">Fictitious entities and demo users</td><td class="wrap">No demo data; the first administrator via <code>RID_BOOTSTRAP_ADMIN_EMAIL</code></td></tr>
+            <tr><td>Antivirus</td><td class="wrap">Optional (step 5)</td><td class="wrap">Enabled, with two replicas</td></tr>
+            <tr><td>Backups</td><td class="wrap">Automatic with pgBackRest on the same server; the off-server copy with <code>install.sh backup</code></td><td class="wrap">Automatic, to the operator's object storage (Barman Cloud)</td></tr>
+            <tr><td>Metrics and alerts</td><td class="wrap">Prometheus, Alertmanager and Grafana on the same server; notifications to Mailpit</td><td class="wrap">The same, with the operator's SMTP</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>What is already tested and what is missing</h3>
+      <ul class="ticks">
+        <li><b>Resilience, tested:</b> with the portal down for 45 seconds, both allowed and denied calls kept going, each as it should. OPA and APISIX restart without the portal. When it came back, the transparency log had every request from the outage, and a revocation reached the gateway in 18 seconds.</li>
+        <li><b>Backups, tested:</b> restore is tested in CI: loss of the volume, return to a point in time, and a repository that is unreadable without its key.</li>
+        <li><b>Load, partly tested:</b> on the development machine, the gateway serves 200 requests per second with a p95 of 13 ms over the network at its initial scale (200 entities, 1,000 APIs, 5,000 subscriptions). The target is 500 per second with a p95 under 50 ms. It will be validated in a production-like environment, with the load generator on another machine.</li>
+        <li><b>Helm charts, not yet installed:</b> they are complete and statically validated. They will be installed for the first time in the operator's environment, together with a restore from its object storage.</li>
+      </ul>
+
+      <h3>Decisions for the operator and the regulator</h3>
+      <div class="tablewrap">
+        <table class="t">
+          <thead><tr><th>Decision</th><th>Today</th><th>What it implies</th></tr></thead>
+          <tbody>
+            <tr><td class="wrap">Second factor for <code>entity_admin</code> and <code>api_publisher</code></td><td class="wrap">Only the platform roles, <code>regulator</code>, <code>auditor</code> and <code>data_steward</code></td><td class="wrap">ASVS level 2 requires it for all access. It is a configuration setting, but it changes how entities sign in</td></tr>
+            <tr><td class="wrap">Public catalog</td><td class="wrap">Off (<code>features.publicCatalog</code>)</td><td class="wrap">When on, anyone can see the APIs with a public classification, without the steward's contact details or the status of the nodes</td></tr>
+            <tr><td class="wrap">Signed gateway assertion</td><td class="wrap">On (<code>features.gatewayAssertion</code>)</td><td class="wrap">Each provider can verify it, and decide whether to require it</td></tr>
+            <tr><td class="wrap">Tests with screen readers and with users</td><td class="wrap">The automated accessibility review passes on every screen</td><td class="wrap">Recommended before production (NVDA, VoiceOver)</td></tr>
+            <tr><td class="wrap">Production TSA, CA and email</td><td class="wrap">Development ones</td><td class="wrap">Accredited TSA, HSM for the intermediate, and the operator's SMTP</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="preguntas">
+      <h2><span class="num">14</span>Questions that often come up</h2>
+      <div>
+        <details class="faq"><summary>Can the operator see the data being exchanged?</summary><p>No. The gateway passes it through without storing it, and the logs only hold masked metadata.</p></details>
+        <details class="faq"><summary>What happens if the portal goes down?</summary><p>Traffic between entities keeps flowing with the latest configuration and the latest policy. Only changes stop: new approvals and publications. It is tested: with the portal down, calls keep going; OPA and APISIX restart without it, and when the portal comes back it recovers the transparency records from the outage.</p></details>
+        <details class="faq"><summary>How does the provider know a request really comes from the gateway?</summary><p>Through the signed assertion (<code>X-RID-Assertion</code>): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.</p></details>
+        <details class="faq"><summary>How much traffic can it handle?</summary><p>On the development machine, 200 requests per second with a p95 of 13 ms added by the gateway. The target, 500 per second, will be validated in a production-like environment. Capacity grows with more gateway nodes: each one counts limits on its own, and the policy gives it its share.</p></details>
+        <details class="faq"><summary>Is the portal available in English?</summary><p>Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen folder are bilingual too.</p></details>
+        <details class="faq"><summary>Does an entity have to open inbound ports?</summary><p>Not if it uses the kit: the node opens the tunnel outbound (UDP 51820). With an existing API, the entity must allow the gateway to reach it.</p></details>
+        <details class="faq"><summary>Can it be integrated with X-Road?</summary><p>Yes: the gateway can use an operator's Security Server as an X-Road client.</p></details>
+        <details class="faq"><summary>Who approves access to sensitive data?</summary><p>The data steward of the entity that owns the data and, in addition, the regulator.</p></details>
+        <details class="faq"><summary>How do you prove the audit log was not altered?</summary><p>With the console's integrity check and with the daily anchor the regulator receives by email, sealed by an independent TSA.</p></details>
+        <details class="faq"><summary>Can it be taken to another country?</summary><p>Yes, without changing code: a new <code>config/country/&lt;code&gt;.yaml</code> and the translation texts. It is tested with an "example country" brought up from the <code>example.yaml</code> template: the full demo passes with its own sectors, purposes and document type.</p></details>
+      </div>
+      <p class="footer">Technical details are in the repository's <code>docs/ARCHITECTURE.md</code>, <code>docs/DEPLOYMENT.md</code>, <code>docs/OPERATIONS.md</code> and <code>docs/RUNBOOK.md</code>. What each entity must provide is in the entity guide.</p>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var big = document.getElementById('bigtext');
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function setBig(on) { root.classList.toggle('big', on); big.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  setBig(load('rid-big') === '1');
+  big.addEventListener('click', function () { var on = !root.classList.contains('big'); setBig(on); store('rid-big', on ? '1' : '0'); });
+
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var box = btn.closest('.code, .cmd');
+      var text = box.querySelector('pre, code').innerText.trim();
+      var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+      var fallback = function () { var r = document.createRange(); r.selectNodeContents(box.querySelector('pre, code')); var s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Selected'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+    });
+  });
+
+  document.querySelectorAll('#pre input').forEach(function (box) {
+    box.checked = load('rid-' + box.id) === '1';
+    box.addEventListener('change', function () { store('rid-' + box.id, box.checked ? '1' : '0'); });
+  });
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  if ('IntersectionObserver' in window) {
+    var seen = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { seen[e.target.id] = e.isIntersecting; });
+      var first = links.find(function (a) { return seen[a.getAttribute('href').slice(1)]; });
+      if (first) links.forEach(function (a) { a.classList.toggle('active', a === first); });
+    }, { rootMargin: '-80px 0px -55% 0px' });
+    links.forEach(function (a) { var s = document.getElementById(a.getAttribute('href').slice(1)); if (s) io.observe(s); });
+  }
+})();
+</script>

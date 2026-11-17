@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks and helpers for the server of a participating entity (docs/guias/entidades.md): network
+# Checks and helpers for the server of a participating entity (docs/guides/entities.md): network
 # reachability of the RID platform, the key and CSR of an application, and a first call through
 # the gateway with mTLS and a certificate-bound token. Needs bash, curl and openssl; nothing else.
 # It is not the instant-APIs kit (ADR-0011): it only exercises the platform's public contract.

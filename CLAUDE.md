@@ -37,7 +37,7 @@ Documentos que mandan (léelos antes de tocar un área):
 4. **Todo cambio de estado de dominio emite un evento de auditoría** en la misma transacción (`AuditService.record(...)`). Sin excepción.
 5. **Los reconciliadores son idempotentes.** El estado deseado se calcula desde la base de datos; APISIX, OPA y Keycloak se ajustan a él. Nunca se escribe en APISIX "a mano" desde un handler HTTP.
 6. **Nada específico de un país en el código.** Nombres de autoridades, tipos de documento, sectores, marco legal, textos de acuerdos: todo en `config/country/<código>.yaml` y en los archivos de i18n.
-7. **UI en español por defecto, código en inglés.** Identificadores, nombres de tablas, commits y comentarios en inglés. Textos de interfaz siempre vía i18n (`next-intl`), nunca literales en componentes.
+7. **UI en español por defecto, código en inglés.** Identificadores, nombres de tablas, commits y comentarios en inglés. Textos de interfaz siempre vía i18n (`next-intl`), nunca literales en componentes. La documentación oficial va en inglés, con su versión en español en `docs/es/` (misma ruta), actualizada en el mismo commit; los ADRs, spikes, informes de rendimiento y BACKLOG anteriores quedan en español y los nuevos se escriben en inglés (ADR-0027).
 8. **Sin secretos en el repo.** `.env.example` documenta variables; los valores reales nunca se commitean.
 9. **Seguridad por defecto:** OWASP ASVS nivel 2 como referencia, validación de toda entrada con zod, errores en formato RFC 9457 (`application/problem+json`), cabeceras de seguridad (CSP, HSTS) en la web.
 10. **Accesibilidad WCAG 2.1 AA** en toda pantalla.

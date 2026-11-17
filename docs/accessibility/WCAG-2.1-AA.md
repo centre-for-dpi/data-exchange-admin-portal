@@ -1,108 +1,110 @@
-# Auditoría WCAG 2.1 AA del portal (M6-02)
+# WCAG 2.1 AA audit of the portal (M6-02)
 
-- Fecha: 2026-11-16. Alcance: las 42 pantallas de `apps/web` en español e inglés, los diálogos que aparecen sobre ellas y las páginas de Keycloak que forman parte del flujo (ingreso y registro).
-- Método: una revisión automatizada de todas las pantallas, que se repite en cada corrida de e2e, más una revisión manual, criterio por criterio, de lo que la automatización no juzga.
-- Estados: **Cumple** · **Corregido** (en esta historia) · **No aplica** · **Pendiente** (con destino).
+> Versión en español: [docs/es/accessibility/WCAG-2.1-AA.md](../es/accessibility/WCAG-2.1-AA.md)
 
-## Revisión automatizada
+- Date: 2026-11-16. Scope: the 42 screens of `apps/web` in Spanish and English, the dialogs that appear over them, and the Keycloak pages that are part of the flow (sign-in and registration).
+- Method: an automated review of every screen, repeated on every e2e run, plus a manual review, criterion by criterion, of what the automation cannot judge.
+- Statuses: **Meets** · **Fixed** (in this story) · **Not applicable** · **Pending** (with a target).
 
-`apps/web/e2e/accessibility.spec.ts` recorre cada pantalla con el rol que más ve de ella, en español y en inglés. Antes publica una API con datos sensibles y la deja en el estado en que existen todas las pantallas de la cadena de aprobación: aprobada por operador y regulador, con una solicitud de acceso aprobada por el responsable de datos que espera al regulador. Una prueba falla si se agrega una página que no está en el recorrido.
+## Automated review
 
-En cada pantalla:
+`apps/web/e2e/accessibility.spec.ts` visits every screen with the role that sees the most of it, in Spanish and in English. First it publishes an API with sensitive data and leaves it in the state where every screen of the approval chain exists: approved by the operator and the regulator, with an access request approved by the data steward and waiting for the regulator. A test fails if a page is added that is not in the walkthrough.
 
-| Verificación | Criterio |
+On every screen:
+
+| Check | Criterion |
 | :-- | :-- |
-| axe, reglas WCAG 2.0/2.1 A y AA | Varios (contraste, nombres, roles, etiquetas, estructura) |
-| `lang` del documento igual al idioma de la ruta | 3.1.1 |
-| Título propio (solo el inicio lleva el nombre del producto a secas) | 2.4.2 |
-| Un solo encabezado de nivel 1, contando `aria-level` | 1.3.1, 2.4.6 |
-| La primera tabulación llega al enlace "Saltar al contenido" | 2.4.1 |
-| Los siguientes elementos interactivos muestran foco visible | 2.4.7 |
-| Sin texto visible fuera del contenedor que lo recorta, con el espaciado de texto del criterio | 1.4.12 |
-| Sin desplazamiento horizontal a 320 px (una tabla puede desplazarse dentro de su propio contenedor) | 1.4.10 |
+| axe, WCAG 2.0/2.1 A and AA rules | Several (contrast, names, roles, labels, structure) |
+| Document `lang` matches the language of the route | 3.1.1 |
+| Its own title (only the home page carries the bare product name) | 2.4.2 |
+| A single level-1 heading, counting `aria-level` | 1.3.1, 2.4.6 |
+| The first Tab reaches the "Skip to content" link | 2.4.1 |
+| The following interactive elements show a visible focus | 2.4.7 |
+| No visible text outside the container that clips it, with the criterion's text spacing | 1.4.12 |
+| No horizontal scrolling at 320 px (a table may scroll inside its own container) | 1.4.10 |
 
-Además:
-- El aviso de fin de sesión: aparece a tiempo, toma el foco, pasa axe y mantiene la sesión.
-- Las páginas de ingreso y registro de Keycloak, solo con axe: son su tema, no el nuestro.
+Also:
+- The session timeout warning: it appears on time, takes focus, passes axe and keeps the session alive.
+- The Keycloak sign-in and registration pages, with axe only: they are Keycloak's theme, not ours.
 
-Para auditar sin fallar en el primer hallazgo: `RID_A11Y_REPORT=1 pnpm --filter @rid/web exec playwright test e2e/accessibility.spec.ts`.
+To audit without failing on the first finding: `RID_A11Y_REPORT=1 pnpm --filter @rid/web exec playwright test e2e/accessibility.spec.ts`.
 
-## Hallazgos y correcciones
+## Findings and fixes
 
-| # | Hallazgo | Criterio | Corrección |
+| # | Finding | Criterion | Fix |
 | :-- | :-- | :-- | :-- |
-| 1 | Los errores de validación del API llegaban en inglés a páginas en español ("at most 6 months for this classification", los mensajes de zod, el `detail` de 409 y 403) | 3.1.2, 3.3.1, 3.3.3 | Cada error del API lleva `key` y `params`, y la web los muestra en el idioma del usuario. Los de zod se redactan con el locale de zod. ADR-0025 |
-| 2 | La sesión terminaba a los 30 minutos sin actividad sin aviso, y se perdía lo escrito | 2.2.1 | Diálogo dos minutos antes con "Seguir conectado", que renueva la sesión con Keycloak (`components/session-timeout.tsx`, `RID_SESSION_IDLE_SECONDS`) |
-| 3 | Con más de una entidad, el selector del encabezado desbordaba a 320 px | 1.4.10 | El selector se acomoda en varias líneas |
-| 4 | Las tablas de la ficha de servicio desbordaban la página a 320 px | 1.4.10 | Desplazamiento dentro de su propio contenedor, como las demás tablas |
-| 5 | La documentación de Scalar agregaba un segundo `h1` a la página de la API | 1.3.1 | Sus encabezados bajan un nivel (`aria-level`) |
-| 6 | El tooltip de los gráficos de uso y del mapa de intercambios no se cerraba con Escape | 1.4.13 | Escape lo oculta sin mover el puntero ni el foco |
-| 7 | El estado de una solicitud de acceso cambiaba en silencio mientras la página se refresca sola | 4.1.3 | El estado es una región `role="status"` |
-| 8 | El límite de solicitudes de alta abiertas respondía un 409 genérico | 3.3.1 | El conflicto dice la razón y el máximo (`too_many_open_requests`) |
-| 9 | A 320 px desbordaban también:<br>• las tablas de uso y de indicadores, porque la rejilla crecía con la tabla;<br>• el formulario de solicitud de acceso, porque un `fieldset` toma el ancho de su contenido y las rutas largas no se cortaban;<br>• el mapa de intercambios y el gráfico diario, por su ancho mínimo | 1.4.10 | Columnas `minmax(0, 1fr)`, `fieldset` que se encoge (regla global), rutas que se cortan donde haga falta, gráficos desde 240 px |
-| 10 | Con el espaciado de texto del criterio, el SVG recortaba las etiquetas del eje de los gráficos de uso, y el enlace "Download OpenAPI Document" de Scalar quedaba cortado | 1.4.12 | El SVG deja ver lo que sale al margen de la tarjeta. El enlace de Scalar se acomoda en varias líneas (CSS propio sobre Scalar) |
+| 1 | API validation errors reached Spanish pages in English ("at most 6 months for this classification", zod messages, the `detail` of 409 and 403) | 3.1.2, 3.3.1, 3.3.3 | Every API error carries `key` and `params`, and the web shows them in the user's language. zod errors are written with zod's locale. ADR-0025 |
+| 2 | The session ended after 30 minutes of inactivity without warning, and whatever had been typed was lost | 2.2.1 | A dialog two minutes before, with "Stay signed in", which renews the session with Keycloak (`components/session-timeout.tsx`, `RID_SESSION_IDLE_SECONDS`) |
+| 3 | With more than one entity, the header selector overflowed at 320 px | 1.4.10 | The selector wraps onto several lines |
+| 4 | The tables on the service page overflowed the page at 320 px | 1.4.10 | Scrolling inside their own container, like the other tables |
+| 5 | The Scalar documentation added a second `h1` to the API page | 1.3.1 | Its headings move down one level (`aria-level`) |
+| 6 | The tooltip of the usage charts and of the exchange map did not close with Escape | 1.4.13 | Escape hides it without moving the pointer or the focus |
+| 7 | The status of an access request changed silently while the page refreshes itself | 4.1.3 | The status is a `role="status"` region |
+| 8 | The limit on open onboarding requests returned a generic 409 | 3.3.1 | The conflict states the reason and the maximum (`too_many_open_requests`) |
+| 9 | At 320 px these also overflowed:<br>• the usage and indicator tables, because the grid grew with the table;<br>• the access request form, because a `fieldset` takes the width of its content and long paths did not wrap;<br>• the exchange map and the daily chart, because of their minimum width | 1.4.10 | `minmax(0, 1fr)` columns, a `fieldset` that shrinks (global rule), paths that break where needed, charts from 240 px |
+| 10 | With the criterion's text spacing, the SVG clipped the axis labels of the usage charts, and Scalar's "Download OpenAPI Document" link was cut off | 1.4.12 | The SVG shows what spills past the card's edge. The Scalar link wraps onto several lines (our own CSS on top of Scalar) |
 
-## Estado por criterio
+## Status by criterion
 
-| Criterio | Estado | Notas |
+| Criterion | Status | Notes |
 | :-- | :-- | :-- |
-| 1.1.1 Contenido no textual | Cumple | Logo decorativo con `alt=""` dentro de un enlace con nombre. Íconos `aria-hidden`. Los gráficos tienen nombre, cada barra o enlace su texto, y una tabla con los mismos datos |
-| 1.2.x Multimedia | No aplica | No hay audio ni video |
-| 1.3.1 Información y relaciones | Corregido | Tablas con `th scope`, listas de definición, `fieldset`/`legend` en grupos, etiquetas asociadas. #5 |
-| 1.3.2 Secuencia significativa | Cumple | El orden del DOM es el visual |
-| 1.3.3 Características sensoriales | Cumple | Las instrucciones no dependen de forma, color ni posición |
-| 1.3.4 Orientación | Cumple | Sin bloqueo de orientación |
-| 1.3.5 Propósito de los campos | Cumple | Los datos propios del usuario se piden en Keycloak (registro), con `autocomplete`. En el portal, los campos de personas son de terceros (designados, oficial de datos) y llevan `autocomplete="off"` a propósito |
-| 1.4.1 Uso del color | Cumple | Los estados llevan texto además del color |
-| 1.4.2 Control del audio | No aplica | |
-| 1.4.3 Contraste mínimo | Cumple | axe en todas las pantallas. El color de marca de cada país se usa oscurecido para texto (`--primary-ink`), y Scalar tiene una paleta propia que cumple 4.5:1 |
-| 1.4.4 Cambio de tamaño del texto | Cumple | Unidades relativas. Se cubre con la reflujo a 320 px (400 %) |
-| 1.4.5 Imágenes de texto | Cumple | No hay |
-| 1.4.10 Reflujo | Corregido | #3, #4, #9. Las tablas anchas se desplazan dentro de su contenedor (excepción del criterio para datos tabulares) |
-| 1.4.11 Contraste de elementos no textuales | Cumple | Borde de los controles #8e8e8e: 3.28:1 sobre blanco, 3.08:1 sobre la superficie. Anillo de foco #0f0f0f: 19:1 |
-| 1.4.12 Espaciado del texto | Corregido | #10. Verificado en cada pantalla: ningún texto visible queda fuera del contenedor que lo recorta |
-| 1.4.13 Contenido al pasar el puntero o con el foco | Corregido | #6. El tooltip aparece también con el foco, se puede recorrer con el puntero y se cierra con Escape |
-| 2.1.1 Teclado | Cumple | Todo con elementos nativos. Las barras de los gráficos y los enlaces del mapa reciben foco |
-| 2.1.2 Sin trampas de teclado | Cumple | El diálogo de sesión no es modal. Scalar no atrapa el foco |
-| 2.1.4 Atajos de una tecla | Cumple | No hay |
-| 2.2.1 Tiempo ajustable | Corregido | #2. El refresco automático mientras se aplica un cambio dura como máximo un minuto y no tiene tiempo límite para el usuario |
-| 2.2.2 Pausar, detener, ocultar | Cumple | Sin animaciones ni carruseles. El refresco automático es breve (≤ 60 s) y solo durante un estado transitorio. Se respeta `prefers-reduced-motion` |
-| 2.3.1 Tres destellos | Cumple | No hay |
-| 2.4.1 Evitar bloques | Cumple | "Saltar al contenido principal" en toda pantalla, verificado |
-| 2.4.2 Titulado de páginas | Cumple | Título propio por pantalla, verificado |
-| 2.4.3 Orden del foco | Cumple | El orden del DOM. El diálogo de sesión toma el foco y lo devuelve |
-| 2.4.4 Propósito de los enlaces | Cumple | axe. Los enlaces de tablas llevan el nombre del recurso |
-| 2.4.5 Múltiples vías | Cumple | Navegación principal, inicio con accesos por rol, búsqueda en el catálogo |
-| 2.4.6 Encabezados y etiquetas | Cumple | Verificado |
-| 2.4.7 Foco visible | Cumple | Anillo oscuro fijo para cualquier color de marca, verificado |
-| 2.5.1 Gestos del puntero | Cumple | No hay gestos |
-| 2.5.2 Cancelación del puntero | Cumple | Elementos nativos (activan al soltar) |
-| 2.5.3 Etiqueta en el nombre | Cumple | El nombre accesible empieza por el texto visible (p. ej. "Notificaciones" con su contador) |
-| 2.5.4 Activación por movimiento | No aplica | |
-| 3.1.1 Idioma de la página | Cumple | Verificado en es y en |
-| 3.1.2 Idioma de las partes | Corregido | #1. Quedan en inglés, a propósito, los diagnósticos técnicos del lint de OpenAPI, que nombran reglas y campos del documento (ADR-0025) |
-| 3.2.1 Al recibir el foco | Cumple | |
-| 3.2.2 Al recibir entradas | Cumple | El cambio de entidad activa tiene su botón; ningún `select` navega solo |
-| 3.2.3 Navegación coherente | Cumple | El mismo encabezado y pie en toda pantalla |
-| 3.2.4 Identificación coherente | Cumple | Los mismos componentes y textos para las mismas funciones |
-| 3.3.1 Identificación de errores | Corregido | Resumen con `role="alert"` y error junto a cada campo con `aria-describedby`. #1, #8 |
-| 3.3.2 Etiquetas o instrucciones | Cumple | Etiqueta visible en todo campo, "(Obligatorio)" en el texto, ayudas con `aria-describedby` |
-| 3.3.3 Sugerencias ante errores | Corregido | Los mensajes dicen qué corregir y en el idioma del usuario (#1) |
-| 3.3.4 Prevención de errores (legales, financieros, datos) | Cumple | Las decisiones con efecto (rechazo, revocación, suspensión, borrado por orden legal) piden motivo o confirmación. Una aprobación se puede revertir con revocación. Lo enviado se puede revisar antes |
-| 4.1.1 Procesamiento | Cumple | HTML generado por React. Ids únicos con `useId` |
-| 4.1.2 Nombre, función, valor | Cumple | axe en todas las pantallas. Elementos nativos, y ARIA solo donde no hay elemento nativo |
-| 4.1.3 Mensajes de estado | Corregido | Confirmaciones con `role="status"`, errores con `role="alert"`. #7 |
+| 1.1.1 Non-text Content | Meets | Decorative logo with `alt=""` inside a named link. Icons are `aria-hidden`. Charts have a name, each bar or link has its text, and there is a table with the same data |
+| 1.2.x Time-based Media | Not applicable | There is no audio or video |
+| 1.3.1 Info and Relationships | Fixed | Tables with `th scope`, definition lists, `fieldset`/`legend` for groups, associated labels. #5 |
+| 1.3.2 Meaningful Sequence | Meets | DOM order is visual order |
+| 1.3.3 Sensory Characteristics | Meets | Instructions do not rely on shape, color or position |
+| 1.3.4 Orientation | Meets | No orientation lock |
+| 1.3.5 Identify Input Purpose | Meets | The user's own data is collected in Keycloak (registration), with `autocomplete`. In the portal, the person fields are about third parties (designated people, data officer) and carry `autocomplete="off"` on purpose |
+| 1.4.1 Use of Color | Meets | Statuses carry text as well as color |
+| 1.4.2 Audio Control | Not applicable | |
+| 1.4.3 Contrast (Minimum) | Meets | axe on every screen. Each country's brand color is darkened for text (`--primary-ink`), and Scalar has its own palette that meets 4.5:1 |
+| 1.4.4 Resize Text | Meets | Relative units. Covered by reflow at 320 px (400 %) |
+| 1.4.5 Images of Text | Meets | There are none |
+| 1.4.10 Reflow | Fixed | #3, #4, #9. Wide tables scroll inside their container (the criterion's exception for tabular data) |
+| 1.4.11 Non-text Contrast | Meets | Control border #8e8e8e: 3.28:1 on white, 3.08:1 on the surface. Focus ring #0f0f0f: 19:1 |
+| 1.4.12 Text Spacing | Fixed | #10. Checked on every screen: no visible text ends up outside the container that clips it |
+| 1.4.13 Content on Hover or Focus | Fixed | #6. The tooltip also appears on focus, can be hovered with the pointer and closes with Escape |
+| 2.1.1 Keyboard | Meets | Everything uses native elements. The chart bars and the map links receive focus |
+| 2.1.2 No Keyboard Trap | Meets | The session dialog is not modal. Scalar does not trap focus |
+| 2.1.4 Character Key Shortcuts | Meets | There are none |
+| 2.2.1 Timing Adjustable | Fixed | #2. The automatic refresh while a change is being applied lasts at most one minute and sets no time limit for the user |
+| 2.2.2 Pause, Stop, Hide | Meets | No animations or carousels. The automatic refresh is short (≤ 60 s) and only during a transient state. `prefers-reduced-motion` is respected |
+| 2.3.1 Three Flashes or Below Threshold | Meets | There are none |
+| 2.4.1 Bypass Blocks | Meets | "Skip to main content" on every screen, checked |
+| 2.4.2 Page Titled | Meets | Each screen has its own title, checked |
+| 2.4.3 Focus Order | Meets | DOM order. The session dialog takes focus and gives it back |
+| 2.4.4 Link Purpose (In Context) | Meets | axe. Links in tables carry the name of the resource |
+| 2.4.5 Multiple Ways | Meets | Main navigation, a home page with shortcuts by role, search in the catalog |
+| 2.4.6 Headings and Labels | Meets | Checked |
+| 2.4.7 Focus Visible | Meets | A fixed dark ring for any brand color, checked |
+| 2.5.1 Pointer Gestures | Meets | There are no gestures |
+| 2.5.2 Pointer Cancellation | Meets | Native elements (they activate on release) |
+| 2.5.3 Label in Name | Meets | The accessible name starts with the visible text (e.g. "Notificaciones" with its counter) |
+| 2.5.4 Motion Actuation | Not applicable | |
+| 3.1.1 Language of Page | Meets | Checked in es and en |
+| 3.1.2 Language of Parts | Fixed | #1. The technical diagnostics of the OpenAPI lint stay in English on purpose, because they name rules and fields of the document (ADR-0025) |
+| 3.2.1 On Focus | Meets | |
+| 3.2.2 On Input | Meets | Changing the active entity has its own button; no `select` navigates by itself |
+| 3.2.3 Consistent Navigation | Meets | The same header and footer on every screen |
+| 3.2.4 Consistent Identification | Meets | The same components and text for the same functions |
+| 3.3.1 Error Identification | Fixed | A summary with `role="alert"` and an error next to each field with `aria-describedby`. #1, #8 |
+| 3.3.2 Labels or Instructions | Meets | A visible label on every field, "(Obligatorio)" in the text, hints with `aria-describedby` |
+| 3.3.3 Error Suggestion | Fixed | Messages say what to correct, in the user's language (#1) |
+| 3.3.4 Error Prevention (Legal, Financial, Data) | Meets | Decisions with consequences (rejection, revocation, suspension, deletion under legal order) ask for a reason or a confirmation. An approval can be reversed by revocation. What is submitted can be reviewed first |
+| 4.1.1 Parsing | Meets | HTML generated by React. Unique ids with `useId` |
+| 4.1.2 Name, Role, Value | Meets | axe on every screen. Native elements, and ARIA only where there is no native element |
+| 4.1.3 Status Messages | Fixed | Confirmations with `role="status"`, errors with `role="alert"`. #7 |
 
 ## Keycloak
 
-Las páginas de ingreso, registro y código de un solo uso son el tema `keycloak.v2` (PatternFly), en español e inglés según el realm. axe no encuentra violaciones en ingreso ni en registro (prueba "Keycloak's sign-in and registration pages"). Un tema propio por país sería configuración del operador y debería pasar la misma prueba.
+The sign-in, registration and one-time code pages use the `keycloak.v2` theme (PatternFly), in Spanish and English depending on the realm. axe finds no violations on sign-in or registration (test "Keycloak's sign-in and registration pages"). A country-specific theme would be operator configuration and should pass the same test.
 
-## Lo que la automatización no cubre
+## What the automation does not cover
 
-- **Lectores de pantalla.** Esta auditoría verifica nombres, roles, estados y regiones vivas con axe y con pruebas, pero no se probó con NVDA, JAWS ni VoiceOver. Antes de la puesta en producción, el operador debe recorrer los flujos principales con NVDA y Firefox y con VoiceOver y Safari: alta de entidad, publicación, solicitud y aprobación de acceso, revisión del regulador.
-- **Usuarios con discapacidad.** Una prueba con usuarios reales, idealmente de las entidades, encontraría problemas de comprensión que ninguna herramienta ve. Queda como recomendación para la operación.
+- **Screen readers.** This audit checks names, roles, states and live regions with axe and with tests, but it was not tested with NVDA, JAWS or VoiceOver. Before going to production, the operator must walk through the main flows with NVDA and Firefox and with VoiceOver and Safari: entity onboarding, publication, access request and approval, regulator review.
+- **Users with disabilities.** A test with real users, ideally from the entities, would find comprehension problems that no tool sees. This remains a recommendation for operations.
 
-## Cómo mantenerlo
+## How to keep it up
 
-- Una pantalla nueva debe entrar en `SCREENS` de `e2e/accessibility.spec.ts`: la prueba de cobertura falla si no está.
-- Una regla de negocio nueva del API con error de campo define su `FieldErrorKey` y sus textos (ADR-0025): `src/i18n/messages.test.ts` falla si faltan.
+- A new screen must be added to `SCREENS` in `e2e/accessibility.spec.ts`: the coverage test fails if it is missing.
+- A new API business rule with a field error defines its `FieldErrorKey` and its texts (ADR-0025): `src/i18n/messages.test.ts` fails if they are missing.

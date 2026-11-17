@@ -1,10 +1,12 @@
 # Guía para entidades participantes
 
+> English version (official): [docs/guides/entities.md](../../guides/entities.md)
+
 Versión 1.2 · noviembre 2026 · para la jornada de incorporación (bootcamp) con las entidades
 
 Esta guía explica qué tiene que **designar, disponer y hacer** cada entidad para conectarse a la Red de Intercambio de Datos (RID), como **proveedora** de datos, como **consumidora** o como ambas. La plataforma central (portal y gateway) la opera el operador nacional: la entidad no instala nada de eso.
 
-**Las proveedoras tienen su propia guía,** en el repositorio del kit (`docs/guias/proveedoras.md`, con su versión para proyectar `proveedoras.html`): cómo se conecta el servicio por el nodo, qué servidor y qué red necesita, cómo se instala el nodo, cómo se publica una API y qué recibe el servicio en cada consulta. Aquí queda lo común a todas las entidades y lo de las consumidoras.
+**Las proveedoras tienen su propia guía,** en el repositorio del kit (`docs/es/guides/providers.md`, con su versión para proyectar `providers.html`): cómo se conecta el servicio por el nodo, qué servidor y qué red necesita, cómo se instala el nodo, cómo se publica una API y qué recibe el servicio en cada consulta. Aquí queda lo común a todas las entidades y lo de las consumidoras.
 
 ## 1. Qué significa para una entidad
 

@@ -455,7 +455,7 @@ summary() {
   info "Usuarios y contraseñas:   sudo ./install.sh credentials"
   info "Código de segundo factor: sudo ./install.sh otp"
   info "Estado:                   sudo ./install.sh status"
-  info "Siguiente paso: docs/INSTALL.md §5 (verificación de punta a punta) y docs/guias/operador.md"
+  info "Siguiente paso: docs/INSTALL.md §5 (verificación de punta a punta) y docs/es/guides/operator.md"
 }
 
 cmd_install() {

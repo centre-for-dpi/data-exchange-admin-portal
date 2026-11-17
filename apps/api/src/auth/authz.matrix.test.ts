@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { API_PREFIX, createApp } from '../app.js';
 import { type DiscoveredRoute, OpenApiService } from '../openapi/openapi.service.js';
 import { repoRoot } from '../seed/realm.js';
-import { AUTHZ_DOC, renderAuthzMatrix } from './authz.matrix.js';
+import { AUTHZ_DOC, AUTHZ_DOC_ES, type DocLang, renderAuthzMatrix } from './authz.matrix.js';
 
 describe('authorization matrix (M2-03)', () => {
   let app: NestFastifyApplication;
@@ -41,9 +41,12 @@ describe('authorization matrix (M2-03)', () => {
     expect(openWrites.map(describeRoute)).toEqual([]);
   });
 
-  it(`${AUTHZ_DOC} is generated from the current policy and routes`, () => {
-    const file = join(repoRoot(), AUTHZ_DOC);
-    const rendered = renderAuthzMatrix(routes);
+  it.each([
+    [AUTHZ_DOC, 'en'],
+    [AUTHZ_DOC_ES, 'es'],
+  ] as [string, DocLang][])('%s is generated from the current policy and routes', (doc, lang) => {
+    const file = join(repoRoot(), doc);
+    const rendered = renderAuthzMatrix(routes, lang);
     if (process.env.RID_UPDATE_AUTHZ_DOC === '1') writeFileSync(file, rendered);
     expect(readFileSync(file, 'utf8').replaceAll('\r\n', '\n')).toBe(rendered);
   });
