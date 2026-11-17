@@ -105,10 +105,10 @@ describe('OPA keeps its last bundle (M6-04)', () => {
 
   it('mounts that directory on a volume, in development and in the pilot', () => {
     const deployEnv = {
-    DEN_PUBLIC_URL: 'https://portal.test',
-    MAILPIT_UI_AUTH: 'a:b',
-    PGBACKREST_REPO1_CIPHER_PASS: 'test-cipher-pass',
-  };
+      DEN_PUBLIC_URL: 'https://portal.test',
+      MAILPIT_UI_AUTH: 'a:b',
+      PGBACKREST_REPO1_CIPHER_PASS: 'test-cipher-pass',
+    };
     for (const compose of [
       config(['docker-compose.yml']),
       config(['docker-compose.yml', 'docker-compose.deploy.yml'], deployEnv),

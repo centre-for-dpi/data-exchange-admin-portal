@@ -60,7 +60,10 @@ const required = (name: string): string => {
 };
 
 export function configFromEnv(): CitizenAppConfig {
-  const publicUrl = (process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100').replace(/\/+$/, '');
+  const publicUrl = (process.env.DEN_CITIZEN_APP_URL ?? 'http://localhost:3100').replace(
+    /\/+$/,
+    '',
+  );
   const issuer = process.env.DEN_CITIZEN_ISSUER ?? 'http://localhost:8080/realms/den-citizens';
   const apiUrl = (
     process.env.CITIZEN_APP_PORTAL_API_URL ??
