@@ -145,6 +145,8 @@ Bit run in every gateway pod, on 127.0.0.1).
 - { name: RID_GATEWAY_TLS_HOSTS, value: {{ .Values.gatewayHost | quote }} }
 - { name: APISIX_ADMIN_URL, value: {{ printf "http://%s:9180" (include "rid.name" "gateway-admin") | quote }} }
 - { name: RID_GATEWAY_INTERNAL_URL, value: {{ include "rid.url.gateway" . | quote }} }
+# Each gateway node counts rate limits locally: the bundle gives each its share (ADR-0020).
+- { name: RID_GATEWAY_NODES, value: {{ .Values.gateway.replicas | quote }} }
 - { name: RID_CONTRACT_RUNNER_GATEWAY_URL, value: {{ include "rid.url.gateway" . | quote }} }
 - { name: RID_GATEWAY_PORTAL_API_URL, value: {{ include "rid.url.api" . | quote }} }
 - { name: RID_GATEWAY_KEYCLOAK_URL, value: {{ printf "http://%s:8080/auth" (include "rid.name" "keycloak") | quote }} }
