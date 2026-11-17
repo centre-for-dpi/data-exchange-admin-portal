@@ -733,6 +733,9 @@
       },
       "certificate_revocation": {
         "executed": "Revocación masiva de certificados"
+      },
+      "gateway_signing_key": {
+        "created": "Clave de firma del gateway creada"
       }
     },
     "filters": {

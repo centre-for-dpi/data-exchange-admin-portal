@@ -733,6 +733,9 @@
       },
       "certificate_revocation": {
         "executed": "Mass certificate revocation"
+      },
+      "gateway_signing_key": {
+        "created": "Gateway signing key created"
       }
     },
     "filters": {
