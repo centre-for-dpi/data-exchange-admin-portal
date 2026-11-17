@@ -20,7 +20,7 @@ export const GATEWAY_HTTP = env('RID_GATEWAY_HTTP_URL', 'http://localhost:9080')
 // With mTLS (M3-10) the gateway is HTTPS and every call presents the application's certificate.
 export const MTLS = GATEWAY.startsWith('https://');
 export const WEB = env('RID_WEB_URL', 'http://localhost:3000');
-const PASSWORD = env('RID_DEMO_USER_PASSWORD', 'demo');
+const PASSWORD = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
 const TOTP_SECRET = env('RID_DEMO_TOTP_SECRET', DEFAULT_DEMO_TOTP_SECRET);
 
 /** A step that did not behave as the script promises. */

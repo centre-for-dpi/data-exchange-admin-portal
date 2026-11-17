@@ -60,7 +60,7 @@ test.describe('login with Keycloak', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
     await page.locator('#username').fill('lucia.datos');
-    await page.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'demo');
+    await page.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'rid-demo-password');
     await page.locator('#kc-login').click();
 
     // The portal sees the session lacks the second factor and asks Keycloak for it.

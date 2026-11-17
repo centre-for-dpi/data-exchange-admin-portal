@@ -72,7 +72,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         },
         {
@@ -94,7 +94,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         }
       ]
@@ -110,7 +110,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         },
         {
@@ -132,7 +132,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         }
       ]
@@ -148,7 +148,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         },
         {
@@ -170,7 +170,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         },
         {
@@ -192,7 +192,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         },
         {
@@ -214,7 +214,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         }
       ]

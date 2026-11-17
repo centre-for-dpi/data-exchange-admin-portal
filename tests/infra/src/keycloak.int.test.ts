@@ -23,7 +23,7 @@ const seedUsers = (
 ).users;
 
 describe('realm rid-portal (M0-03)', () => {
-  const password = env('RID_DEMO_USER_PASSWORD', 'demo');
+  const password = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
 
   it.each(seedUsers)('$username logs in through apps/web (code + PKCE)', async (user) => {
     const result = await loginWithAuthorizationCode(user.username, password);
@@ -82,7 +82,7 @@ describe('realm rid-portal (M0-03)', () => {
 });
 
 describe('realm rid-portal: second factor (M3-08)', () => {
-  const password = env('RID_DEMO_USER_PASSWORD', 'demo');
+  const password = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
   const tokenUrl = `${keycloakUrl()}/realms/rid-portal/protocol/openid-connect/token`;
   /** Keycloak accepts each code once, and the codes of the periods next to this one. */
   const used = new Set<string>();
@@ -379,7 +379,7 @@ const citizens = (
 ).users;
 
 describe('realm rid-citizens (MT-05)', () => {
-  const password = env('RID_DEMO_USER_PASSWORD', 'demo');
+  const password = env('RID_DEMO_USER_PASSWORD', 'rid-demo-password');
 
   it.each(citizens)(
     '$username logs in to the Carpeta and its token carries the verified document only',

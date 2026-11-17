@@ -31,7 +31,9 @@ test.describe('reference citizen folder (MT-07)', () => {
     await citizen.getByRole('link', { name: 'Ingresar con tu identidad digital' }).click();
     await citizen.waitForURL(/\/realms\/rid-citizens\//);
     await citizen.locator('#username').fill('ciudadana.demo');
-    await citizen.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'demo');
+    await citizen
+      .locator('#password')
+      .fill(process.env.RID_DEMO_USER_PASSWORD ?? 'rid-demo-password');
     await citizen.locator('#kc-login').click();
     await citizen.waitForURL(`${carpeta}/consultas`);
 

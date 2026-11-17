@@ -125,7 +125,7 @@ export async function enrollOneTimeCode(page: Page, password: string): Promise<v
 export async function keycloakLogin(page: Page, username: string): Promise<void> {
   await page.waitForURL(/\/realms\/rid-portal\//);
   await page.locator('#username').fill(username);
-  await page.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'demo');
+  await page.locator('#password').fill(process.env.RID_DEMO_USER_PASSWORD ?? 'rid-demo-password');
   await page.locator('#kc-login').click();
   if (MFA_USERS.has(username)) await enterOneTimeCode(page, username);
 }

@@ -277,7 +277,11 @@ questions() {
   step "Paso 6 · Usuarios de demostración"
   info "El piloto carga entidades ficticias y usuarios de demo (operador, regulador, publicador…)."
   info "Es la única forma, por ahora, de tener el primer administrador de plataforma (docs/INSTALL.md §6)."
-  ask_secret DEMO_PASSWORD "Contraseña común de los usuarios de demo (Enter = una aleatoria)"
+  while :; do
+    ask_secret DEMO_PASSWORD "Contraseña común de los usuarios de demo, 12 caracteres o más (Enter = una aleatoria)"
+    [[ -z $DEMO_PASSWORD || ${#DEMO_PASSWORD} -ge 12 ]] && break
+    warn "La política de contraseñas de Keycloak exige 12 caracteres o más."
+  done
 
   step "Resumen"
   printf '  %-28s %s\n' "País:" "$COUNTRY" \

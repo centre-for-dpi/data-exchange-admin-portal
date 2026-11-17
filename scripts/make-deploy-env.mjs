@@ -51,6 +51,12 @@ if (
   console.error(`--country: no config/country/${country}.yaml`);
   process.exit(2);
 }
+// The realm's password policy (M6-01) refuses shorter ones, and Keycloak would not import it.
+const demoPassword = values['demo-password'] || process.env.RID_DEPLOY_DEMO_PASSWORD;
+if (demoPassword !== undefined && demoPassword.length < 12) {
+  console.error('--demo-password: at least 12 characters (the realm password policy)');
+  process.exit(1);
+}
 const out = resolve(root, values.out);
 if (existsSync(out)) {
   console.error(`${out} exists: not overwriting the secrets of a deployment.`);

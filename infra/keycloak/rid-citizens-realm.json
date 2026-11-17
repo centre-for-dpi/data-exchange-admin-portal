@@ -21,7 +21,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"document_type\",\"displayName\":\"Tipo de documento\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"min\":1,\"max\":10}}},{\"name\":\"document_number\",\"displayName\":\"Número de documento\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"min\":3,\"max\":30}}}],\"groups\":[]}"
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"document_type\",\"displayName\":\"Tipo de documento\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"min\":1,\"max\":32}}},{\"name\":\"document_number\",\"displayName\":\"Número de documento\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false,\"validations\":{\"length\":{\"min\":3,\"max\":30}}}],\"groups\":[]}"
           ]
         }
       }
@@ -153,7 +153,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         }
       ]
@@ -171,7 +171,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${RID_DEMO_USER_PASSWORD:demo}",
+          "value": "${RID_DEMO_USER_PASSWORD:rid-demo-password}",
           "temporary": false
         }
       ]
