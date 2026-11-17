@@ -1,6 +1,6 @@
 # Guía para el operador y el regulador
 
-Versión 1.0 · noviembre 2026 · para la sesión de arquitectura y despliegue con el operador (AND) y el regulador (MinTIC)
+Versión 1.2 · noviembre 2026 · código con el hito M6 (endurecimiento) cerrado · para la sesión de arquitectura y despliegue con el operador (AND) y el regulador (MinTIC)
 
 Esta guía explica **qué es cada pieza de la plataforma, por qué está y quién la opera**, y cómo se despliega la infraestructura central. Para el detalle técnico remite a `ARCHITECTURE.md`, `DEPLOYMENT.md` y `OPERATIONS.md`; la instalación paso a paso está en [`INSTALL.md`](../INSTALL.md).
 
@@ -75,6 +75,8 @@ flowchart TB
     CA[step-ca · CA de la red]
     TSA[TSA · sellado de tiempo]
     MAIL[Correo]
+    BCK[pgBackRest · respaldos cifrados]
+    AV[ClamAV · antivirus, opcional]
   end
   subgraph DAT["Plano de datos — atiende cada llamada"]
     GW[APISIX + etcd · gateway]
@@ -90,6 +92,8 @@ flowchart TB
   API -- "clientes OAuth" --> KC
   API -- "firma certificados" --> CA
   API -- "sella" --> TSA
+  API -- "revisa documentos" --> AV
+  PG -- "archiva cada cambio" --> BCK
   OPA -- "descarga la política" --> API
   GW -- "¿se permite?" --> OPA
   GW --> HUB
@@ -116,20 +120,22 @@ Para cada uno: **qué hace**, **qué pasa si cae** y **qué guarda**. Todos corr
 | Componente | Qué hace | Si cae | Guarda |
 | :-- | :-- | :-- | :-- |
 | **Portal web** (Next.js) | Interfaz de todas las personas: catálogo, documentación interactiva, consolas de operador, regulador, entidad y auditoría. No decide permisos: los decide el API | No hay portal; el tráfico sigue | Nada |
-| **API del portal** (NestJS) | El cerebro. Aplica los flujos (alta, publicación, solicitud, aprobación), verifica rol y entidad en **cada** petición, registra cada cambio en la bitácora. En segundo plano: reconcilia APISIX, Keycloak, OPA y el hub; firma certificados; sella la transparencia y la bitácora; envía correos y avisos; vence suscripciones y certificados | No hay portal ni cambios; el tráfico sigue con lo último | Nada propio: todo en PostgreSQL |
+| **API del portal** (NestJS) | El cerebro. Aplica los flujos (alta, publicación, solicitud, aprobación), verifica rol y entidad en **cada** petición, registra cada cambio en la bitácora. En segundo plano: reconcilia APISIX, Keycloak, OPA y el hub; firma certificados; sella la transparencia y la bitácora; envía correos y avisos; vence suscripciones y certificados; rota cada 90 días la clave con la que el gateway firma sus aserciones y publica las claves públicas (JWKS) | No hay portal ni cambios; el tráfico sigue con lo último | Nada propio: todo en PostgreSQL |
 | **PostgreSQL** | **Única fuente de verdad**: entidades, personas y roles, APIs, aplicaciones, suscripciones, bitácora, registro de transparencia, colas de trabajos. La bitácora es de solo inserción, incluso para el dueño de la base | Se detiene el plano de gobierno; el tráfico sigue | Todo. **Se respalda** |
+| **pgBackRest** | Archiva cada cambio de PostgreSQL en pocos minutos (como mucho 5 minutos de pérdida), toma un respaldo completo por semana y uno diferencial por día, y conserva cuatro semanas, en un repositorio **cifrado**. Permite volver al último estado o a un instante exacto; la restauración se prueba en CI | Los cambios nuevos esperan a ser archivados; el tráfico sigue | El repositorio cifrado. **Se copia fuera del servidor** |
 | **Keycloak** | Identidad: **autentica, no autoriza** (los roles viven en PostgreSQL). Tres realms: `rid-portal` (personas, con segundo factor), `rid-gateway` (aplicaciones de las entidades; sus clientes los crea el portal) y `rid-citizens` (identidad ciudadana simulada; en producción se usa la del país) | Nadie inicia sesión; las aplicaciones no obtienen tokens nuevos | Usuarios y clientes (en PostgreSQL) |
 | **step-ca** | **Autoridad certificadora de la red.** Firma los certificados de las aplicaciones (a partir del CSR que sube la entidad: la llave privada nunca sale de la entidad), el del gateway y los de los nodos. Solo le habla el API | No se emiten certificados; los vigentes siguen sirviendo | Llaves de la CA. **Perderla invalida todos los certificados: se respalda** |
 | **TSA** (sellado de tiempo RFC 3161) | Sella el anclaje diario de la bitácora y los lotes del registro de transparencia: prueba que existían en ese momento y que nadie los reescribió | Los sellos quedan pendientes y se hacen al volver | Su llave (la de desarrollo; en producción, la TSA acreditada del país) |
 | **Correo** (Mailpit en el piloto) | Captura todo el correo (invitaciones, avisos, verificación de cuentas, anclajes al regulador) y lo muestra en `/mail` con contraseña. En producción, el SMTP del operador | No salen correos | Correos del piloto |
+| **ClamAV** (antivirus, opcional) | Revisa cada documento que se sube (designaciones, acuerdos de intercambio) antes de guardarlo. Uno infectado se rechaza; el log guarda la firma del virus y el hash, nunca el nombre ni el contenido | No se suben documentos (falla cerrado); el tráfico sigue | Sus firmas de virus, que actualiza desde internet |
 
 ### 4.3 Plano de datos
 
 | Componente | Qué hace | Si cae | Guarda |
 | :-- | :-- | :-- | :-- |
-| **APISIX** (gateway) | Toda llamada entre entidades pasa por aquí. Termina el **mTLS** (exige el certificado de la aplicación), valida el token, borra las cabeceras que solo el gateway puede poner, pregunta a OPA, aplica el límite de la suscripción y reenvía al proveedor con las cabeceras de trazabilidad. **No guarda cuerpos** | Se corta el tráfico | Nada (su configuración está en etcd) |
+| **APISIX** (gateway) | Toda llamada entre entidades pasa por aquí. Termina el **mTLS** (exige el certificado de la aplicación), valida el token, borra las cabeceras que solo el gateway puede poner, pregunta a OPA, aplica el límite de la suscripción y reenvía al proveedor con las cabeceras de trazabilidad y una **aserción firmada** de la llamada. **No guarda cuerpos** | Se corta el tráfico | Nada (su configuración está en etcd) |
 | **etcd** | Configuración del gateway (rutas, destinos, certificados). Se reconstruye desde PostgreSQL | APISIX sigue con lo que tiene en memoria, sin cambios nuevos | Configuración reconstruible |
-| **OPA** | **Decide cada llamada** con la política que publica el portal (suscripciones vigentes, finalidades, operaciones, huellas de certificados). Responde "sí" o "no, por esta razón" (`no_subscription`, `purpose_not_allowed`…). No consulta la base del portal en línea. Sin política, **niega todo** (falla cerrado) | Se corta el tráfico | Nada (descarga la política cada 10–20 s) |
+| **OPA** | **Decide cada llamada** con la política que publica el portal (suscripciones vigentes, finalidades, operaciones, huellas de certificados). Responde "sí" o "no, por esta razón" (`no_subscription`, `purpose_not_allowed`…). No consulta la base del portal en línea. Sin política, **niega todo** (falla cerrado) | Se corta el tráfico | La última política, en disco: si reinicia sin el portal, sigue decidiendo con ella. La renueva cada 10–20 s |
 | **Hub WireGuard** | Extremo central de los túneles cifrados que abren los **nodos del kit** desde la red de cada entidad, de adentro hacia afuera (la entidad no abre puertos de entrada). El gateway llega al nodo por el túnel, con mTLS de punta a punta. Un nodo no puede alcanzar a otros nodos ni a la plataforma | Las APIs servidas por nodos no responden | Último estado de los túneles |
 | **Fluent Bit (transparencia)** | Lleva del gateway al portal el registro de cada consulta **autorizada** a datos de una persona: quién, para qué, con qué suscripción, y el **seudónimo** del titular (nunca su número de documento) | Los registros esperan en su búfer en disco | Búfer temporal |
 | **Fluent Bit (analítica) + OpenSearch** | Segunda barrera de privacidad: deja pasar solo metadatos permitidos (sin ruta real, sin query, sin cuerpo) y los guarda para los indicadores de uso | Se pierden esos metadatos; el tráfico no se afecta | Metadatos de uso (prescindible) |
@@ -181,12 +187,12 @@ sequenceDiagram
   C->>GW: GET /salud/afiliacion/v1/... (mTLS + token + X-RID-Purpose + X-RID-End-User)
   GW->>OPA: ¿se permite?
   OPA-->>GW: sí + cabeceras de trazabilidad
-  GW->>P: consulta + quién, para qué, con qué suscripción
+  GW->>P: consulta + quién, para qué, con qué suscripción + aserción firmada (X-RID-Assertion)
   P-->>GW: respuesta
   GW-->>C: respuesta (no se guarda)
 ```
 
-El proveedor recibe en cada consulta la entidad y la aplicación consumidoras, la suscripción, la finalidad, la operación y el hash del funcionario: ya no ve "solo al gateway".
+El proveedor recibe en cada consulta la entidad y la aplicación consumidoras, la suscripción, la finalidad, la operación y el hash del funcionario: ya no ve "solo al gateway". Con la **aserción firmada** (un JWS por llamada, ligado al método, la URI y el cuerpo) comprueba además que la consulta pasó por el gateway y no fue alterada, con las claves públicas de `https://<portal>/api/v1/gateway/jwks`.
 
 ### 5.4 Rendición de cuentas al ciudadano
 
@@ -204,6 +210,8 @@ Cada consulta autorizada a datos de una persona queda en el registro de transpar
 | Cuentas protegidas | Segundo factor para roles críticos; aviso al dueño cuando cambia una credencial |
 | Autorización en el servidor | Cada endpoint verifica rol y entidad; la matriz completa está en `AUTHZ.md` y la comprueban tests |
 | Entidades aisladas | Cada proveedor con mTLS acepta solo el certificado del gateway emitido para él; un nodo no alcanza a otros |
+| El proveedor sabe que la consulta es legítima | Aserción firmada por el gateway en cada llamada (ES256), ligada a la petición y a ese proveedor, verificable con un JWKS público. Una cabecera falsa del cliente se descarta |
+| Revisada contra estándares | OWASP ASVS nivel 2, capítulo por capítulo (`docs/security/ASVS-L2.md`), y WCAG 2.1 AA en las 42 pantallas, en español y en inglés (`docs/accessibility`) |
 
 ## 7. Despliegue de la infraestructura del operador (en vivo)
 
@@ -215,7 +223,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
    git clone <url-del-repositorio> rid && cd rid
    sudo ./install.sh
    ```
-   El script pregunta el país, los dos nombres, el proxy y el certificado, si se activa la observabilidad y la contraseña de demo. Después genera todos los secretos, compila, arranca y comprueba.
+   El script pregunta el país, los dos nombres, el proxy y el certificado, si se activan la observabilidad y el antivirus de documentos, y la contraseña de demo (12 caracteres o más). Después genera todos los secretos, compila, arranca y comprueba.
 3. **Entregar:**
    - copia cifrada del `.env` fuera del servidor (custodia del operador);
    - credenciales (`sudo ./install.sh credentials`) a las personas que correspondan;
@@ -230,6 +238,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | `RID_SUBJECT_REF_KEY`, `RID_END_USER_HASH_SALT` | Definen los seudónimos; **no se rotan** | AND |
 | Volumen de step-ca | Llaves de la CA de la red | AND (respaldo cifrado) |
 | `PGBACKREST_REPO1_CIPHER_PASS` | Cifra los respaldos de la base: sin ella no se restaura ninguno | AND, copia fuera del servidor, junto al `.env` |
+| `RID_SECRETS_KEY` | Sella los secretos de los clientes y la clave con la que firma el gateway | AND, dentro del `.env` |
 | Administrador de Keycloak | Control de las identidades | AND, dos personas |
 | Usuarios con rol `regulator` | Supervisión | MinTIC |
 
@@ -239,30 +248,56 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 - **Respaldos:** la base se respalda sola (pgBackRest): cada cambio queda archivado a los pocos minutos y hay un respaldo cada día, con un mes de historia. `sudo ./install.sh backup` antes de cada actualización y con regularidad, para llevar una copia fuera del servidor. Guarda también fuera del servidor la clave `PGBACKREST_REPO1_CIPHER_PASS` del `.env`: sin ella no se restaura nada.
 - **Restaurar:** `sudo ./install.sh restore` vuelve al último estado; `sudo ./install.sh restore "2026-11-20 14:30:00-05"`, a ese instante (`OPERATIONS.md §6`).
 - **Actualizar:** `sudo ./install.sh update`, que respalda, actualiza, recompila y reinicia.
-- **Incidentes, rotación de la CA intermedia y revocación masiva de certificados:** el runbook del operador (`RUNBOOK.md`). La revocación masiva está en la consola: Revocación masiva de certificados.
+- **Runbook del operador** (`RUNBOOK.md`): alta de una entidad hasta su primera API publicada, suspensión y baja; incidentes con severidades y un procedimiento por caso; rotación de la CA intermedia, planificada y de emergencia; revocación masiva de certificados.
+- **Revocación masiva de certificados:** Consola → Revocación masiva de certificados, solo `platform_admin` con segundo factor. Filtra por entidad, por fecha de emisión y por intermedia, muestra una vista previa y revoca solo si el conjunto no cambió. Cada certificado deja de servir en menos de 60 segundos y los desarrolladores reciben un aviso. No se deshace.
+- **Clave de firma del gateway:** el portal la rota sola cada 90 días; la anterior sigue en el JWKS para que lo archivado siga verificando. Si se compromete, se rota de inmediato como comprometida (`POST /api/v1/admin/gateway-signing-keys/rotate`) y se avisa a los proveedores (`RUNBOOK.md §2.2`).
+- **Al actualizar** un piloto instalado antes de los respaldos automáticos, `update` agrega la clave de cifrado de los respaldos al `.env` y lo avisa: guarda la copia de `.env` de nuevo.
 - **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte. Si algo no cuadra, se mira `sync_state` (`OPERATIONS.md §4.2`).
 - **Alertas** (con la observabilidad activada): Prometheus vigila el gateway, el API y OPA, y Alertmanager avisa por correo al operador (en el piloto, a `/mail`) cuando hay muchos 5xx o latencia alta, un servicio no responde, OPA se atrasa con la política, falla una reconciliación, hay nodos fuera de línea, vence pronto un certificado o se acumula la cola de trabajos. El tablero del operador está en `https://<portal>/grafana/`.
 
 ## 9. Piloto hoy vs. producción
 
-| Tema | Piloto (esta instalación) | Producción (M6) |
+| Tema | Piloto (esta instalación) | Producción |
 | :-- | :-- | :-- |
-| Topología | Un servidor | ≥ 2 nodos de gateway en zonas distintas, réplicas de portal y API, PostgreSQL con réplica (Helm charts, M6-05) |
+| Topología | Un servidor, con Docker Compose | Kubernetes con los Helm charts de `infra/helm`: ≥ 2 nodos de gateway en zonas distintas, réplicas de portal y API, etcd de 3 miembros, PostgreSQL con réplica, NetworkPolicies de entrada y salida |
+| Tráfico interno | Redes de Docker separadas (gateway, proveedores, resto) | Además, TLS entre componentes con una PKI interna (cert-manager) |
+| Imágenes | Se compilan en el servidor | Imágenes publicadas con versión, su SBOM y escaneo de vulnerabilidades (Trivy) |
 | CA | CA de desarrollo en un volumen | Raíz fuera de línea, intermedia en HSM |
 | Sellado de tiempo | TSA de desarrollo | TSA acreditada del país |
 | Correo | Mailpit | SMTP del operador |
 | Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
 | Identidad ciudadana | Simulada (`rid-citizens`) | La del país |
-| Datos iniciales | Entidades ficticias y usuarios de demo | Sin datos de demo; primer administrador por un procedimiento propio |
+| Datos iniciales | Entidades ficticias y usuarios de demo | Sin datos de demo; el primer `platform_admin` es quien entra primero con la dirección de `RID_BOOTSTRAP_ADMIN_EMAIL`, verificada por Keycloak (`DEPLOYMENT.md §9`) |
+| Antivirus | Opcional (paso 5 del instalador) | Activado, con dos réplicas |
 | Respaldos | Automáticos con pgBackRest en el mismo servidor; la copia fuera de él con `install.sh backup` | Automáticos al almacenamiento de objetos del operador (Barman Cloud) |
 | Métricas y alertas | Prometheus, Alertmanager y Grafana en el mismo servidor; avisos a Mailpit | Los mismos, con el SMTP del operador y almacenamiento de métricas de larga duración |
+
+**Qué ya está probado y qué falta:**
+
+- **Resiliencia, probada** (`docs/performance/M6-04.md`): con el portal caído 45 segundos, las llamadas permitidas y las negadas siguieron, cada una como debía. OPA y APISIX reinician sin el portal. Al volver, el registro de transparencia tenía todas las consultas de la caída y una revocación llegó al gateway en 18 segundos.
+- **Respaldos, probados:** la restauración se prueba en CI: pérdida del volumen, vuelta a un instante y repositorio ilegible sin su clave.
+- **Carga, a medias** (`docs/performance/M6-03.md`): en la máquina de desarrollo el gateway atiende 200 peticiones por segundo con un p95 de 13 ms sobre la red a su escala inicial (200 entidades, 1.000 APIs, 5.000 suscripciones). La meta es 500 por segundo con p95 menor de 50 ms. Se valida en un entorno tipo producción, con el generador de carga en otra máquina.
+- **Helm charts, sin instalar:** están completos y validados de forma estática. Se instalan por primera vez en el entorno del operador, junto con una restauración desde su almacenamiento de objetos.
+
+**Decisiones del operador y del regulador:**
+
+| Decisión | Hoy | Qué implica |
+| :-- | :-- | :-- |
+| Segundo factor para `entity_admin` y `api_publisher` | Solo los roles de plataforma (incluidos `regulator` y `auditor`) y `data_steward` | ASVS nivel 2 lo pide para todo acceso. Es configuración, pero cambia el ingreso de las entidades |
+| Catálogo público | Apagado (`features.publicCatalog`) | Encendido, cualquiera ve las APIs de clasificación pública, sin el contacto del responsable ni el estado de los nodos |
+| Aserción firmada del gateway | Encendida (`features.gatewayAssertion`) | Cada proveedor puede verificarla, y decidir si la exige |
+| Pruebas con lectores de pantalla y con usuarios | La revisión automatizada de accesibilidad pasa en todas las pantallas | Recomendadas antes de producción (NVDA, VoiceOver) |
+| TSA, CA y correo de producción | De desarrollo | TSA acreditada, HSM para la intermedia y el SMTP del operador |
 
 ## 10. Preguntas que suelen surgir
 
 - **¿El operador puede ver los datos que se intercambian?** No. El gateway los pasa sin guardarlos y los logs solo tienen metadatos enmascarados.
-- **¿Qué pasa si se cae el portal?** El tráfico entre entidades sigue con la última configuración y la última política. Solo se detienen los cambios (nuevas aprobaciones, publicaciones).
+- **¿Qué pasa si se cae el portal?** El tráfico entre entidades sigue con la última configuración y la última política. Solo se detienen los cambios (nuevas aprobaciones, publicaciones). Está probado: con el portal caído, las llamadas siguen; OPA y APISIX reinician sin él, y al volver el portal recupera los registros de transparencia de la caída.
+- **¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?** Por la aserción firmada (`X-RID-Assertion`): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.
+- **¿Cuánto tráfico aguanta?** En la máquina de desarrollo, 200 consultas por segundo con un p95 de 13 ms agregados por el gateway. La meta, 500 por segundo, se valida en un entorno tipo producción. La capacidad crece con más nodos de gateway: cada uno cuenta los límites por su lado y la política le da su parte.
+- **¿El portal está en inglés?** Sí, completo, además del español, que es el idioma por omisión. Los correos y la carpeta ciudadana también son bilingües.
 - **¿Una entidad tiene que abrir puertos de entrada?** No, si usa el kit: el nodo abre el túnel hacia afuera (UDP 51820). Con una API existente, la entidad debe permitir que el gateway llegue a ella.
 - **¿Se puede integrar con X-Road?** Sí: el gateway puede usar un Security Server del operador como cliente X-Road (`ARCHITECTURE.md §10`).
 - **¿Quién aprueba el acceso a datos sensibles?** El responsable de datos de la entidad dueña y, además, el regulador.
 - **¿Cómo se demuestra que la bitácora no fue alterada?** Con la verificación de integridad de la consola y con el anclaje diario que el regulador recibe por correo, sellado por una TSA independiente.
-- **¿Se puede llevar a otro país?** Sí, sin cambiar código: un `config/country/<código>.yaml` nuevo y los textos de i18n.
+- **¿Se puede llevar a otro país?** Sí, sin cambiar código: un `config/country/<código>.yaml` nuevo y los textos de i18n. Está probado con un "país de ejemplo" levantado desde la plantilla `example.yaml` (`pnpm example:country`): la demo completa pasa con sus propios sectores, finalidades y tipo de documento.

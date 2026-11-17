@@ -302,7 +302,8 @@ details.faq[open] summary { color: var(--gov); }
     <p class="lede">Qué es cada pieza de la Red de Intercambio de Datos, por qué está y quién la opera. Al final, la instalación de la infraestructura central en el servidor del operador, paso a paso.</p>
     <div class="meta">
       <span><b>Para</b> el operador (AND) y el regulador (MinTIC)</span>
-      <span><b>Versión</b> 1.1 · noviembre 2026</span>
+      <span><b>Versión</b> 1.2 · noviembre 2026</span>
+      <span><b>Código</b> con el hito M6 (endurecimiento) cerrado</span>
       <span><b>Topología</b> piloto en un servidor</span>
     </div>
   </div>
@@ -437,7 +438,7 @@ details.faq[open] summary { color: var(--gov); }
       <p>El <b style="color:var(--gov)">plano de gobierno</b> decide quién puede qué y lo traduce a configuración. El <b style="color:var(--data)">plano de datos</b> atiende cada llamada con la última configuración y la última política recibidas. <b>Si cae el portal, el tráfico entre entidades sigue funcionando.</b></p>
       <figure>
         <div class="figscroll">
-          <svg viewBox="0 0 1000 690" role="img" aria-label="Arquitectura. Traefik recibe todo en el puerto 443: por el nombre del portal termina HTTPS y reparte a la web, al API y a Keycloak; por el nombre del gateway pasa el TLS sin abrirlo a APISIX. El API configura APISIX, crea clientes en Keycloak, firma con step-ca, sella con la TSA y guarda en PostgreSQL. OPA descarga la política del API y APISIX le pregunta en cada llamada. APISIX llega a los nodos del kit por el hub WireGuard y a las APIs existentes por HTTPS. Fluent Bit lleva los metadatos al registro de transparencia del API y a OpenSearch.">
+          <svg viewBox="0 0 1000 690" role="img" aria-label="Arquitectura. Traefik recibe todo en el puerto 443: por el nombre del portal termina HTTPS y reparte a la web, al API y a Keycloak; por el nombre del gateway pasa el TLS sin abrirlo a APISIX. El API configura APISIX, crea clientes en Keycloak, firma con step-ca, sella con la TSA, revisa los documentos con ClamAV (opcional) y guarda en PostgreSQL, que pgBackRest respalda de forma continua. OPA descarga la política del API y APISIX le pregunta en cada llamada. APISIX llega a los nodos del kit por el hub WireGuard y a las APIs existentes por HTTPS. Fluent Bit lleva los metadatos al registro de transparencia del API y a OpenSearch.">
             <defs>
               <marker id="a-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ah"></path></marker>
               <marker id="a-ahm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahm"></path></marker>
@@ -486,6 +487,10 @@ details.faq[open] summary { color: var(--gov); }
             <text x="160" y="302" text-anchor="end" class="d-ts">usa el API</text>
             <line x1="372" y1="322" x2="382" y2="270" class="d-line" marker-end="url(#a-ah)"></line>
             <text x="392" y="300" class="d-ts">clientes OAuth</text>
+            <rect x="55" y="326" width="82" height="42" rx="6" class="d-gov" stroke-dasharray="4 3"></rect>
+            <text x="96" y="344" text-anchor="middle" class="d-tb">ClamAV</text>
+            <text x="96" y="360" text-anchor="middle" class="d-ts">opcional</text>
+            <line x1="160" y1="347" x2="139" y2="347" class="d-thin" marker-end="url(#a-ahm)"></line>
             <!-- governance layer D -->
             <rect x="55" y="430" width="100" height="48" rx="6" class="d-gov"></rect>
             <text x="105" y="450" text-anchor="middle" class="d-tb">PostgreSQL</text>
@@ -503,7 +508,12 @@ details.faq[open] summary { color: var(--gov); }
             <line x1="240" y1="372" x2="218" y2="428" class="d-thin" marker-end="url(#a-ahm)"></line>
             <line x1="310" y1="372" x2="324" y2="428" class="d-thin" marker-end="url(#a-ahm)"></line>
             <line x1="380" y1="372" x2="428" y2="428" class="d-thin" marker-end="url(#a-ahm)"></line>
-            <text x="56" y="560" class="d-ts">Solo el API habla con estos cuatro.</text>
+            <rect x="55" y="505" width="100" height="42" rx="6" class="d-gov"></rect>
+            <text x="105" y="523" text-anchor="middle" class="d-tb">pgBackRest</text>
+            <text x="105" y="539" text-anchor="middle" class="d-ts">respaldo cifrado</text>
+            <line x1="105" y1="478" x2="105" y2="503" class="d-thin" marker-end="url(#a-ahm)"></line>
+            <text x="112" y="495" class="d-ts">archiva cada cambio</text>
+            <text x="56" y="574" class="d-ts">Solo el API habla con ellos y con ClamAV.</text>
             <!-- data layer B/C -->
             <rect x="600" y="222" width="280" height="46" rx="6" class="d-data" stroke-width="2"></rect>
             <text x="740" y="242" text-anchor="middle" class="d-tb">APISIX + etcd</text>
@@ -551,7 +561,7 @@ details.faq[open] summary { color: var(--gov); }
             <text x="972" y="612" text-anchor="end" class="d-ts">HTTPS al proveedor</text>
           </svg>
         </div>
-        <figcaption>En verde, el camino de una consulta entre entidades; nunca toca el portal. El API configura el gateway y OPA descarga del API la política: el plano de datos no consulta la base del portal en línea. Prometheus, Alertmanager y Grafana (opcionales) miden el gateway, el API y OPA.</figcaption>
+        <figcaption>En verde, el camino de una consulta entre entidades; nunca toca el portal. El API configura el gateway y OPA descarga del API la política: el plano de datos no consulta la base del portal en línea. Prometheus, Alertmanager y Grafana (opcionales) miden el gateway, el API y OPA. En línea punteada, lo opcional del plano de gobierno: ClamAV revisa cada documento antes de guardarlo.</figcaption>
       </figure>
       <div class="callout info">
         <b>El portal nunca configura el gateway "a mano"</b>
@@ -588,13 +598,18 @@ details.faq[open] summary { color: var(--gov); }
         </article>
         <article class="comp g">
           <div><h4>API del portal</h4><span class="tech">NestJS</span></div>
-          <p>El cerebro. Aplica los flujos (alta, publicación, solicitud, aprobación), verifica rol y entidad en <b>cada</b> petición y registra cada cambio en la bitácora. En segundo plano reconcilia APISIX, Keycloak, OPA y el hub; firma certificados; sella; envía correos; vence suscripciones y certificados.</p>
+          <p>El cerebro. Aplica los flujos (alta, publicación, solicitud, aprobación), verifica rol y entidad en <b>cada</b> petición y registra cada cambio en la bitácora. En segundo plano reconcilia APISIX, Keycloak, OPA y el hub; firma certificados; sella; envía correos; vence suscripciones y certificados; rota cada 90 días la clave con la que el gateway firma sus aserciones y publica las claves públicas (JWKS).</p>
           <dl><dt>Si cae</dt><dd><span class="tag warn">el tráfico sigue, sin cambios</span>Sigue con la última política publicada.</dd><dt>Guarda</dt><dd>Nada propio: todo en PostgreSQL.</dd></dl>
         </article>
         <article class="comp g">
           <div><h4>PostgreSQL</h4><span class="tech">base de datos</span></div>
           <p><b>Única fuente de verdad:</b> entidades, personas y roles, APIs, aplicaciones, suscripciones, bitácora, registro de transparencia y colas de trabajos. La bitácora es de solo inserción, incluso para el dueño de la base.</p>
           <dl><dt>Si cae</dt><dd><span class="tag warn">el tráfico sigue, sin cambios</span>Se detiene el plano de gobierno.</dd><dt>Guarda</dt><dd><span class="tag plain">se respalda</span>Todo.</dd></dl>
+        </article>
+        <article class="comp g">
+          <div><h4>pgBackRest</h4><span class="tech">respaldos de la base</span></div>
+          <p>Archiva cada cambio de PostgreSQL en pocos minutos (como mucho 5 minutos de pérdida), toma un respaldo completo por semana y uno diferencial por día, y conserva cuatro semanas. El repositorio está <b>cifrado</b>. Permite volver al último estado o a un instante exacto, con una restauración probada en CI.</p>
+          <dl><dt>Si cae</dt><dd><span class="tag ok">el tráfico sigue</span>Los cambios nuevos esperan a ser archivados.</dd><dt>Guarda</dt><dd><span class="tag plain">se respalda</span>El repositorio cifrado. Se copia fuera del servidor.</dd></dl>
         </article>
         <article class="comp g">
           <div><h4>Keycloak</h4><span class="tech">identidad · OpenID Connect</span></div>
@@ -616,13 +631,18 @@ details.faq[open] summary { color: var(--gov); }
           <p>Captura todo el correo (invitaciones, avisos, verificación de cuentas, anclajes al regulador, alertas) y lo muestra en <code>/mail</code> con contraseña. En producción, el SMTP del operador.</p>
           <dl><dt>Si cae</dt><dd><span class="tag ok">el tráfico sigue</span>No salen correos.</dd><dt>Guarda</dt><dd>Los correos del piloto.</dd></dl>
         </article>
+        <article class="comp g">
+          <div><h4>ClamAV</h4><span class="tech">antivirus · opcional</span></div>
+          <p>Revisa cada documento que se sube (designaciones, acuerdos de intercambio) antes de guardarlo. Uno infectado se rechaza; el log guarda la firma del virus y el hash, nunca el nombre ni el contenido. Actualiza sus firmas desde internet.</p>
+          <dl><dt>Si cae</dt><dd><span class="tag ok">el tráfico sigue</span>No se suben documentos: falla cerrado.</dd><dt>Guarda</dt><dd>Sus firmas de virus.</dd></dl>
+        </article>
       </div>
 
       <h3 style="color:var(--data)">Plano de datos</h3>
       <div class="comps">
         <article class="comp d">
           <div><h4>APISIX</h4><span class="tech">gateway</span></div>
-          <p>Toda llamada entre entidades pasa por aquí. Exige el certificado de la aplicación (mTLS), valida el token, borra las cabeceras que solo el gateway puede poner, pregunta a OPA, aplica el límite de la suscripción y reenvía al proveedor con las cabeceras de trazabilidad. <b>No guarda cuerpos.</b></p>
+          <p>Toda llamada entre entidades pasa por aquí. Exige el certificado de la aplicación (mTLS), valida el token, borra las cabeceras que solo el gateway puede poner, pregunta a OPA, aplica el límite de la suscripción y reenvía al proveedor con las cabeceras de trazabilidad y una <b>aserción firmada</b> de la llamada. <b>No guarda cuerpos.</b></p>
           <dl><dt>Si cae</dt><dd><span class="tag bad">se corta el tráfico</span></dd><dt>Guarda</dt><dd>Nada; su configuración está en etcd.</dd></dl>
         </article>
         <article class="comp d">
@@ -633,7 +653,7 @@ details.faq[open] summary { color: var(--gov); }
         <article class="comp d">
           <div><h4>OPA</h4><span class="tech">Open Policy Agent</span></div>
           <p><b>Decide cada llamada</b> con la política que publica el portal: suscripciones vigentes, finalidades, operaciones y huellas de certificados. Responde "sí" o "no, por esta razón" (<code>no_subscription</code>, <code>purpose_not_allowed</code>…). Sin política, <b>niega todo</b>: falla cerrado.</p>
-          <dl><dt>Si cae</dt><dd><span class="tag bad">se corta el tráfico</span></dd><dt>Guarda</dt><dd>Nada; descarga la política cada 10–20 s.</dd></dl>
+          <dl><dt>Si cae</dt><dd><span class="tag bad">se corta el tráfico</span></dd><dt>Guarda</dt><dd>La última política, en disco: si reinicia sin el portal, sigue decidiendo con ella. La renueva cada 10–20 s.</dd></dl>
         </article>
         <article class="comp d">
           <div><h4>Hub WireGuard</h4><span class="tech">51820/udp</span></div>
@@ -710,7 +730,7 @@ details.faq[open] summary { color: var(--gov); }
       <figure>
         <h3>Una llamada, de punta a punta</h3>
         <div class="figscroll">
-          <svg viewBox="0 0 1000 500" role="img" aria-label="El sistema consumidor pide un token al gateway con su certificado y su secreto; Keycloak lo emite ligado al certificado por 5 minutos. Luego llama al gateway con el certificado, el token, la finalidad y el funcionario. El gateway pregunta a OPA; si OPA permite, reenvía al proveedor con las cabeceras de trazabilidad, y la respuesta vuelve sin guardarse.">
+          <svg viewBox="0 0 1000 500" role="img" aria-label="El sistema consumidor pide un token al gateway con su certificado y su secreto; Keycloak lo emite ligado al certificado por 5 minutos. Luego llama al gateway con el certificado, el token, la finalidad y el funcionario. El gateway pregunta a OPA; si OPA permite, reenvía al proveedor con las cabeceras de trazabilidad y una aserción firmada, y la respuesta vuelve sin guardarse.">
             <defs>
               <marker id="s-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ah"></path></marker>
               <marker id="s-ahd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="d-ahd"></path></marker>
@@ -751,13 +771,14 @@ details.faq[open] summary { color: var(--gov); }
             <text x="515" y="328" text-anchor="middle" class="d-ts">sí + cabeceras de trazabilidad · o 403 con su razón</text>
             <line x1="330" y1="375" x2="898" y2="375" class="d-strong" marker-end="url(#s-ahd)"></line>
             <text x="615" y="368" text-anchor="middle" class="d-ts">consulta + quién, para qué, con qué suscripción</text>
+            <text x="615" y="391" text-anchor="middle" class="d-ts">+ aserción firmada por el gateway (X-RID-Assertion)</text>
             <line x1="900" y1="415" x2="332" y2="415" class="d-dash" marker-end="url(#s-ah)"></line>
             <text x="615" y="408" text-anchor="middle" class="d-ts">respuesta</text>
             <line x1="330" y1="455" x2="107" y2="455" class="d-strong" marker-end="url(#s-ahd)"></line>
             <text x="217" y="448" text-anchor="middle" class="d-ts">respuesta (no se guarda)</text>
           </svg>
         </div>
-        <figcaption>El proveedor recibe en cada consulta la entidad y la aplicación consumidoras, la suscripción, la finalidad, la operación y el hash del funcionario: ya no ve "solo al gateway". Un token robado no sirve sin la llave privada del certificado.</figcaption>
+        <figcaption>El proveedor recibe en cada consulta la entidad y la aplicación consumidoras, la suscripción, la finalidad, la operación y el hash del funcionario: ya no ve "solo al gateway". Con la aserción firmada (un JWS por llamada, ligado al método, la URI y el cuerpo) comprueba además que la consulta pasó por el gateway y no fue alterada, con las claves públicas de <code>https://&lt;portal&gt;/api/v1/gateway/jwks</code>. Un token robado no sirve sin la llave privada del certificado.</figcaption>
       </figure>
 
       <div class="flowcard">
@@ -778,6 +799,8 @@ details.faq[open] summary { color: var(--gov); }
         <div><b>Cuentas protegidas</b><span>Segundo factor para roles críticos, límites de peticiones y aviso al dueño cuando cambia una credencial.</span></div>
         <div><b>Autorización en el servidor</b><span>Cada endpoint verifica rol y entidad. La matriz completa está en <code>AUTHZ.md</code> y la comprueban tests.</span></div>
         <div><b>Entidades aisladas</b><span>Cada proveedor con mTLS acepta solo el certificado del gateway emitido para él; un nodo no alcanza a otros.</span></div>
+        <div><b>El proveedor sabe que la consulta es legítima</b><span>Aserción firmada por el gateway en cada llamada (ES256), ligada a la petición y a ese proveedor, verificable con un JWKS público. Una cabecera falsa del cliente se descarta.</span></div>
+        <div><b>Revisada contra estándares</b><span>OWASP ASVS nivel 2, capítulo por capítulo (<code>docs/security/ASVS-L2.md</code>), y WCAG 2.1 AA en las 42 pantallas, en español y en inglés (<code>docs/accessibility</code>).</span></div>
       </div>
     </section>
 
@@ -794,7 +817,7 @@ details.faq[open] summary { color: var(--gov); }
       </div>
       <details class="faq">
         <summary>De dónde salen estos números</summary>
-        <p>En reposo, el stack completo usa unos 2,3 GB de RAM (Keycloak ~650 MB, OpenSearch ~670 MB, APISIX ~190 MB, API ~150 MB, web ~120 MB, el resto menos de 70 MB cada uno). El pico real es la compilación de las imágenes del portal y del API en la instalación y en cada actualización: 3–4 GB más durante 10–20 minutos. Las imágenes ocupan ~15 GB y la caché de compilación crece con cada actualización (llegó a 17 GB en el piloto). El kernel ≥ 5.6 trae WireGuard; sin él, el hub usa <code>wireguard-go</code>, que funciona pero rinde menos.</p>
+        <p>En reposo, el stack completo usa unos 2,3 GB de RAM (Keycloak ~650 MB, OpenSearch ~670 MB, APISIX ~190 MB, API ~150 MB, web ~120 MB, el resto menos de 70 MB cada uno). El antivirus, si se activa, suma ~1,2 GB. El pico real es la compilación de las imágenes del portal y del API en la instalación y en cada actualización: 3–4 GB más durante 10–20 minutos. Las imágenes ocupan ~15 GB y la caché de compilación crece con cada actualización (llegó a 17 GB en el piloto). El kernel ≥ 5.6 trae WireGuard; sin él, el hub usa <code>wireguard-go</code>, que funciona pero rinde menos.</p>
       </details>
 
       <h3>Red y DNS</h3>
@@ -831,7 +854,7 @@ details.faq[open] summary { color: var(--gov); }
       <h2><span class="num">8</span>Instalar</h2>
       <div class="code"><button class="copy" type="button">Copiar</button><pre><code>git clone &lt;url-del-repositorio&gt; rid &amp;&amp; cd rid
 sudo ./install.sh</code></pre></div>
-      <p>El script comprueba el servidor, hace seis preguntas, muestra un resumen y pide confirmación antes de tocar nada. Después compila y arranca todo (10–20 minutos la primera vez) y comprueba que funciona. Si falta Docker, ofrece instalarlo.</p>
+      <p>El script comprueba el servidor, hace las preguntas de los pasos 2 a 6, muestra un resumen y pide confirmación antes de tocar nada. Después compila y arranca todo (10–20 minutos la primera vez) y comprueba que funciona. Si falta Docker, ofrece instalarlo.</p>
 
       <div class="qs">
         <div class="q"><div class="qn">Paso<b>1</b></div><div><h4>Verificación del servidor</h4><p class="auto">Sin preguntas. Sistema, CPU, RAM, disco, Docker y Compose ≥ 2.26, <code>/dev/net/tun</code>, puertos libres y DNS. Se detiene si falta algo imprescindible.</p></div></div>
@@ -846,9 +869,14 @@ sudo ./install.sh</code></pre></div>
             <div><kbd>1</kbd><span><b>Let's Encrypt</b>: correo de contacto opcional; el puerto 80 debe ser alcanzable.</span></div>
             <div><kbd>2</kbd><span><b>Certificado propio</b>: rutas al certificado (cadena completa) y a la llave, en PEM. Debe ser de una CA pública reconocida, porque el API y la web también llaman al portal por su nombre.</span></div>
           </div></div></div>
-        <div class="q"><div class="qn">Paso<b>5</b></div><div><h4>Observabilidad</h4><p>OpenSearch, Prometheus, Alertmanager y Grafana: indicadores de uso, alertas por correo y tablero del operador. Sí, si el servidor tiene 16 GB. Se puede prescindir: no afecta al tráfico, a la auditoría ni a la transparencia.</p></div></div>
-        <div class="q"><div class="qn">Paso<b>6</b></div><div><h4>Contraseña de los usuarios de demo</h4><p>Enter genera una aleatoria. Elige una si la vas a compartir en el bootcamp.</p></div></div>
-        <div class="q"><div class="qn">Paso<b>7</b></div><div><h4>Secretos</h4><p class="auto">Sin preguntas. Escribe <code>.env</code> (modo 600) con todos los secretos generados al azar: bases de datos, claves de firma, llave del seudónimo, clave del hub WireGuard, tokens internos.</p></div></div>
+        <div class="q"><div class="qn">Paso<b>5</b></div><div><h4>Observabilidad y antivirus</h4>
+          <p>Dos preguntas de sí o no:</p>
+          <ul class="ticks">
+            <li><b>Observabilidad</b> (OpenSearch, Prometheus, Alertmanager, Grafana): indicadores de uso, alertas por correo y tablero del operador. Sí, si el servidor tiene 16 GB. Se puede prescindir: no afecta al tráfico, a la auditoría ni a la transparencia.</li>
+            <li><b>Antivirus de documentos</b> (ClamAV): revisa cada documento subido antes de guardarlo. Sí, si el servidor tiene 8 GB. Suma ~1,2 GB de RAM y descarga sus firmas de internet.</li>
+          </ul></div></div>
+        <div class="q"><div class="qn">Paso<b>6</b></div><div><h4>Contraseña de los usuarios de demo</h4><p>12 caracteres o más (la política de contraseñas de Keycloak). Enter genera una aleatoria. Elige una si la vas a compartir en el bootcamp.</p></div></div>
+        <div class="q"><div class="qn">Paso<b>7</b></div><div><h4>Secretos</h4><p class="auto">Sin preguntas. Escribe <code>.env</code> (modo 600) con todos los secretos generados al azar: bases de datos, claves de firma, llave del seudónimo, clave del hub WireGuard, clave de cifrado de los respaldos, tokens internos.</p></div></div>
         <div class="q"><div class="qn">Paso<b>8</b></div><div><h4>Preparación del servidor</h4><p class="auto">Sin preguntas. Crea la red de Docker y ajusta <code>vm.max_map_count</code> para OpenSearch. Si detecta <code>ufw</code> o <code>firewalld</code>, ofrece abrir los puertos.</p></div></div>
         <div class="q"><div class="qn">Paso<b>9</b></div><div><h4>Compilar y arrancar</h4><p class="auto">Sin preguntas. Espera a que cada servicio esté sano.</p></div></div>
         <div class="q"><div class="qn">Paso<b>10</b></div><div><h4>Comprobaciones</h4><p class="auto">Que el API responde; que la política de OPA <b>no</b> está expuesta al público; que Keycloak responde; que OPA ya tiene política; que el gateway presenta el certificado de la red.</p></div></div>
@@ -873,11 +901,12 @@ sudo ./install.sh</code></pre></div>
             <tr><td><code>&lt;gateway&gt;:51820/udp</code></td><td class="wrap">Hub WireGuard: túneles de los nodos del kit</td><td>Nodos</td></tr>
             <tr><td><code>https://&lt;portal&gt;/mail</code></td><td class="wrap">Correo de pruebas: todo el correo del piloto llega aquí, con usuario y contraseña</td><td>Operador</td></tr>
             <tr><td><code>https://&lt;portal&gt;/grafana/</code></td><td class="wrap">Tablero del operador, con su propio usuario <code>admin</code> (con observabilidad)</td><td>Operador</td></tr>
+            <tr><td><code>https://&lt;portal&gt;/api/v1/gateway/jwks</code></td><td class="wrap">Claves públicas con las que los proveedores verifican la aserción del gateway</td><td>Proveedores</td></tr>
             <tr><td><code>https://&lt;portal&gt;/carpeta</code></td><td class="wrap">Carpeta ciudadana de referencia (demo de transparencia)</td><td>Demos</td></tr>
           </tbody>
         </table>
       </div>
-      <p>Los demás servicios (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, el runner de contratos y los proveedores de prueba) no se publican.</p>
+      <p>Los demás servicios (PostgreSQL, pgBackRest, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch, ClamAV, el runner de contratos y los proveedores de prueba) no se publican.</p>
 
       <h3>Comprobación de punta a punta</h3>
       <ol class="steps">
@@ -888,7 +917,7 @@ sudo ./install.sh</code></pre></div>
       </ol>
       <div class="callout info">
         <b>Datos de demostración y primer administrador</b>
-        <p>El piloto siempre carga tres entidades ficticias y los usuarios de demo. Así existe el primer <code>platform_admin</code> (<code>pablo.plataforma</code>): hoy no hay otra forma de crearlo. Las entidades reales se dan de alta desde el portal; las ficticias sirven para practicar. En producción no hay usuarios semilla.</p>
+        <p>El piloto siempre carga tres entidades ficticias y los usuarios de demo. Así existe el primer <code>platform_admin</code> (<code>pablo.plataforma</code>). Las entidades reales se dan de alta desde el portal; las ficticias sirven para practicar. En producción no hay usuarios semilla: el primer <code>platform_admin</code> es quien entra primero con la dirección de <code>RID_BOOTSTRAP_ADMIN_EMAIL</code>, verificada por Keycloak, mientras la red no tiene ninguno. Queda auditado, y después se borra el valor.</p>
       </div>
     </section>
 
@@ -903,6 +932,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td><code>RID_SUBJECT_REF_KEY</code><br><code>RID_END_USER_HASH_SALT</code></td><td class="wrap">Definen los seudónimos; <b>no se rotan</b></td><td>AND</td></tr>
             <tr><td>Volumen de step-ca</td><td class="wrap">Llaves de la CA de la red</td><td class="wrap">AND, respaldo cifrado</td></tr>
             <tr><td><code>PGBACKREST_REPO1_CIPHER_PASS</code></td><td class="wrap">Cifra los respaldos de la base: sin ella no se restaura ninguno</td><td class="wrap">AND, copia fuera del servidor, junto al <code>.env</code></td></tr>
+            <tr><td><code>RID_SECRETS_KEY</code></td><td class="wrap">Sella los secretos de los clientes y la clave con la que firma el gateway</td><td class="wrap">AND, dentro del <code>.env</code></td></tr>
             <tr><td>Administrador de Keycloak</td><td class="wrap">Control de las identidades</td><td class="wrap">AND, dos personas</td></tr>
             <tr><td>Usuarios <code>regulator</code></td><td class="wrap">Supervisión</td><td>MinTIC</td></tr>
           </tbody>
@@ -927,7 +957,10 @@ sudo ./install.sh</code></pre></div>
       <ul class="ticks">
         <li><b>Cada día:</b> servicios sanos, nada fuera de sincronía con el gateway (Consola del operador → Sincronización del gateway), cadena de auditoría íntegra (Consola → Auditoría → "Verificar integridad") y registro de transparencia íntegro.</li>
         <li><b>Alertas:</b> con la observabilidad activada llegan por correo (en el piloto, a <code>/mail</code>). El tablero está en <code>/grafana/</code>.</li>
-        <li><b>Incidentes, rotación de la CA intermedia y revocación masiva de certificados:</b> el runbook del operador (<code>docs/RUNBOOK.md</code>). La revocación masiva está en la consola: "Revocación masiva de certificados".</li>
+        <li><b>Runbook del operador</b> (<code>docs/RUNBOOK.md</code>): alta de una entidad hasta su primera API publicada, suspensión y baja; incidentes con severidades y un procedimiento por caso; rotación de la CA intermedia, planificada y de emergencia; revocación masiva de certificados.</li>
+        <li><b>Revocación masiva de certificados:</b> Consola → "Revocación masiva de certificados", solo <code>platform_admin</code> con segundo factor. Filtra por entidad, por fecha de emisión y por intermedia, muestra una vista previa y revoca solo si el conjunto no cambió. Cada certificado deja de servir en menos de 60 segundos y los desarrolladores reciben un aviso. No se deshace.</li>
+        <li><b>Clave de firma del gateway:</b> el portal la rota sola cada 90 días; la anterior sigue en el JWKS para que lo archivado siga verificando. Si se compromete, se rota de inmediato como comprometida (<code>POST /api/v1/admin/gateway-signing-keys/rotate</code>) y se avisa a los proveedores (runbook §2.2).</li>
+        <li><b>Al actualizar</b> un piloto instalado antes de los respaldos automáticos, <code>update</code> agrega la clave de cifrado de los respaldos al <code>.env</code> y lo avisa: guarda la copia de <code>.env</code> de nuevo.</li>
         <li><b>Nunca</b> se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte. Si algo no cuadra, se mira "Sincronización del gateway" en la consola del operador y se reintenta desde ahí.</li>
       </ul>
     </section>
@@ -942,6 +975,8 @@ sudo ./install.sh</code></pre></div>
             <tr><td class="wrap">Certificado inválido en el portal</td><td class="wrap">Let's Encrypt no pudo validar: el DNS del portal no apunta aquí o el puerto 80 está cerrado. Corrige y espera, porque Traefik reintenta solo. <code>sudo ./install.sh logs edge</code>.</td></tr>
             <tr><td class="wrap">Un servicio no queda sano</td><td class="wrap"><code>sudo ./install.sh logs &lt;servicio&gt;</code>. Keycloak puede tardar hasta 5 minutos en una máquina chica. Vuelve a ejecutar <code>sudo ./install.sh</code>.</td></tr>
             <tr><td class="wrap">OpenSearch se reinicia</td><td class="wrap">Falta memoria o <code>vm.max_map_count</code>. Reinstala sin observabilidad o amplía la RAM.</td></tr>
+            <tr><td class="wrap">Keycloak no importa su realm (usuarios de demo)</td><td class="wrap">La contraseña tiene menos de 12 caracteres: la política del realm la rechaza al importarlo. El instalador ya no la acepta; en un <code>.env</code> escrito a mano, cámbiala.</td></tr>
+            <tr><td class="wrap">Subir un documento da "servicio no disponible"</td><td class="wrap">El antivirus no responde (falla cerrado). En el primer arranque descarga sus firmas y tarda unos minutos: <code>sudo ./install.sh logs clamav</code>.</td></tr>
             <tr><td class="wrap">Inicio de sesión en bucle</td><td class="wrap">El nombre del portal no coincide con el de <code>.env</code> (<code>RID_PUBLIC_URL</code>).</td></tr>
             <tr><td class="wrap">Los nodos no conectan</td><td class="wrap">51820/udp cerrado en el firewall de la nube, o el DNS del gateway no apunta aquí.</td></tr>
             <tr><td class="wrap">Se perdió <code>.env</code></td><td class="wrap">Sin copia no hay recuperación: se reinstala desde cero, borrando los volúmenes <code>rid_*</code>.</td></tr>
@@ -956,15 +991,40 @@ sudo ./install.sh</code></pre></div>
         <table class="t">
           <thead><tr><th>Tema</th><th>Piloto (esta instalación)</th><th>Producción</th></tr></thead>
           <tbody>
-            <tr><td>Topología</td><td class="wrap">Un servidor</td><td class="wrap">≥ 2 nodos de gateway en zonas distintas, réplicas de portal y API, PostgreSQL con réplica (Helm charts)</td></tr>
+            <tr><td>Topología</td><td class="wrap">Un servidor, con Docker Compose</td><td class="wrap">Kubernetes con los Helm charts de <code>infra/helm</code>: ≥ 2 nodos de gateway en zonas distintas, réplicas de portal y API, etcd de 3 miembros, PostgreSQL con réplica, NetworkPolicies de entrada y salida</td></tr>
+            <tr><td>Tráfico interno</td><td class="wrap">Redes de Docker separadas (gateway, proveedores, resto)</td><td class="wrap">Además, TLS entre componentes con una PKI interna (cert-manager)</td></tr>
+            <tr><td>Imágenes</td><td class="wrap">Se compilan en el servidor</td><td class="wrap">Imágenes publicadas con versión, su SBOM y escaneo de vulnerabilidades (Trivy)</td></tr>
             <tr><td>CA</td><td class="wrap">CA de desarrollo en un volumen</td><td class="wrap">Raíz fuera de línea, intermedia en HSM</td></tr>
             <tr><td>Sellado de tiempo</td><td class="wrap">TSA de desarrollo</td><td class="wrap">TSA acreditada del país</td></tr>
             <tr><td>Correo</td><td class="wrap">Mailpit</td><td class="wrap">SMTP del operador</td></tr>
             <tr><td>Secretos</td><td class="wrap"><code>.env</code> en disco</td><td class="wrap">Gestor de secretos (OpenBao)</td></tr>
             <tr><td>Identidad ciudadana</td><td class="wrap">Simulada (<code>rid-citizens</code>)</td><td class="wrap">La del país</td></tr>
-            <tr><td>Datos iniciales</td><td class="wrap">Entidades ficticias y usuarios de demo</td><td class="wrap">Sin datos de demo; primer administrador por un procedimiento propio</td></tr>
+            <tr><td>Datos iniciales</td><td class="wrap">Entidades ficticias y usuarios de demo</td><td class="wrap">Sin datos de demo; el primer administrador con <code>RID_BOOTSTRAP_ADMIN_EMAIL</code></td></tr>
+            <tr><td>Antivirus</td><td class="wrap">Opcional (paso 5)</td><td class="wrap">Activado, con dos réplicas</td></tr>
             <tr><td>Respaldos</td><td class="wrap">Automáticos con pgBackRest en el mismo servidor; la copia fuera de él con <code>install.sh backup</code></td><td class="wrap">Automáticos al almacenamiento de objetos del operador (Barman Cloud)</td></tr>
             <tr><td>Métricas y alertas</td><td class="wrap">Prometheus, Alertmanager y Grafana en el mismo servidor; avisos a Mailpit</td><td class="wrap">Los mismos, con el SMTP del operador</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Qué ya está probado y qué falta</h3>
+      <ul class="ticks">
+        <li><b>Resiliencia, probada:</b> con el portal caído 45 segundos, las llamadas permitidas y las negadas siguieron, cada una como debía. OPA y APISIX reinician sin el portal. Al volver, el registro de transparencia tenía todas las consultas de la caída y una revocación llegó al gateway en 18 segundos.</li>
+        <li><b>Respaldos, probados:</b> la restauración se prueba en CI: pérdida del volumen, vuelta a un instante y repositorio ilegible sin su clave.</li>
+        <li><b>Carga, a medias:</b> en la máquina de desarrollo el gateway atiende 200 peticiones por segundo con un p95 de 13 ms sobre la red a su escala inicial (200 entidades, 1.000 APIs, 5.000 suscripciones). La meta es 500 por segundo con p95 menor de 50 ms. Se valida en un entorno tipo producción, con el generador de carga en otra máquina.</li>
+        <li><b>Helm charts, sin instalar:</b> están completos y validados de forma estática. Se instalan por primera vez en el entorno del operador, junto con una restauración desde su almacenamiento de objetos.</li>
+      </ul>
+
+      <h3>Decisiones del operador y del regulador</h3>
+      <div class="tablewrap">
+        <table class="t">
+          <thead><tr><th>Decisión</th><th>Hoy</th><th>Qué implica</th></tr></thead>
+          <tbody>
+            <tr><td class="wrap">Segundo factor para <code>entity_admin</code> y <code>api_publisher</code></td><td class="wrap">Solo los roles de plataforma, <code>regulator</code>, <code>auditor</code> y <code>data_steward</code></td><td class="wrap">ASVS nivel 2 lo pide para todo acceso. Es configuración, pero cambia el ingreso de las entidades</td></tr>
+            <tr><td class="wrap">Catálogo público</td><td class="wrap">Apagado (<code>features.publicCatalog</code>)</td><td class="wrap">Encendido, cualquiera ve las APIs de clasificación pública, sin el contacto del responsable ni el estado de los nodos</td></tr>
+            <tr><td class="wrap">Aserción firmada del gateway</td><td class="wrap">Encendida (<code>features.gatewayAssertion</code>)</td><td class="wrap">Cada proveedor puede verificarla, y decidir si la exige</td></tr>
+            <tr><td class="wrap">Pruebas con lectores de pantalla y con usuarios</td><td class="wrap">La revisión automatizada de accesibilidad pasa en todas las pantallas</td><td class="wrap">Recomendadas antes de producción (NVDA, VoiceOver)</td></tr>
+            <tr><td class="wrap">TSA, CA y correo de producción</td><td class="wrap">De desarrollo</td><td class="wrap">TSA acreditada, HSM para la intermedia y el SMTP del operador</td></tr>
           </tbody>
         </table>
       </div>
@@ -974,14 +1034,17 @@ sudo ./install.sh</code></pre></div>
       <h2><span class="num">14</span>Preguntas que suelen surgir</h2>
       <div>
         <details class="faq"><summary>¿El operador puede ver los datos que se intercambian?</summary><p>No. El gateway los pasa sin guardarlos y los logs solo tienen metadatos enmascarados.</p></details>
-        <details class="faq"><summary>¿Qué pasa si se cae el portal?</summary><p>El tráfico entre entidades sigue con la última configuración y la última política. Solo se detienen los cambios: nuevas aprobaciones y publicaciones.</p></details>
+        <details class="faq"><summary>¿Qué pasa si se cae el portal?</summary><p>El tráfico entre entidades sigue con la última configuración y la última política. Solo se detienen los cambios: nuevas aprobaciones y publicaciones. Está probado: con el portal caído, las llamadas siguen; OPA y APISIX reinician sin él, y al volver el portal recupera los registros de transparencia de la caída.</p></details>
+        <details class="faq"><summary>¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?</summary><p>Por la aserción firmada (<code>X-RID-Assertion</code>): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.</p></details>
+        <details class="faq"><summary>¿Cuánto tráfico aguanta?</summary><p>En la máquina de desarrollo, 200 consultas por segundo con un p95 de 13 ms agregados por el gateway. La meta, 500 por segundo, se valida en un entorno tipo producción. La capacidad crece con más nodos de gateway: cada uno cuenta los límites por su lado y la política le da su parte.</p></details>
+        <details class="faq"><summary>¿El portal está en inglés?</summary><p>Sí, completo, además del español, que es el idioma por omisión. Los correos y la carpeta ciudadana también son bilingües.</p></details>
         <details class="faq"><summary>¿Una entidad tiene que abrir puertos de entrada?</summary><p>No, si usa el kit: el nodo abre el túnel hacia afuera (UDP 51820). Con una API existente, la entidad debe permitir que el gateway llegue a ella.</p></details>
         <details class="faq"><summary>¿Se puede integrar con X-Road?</summary><p>Sí: el gateway puede usar un Security Server del operador como cliente X-Road.</p></details>
         <details class="faq"><summary>¿Quién aprueba el acceso a datos sensibles?</summary><p>El responsable de datos de la entidad dueña y, además, el regulador.</p></details>
         <details class="faq"><summary>¿Cómo se demuestra que la bitácora no fue alterada?</summary><p>Con la verificación de integridad de la consola y con el anclaje diario que el regulador recibe por correo, sellado por una TSA independiente.</p></details>
-        <details class="faq"><summary>¿Se puede llevar a otro país?</summary><p>Sí, sin cambiar código: un <code>config/country/&lt;código&gt;.yaml</code> nuevo y los textos de traducción.</p></details>
+        <details class="faq"><summary>¿Se puede llevar a otro país?</summary><p>Sí, sin cambiar código: un <code>config/country/&lt;código&gt;.yaml</code> nuevo y los textos de traducción. Está probado con un "país de ejemplo" levantado desde la plantilla <code>example.yaml</code>: la demo completa pasa con sus propios sectores, finalidades y tipo de documento.</p></details>
       </div>
-      <p class="footer">Detalle técnico en <code>docs/ARCHITECTURE.md</code>, <code>docs/DEPLOYMENT.md</code> y <code>docs/OPERATIONS.md</code> del repositorio. Lo que debe disponer cada entidad está en la guía de entidades.</p>
+      <p class="footer">Detalle técnico en <code>docs/ARCHITECTURE.md</code>, <code>docs/DEPLOYMENT.md</code>, <code>docs/OPERATIONS.md</code> y <code>docs/RUNBOOK.md</code> del repositorio. Lo que debe disponer cada entidad está en la guía de entidades.</p>
     </section>
   </main>
 </div>
