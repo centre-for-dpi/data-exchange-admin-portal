@@ -281,3 +281,6 @@ Found in the rehearsal and recorded in the portal's backlog (section P):
 - **P-03** The kit bundle, its checksum and the commands on the portal's nodes page.
 - **P-04** Offering only the service types the country allows (the node and X-Road), with clear names.
 - **P-05** A CSR command that works the same on Linux, Git Bash and PowerShell.
+- **P-06** The deployment's `.env` sends documents to a folder the API cannot write (the workaround is in the table above).
+- **P-07** Not letting a version be approved with failed validations, and explaining what to do with each failure.
+- **P-08** Disabling the pilot's demo accounts and making the verification link last longer.

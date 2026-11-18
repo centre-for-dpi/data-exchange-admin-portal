@@ -281,3 +281,6 @@ Encontrado en el ensayo y anotado en el backlog del portal (sección P):
 - **P-03** El paquete del kit, su huella y los comandos en la pantalla de nodos del portal.
 - **P-04** Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.
 - **P-05** Un comando de CSR que funcione igual en Linux, Git Bash y PowerShell.
+- **P-06** El `.env` del despliegue manda los documentos a una carpeta donde el API no puede escribir (el arreglo provisional está en la tabla de problemas).
+- **P-07** Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.
+- **P-08** Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.
