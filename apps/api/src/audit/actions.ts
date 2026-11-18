@@ -9,6 +9,7 @@ export const AUDIT_ACTIONS = [
   'user.registered',
   'user.created',
   'platform_role.granted',
+  'platform_role.revoked',
   'notification_preference.updated',
   // Entities and members (M2-01, M2-02)
   'entity.created',

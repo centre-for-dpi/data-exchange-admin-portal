@@ -89,10 +89,10 @@ Estado general de un vistazo: `dc ps` (todos `running`, y `healthy` los que tien
 | Finalidades adicionales | Consola del operador → Finalidades (`purpose.manage`) | Inmediato |
 | Entidades | El solicitante se registra y pide el alta de su entidad; un `platform_reviewer` o `platform_admin` la aprueba (`entity_review.decide`) y el solicitante queda como `entity_admin`. El `platform_admin` también puede crearlas desde la consola (`entity_admin.create`) y suspenderlas, reactivarlas o darlas de baja (`entity_admin.decide`) | Inmediato |
 | Personas de una entidad | El `entity_admin` invita por correo y asigna roles (ADR-0018) | Inmediato; los roles se leen en cada petición |
-| Roles de plataforma | **Hoy solo los asigna el seed** a los usuarios semilla del realm (`infra/keycloak/README.md`) | Ver la advertencia siguiente |
+| Roles de plataforma | El seed se los da a los usuarios de demo (`infra/keycloak/README.md`). Las personas del operador reciben los suyos desde la línea de comandos del servidor, después de registrarse y entrar una vez: `sudo ./install.sh platform-role grant <correo> <rol>` en el piloto, `node dist/admin/platform-roles-cli.js grant <correo> <rol>` en el contenedor del API en los demás despliegues (`revoke`, `list`). Queda auditado (`platform_role.granted`, `platform_role.revoked`); el último `platform_admin` no se puede quitar | De inmediato; el segundo factor se pide en el siguiente ingreso de la persona |
 | Autorregistro | Realm `den-portal`: `registrationAllowed` y `verifyEmail` | Ya activo en realms nuevos; en uno existente, §5.3 |
 
-> **Advertencia.** No existe todavía una forma de dar el primer `platform_admin` de un despliegue real sin el seed de demo, que además crea entidades ficticias. Mientras no exista, un piloto es un entorno de demostración, no de producción (`DEPLOYMENT.md §8`).
+> **Advertencia.** El piloto siempre carga el seed de demo, con entidades ficticias y usuarios de demo que conservan sus roles de plataforma. Dar cuentas y roles propios a las personas del operador con el comando anterior no los quita, así que un piloto sigue siendo un entorno de demostración, no de producción (`DEPLOYMENT.md §8`).
 
 ## 3. Procesos en segundo plano del API
 

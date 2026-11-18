@@ -62,6 +62,8 @@ flowchart LR
 
 Critical roles (platform roles and `data_steward`) require a **second factor** (a TOTP code from an authenticator app). Nobody approves what they themselves requested (separation of duties).
 
+No screen grants platform roles yet. Each person of the operator registers in the portal, verifies the address and signs in once; then, on the server, `sudo ./install.sh platform-role grant <email> <role>` gives the role, audited (`list` shows who has which, `revoke` takes it away).
+
 ## 3. Architecture: two planes
 
 ```mermaid

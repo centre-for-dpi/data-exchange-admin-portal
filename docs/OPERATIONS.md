@@ -89,10 +89,10 @@ Overall status at a glance: `dc ps` (all `running`, and `healthy` those that hav
 | Additional purposes | Operator console → Purposes (`purpose.manage`) | Immediately |
 | Entities | The requester registers and requests onboarding for their entity; a `platform_reviewer` or `platform_admin` approves it (`entity_review.decide`) and the requester becomes `entity_admin`. The `platform_admin` can also create them from the console (`entity_admin.create`) and suspend, reactivate or offboard them (`entity_admin.decide`) | Immediately |
 | People in an entity | The `entity_admin` invites them by email and assigns roles (ADR-0018) | Immediately; roles are read on every request |
-| Platform roles | **Today only the seed assigns them**, to the realm's seed users (`infra/keycloak/README.md`) | See the following warning |
+| Platform roles | The seed gives them to the demo users (`infra/keycloak/README.md`). The operator's own people get theirs from the server's command line, after they register and sign in once: `sudo ./install.sh platform-role grant <email> <role>` in the pilot, `node dist/admin/platform-roles-cli.js grant <email> <role>` in the API container elsewhere (`revoke`, `list`). Audited (`platform_role.granted`, `platform_role.revoked`); the last `platform_admin` cannot be revoked | Immediately; the second factor is asked at the person's next sign-in |
 | Self-registration | Realm `den-portal`: `registrationAllowed` and `verifyEmail` | Already active on new realms; on an existing one, §5.3 |
 
-> **Warning.** There is not yet a way to create the first `platform_admin` of a real deployment without the demo seed, which also creates fictitious entities. Until there is, a pilot is a demonstration environment, not a production one (`DEPLOYMENT.md §8`).
+> **Warning.** The pilot always loads the demo seed, with fictitious entities and demo users that keep their platform roles. Giving the operator's people their own accounts and roles with the command above does not remove them, so a pilot is still a demonstration environment, not a production one (`DEPLOYMENT.md §8`).
 
 ## 3. API background processes
 

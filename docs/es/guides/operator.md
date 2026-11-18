@@ -62,6 +62,8 @@ flowchart LR
 
 Los roles críticos (plataforma y `data_steward`) exigen **segundo factor** (código TOTP de una app autenticadora). Nadie aprueba lo que él mismo pidió (separación de funciones).
 
+Ninguna pantalla da todavía los roles de plataforma. Cada persona del operador se registra en el portal, verifica su correo y entra una vez; después, en el servidor, `sudo ./install.sh platform-role grant <correo> <rol>` le da el rol, auditado (`list` muestra quién tiene cuál y `revoke` lo quita).
+
 ## 3. Arquitectura: dos planos
 
 ```mermaid

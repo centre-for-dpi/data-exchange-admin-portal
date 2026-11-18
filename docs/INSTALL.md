@@ -118,11 +118,11 @@ The other services (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearch,
 
 ## 6. Demo data and first administrator
 
-The pilot **always** loads the seed: three fictitious entities (the operator, a health entity, a social programs entity) and the demo users with their roles. That is how the first `platform_admin` (`pablo.plataforma`) exists: today there is no other way to create it (`DEPLOYMENT.md §8`). For the bootcamp:
+The pilot **always** loads the seed: three fictitious entities (the operator, a health entity, a social programs entity) and the demo users with their roles. That is how the first `platform_admin` (`pablo.plataforma`) exists (`DEPLOYMENT.md §8`). For the bootcamp:
 
 - real entities are onboarded from the portal (self-registration and an onboarding request, or direct registration by the `platform_admin`);
 - the fictitious entities are for practice;
-- before real use, the operator creates the accounts for its people and assigns them roles. In production there are no seed users.
+- before real use, the operator's people get their own accounts: each one registers in the portal, verifies the address and signs in once, and then the server gives the role with `sudo ./install.sh platform-role grant <email> <role>` (`platform_admin`, `platform_reviewer`, `regulator` or `auditor`; `list` shows who has which, `revoke` takes it away). In production there are no seed users.
 
 ## 7. Day-to-day commands
 

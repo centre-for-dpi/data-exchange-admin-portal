@@ -432,6 +432,7 @@ details.faq[open] summary { color: var(--gov); }
         <div class="role"><header><code>app_developer</code></header><span class="who">Each entity</span><p>Create applications, credentials and access requests.</p></div>
       </div>
       <p>The second factor is a TOTP code from an authenticator app. Nobody approves what they themselves requested: the portal separates duties.</p>
+      <p>No screen grants platform roles yet. Each person of the operator registers in the portal, verifies the address and signs in once; then, on the server, <code>sudo ./install.sh platform-role grant &lt;email&gt; &lt;role&gt;</code> gives the role, audited (<code>list</code> shows who has which, <code>revoke</code> takes it away).</p>
     </section>
 
     <section id="arquitectura">

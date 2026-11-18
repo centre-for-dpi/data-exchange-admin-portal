@@ -658,7 +658,8 @@
         "created": "Usuario creado"
       },
       "platform_role": {
-        "granted": "Rol de plataforma asignado"
+        "granted": "Rol de plataforma asignado",
+        "revoked": "Rol de plataforma retirado"
       },
       "notification_preference": {
         "updated": "Preferencias de avisos cambiadas"

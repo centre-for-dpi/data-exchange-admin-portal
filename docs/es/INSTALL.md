@@ -118,11 +118,11 @@ Los demás servicios (PostgreSQL, etcd, OPA, step-ca, TSA, Fluent Bit, OpenSearc
 
 ## 6. Datos de demostración y primer administrador
 
-El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de salud, una de programas sociales) y los usuarios de demo con sus roles. Así existe el primer `platform_admin` (`pablo.plataforma`): hoy no hay otra forma de crearlo (`DEPLOYMENT.md §8`). Para el bootcamp:
+El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de salud, una de programas sociales) y los usuarios de demo con sus roles. Así existe el primer `platform_admin` (`pablo.plataforma`) (`DEPLOYMENT.md §8`). Para el bootcamp:
 
 - las entidades reales se dan de alta desde el portal (autorregistro y solicitud de alta, o alta directa por el `platform_admin`);
 - las entidades ficticias sirven para practicar;
-- antes de un uso real, el operador crea las cuentas de sus personas y les asigna roles. En producción no hay usuarios semilla.
+- antes de un uso real, las personas del operador tienen cuentas propias: cada una se registra en el portal, verifica su correo y entra una vez, y después el servidor le da el rol con `sudo ./install.sh platform-role grant <correo> <rol>` (`platform_admin`, `platform_reviewer`, `regulator` o `auditor`; `list` muestra quién tiene cuál y `revoke` lo quita). En producción no hay usuarios semilla.
 
 ## 7. Comandos del día a día
 

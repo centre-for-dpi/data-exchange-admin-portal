@@ -658,7 +658,8 @@
         "created": "User created"
       },
       "platform_role": {
-        "granted": "Platform role granted"
+        "granted": "Platform role granted",
+        "revoked": "Platform role revoked"
       },
       "notification_preference": {
         "updated": "Notice preferences changed"

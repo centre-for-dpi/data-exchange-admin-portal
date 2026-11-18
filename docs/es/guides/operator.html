@@ -432,6 +432,7 @@ details.faq[open] summary { color: var(--gov); }
         <div class="role"><header><code>app_developer</code></header><span class="who">Cada entidad</span><p>Crear aplicaciones, credenciales y solicitudes de acceso.</p></div>
       </div>
       <p>El segundo factor es un código TOTP de una app autenticadora. Nadie aprueba lo que él mismo pidió: el portal separa las funciones.</p>
+      <p>Ninguna pantalla da todavía los roles de plataforma. Cada persona del operador se registra en el portal, verifica su correo y entra una vez; después, en el servidor, <code>sudo ./install.sh platform-role grant &lt;correo&gt; &lt;rol&gt;</code> le da el rol, auditado (<code>list</code> muestra quién tiene cuál y <code>revoke</code> lo quita).</p>
     </section>
 
     <section id="arquitectura">

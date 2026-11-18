@@ -15,6 +15,9 @@
 #   sudo ./install.sh images <tag>|build  # published images from ghcr.io (0.2.0, sha-<commit>)
 #                                  # instead of building the API, web, hub and runner here
 #   sudo ./install.sh stop|start   # stop or start every container (data is kept)
+#   sudo ./install.sh platform-role grant|revoke <email> <role> [--reason "..."] | list
+#                                  # platform roles of the operator's own people, audited;
+#                                  # the person registers and signs in once first
 #
 # Re-running the install keeps the existing .env: secrets of a running deployment never change
 # under it (database passwords, signing key, subject key; DEPLOYMENT.md §4.1).
@@ -554,6 +557,14 @@ cmd_credentials() {
   info "Código de segundo factor de los usuarios de demo: sudo ./install.sh otp"
 }
 
+# Platform roles (operator, reviewer, regulator, auditor) for the operator's own people: no screen
+# grants them yet. The person registers in the portal, verifies the address and signs in once.
+cmd_platform_role() {
+  require_install
+  [[ $# -ge 1 ]] || fail "Uso: ./install.sh platform-role grant|revoke <correo> <rol> [--reason \"motivo\"] | list"
+  dc exec -T api node --enable-source-maps dist/admin/platform-roles-cli.js "$@"
+}
+
 cmd_otp() {
   require_install
   docker run --rm -v "$ROOT:/w:ro" -w /w "$NODE_IMAGE" node scripts/totp.mjs
@@ -644,8 +655,9 @@ case ${1:-install} in
   restore) shift; cmd_restore "${1:-}" ;;
   update) cmd_update ;;
   images) shift; cmd_images "${1:-}" ;;
+  platform-role) shift; cmd_platform_role "$@" ;;
   stop) require_install; dc stop ;;
   start) require_install; dc up -d --wait --wait-timeout 900 ;;
-  -h | --help | help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help | help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) fail "Comando desconocido: $1 (ver ./install.sh help)" ;;
 esac
