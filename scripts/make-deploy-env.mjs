@@ -158,6 +158,8 @@ const set = {
   DEN_STEP_CA_URL: 'https://step-ca:9000',
   // The step-ca volume is mounted read-only in the API container (docker-compose.deploy.yml).
   DEN_STEP_CA_ROOT_FILE: '/var/lib/den/step-ca/root_ca.crt',
+  // The api-documents volume (docker-compose.deploy.yml); .env.example's value is for development.
+  DEN_DOCUMENTS_DIR: '/var/lib/den/documents',
   TRAEFIK_NETWORK: values['traefik-network'],
   // Random unless asked: the seed users include platform administrators.
   DEN_DEMO_USER_PASSWORD:

@@ -200,6 +200,9 @@ services:
     environment:
       DEN_ALLOW_SEED: 'true'
       DEN_SMTP_URL: smtp://mailpit:1025
+      # Where api-documents is mounted. Set here so an .env with the development value
+      # (data/documents, not writable by `node`) cannot send uploads elsewhere.
+      DEN_DOCUMENTS_DIR: /var/lib/den/documents
     volumes:
       - api-documents:/var/lib/den/documents
       # Only the certificates of the CA (DEN_STEP_CA_ROOT_FILE): the API verifies step-ca's TLS

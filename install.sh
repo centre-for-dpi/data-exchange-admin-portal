@@ -90,6 +90,11 @@ ensure_env_additions() {
     chmod 600 "$ENV_FILE"
     warn "Nueva clave de cifrado de los respaldos (PGBACKREST_REPO1_CIPHER_PASS) en .env: guarda una copia fuera del servidor. Sin ella no se puede restaurar ningún respaldo."
   fi
+  # Earlier .env files carried the development value (data/documents), which the API cannot write.
+  if [[ $(env_get DEN_DOCUMENTS_DIR) != /var/lib/den/documents ]]; then
+    env_set DEN_DOCUMENTS_DIR /var/lib/den/documents
+    info "DEN_DOCUMENTS_DIR corregido en .env: /var/lib/den/documents (volumen api-documents)."
+  fi
 }
 
 # --- compose ------------------------------------------------------------------------------------

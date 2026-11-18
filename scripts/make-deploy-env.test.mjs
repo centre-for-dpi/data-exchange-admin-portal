@@ -48,3 +48,24 @@ describe('make-deploy-env demo password', () => {
     expect(demoPassword(r.out)).toBe('a-long-enough-password');
   });
 });
+
+describe('make-deploy-env documents folder', () => {
+  // The development value (data/documents) resolved inside the image to a folder `node` cannot
+  // create, and env_file overrode the image's ENV: uploads failed in every deployment (P-06).
+  it('points DEN_DOCUMENTS_DIR at the api-documents volume', () => {
+    const r = run({ DEN_DEPLOY_DEMO_PASSWORD: '' });
+    expect(r.status).toBe(0);
+    const lines = readFileSync(r.out, 'utf8').match(/^DEN_DOCUMENTS_DIR=.*$/gm);
+    expect(lines).toEqual(['DEN_DOCUMENTS_DIR=/var/lib/den/documents']);
+  });
+
+  it('the deploy overlay pins it for the API whatever .env says', () => {
+    const overlay = readFileSync(
+      resolve(import.meta.dirname, '../infra/compose/docker-compose.deploy.yml'),
+      'utf8',
+    );
+    const api = overlay.slice(overlay.indexOf('\n  api:\n'), overlay.indexOf('\n  web:\n'));
+    expect(api).toMatch(/^ {6}DEN_DOCUMENTS_DIR: \/var\/lib\/den\/documents$/m);
+    expect(api).toContain('api-documents:/var/lib/den/documents');
+  });
+});
