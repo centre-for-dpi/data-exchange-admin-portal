@@ -210,6 +210,8 @@ dc restart <service>        # or: dc up -d <service> if its configuration change
 
 In the sync console (`/operator/sync`, M5-07), a `platform_admin` retries an object: its reconciler's job is queued. The console also shows the drift that was found, that is, changes made outside the portal that the reconciler undid. Restarting the API triggers a full reconciliation of APISIX and Keycloak; otherwise, the periodic pass runs every 5 minutes. APISIX and Keycloak are **never** corrected by hand: the reconciler reverts it (rule 5).
 
+The console also lists, under "Versions on a channel no longer accepted", the versions whose upstream type the country configuration (`features.upstreams`) or the deployment (X-Road settings) no longer accepts (P-04, ADR-0029). They keep working. The operator decides: keep them, ask the entity for a new version through the node (the old one cannot be revised), or accept the type again in the country configuration, which needs a new API image.
+
 ### 5.2.1 Synthetic traffic for demos
 
 `pnpm traffic:simulate [--from YYYY-MM-DD] [--days 30] [--scale 1] [--seed 42]` generates a month of simulated calls from the active production subscriptions, to show the indicators, the usage and the exchange map without real traffic. The calls follow a business-day and office-hours pattern, with denials and their reasons, and provider errors.

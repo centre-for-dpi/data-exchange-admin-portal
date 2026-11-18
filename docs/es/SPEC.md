@@ -83,7 +83,9 @@ Uno de:
 
 - `node`: servicio expuesto por un nodo del kit (`nodeId`, `servicePath`). Es el camino de las APIs instantáneas. El nodo debe ser de la entidad que publica; el gateway lo llama por su túnel y deja de hacerlo si se da de baja. El detalle de la API, para el proveedor, el revisor y el consumidor, muestra el estado del nodo.
 - `xroad`: servicio consumido vía X-Road (`serviceId` con instancia/clase/miembro/subsistema/servicio, y una ruta opcional). El gateway actúa como miembro cliente, a través del Security Server del operador, que fija la configuración del despliegue y no la versión (SPIKE S-5). El miembro del servicio debe ser el miembro X-Road de la entidad, que registra el operador.
-- `direct`: URL HTTPS de una API existente de la entidad (`url`, `mtls: bool`).
+- `direct`: API pública HTTPS de la entidad, que el gateway llama sin nodo (`url`, `mtls: bool`).
+
+El nodo es el canal por defecto (ADR-0029): el país lista en `features.upstreams` los tipos que pueden usar las versiones nuevas, `[node, xroad]` si se omite. `direct` es opcional, y `xroad` solo se ofrece donde el despliegue tiene el Security Server del operador. El API rechaza otro tipo, como upstream o como sandbox, al crear, revisar, editar o enviar una versión (400, `upstream_type_not_allowed` o `xroad_not_configured`). El formulario de versión ofrece solo los tipos permitidos y, si hay uno solo, no pregunta. Una versión que ya tiene un tipo que el país dejó de aceptar sigue funcionando; su ficha y la consola de sincronización del operador la señalan, y el operador decide.
 
 ### Application (aplicación consumidora)
 `entityId` (consumidora), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (determinista), `status` (`active` | `suspended` | `deleted`), `technicalContact`.
@@ -137,7 +139,7 @@ draft → in_review → approved_operator → [approved_regulator] → published
 published → deprecated → retired
 ```
 
-1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige upstream, completa campos expuestos, base legal, finalidades permitidas, SLA.
+1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige el upstream entre los tipos que acepta el país (§3.1), completa campos expuestos, base legal, finalidades permitidas, SLA.
 2. Validaciones automáticas al enviar a revisión (bloqueantes):
    - Lint del OpenAPI con el conjunto de reglas DEN (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), descripciones en español.
    - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba (GET a la raíz del servicio; pasa con cualquier respuesta que no sea 5xx).
@@ -291,6 +293,7 @@ features:
   sandbox: { autoApprove: true }
   approval: { regulatorForSensitive: true }
   lint: { noIdInQuery: true }
+  upstreams: [node, xroad]   # ADR-0029: direct es opcional
 subscriptionMaxValidityMonths: { public: 24, internal: 24, personal: 12, sensitive: 6 }
 branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/logo.svg", primaryColor: "#6564DB" }
 ```

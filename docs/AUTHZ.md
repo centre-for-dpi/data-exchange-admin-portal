@@ -200,3 +200,4 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | GET | `/api/v1/transparency/jwks` | public (no session; internal routes require their own service token) |
 | GET | `/api/v1/transparency/records/:id/receipt` | platform: `audit.read` |
 | GET | `/api/v1/transparency/verify` | platform: `audit.read` |
+| GET | `/api/v1/upstream-types` | any session; own resources only |

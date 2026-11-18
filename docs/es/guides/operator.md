@@ -290,6 +290,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | Segundo factor para `entity_admin` y `api_publisher` | Solo los roles de plataforma (incluidos `regulator` y `auditor`) y `data_steward` | ASVS nivel 2 lo pide para todo acceso. Es configuración, pero cambia el ingreso de las entidades |
 | Catálogo público | Apagado (`features.publicCatalog`) | Encendido, cualquiera ve las APIs de clasificación pública, sin el contacto del responsable ni el estado de los nodos |
 | Aserción firmada del gateway | Encendida (`features.gatewayAssertion`) | Cada proveedor puede verificarla, y decidir si la exige |
+| Canales de los proveedores | El nodo y X-Road (`features.upstreams`); X-Road solo con el Security Server del operador | Agregar `direct` deja publicar una API pública HTTPS sin nodo: la entidad debe exponer su API al gateway y mantener sus propios certificados (ADR-0029) |
 | Pruebas con lectores de pantalla y con usuarios | La revisión automatizada de accesibilidad pasa en todas las pantallas | Recomendadas antes de producción (NVDA, VoiceOver) |
 | TSA, CA y correo de producción | De desarrollo | TSA acreditada, HSM para la intermedia y el SMTP del operador |
 
@@ -300,7 +301,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 - **¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?** Por la aserción firmada (`X-DEN-Assertion`): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.
 - **¿Cuánto tráfico aguanta?** En la máquina de desarrollo, 200 consultas por segundo con un p95 de 13 ms agregados por el gateway. La meta, 500 por segundo, se valida en un entorno tipo producción. La capacidad crece con más nodos de gateway: cada uno cuenta los límites por su lado y la política le da su parte.
 - **¿El portal está en inglés?** Sí, completo, además del español, que es el idioma por omisión. Los correos y la app ciudadana también son bilingües.
-- **¿Una entidad tiene que abrir puertos de entrada?** No, si usa el kit: el nodo abre el túnel hacia afuera (UDP 51820). Con una API existente, la entidad debe permitir que el gateway llegue a ella.
+- **¿Una entidad tiene que abrir puertos de entrada?** No: todo proveedor entra por su nodo, que abre el túnel hacia afuera (UDP 51820), o por X-Road. Solo si el país habilita APIs públicas sin nodo (`direct`, ADR-0029) esa entidad debe permitir que el gateway llegue a su API.
 - **¿Se puede integrar con X-Road?** Sí: el gateway puede usar un Security Server del operador como cliente X-Road (`ARCHITECTURE.md §10`).
 - **¿Quién aprueba el acceso a datos sensibles?** El responsable de datos de la entidad dueña y, además, el regulador.
 - **¿Cómo se demuestra que la bitácora no fue alterada?** Con la verificación de integridad de la consola y con el anclaje diario que el regulador recibe por correo, sellado por una TSA independiente.

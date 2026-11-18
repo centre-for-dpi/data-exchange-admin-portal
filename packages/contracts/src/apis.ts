@@ -105,6 +105,19 @@ export const xroadServicePath = (id: XroadServiceId): string =>
     .filter((part): part is string => part !== undefined)
     .join('/')}`;
 
+/**
+ * How a provider's service reaches the gateway (SPEC.md §3.1). Which ones a deployment accepts for
+ * new versions is the country's `features.upstreams`, with `xroad` only where the deployment has
+ * the operator's Security Server (P-04, ADR-0029).
+ */
+export const UPSTREAM_TYPES = ['node', 'xroad', 'direct'] as const;
+export const upstreamTypeSchema = z.enum(UPSTREAM_TYPES);
+export type UpstreamType = z.infer<typeof upstreamTypeSchema>;
+
+/** The upstream types new versions may use in this deployment (P-04), node first. */
+export const upstreamTypesSchema = z.object({ allowed: z.array(upstreamTypeSchema) });
+export type UpstreamTypes = z.infer<typeof upstreamTypesSchema>;
+
 /** Where the service lives (SPEC.md §3.1). */
 export const upstreamSchema = z.discriminatedUnion('type', [
   z.strictObject({
@@ -286,6 +299,11 @@ export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
   /** The kit node of a `node` upstream with a nodeId; null otherwise. */
   node: upstreamNodeSchema.nullable(),
   sandboxUpstream: upstreamSchema.nullable(),
+  /**
+   * Types of its upstream or sandbox upstream that this deployment no longer accepts for new
+   * versions (P-04): the version keeps working, and the operator decides. Empty when all are.
+   */
+  disallowedUpstreamTypes: z.array(upstreamTypeSchema),
   /** Automatic validations at submission (M4-06); null until the first run. */
   validation: versionValidationSchema.nullable(),
   exposedFields: z.array(exposedFieldSchema),

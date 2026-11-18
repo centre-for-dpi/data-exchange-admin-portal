@@ -200,3 +200,4 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | GET | `/api/v1/transparency/jwks` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/transparency/records/:id/receipt` | plataforma: `audit.read` |
 | GET | `/api/v1/transparency/verify` | plataforma: `audit.read` |
+| GET | `/api/v1/upstream-types` | cualquier sesión; solo recursos propios |

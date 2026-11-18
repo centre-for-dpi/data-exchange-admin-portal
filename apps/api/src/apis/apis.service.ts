@@ -33,6 +33,7 @@ import { nodeIdOf, upstreamNodes } from '../nodes/node-status.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
 import { storedValidation, VersionValidationService } from './version-validation.service.js';
 import { lintOpenApi, listOperations } from './lint/openapi-lint.js';
+import { assertUpstreamTypeAllowed, disallowedUpstreamTypes } from './upstream-types.js';
 
 type ApiRow = Prisma.ApiGetPayload<object>;
 export const VERSION_INCLUDE = {
@@ -73,6 +74,13 @@ export const versionSnapshot = (v: VersionRow) => ({
   openapiSha256: v.openapiSha256,
   lintValid: (v.lintReport as LintReport | null)?.valid ?? false,
 });
+
+/** The stored upstreams of a version still have types the deployment accepts (P-04). */
+function assertStoredUpstreamsAllowed(v: VersionRow): void {
+  assertUpstreamTypeAllowed(v.upstreamType, 'upstream');
+  const sandbox = v.sandboxUpstream as { type?: Upstream['type'] } | null;
+  if (sandbox?.type) assertUpstreamTypeAllowed(sandbox.type, 'sandboxUpstream');
+}
 
 /**
  * Registration of APIs and versions by the provider entity (SPEC.md §4.2, M1-03). Every state
@@ -216,6 +224,10 @@ export class ApisService {
       upstream: upstreamSchema.parse(v.upstream),
       node,
       sandboxUpstream: v.sandboxUpstream ? upstreamSchema.parse(v.sandboxUpstream) : null,
+      disallowedUpstreamTypes: disallowedUpstreamTypes([
+        v.upstream as { type?: unknown } | null,
+        v.sandboxUpstream as { type?: unknown } | null,
+      ]),
       validation: storedValidation(v.validationReport),
       exposedFields: v.exposedFields as ApiVersionDetail['exposedFields'],
       allowedPurposes: v.allowedPurposes.map((p) => p.purposeCode).sort(),
@@ -271,7 +283,8 @@ export class ApisService {
   /**
    * What a version's upstream (or sandbox upstream) may name (M4-04, M4-05): a kit node of the same
    * entity still in the network, or a service of the entity's own X-Road member in the operator's
-   * instance. The reconciler checks it again on every pass and fails closed.
+   * instance. The reconciler checks it again on every pass and fails closed. Its type is checked
+   * before (assertUpstreamTypeAllowed, P-04).
    */
   private async assertUpstreamAllowed(
     entity: { id: string; xroadMemberClass: string | null; xroadMemberCode: string | null },
@@ -358,6 +371,10 @@ export class ApisService {
         })),
       );
     }
+    // Type first for both, so a refused type is reported before node or member details.
+    assertUpstreamTypeAllowed(data.upstream.type, 'upstream');
+    if (data.sandboxUpstream)
+      assertUpstreamTypeAllowed(data.sandboxUpstream.type, 'sandboxUpstream');
     await this.assertUpstreamAllowed(entity, data.upstream, 'upstream');
     if (data.sandboxUpstream) {
       await this.assertUpstreamAllowed(entity, data.sandboxUpstream, 'sandboxUpstream');
@@ -433,11 +450,15 @@ export class ApisService {
   ): Promise<ApiVersionDetail> {
     const before = await this.findVersion(entityId, apiId, versionId);
     if (before.status === 'published') {
+      // A version whose upstream type is no longer accepted keeps serving, but is not changed
+      // (P-04).
+      assertStoredUpstreamsAllowed(before);
       return this.revise(entityId, apiId, before, principal, source, requestId);
     }
     if (!isEditable(before.status)) {
       throw new ConflictError(`A version in status ${before.status} cannot be edited`);
     }
+    assertStoredUpstreamsAllowed(before);
     const api = await this.findApi(entityId, apiId);
     const parsed = await this.lint(source, api.classification);
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -704,6 +725,7 @@ export class ApisService {
     const before = await this.findVersion(entityId, apiId, versionId);
     const target: ApiVersionStatus = 'in_review';
     assertTransition(before.status, target);
+    assertStoredUpstreamsAllowed(before);
 
     const report = before.lintReport as LintReport | null;
     if (!report?.valid) {

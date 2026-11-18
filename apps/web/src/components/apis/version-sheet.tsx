@@ -81,6 +81,19 @@ export async function VersionSheet({
 
   return (
     <>
+      {version.disallowedUpstreamTypes.length > 0 ? (
+        // P-04: its channel is no longer accepted for new versions; it keeps working.
+        <Notice tone="warning" data-testid="upstream-disallowed">
+          {t('version.detail.upstreamDisallowed', {
+            types: format.list(
+              version.disallowedUpstreamTypes.map((type) =>
+                t(`version.detail.upstreamTypeNames.${type}`),
+              ),
+              { type: 'conjunction' },
+            ),
+          })}
+        </Notice>
+      ) : null}
       <div className="card p-6">
         <dl className="facts">
           <dt>{t('version.detail.status')}</dt>

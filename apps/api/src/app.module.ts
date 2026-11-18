@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApisController } from './apis/apis.controller.js';
+import { UpstreamTypesController } from './apis/upstream-types.controller.js';
 import { ApplicationsController } from './applications/applications.controller.js';
 import { ApplicationsService } from './applications/applications.service.js';
 import {
@@ -111,6 +112,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     PurposesController,
     AdminPurposesController,
     ApisController,
+    UpstreamTypesController,
     ReviewsController,
     RegulatorController,
     CatalogController,

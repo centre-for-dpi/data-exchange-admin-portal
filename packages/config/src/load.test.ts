@@ -79,6 +79,7 @@ describe('versioned country files', () => {
       approval: { regulatorForSensitive: true },
       lint: { noIdInQuery: true },
       gatewayAssertion: true,
+      upstreams: ['node', 'xroad'], // P-04: no direct upstreams in Colombia
     });
     expect(config.subscriptionMaxValidityMonths).toEqual({
       public: 24,
@@ -189,6 +190,32 @@ describe('validation', () => {
       auditYears: 5,
       accessLogMonths: 12,
       subjectAccessMonths: 60,
+    });
+  });
+
+  describe('features.upstreams (P-04)', () => {
+    it('defaults to the node and X-Road: direct is opt-in', () => {
+      const loaded = parseCountryConfigFile(writeConfig(set('features.upstreams', undefined)));
+      expect(loaded.features.upstreams).toEqual(['node', 'xroad']);
+    });
+
+    it('accepts any non-empty set of known types, direct included', () => {
+      for (const upstreams of [
+        ['node'],
+        ['xroad'],
+        ['node', 'direct'],
+        ['direct', 'node', 'xroad'],
+      ]) {
+        const loaded = parseCountryConfigFile(writeConfig(set('features.upstreams', upstreams)));
+        expect(loaded.features.upstreams).toEqual(upstreams);
+      }
+    });
+
+    it('rejects an empty list, an unknown type and a repeated one', () => {
+      expectInvalid(set('features.upstreams', []), /features\.upstreams/);
+      expectInvalid(set('features.upstreams', ['node', 'ftp']), /features\.upstreams\.1/);
+      expectInvalid(set('features.upstreams', ['node', 'node']), /duplicate upstream type "node"/);
+      expectInvalid(set('features.upstreams', 'node'), /features\.upstreams/);
     });
   });
 

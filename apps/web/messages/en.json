@@ -148,9 +148,17 @@
       "versionHint": "Major.minor, for example 1.0",
       "openapiFile": "OpenAPI file (YAML or JSON)",
       "openapiText": "Or paste the OpenAPI document",
-      "upstreamType": "Where does the service live?",
-      "upstreamNode": "Node of the instant-APIs kit",
-      "upstreamDirect": "Existing API of the entity (HTTPS)",
+      "upstreamType": "How does the service reach the network?",
+      "upstreamTypes": {
+        "node": "Node of the entity (own API or instant API)",
+        "xroad": "Service in X-Road",
+        "direct": "Public API of the entity (HTTPS, no node)"
+      },
+      "upstreamOnly": {
+        "node": "The service comes in through the entity's node: your own API or an instant API behind the node. Choose the node and the service's path on it.",
+        "xroad": "The service comes in through X-Road, via the operator's Security Server.",
+        "direct": "The service is a public API of the entity, called over HTTPS without a node."
+      },
       "servicePath": "Service path on the node",
       "url": "API URL",
       "mtls": "The API requires mTLS",
@@ -168,7 +176,6 @@
       "node": "Kit node",
       "nodeHint": "Where the service runs. The gateway calls it through the node's tunnel.",
       "noNode": "None (the environment's test service)",
-      "upstreamXroad": "Service in X-Road",
       "xroadServiceId": "Service identifier in X-Road",
       "xroadInstance": "Instance",
       "xroadMemberClass": "Member class",
@@ -180,7 +187,7 @@
       "sandboxHint": "With synthetic data. The contract test at submission and sandbox applications go there, never to the real service.",
       "sandbox_none": "No sandbox",
       "sandbox_node": "On a node",
-      "sandbox_direct": "URL",
+      "sandbox_direct": "Public API (HTTPS, no node)",
       "sandboxNode": "Sandbox node",
       "sandboxServicePath": "Path of the test service",
       "sandboxUrl": "URL of the test service"
@@ -208,7 +215,13 @@
       "none": "None",
       "reviews": "Reviews",
       "published": "The version is published.",
-      "node": "Kit node"
+      "node": "Kit node",
+      "upstreamDisallowed": "This network no longer accepts new versions with {types}. The version keeps working; the operator decides what to do with it (for example, ask for a new version through the node).",
+      "upstreamTypeNames": {
+        "node": "node of the entity",
+        "xroad": "service in X-Road",
+        "direct": "public API without a node"
+      }
     },
     "lifecycle": {
       "deprecatedNotice": "Deprecated version: it is retired on {date}. Current consumers keep access until then; no new requests are accepted.",
@@ -1570,7 +1583,12 @@
       "opa": "Policy (OPA)",
       "wireguard": "Node hub",
       "opensearch": "Analytics (OpenSearch)"
-    }
+    },
+    "disallowedTitle": "Versions on a channel no longer accepted",
+    "disallowedLead": "They keep working. The country configuration no longer accepts their kind of service for new versions: decide whether they stay, whether the entity publishes a new version through the node, or whether the country accepts the type again.",
+    "disallowedApi": "API and version",
+    "disallowedEntity": "Entity",
+    "disallowedTypes": "Channel"
   },
   "apiErrors": {
     "fields": {
@@ -1632,7 +1650,9 @@
       "file_name_format": "A file name without path separators or control characters.",
       "too_many_open_requests": "You already have {max} open requests: wait for a decision before creating another.",
       "validations_pending": "The version was not approved: the automatic validations have not finished yet. Wait a moment and reload the page.",
-      "validations_failed": "The version was not approved: its automatic validations failed. The provider must fix the service and run them again."
+      "validations_failed": "The version was not approved: its automatic validations failed. The provider must fix the service and run them again.",
+      "upstream_type_not_allowed": "This network does not accept that channel for the service. Providers come in through the entity's node.",
+      "xroad_not_configured": "X-Road is not configured in this deployment: the operator has no Security Server."
     },
     "codes": {
       "validation_failed": "Check the data you sent.",

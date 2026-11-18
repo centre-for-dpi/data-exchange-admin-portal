@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { CountryConfigError, getCountryConfig } from '@den/config';
 import { createApp } from './app.js';
+import { allowedUpstreamTypes } from './apis/upstream-types.js';
 import { loadDevEnv } from './dev-env.js';
 
 const DEFAULT_PORT = 4000;
@@ -19,6 +20,15 @@ async function bootstrap(): Promise<void> {
       process.exit(1);
     }
     throw error;
+  }
+  // P-04: a country that only accepts xroad needs the deployment's X-Road settings, or providers
+  // could not publish anything.
+  if (allowedUpstreamTypes().length === 0) {
+    console.error(
+      'features.upstreams only allows xroad, and DEN_XROAD_SECURITY_SERVER_URL and ' +
+        'DEN_XROAD_CLIENT are not set: providers could not register any version',
+    );
+    process.exit(1);
   }
 
   const app = await createApp();

@@ -1,4 +1,9 @@
-import { apiDetailSchema, nodeListSchema, purposeListSchema } from '@den/contracts';
+import {
+  apiDetailSchema,
+  nodeListSchema,
+  purposeListSchema,
+  upstreamTypesSchema,
+} from '@den/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -47,11 +52,19 @@ export default async function NewVersionPage({ params }: PageProps) {
       description: '',
     }));
 
+  // Where the service may live in this deployment (P-04): the form offers only these.
+  const { allowed } = await apiGet('/upstream-types', upstreamTypesSchema);
+
   return (
     <Page>
       <PageHeader title={t('version.create.title', { api: api.name })} />
       <div className="card max-w-3xl p-6 md:p-8">
-        <CreateVersionForm apiId={api.id} purposes={purposes} nodes={nodes} />
+        <CreateVersionForm
+          apiId={api.id}
+          purposes={purposes}
+          nodes={nodes}
+          upstreamTypes={allowed}
+        />
       </div>
     </Page>
   );

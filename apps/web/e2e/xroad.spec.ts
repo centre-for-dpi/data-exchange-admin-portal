@@ -7,6 +7,12 @@ import { expectNoAccessibilityViolations } from './helpers';
 // is consumed through X-Road, only for a service of that member (another member's service is
 // refused: apps/api apis.int.test.ts). The traffic through a Security
 // Server is tested against APISIX and OPA in apps/api (xroad.int.test.ts).
+// The form offers X-Road only where the API runs with the operator's Security Server (DEN_XROAD_*,
+// P-04); the development .env leaves it out, and then only the member is set here.
+const xroadConfigured = Boolean(
+  process.env.DEN_XROAD_SECURITY_SERVER_URL?.trim() && process.env.DEN_XROAD_CLIENT?.trim(),
+);
+
 test.describe('X-Road upstream (M4-05)', () => {
   test('pablo sets the X-Road member of salud; pedro registers a version on it', async ({
     browser,
@@ -28,6 +34,11 @@ test.describe('X-Road upstream (M4-05)', () => {
     await signIn(page, 'pedro.publicador', '/my-apis');
     await registerApi(page, `xroad-${Date.now().toString(36)}`, `Afiliación X-Road ${code}`);
     await page.getByRole('link', { name: 'Nueva versión' }).click();
+    if (!xroadConfigured) {
+      await expect(page.getByLabel(/^Versión/)).toBeVisible();
+      await expect(page.getByLabel('Servicio en X-Road')).toHaveCount(0);
+      return;
+    }
     await page.getByLabel(/^Versión/).fill('1.0');
     await page.getByLabel('Archivo OpenAPI (YAML o JSON)').setInputFiles(openapiFile);
     await page.getByLabel('Servicio en X-Road').check();

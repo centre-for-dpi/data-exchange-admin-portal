@@ -1,5 +1,6 @@
 'use client';
 
+import type { UpstreamType } from '@den/contracts';
 import { useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 import {
@@ -11,6 +12,7 @@ import {
   submitVersionAction,
 } from '../../lib/api-actions';
 import { type FormState, initialFormState } from '../../lib/forms';
+import { upstreamChoices } from '../../lib/upstream-choices';
 import { ErrorSummary, Field, checkClass, errorTextClass, inputClass } from '../form/field';
 import { Button } from '../ui/button';
 
@@ -195,7 +197,16 @@ function OpenapiInputs({ state }: { state: FormState }) {
  * Optional test upstream with synthetic data (M4-06, M4-08): the contract test at submission and
  * the sandbox applications go there, never to the production upstream.
  */
-function SandboxFields({ nodes, state }: { nodes: Option[]; state: FormState }) {
+function SandboxFields({
+  nodes,
+  state,
+  kinds,
+}: {
+  nodes: Option[];
+  state: FormState;
+  /** none, and the types the deployment accepts (P-04). */
+  kinds: Array<'none' | 'node' | 'direct'>;
+}) {
   const t = useTranslations('version.create');
   const [kind, setKind] = useState<'none' | 'node' | 'direct'>('none');
   return (
@@ -203,7 +214,7 @@ function SandboxFields({ nodes, state }: { nodes: Option[]; state: FormState }) 
       <legend className="mb-1 text-sm font-medium text-foreground-strong">{t('sandbox')}</legend>
       <p className="text-sm text-muted-foreground">{t('sandboxHint')}</p>
       <div className="grid gap-2 sm:grid-cols-3">
-        {(['none', 'node', 'direct'] as const).map((value) => (
+        {kinds.map((value) => (
           <label
             key={value}
             className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border-control bg-background px-4 py-3 text-sm has-[:checked]:border-primary-ink has-[:checked]:bg-primary-soft"
@@ -251,18 +262,22 @@ export function CreateVersionForm({
   apiId,
   purposes,
   nodes = [],
+  upstreamTypes,
 }: {
   apiId: string;
   purposes: Option[];
   /** Kit nodes of the entity in the network (M4-04). */
   nodes?: Option[];
+  /** Upstream types the deployment accepts (P-04): the form offers only these. */
+  upstreamTypes: UpstreamType[];
 }) {
   const t = useTranslations('version.create');
   const [state, action, pending] = useActionState(
     createVersionAction.bind(null, apiId),
     initialFormState,
   );
-  const [upstreamType, setUpstreamType] = useState<'node' | 'direct' | 'xroad'>('node');
+  const choices = upstreamChoices(upstreamTypes);
+  const [upstreamType, setUpstreamType] = useState<UpstreamType>(choices.initial);
   const purposeErrors = state.fieldErrors?.allowedPurposes ?? [];
   return (
     <form action={action} className="space-y-5" noValidate>
@@ -272,33 +287,39 @@ export function CreateVersionForm({
       </Field>
       <OpenapiInputs state={state} />
 
-      <fieldset className="space-y-3">
-        <legend className="mb-1 text-sm font-medium text-foreground-strong">
-          {t('upstreamType')}
-        </legend>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {(['node', 'direct', 'xroad'] as const).map((type) => (
-            <label
-              key={type}
-              className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border-control bg-background px-4 py-3 text-sm has-[:checked]:border-primary-ink has-[:checked]:bg-primary-soft"
-            >
-              <input
-                type="radio"
-                className={checkClass}
-                name="upstreamType"
-                value={type}
-                checked={upstreamType === type}
-                onChange={() => setUpstreamType(type)}
-              />
-              {type === 'node'
-                ? t('upstreamNode')
-                : type === 'direct'
-                  ? t('upstreamDirect')
-                  : t('upstreamXroad')}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      {choices.ask ? (
+        <fieldset className="space-y-3">
+          <legend className="mb-1 text-sm font-medium text-foreground-strong">
+            {t('upstreamType')}
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {choices.types.map((type) => (
+              <label
+                key={type}
+                className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border-control bg-background px-4 py-3 text-sm has-[:checked]:border-primary-ink has-[:checked]:bg-primary-soft"
+              >
+                <input
+                  type="radio"
+                  className={checkClass}
+                  name="upstreamType"
+                  value={type}
+                  checked={upstreamType === type}
+                  onChange={() => setUpstreamType(type)}
+                />
+                {t(`upstreamTypes.${type}`)}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : (
+        <>
+          {/* One type only (the node, by default): nothing to choose (P-04). */}
+          <input type="hidden" name="upstreamType" value={upstreamType} />
+          <p className="text-sm text-muted-foreground" data-testid="upstream-only">
+            {t(`upstreamOnly.${upstreamType}`)}
+          </p>
+        </>
+      )}
       {upstreamType === 'node' ? (
         <>
           <Field name="nodeId" label={t('node')} hint={t('nodeHint')} state={state}>
@@ -357,7 +378,7 @@ export function CreateVersionForm({
         </>
       )}
 
-      <SandboxFields nodes={nodes} state={state} />
+      <SandboxFields nodes={nodes} state={state} kinds={choices.sandbox} />
 
       <fieldset
         className="space-y-2"

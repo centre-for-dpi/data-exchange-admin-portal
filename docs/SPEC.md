@@ -83,7 +83,9 @@ One of:
 
 - `node`: a service exposed by a kit node (`nodeId`, `servicePath`). This is the path for instant APIs. The node must belong to the publishing entity; the gateway calls it through its tunnel and stops doing so if the node is decommissioned. The API detail page shows the node's status to the provider, the reviewer and the consumer.
 - `xroad`: a service consumed through X-Road (`serviceId` with instance/class/member/subsystem/service, and an optional path). The gateway acts as a client member, through the operator's Security Server, which pins the deployment's configuration and not the version (SPIKE S-5). The service's member must be the entity's X-Road member, which the operator registers.
-- `direct`: HTTPS URL of an existing entity API (`url`, `mtls: bool`).
+- `direct`: public HTTPS API of the entity, called by the gateway without a node (`url`, `mtls: bool`).
+
+The node is the default channel (ADR-0029): the country lists the types new versions may use in `features.upstreams`, `[node, xroad]` if omitted. `direct` is opt-in, and `xroad` is offered only where the deployment has the operator's Security Server. The API refuses another type, as upstream or sandbox, when a version is created, revised, edited or submitted (400, `upstream_type_not_allowed` or `xroad_not_configured`). The version form offers only the allowed types, and with a single one it does not ask. A version that already has a type the country no longer accepts keeps working; its sheet and the operator's sync console flag it, and the operator decides.
 
 ### Application (consumer application)
 `entityId` (consumer), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (deterministic), `status` (`active` | `suspended` | `deleted`), `technicalContact`.
@@ -137,7 +139,7 @@ draft → in_review → approved_operator → [approved_regulator] → published
 published → deprecated → retired
 ```
 
-1. `api_publisher` creates the API and the version: uploads OpenAPI 3.x, chooses the upstream, fills in the exposed fields, legal basis, allowed purposes and SLA.
+1. `api_publisher` creates the API and the version: uploads OpenAPI 3.x, chooses the upstream among the types the country accepts (§3.1), fills in the exposed fields, legal basis, allowed purposes and SLA.
 2. Automatic validations when submitting for review (blocking):
    - OpenAPI lint with the DEN ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), descriptions in Spanish.
    - Connectivity: the portal asks the node/URL for a `healthcheck` through the gateway in test mode (GET to the service root; it passes with any response that is not a 5xx).
@@ -291,6 +293,7 @@ features:
   sandbox: { autoApprove: true }
   approval: { regulatorForSensitive: true }
   lint: { noIdInQuery: true }
+  upstreams: [node, xroad]   # ADR-0029: direct is opt-in
 subscriptionMaxValidityMonths: { public: 24, internal: 24, personal: 12, sensitive: 6 }
 branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/logo.svg", primaryColor: "#6564DB" }
 ```

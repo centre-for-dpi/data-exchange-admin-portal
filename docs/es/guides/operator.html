@@ -660,7 +660,7 @@ details.faq[open] summary { color: var(--gov); }
         <article class="comp d">
           <div><h4>Hub WireGuard</h4><span class="tech">51820/udp</span></div>
           <p>Extremo central de los túneles cifrados que abren los <b>nodos del kit</b> desde la red de cada entidad, de adentro hacia afuera: la entidad no abre puertos de entrada. Un nodo no alcanza a otros nodos ni a la plataforma.</p>
-          <dl><dt>Si cae</dt><dd><span class="tag bad">caen las APIs de los nodos</span>Las APIs existentes siguen.</dd><dt>Guarda</dt><dd>El último estado de los túneles.</dd></dl>
+          <dl><dt>Si cae</dt><dd><span class="tag bad">caen las APIs de los nodos</span>Los servicios en X-Road siguen.</dd><dt>Guarda</dt><dd>El último estado de los túneles.</dd></dl>
         </article>
         <article class="comp d">
           <div><h4>Fluent Bit · transparencia</h4><span class="tech">del gateway al portal</span></div>
@@ -1025,6 +1025,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td class="wrap">Segundo factor para <code>entity_admin</code> y <code>api_publisher</code></td><td class="wrap">Solo los roles de plataforma, <code>regulator</code>, <code>auditor</code> y <code>data_steward</code></td><td class="wrap">ASVS nivel 2 lo pide para todo acceso. Es configuración, pero cambia el ingreso de las entidades</td></tr>
             <tr><td class="wrap">Catálogo público</td><td class="wrap">Apagado (<code>features.publicCatalog</code>)</td><td class="wrap">Encendido, cualquiera ve las APIs de clasificación pública, sin el contacto del responsable ni el estado de los nodos</td></tr>
             <tr><td class="wrap">Aserción firmada del gateway</td><td class="wrap">Encendida (<code>features.gatewayAssertion</code>)</td><td class="wrap">Cada proveedor puede verificarla, y decidir si la exige</td></tr>
+            <tr><td class="wrap">Canales de los proveedores</td><td class="wrap">El nodo y X-Road (<code>features.upstreams</code>); X-Road solo con el Security Server del operador</td><td class="wrap">Agregar <code>direct</code> deja publicar una API pública HTTPS sin nodo: la entidad debe exponer su API al gateway y mantener sus propios certificados (ADR-0029)</td></tr>
             <tr><td class="wrap">Pruebas con lectores de pantalla y con usuarios</td><td class="wrap">La revisión automatizada de accesibilidad pasa en todas las pantallas</td><td class="wrap">Recomendadas antes de producción (NVDA, VoiceOver)</td></tr>
             <tr><td class="wrap">TSA, CA y correo de producción</td><td class="wrap">De desarrollo</td><td class="wrap">TSA acreditada, HSM para la intermedia y el SMTP del operador</td></tr>
           </tbody>
@@ -1040,7 +1041,7 @@ sudo ./install.sh</code></pre></div>
         <details class="faq"><summary>¿Cómo sabe el proveedor que una consulta viene de verdad del gateway?</summary><p>Por la aserción firmada (<code>X-DEN-Assertion</code>): un JWS por llamada, ligado al método, a la URI, al cuerpo y a ese proveedor, que verifica con las claves públicas del portal. Una aserción que el cliente intente colar se descarta. La guía de entidades trae ejemplos de verificación en Node.js y Python.</p></details>
         <details class="faq"><summary>¿Cuánto tráfico aguanta?</summary><p>En la máquina de desarrollo, 200 consultas por segundo con un p95 de 13 ms agregados por el gateway. La meta, 500 por segundo, se valida en un entorno tipo producción. La capacidad crece con más nodos de gateway: cada uno cuenta los límites por su lado y la política le da su parte.</p></details>
         <details class="faq"><summary>¿El portal está en inglés?</summary><p>Sí, completo, además del español, que es el idioma por omisión. Los correos y la app ciudadana también son bilingües.</p></details>
-        <details class="faq"><summary>¿Una entidad tiene que abrir puertos de entrada?</summary><p>No, si usa el kit: el nodo abre el túnel hacia afuera (UDP 51820). Con una API existente, la entidad debe permitir que el gateway llegue a ella.</p></details>
+        <details class="faq"><summary>¿Una entidad tiene que abrir puertos de entrada?</summary><p>No: todo proveedor entra por su nodo, que abre el túnel hacia afuera (UDP 51820), o por X-Road. Solo si el país habilita APIs públicas sin nodo (<code>direct</code>) esa entidad debe permitir que el gateway llegue a su API.</p></details>
         <details class="faq"><summary>¿Se puede integrar con X-Road?</summary><p>Sí: el gateway puede usar un Security Server del operador como cliente X-Road.</p></details>
         <details class="faq"><summary>¿Quién aprueba el acceso a datos sensibles?</summary><p>El responsable de datos de la entidad dueña y, además, el regulador.</p></details>
         <details class="faq"><summary>¿Cómo se demuestra que la bitácora no fue alterada?</summary><p>Con la verificación de integridad de la consola y con el anclaje diario que el regulador recibe por correo, sellado por una TSA independiente.</p></details>

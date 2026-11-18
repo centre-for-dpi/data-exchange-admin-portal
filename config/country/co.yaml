@@ -84,6 +84,10 @@ features:
   # The gateway signs each call to the provider (X-DEN-Assertion, ADR-0024): proof the provider
   # can keep. Providers verify it with the JWKS at /api/v1/gateway/jwks.
   gatewayAssertion: true
+  # How providers' services reach the gateway (ADR-0029): through the entity's kit node, or a
+  # service in X-Road (offered only where the deployment has the operator's Security Server,
+  # DEN_XROAD_*). Add `direct` to also accept HTTPS APIs called without a node.
+  upstreams: [node, xroad]
 
 subscriptionMaxValidityMonths:
   public: 24

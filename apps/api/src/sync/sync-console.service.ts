@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import type { SyncPage, SyncQuery } from '@den/contracts';
+import type { DisallowedUpstream, SyncPage, SyncQuery } from '@den/contracts';
 import { OPENSEARCH_SYNC_TOPIC } from '../analytics/access-log-index.js';
+import { allowedUpstreamTypes, disallowedUpstreamTypes } from '../apis/upstream-types.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { NotFoundError } from '../common/errors.js';
 import { OutboxService } from '../outbox/outbox.service.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { KEYCLOAK_SYNC_TOPIC } from '../reconcilers/keycloak/keycloak.reconciler.js';
@@ -45,7 +46,7 @@ export class SyncConsoleService {
           ? { status: query.status }
           : {}),
     };
-    const [summary, recentDrift, rows] = await Promise.all([
+    const [summary, recentDrift, rows, disallowedUpstreams] = await Promise.all([
       this.prisma.syncState.groupBy({ by: ['system', 'status'], _count: { _all: true } }),
       this.prisma.syncState.count({ where: { driftDetectedAt: { gte: dayAgo } } }),
       this.prisma.syncState.findMany({
@@ -54,6 +55,7 @@ export class SyncConsoleService {
         take: query.limit + 1,
         ...(query.cursor ? { cursor: { target: query.cursor }, skip: 1 } : {}),
       }),
+      this.disallowedUpstreams(),
     ]);
     const items = rows.slice(0, query.limit);
     return {
@@ -74,7 +76,53 @@ export class SyncConsoleService {
         driftCount: r.driftCount,
       })),
       nextCursor: rows.length > query.limit ? (items.at(-1)?.target ?? null) : null,
+      disallowedUpstreams,
     };
+  }
+
+  /**
+   * Versions not yet retired whose upstream or sandbox upstream has a type the deployment no
+   * longer accepts (P-04). They keep their route; the operator decides what to do with them.
+   */
+  private async disallowedUpstreams(): Promise<DisallowedUpstream[]> {
+    const allowed = allowedUpstreamTypes();
+    const rows = await this.prisma.apiVersion.findMany({
+      where: {
+        status: { not: 'retired' },
+        OR: [
+          { upstreamType: { notIn: allowed } },
+          // The sandbox's type lives in its JSON; few versions have one.
+          { sandboxUpstream: { not: Prisma.DbNull } },
+        ],
+      },
+      select: {
+        id: true,
+        version: true,
+        status: true,
+        upstream: true,
+        sandboxUpstream: true,
+        api: { select: { name: true, entity: { select: { legalName: true } } } },
+      },
+      orderBy: { id: 'asc' },
+    });
+    return rows.flatMap((v) => {
+      const types = disallowedUpstreamTypes(
+        [v.upstream as { type?: unknown } | null, v.sandboxUpstream as { type?: unknown } | null],
+        allowed,
+      );
+      return types.length === 0
+        ? []
+        : [
+            {
+              versionId: v.id,
+              version: v.version,
+              status: v.status,
+              apiName: v.api.name,
+              entityName: v.api.entity.legalName,
+              types,
+            },
+          ];
+    });
   }
 
   /** Queues the reconcile of one object now, instead of waiting for the next periodic pass. */

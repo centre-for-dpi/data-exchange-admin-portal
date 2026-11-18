@@ -129,6 +129,24 @@ describe('API registration (M1-03)', () => {
   });
 
   describe('versions through X-Road (M4-05)', () => {
+    // xroad is offered only where the deployment has the operator's Security Server (P-04).
+    const saved = {
+      url: process.env.DEN_XROAD_SECURITY_SERVER_URL,
+      client: process.env.DEN_XROAD_CLIENT,
+    };
+    beforeAll(() => {
+      process.env.DEN_XROAD_SECURITY_SERVER_URL = 'http://ss.xroad.test:8080';
+      process.env.DEN_XROAD_CLIENT = 'CO/GOV/9000000001/DEN-GATEWAY';
+    });
+    afterAll(() => {
+      for (const [name, value] of [
+        ['DEN_XROAD_SECURITY_SERVER_URL', saved.url],
+        ['DEN_XROAD_CLIENT', saved.client],
+      ] as const) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    });
     const serviceId = (memberCode: string) => ({
       instance: 'CO',
       memberClass: 'GOV',

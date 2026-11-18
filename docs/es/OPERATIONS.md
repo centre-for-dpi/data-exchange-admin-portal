@@ -210,6 +210,8 @@ dc restart <servicio>        # o: dc up -d <servicio> si cambió su configuraci�
 
 En la consola de sincronización (`/operator/sync`, M5-07), un `platform_admin` reintenta un objeto: se encola el trabajo de su reconciliador. La consola también muestra la deriva que se encontró, es decir, cambios hechos fuera del portal que el reconciliador deshizo. Reiniciar el API lanza una reconciliación completa de APISIX y Keycloak; si no, la pasada periódica corre cada 5 minutos. **Nunca** se corrige APISIX ni Keycloak a mano: el reconciliador lo revierte (regla 5).
 
+La consola también lista, en "Versiones con un canal que ya no se acepta", las versiones cuyo tipo de upstream ya no aceptan la configuración del país (`features.upstreams`) o el despliegue (configuración de X-Road) (P-04, ADR-0029). Siguen funcionando. El operador decide: mantenerlas, pedir a la entidad una versión nueva por el nodo (la anterior no se puede revisar), o volver a aceptar el tipo en la configuración del país, lo que requiere una imagen nueva del API.
+
 ### 5.2.1 Tráfico sintético para demos
 
 `pnpm traffic:simulate [--from AAAA-MM-DD] [--days 30] [--scale 1] [--seed 42]` genera un mes de llamadas simuladas de las suscripciones activas de producción, para mostrar los indicadores, el uso y el mapa de intercambios sin tráfico real. Las llamadas tienen patrón de días hábiles y horario de oficina, negaciones con su razón y errores del proveedor.

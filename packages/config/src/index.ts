@@ -11,11 +11,14 @@ export {
   type LoadOptions,
 } from './load.js';
 export {
+  DEFAULT_UPSTREAMS,
   UI_LOCALES,
+  UPSTREAM_TYPES,
   countryConfigSchema,
   localizedTextSchema,
   type CountryConfig,
   type CountryConfigInput,
   type LocalizedText,
   type UiLocale,
+  type UpstreamType,
 } from './schema.js';

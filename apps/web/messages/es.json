@@ -148,9 +148,17 @@
       "versionHint": "Mayor.menor, por ejemplo 1.0",
       "openapiFile": "Archivo OpenAPI (YAML o JSON)",
       "openapiText": "O pega el documento OpenAPI",
-      "upstreamType": "¿Dónde vive el servicio?",
-      "upstreamNode": "Nodo del kit de APIs instantáneas",
-      "upstreamDirect": "API existente de la entidad (HTTPS)",
+      "upstreamType": "¿Por dónde llega el servicio?",
+      "upstreamTypes": {
+        "node": "Nodo de la entidad (API propia o API instantánea)",
+        "xroad": "Servicio en X-Road",
+        "direct": "API pública de la entidad (HTTPS, sin nodo)"
+      },
+      "upstreamOnly": {
+        "node": "El servicio llega por el nodo de la entidad: tu propia API o una API instantánea detrás del nodo. Elige el nodo y la ruta del servicio en él.",
+        "xroad": "El servicio llega por X-Road, a través del Security Server del operador.",
+        "direct": "El servicio es una API pública de la entidad, llamada por HTTPS sin nodo."
+      },
       "servicePath": "Ruta del servicio en el nodo",
       "url": "URL de la API",
       "mtls": "La API exige mTLS",
@@ -168,7 +176,6 @@
       "node": "Nodo del kit",
       "nodeHint": "Donde corre el servicio. El gateway lo llama por el túnel del nodo.",
       "noNode": "Ninguno (servicio de prueba del entorno)",
-      "upstreamXroad": "Servicio en X-Road",
       "xroadServiceId": "Identificador del servicio en X-Road",
       "xroadInstance": "Instancia",
       "xroadMemberClass": "Clase de miembro",
@@ -180,7 +187,7 @@
       "sandboxHint": "Con datos sintéticos. La prueba de contrato al enviar a revisión y las aplicaciones sandbox van ahí, nunca al servicio real.",
       "sandbox_none": "Sin sandbox",
       "sandbox_node": "En un nodo",
-      "sandbox_direct": "URL",
+      "sandbox_direct": "API pública (HTTPS, sin nodo)",
       "sandboxNode": "Nodo del sandbox",
       "sandboxServicePath": "Ruta del servicio de pruebas",
       "sandboxUrl": "URL del servicio de pruebas"
@@ -208,7 +215,13 @@
       "none": "Ninguno",
       "reviews": "Revisiones",
       "published": "La versión está publicada.",
-      "node": "Nodo del kit"
+      "node": "Nodo del kit",
+      "upstreamDisallowed": "Esta red ya no acepta versiones nuevas con {types}. La versión sigue funcionando; el operador decide qué hacer con ella (por ejemplo, pedir una versión nueva por el nodo).",
+      "upstreamTypeNames": {
+        "node": "nodo de la entidad",
+        "xroad": "servicio en X-Road",
+        "direct": "API pública sin nodo"
+      }
     },
     "lifecycle": {
       "deprecatedNotice": "Versión obsoleta: se retira el {date}. Los consumidores actuales siguen con acceso hasta entonces; no se aceptan solicitudes nuevas.",
@@ -1570,7 +1583,12 @@
       "opa": "Política (OPA)",
       "wireguard": "Hub de nodos",
       "opensearch": "Analítica (OpenSearch)"
-    }
+    },
+    "disallowedTitle": "Versiones con un canal que ya no se acepta",
+    "disallowedLead": "Siguen funcionando. La configuración del país ya no acepta su tipo de servicio para versiones nuevas: decide si se mantienen, si la entidad publica una versión nueva por el nodo, o si el país vuelve a aceptar el tipo.",
+    "disallowedApi": "API y versión",
+    "disallowedEntity": "Entidad",
+    "disallowedTypes": "Canal"
   },
   "apiErrors": {
     "fields": {
@@ -1632,7 +1650,9 @@
       "file_name_format": "Un nombre de archivo sin separadores de ruta ni caracteres de control.",
       "too_many_open_requests": "Ya tienes {max} solicitudes abiertas: espera una decisión antes de crear otra.",
       "validations_pending": "La versión no se aprobó: las validaciones automáticas todavía no terminan. Espera un momento y recarga la página.",
-      "validations_failed": "La versión no se aprobó: sus validaciones automáticas fallaron. El proveedor debe corregir el servicio y repetirlas."
+      "validations_failed": "La versión no se aprobó: sus validaciones automáticas fallaron. El proveedor debe corregir el servicio y repetirlas.",
+      "upstream_type_not_allowed": "Esta red no acepta ese canal para el servicio. Los proveedores entran por el nodo de la entidad.",
+      "xroad_not_configured": "X-Road no está configurado en este despliegue: el operador no tiene Security Server."
     },
     "codes": {
       "validation_failed": "Revisa los datos enviados.",

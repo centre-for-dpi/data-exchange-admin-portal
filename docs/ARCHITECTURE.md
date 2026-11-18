@@ -28,8 +28,8 @@ flowchart TB
   end
   subgraph Entities
     C[Consumer system]
-    N1[Kit node · instant APIs]
-    D1[Existing API]
+    N1[Kit node · own or instant APIs]
+    D1[Public API · direct, opt-in]
     XR[X-Road Security Server]
   end
   U1 & U2 & U3 --> WEB --> API --> PG
@@ -129,6 +129,7 @@ Reconciler
 - **Operator console (`/operator/sync`, M5-07).** Shows `sync_state` by system and status: whether the desired hash is applied, the errors with their attempts, and the drift found.
   - **Drift.** A pass that had to write even though the desired state had not changed since it was applied (`appliedHash = desiredHash` and `in_sync`): someone changed the object outside the portal. The reconciler corrects it and records `driftDetectedAt` and `driftCount`. This is how drift is detected in APISIX versions and in Keycloak clients.
   - **Retry.** `POST /admin/sync/retry`, `platform_admin` only, enqueues the job of the reconciler that owns the target: `gateway.sync` (`apiVersion:<id>`, or `gateway:all` for TLS and the custom routes), `keycloak.sync`, `policy.sync`, `wireguard.sync` or `opensearch.sync`. It never calls the system from the controller, and it is recorded in the audit log (`sync.retry_requested`).
+  - **Channels no longer accepted (P-04, ADR-0029).** `GET /admin/sync` also returns `disallowedUpstreams`: the versions not yet retired whose upstream or sandbox upstream has a type the deployment no longer accepts. The console lists them with a link to their sheet; they keep their route until the operator decides.
 - Deterministic IDs: `den-route-<apiVersionId>`, `den-upstream-<apiVersionId>`, `den-app-<applicationId>`.
 
 ### 4.1 APISIX objects per published API version
@@ -143,6 +144,7 @@ Reconciler
   - Over HTTPS, the gateway presents its certificate for X-Road (`den-ssl-gateway-xroad`, `CN=<DEN_GATEWAY_CLIENT_NAME>.xroad`, which the operator registers in the Security Server) and verifies the Security Server's with `DEN_XROAD_SECURITY_SERVER_CA`.
   - Confused deputy: the member in the `serviceId` must be the entity's X-Road member, which the operator registers (`PUT /admin/entities/{id}/xroad-member`, `entity.xroad_member_set`, unique per entity). It is validated when the version is registered (400) and on every reconciler pass (fails closed). Changing the member reconciles the entity's `xroad` versions.
   - Without `DEN_XROAD_SECURITY_SERVER_URL` and `DEN_XROAD_CLIENT`, `xroad` versions stay in sync error, without a route.
+- **Types allowed (P-04, ADR-0029).** The node is the default channel. New versions may only use the types in the country's `features.upstreams` (`[node, xroad]` if omitted; `direct` is opt-in), and `xroad` only where the deployment has `DEN_XROAD_SECURITY_SERVER_URL` and `DEN_XROAD_CLIENT`. `GET /api/v1/upstream-types` returns them to the portal's form. Creating a version, replacing its OpenAPI (a draft edit or a published revision) and submitting it check the upstream and the sandbox upstream: another type is a 400 with `upstream_type_not_allowed` or `xroad_not_configured` on `upstream.type` / `sandboxUpstream.type`. The reconciler does not look at the list: a version whose type the country stops accepting keeps its route, and the version detail flags it (`disallowedUpstreamTypes`). A list with only `xroad` and no X-Road settings stops the API at startup.
 
 **Route** `den-route-<apiVersionId>`
 - `uri = /{entitySlug}/{apiSlug}/v{major}/*`, methods declared in the OpenAPI.

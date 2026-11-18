@@ -70,6 +70,17 @@ const uniqueBy =
 
 const months = z.number().int().min(1).max(120);
 
+/**
+ * How a provider's service reaches the gateway (SPEC.md §3.1): through the entity's kit node, a
+ * service in X-Road, or an HTTPS API called without a node. Same values as `upstream.type` in
+ * packages/contracts.
+ */
+export const UPSTREAM_TYPES = ['node', 'xroad', 'direct'] as const;
+export type UpstreamType = (typeof UPSTREAM_TYPES)[number];
+
+/** Without `features.upstreams`: the node, and X-Road where the deployment has its settings. */
+export const DEFAULT_UPSTREAMS: readonly UpstreamType[] = ['node', 'xroad'];
+
 export const countryConfigSchema = z.strictObject({
   country: z.strictObject({
     /** ISO 3166-1 alpha-2, upper case (XX for the example template). */
@@ -112,6 +123,16 @@ export const countryConfigSchema = z.strictObject({
      * provider verifies with the portal's JWKS and can keep as proof. Off by default.
      */
     gatewayAssertion: z.boolean().default(false),
+    /**
+     * Upstream types providers may register new versions with (P-04, ADR-0029). The node is the
+     * default channel; `xroad` is offered only where the deployment has the operator's Security
+     * Server (DEN_XROAD_*); `direct` (an HTTPS API called without a node) is opt-in per country.
+     */
+    upstreams: z
+      .array(z.enum(UPSTREAM_TYPES))
+      .min(1)
+      .superRefine(uniqueBy((type) => type, 'upstream type'))
+      .default(() => [...DEFAULT_UPSTREAMS]),
   }),
   /** Maximum subscription validity per API classification (SPEC.md §5). */
   subscriptionMaxValidityMonths: z.strictObject({

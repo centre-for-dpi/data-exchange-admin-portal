@@ -59,6 +59,10 @@ features:
     noIdInQuery: true # OpenAPI lint rejects identifiers in query strings.
   # The gateway signs each call to the provider (ADR-0024).
   gatewayAssertion: true
+  # Upstream types providers may register (ADR-0029): `node` (the entity's kit node, the default
+  # channel), `xroad` (offered only with the deployment's X-Road settings, DEN_XROAD_*) and
+  # `direct` (an HTTPS API called without a node, opt-in). Default: [node, xroad].
+  upstreams: [node, xroad]
 
 subscriptionMaxValidityMonths: # Per API classification.
   public: 24

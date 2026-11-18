@@ -84,6 +84,10 @@ export const FieldErrorKey = {
   XroadMemberMissing: 'xroad_member_missing',
   XroadWrongInstance: 'xroad_wrong_instance',
   XroadOtherMember: 'xroad_other_member',
+  /** The upstream type is not among those the deployment accepts (features.upstreams, P-04). */
+  UpstreamTypeNotAllowed: 'upstream_type_not_allowed',
+  /** An `xroad` upstream in a deployment without the operator's Security Server (P-04). */
+  XroadNotConfigured: 'xroad_not_configured',
   IncompatibleChange: 'incompatible_change',
   RetirementNotice: 'retirement_notice',
   ExportTooLarge: 'export_too_large',

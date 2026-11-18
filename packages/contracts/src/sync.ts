@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { upstreamTypeSchema } from './apis.js';
 
 /** Systems the portal reconciles (sync_state.system). */
 export const SYNC_SYSTEMS = ['apisix', 'keycloak', 'opa', 'wireguard', 'opensearch'] as const;
@@ -33,6 +34,21 @@ export const syncTargetSchema = z.object({
 });
 export type SyncTarget = z.infer<typeof syncTargetSchema>;
 
+/**
+ * A version still served with an upstream type the deployment no longer accepts for new versions
+ * (P-04): it keeps working until the operator decides.
+ */
+export const disallowedUpstreamSchema = z.object({
+  versionId: z.uuid(),
+  version: z.string(),
+  status: z.string(),
+  apiName: z.string(),
+  entityName: z.string(),
+  /** The types of its upstream and sandbox upstream that are no longer accepted. */
+  types: z.array(upstreamTypeSchema),
+});
+export type DisallowedUpstream = z.infer<typeof disallowedUpstreamSchema>;
+
 export const syncPageSchema = z.object({
   summary: z.array(
     z.object({
@@ -45,6 +61,8 @@ export const syncPageSchema = z.object({
   recentDrift: z.number().int(),
   items: z.array(syncTargetSchema),
   nextCursor: z.string().nullable(),
+  /** Versions not yet retired whose upstream type is no longer accepted (P-04). */
+  disallowedUpstreams: z.array(disallowedUpstreamSchema),
 });
 export type SyncPage = z.infer<typeof syncPageSchema>;
 

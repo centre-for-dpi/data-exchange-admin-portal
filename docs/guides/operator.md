@@ -290,6 +290,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 | Second factor for `entity_admin` and `api_publisher` | Only the platform roles (including `regulator` and `auditor`) and `data_steward` | ASVS level 2 requires it for all access. It is a configuration setting, but it changes how entities sign in |
 | Public catalog | Off (`features.publicCatalog`) | When on, anyone can see the APIs with a public classification, without the steward's contact details or the status of the nodes |
 | Signed gateway assertion | On (`features.gatewayAssertion`) | Each provider can verify it, and decide whether to require it |
+| Provider channels | The node and X-Road (`features.upstreams`); X-Road only with the operator's Security Server | Adding `direct` lets entities publish a public HTTPS API without a node: the entity must expose its API to the gateway and keep its own certificates (ADR-0029) |
 | Tests with screen readers and with users | The automated accessibility review passes on every screen | Recommended before production (NVDA, VoiceOver) |
 | Production TSA, CA and email | Development ones | Accredited TSA, HSM for the intermediate, and the operator's SMTP |
 
@@ -300,7 +301,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 - **How does the provider know a request really comes from the gateway?** Through the signed assertion (`X-DEN-Assertion`): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.
 - **How much traffic can it handle?** On the development machine, 200 requests per second with a p95 of 13 ms added by the gateway. The target, 500 per second, will be validated in a production-like environment. Capacity grows with more gateway nodes: each one counts limits on its own, and the policy gives it its share.
 - **Is the portal available in English?** Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen app are bilingual too.
-- **Does an entity have to open inbound ports?** Not if it uses the kit: the node opens the tunnel outbound (UDP 51820). With an existing API, the entity must allow the gateway to reach it.
+- **Does an entity have to open inbound ports?** No: every provider comes in through its node, which opens the tunnel outbound (UDP 51820), or through X-Road. Only if the country enables public APIs without a node (`direct`, ADR-0029) must that entity allow the gateway to reach its API.
 - **Can it be integrated with X-Road?** Yes: the gateway can use an operator's Security Server as an X-Road client (`ARCHITECTURE.md §10`).
 - **Who approves access to sensitive data?** The data steward of the entity that owns the data and, in addition, the regulator.
 - **How do you prove the audit log was not altered?** With the console's integrity check and with the daily anchor the regulator receives by email, sealed by an independent TSA.

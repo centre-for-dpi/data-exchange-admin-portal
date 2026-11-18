@@ -660,7 +660,7 @@ details.faq[open] summary { color: var(--gov); }
         <article class="comp d">
           <div><h4>WireGuard hub</h4><span class="tech">51820/udp</span></div>
           <p>The central end of the encrypted tunnels that the <b>kit's nodes</b> open from each entity's network, from the inside out: the entity opens no inbound ports. A node cannot reach other nodes or the platform.</p>
-          <dl><dt>If down</dt><dd><span class="tag bad">node APIs go down</span>Existing APIs keep working.</dd><dt>Stores</dt><dd>The latest state of the tunnels.</dd></dl>
+          <dl><dt>If down</dt><dd><span class="tag bad">node APIs go down</span>X-Road services keep working.</dd><dt>Stores</dt><dd>The latest state of the tunnels.</dd></dl>
         </article>
         <article class="comp d">
           <div><h4>Fluent Bit · transparency</h4><span class="tech">from the gateway to the portal</span></div>
@@ -1025,6 +1025,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td class="wrap">Second factor for <code>entity_admin</code> and <code>api_publisher</code></td><td class="wrap">Only the platform roles, <code>regulator</code>, <code>auditor</code> and <code>data_steward</code></td><td class="wrap">ASVS level 2 requires it for all access. It is a configuration setting, but it changes how entities sign in</td></tr>
             <tr><td class="wrap">Public catalog</td><td class="wrap">Off (<code>features.publicCatalog</code>)</td><td class="wrap">When on, anyone can see the APIs with a public classification, without the steward's contact details or the status of the nodes</td></tr>
             <tr><td class="wrap">Signed gateway assertion</td><td class="wrap">On (<code>features.gatewayAssertion</code>)</td><td class="wrap">Each provider can verify it, and decide whether to require it</td></tr>
+            <tr><td class="wrap">Provider channels</td><td class="wrap">The node and X-Road (<code>features.upstreams</code>); X-Road only with the operator's Security Server</td><td class="wrap">Adding <code>direct</code> lets entities publish a public HTTPS API without a node: the entity must expose its API to the gateway and keep its own certificates (ADR-0029)</td></tr>
             <tr><td class="wrap">Tests with screen readers and with users</td><td class="wrap">The automated accessibility review passes on every screen</td><td class="wrap">Recommended before production (NVDA, VoiceOver)</td></tr>
             <tr><td class="wrap">Production TSA, CA and email</td><td class="wrap">Development ones</td><td class="wrap">Accredited TSA, HSM for the intermediate, and the operator's SMTP</td></tr>
           </tbody>
@@ -1040,7 +1041,7 @@ sudo ./install.sh</code></pre></div>
         <details class="faq"><summary>How does the provider know a request really comes from the gateway?</summary><p>Through the signed assertion (<code>X-DEN-Assertion</code>): one JWS per call, bound to the method, the URI, the body and that provider, which it verifies with the portal's public keys. An assertion the client tries to slip in is discarded. The entity guide has verification examples in Node.js and Python.</p></details>
         <details class="faq"><summary>How much traffic can it handle?</summary><p>On the development machine, 200 requests per second with a p95 of 13 ms added by the gateway. The target, 500 per second, will be validated in a production-like environment. Capacity grows with more gateway nodes: each one counts limits on its own, and the policy gives it its share.</p></details>
         <details class="faq"><summary>Is the portal available in English?</summary><p>Yes, fully, in addition to Spanish, which is the default language. The emails and the citizen app are bilingual too.</p></details>
-        <details class="faq"><summary>Does an entity have to open inbound ports?</summary><p>Not if it uses the kit: the node opens the tunnel outbound (UDP 51820). With an existing API, the entity must allow the gateway to reach it.</p></details>
+        <details class="faq"><summary>Does an entity have to open inbound ports?</summary><p>No: every provider comes in through its node, which opens the tunnel outbound (UDP 51820), or through X-Road. Only if the country enables public APIs without a node (<code>direct</code>) must that entity allow the gateway to reach its API.</p></details>
         <details class="faq"><summary>Can it be integrated with X-Road?</summary><p>Yes: the gateway can use an operator's Security Server as an X-Road client.</p></details>
         <details class="faq"><summary>Who approves access to sensitive data?</summary><p>The data steward of the entity that owns the data and, in addition, the regulator.</p></details>
         <details class="faq"><summary>How do you prove the audit log was not altered?</summary><p>With the console's integrity check and with the daily anchor the regulator receives by email, sealed by an independent TSA.</p></details>

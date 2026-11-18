@@ -119,6 +119,52 @@ export default async function SyncConsolePage({ params, searchParams }: PageProp
         </div>
       </Section>
 
+      {page.disallowedUpstreams.length > 0 ? (
+        // P-04: versions still served on a channel the country no longer accepts.
+        <Section
+          title={t('syncConsole.disallowedTitle')}
+          description={t('syncConsole.disallowedLead')}
+        >
+          <div className="table-wrap" data-testid="disallowed-upstreams">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('syncConsole.disallowedApi')}</th>
+                  <th scope="col">{t('syncConsole.disallowedEntity')}</th>
+                  <th scope="col">{t('syncConsole.status')}</th>
+                  <th scope="col">{t('syncConsole.disallowedTypes')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.disallowedUpstreams.map((row) => (
+                  <tr key={row.versionId}>
+                    <td>
+                      <Link href={`/operator/reviews/${row.versionId}`} className="link">
+                        {row.apiName} {row.version}
+                      </Link>
+                    </td>
+                    <td className="text-sm">{row.entityName}</td>
+                    <td>
+                      <Badge tone="neutral">
+                        {t.has(`versionStatus.${row.status}`)
+                          ? t(`versionStatus.${row.status}`)
+                          : row.status}
+                      </Badge>
+                    </td>
+                    <td className="text-sm">
+                      {format.list(
+                        row.types.map((type) => t(`version.detail.upstreamTypeNames.${type}`)),
+                        { type: 'conjunction' },
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      ) : null}
+
       <form method="get" className="usage-filters" aria-label={t('syncConsole.filters')}>
         <UsageFilter id="sync-status" label={t('syncConsole.status')}>
           <select
