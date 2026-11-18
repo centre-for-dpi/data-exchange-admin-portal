@@ -886,3 +886,21 @@ Objetivo: que el ciudadano vea en la Carpeta Ciudadana Digital quién consultó 
 
 **Cierre M6:** despliegue en un entorno tipo producción del operador con las pruebas de M6-03 y M6-04 en verde.
   - _Estado (2026-11-17):_ M6-01, M6-02, M6-04 y M6-06 a M6-10 hechas. M6-11 también. Quedan abiertas M6-03 (la prueba de carga, en el entorno tipo producción) y M6-05 (instalar el chart), que dependen de ese entorno.
+
+---
+
+## P — Pilot follow-ups (found in the 2026-11-18 rehearsal)
+
+Stories that came out of rehearsing the full onboarding by hand on the demo network, with accounts created from scratch.
+
+- [x] **P-01 — Platform roles from the server's command line**
+  - No screen grants platform roles, so a real operator could only use the seed's demo personas.
+  - `./install.sh platform-role grant|revoke <email> <role> [--reason]` and `list` (in other deployments, `node dist/admin/platform-roles-cli.js` in the API container). The person registers, verifies the address and signs in once first.
+  - Audited in the same transaction as the command-line actor (`platform_role.granted`, new `platform_role.revoked`). Refuses an address with no account, a disabled account, a role that is not a platform role, and revoking the last `platform_admin`.
+  - _Not done:_ a console screen to grant and revoke platform roles (with MFA and audit); the command covers the pilot until then.
+- [ ] **P-02 — Warn when a node serves a contract other than the published one**
+  - Today the node sends the SHA-256 of each service's OpenAPI in every heartbeat (`services[].openapiSha256`) and the portal stores it, but nothing compares it with the published version's `openapiSha256`. If an entity changes its API without publishing a new version, nobody notices.
+  - The portal compares, per published version with a `node` upstream, the hash the node reports for the service on that `servicePath` with the version's hash, and shows the result where the entity and the operator look: the version sheet (publisher, reviewer), the node page (entity admin) and the operator's sync console.
+  - States: matches · differs (warning, with both hashes and since when) · not reported (the service has no OpenAPI on the node: the node's logs show `(unknown)` routes; a hint to add it).
+  - On a change from "matches" to "differs", a notification to the entity's `api_publisher` and `entity_admin`, and an audit event. It never blocks traffic: the gateway keeps routing by the published contract.
+  - Tests: comparison per service path, the three states, the notification on the transition only, authorization of each place it is shown (right role yes, others 403, another entity 404).
