@@ -58,10 +58,13 @@ mtls_request() {
   for h in "$@"; do req+="$h$crlf"; done
   [[ -n $data ]] && req+="Content-Type: application/x-www-form-urlencoded${crlf}Content-Length: ${#data}${crlf}"
   req+="$crlf$data"
-  local port=443
+  local port=443 name=${host%%:*}
   [[ $host == *:* ]] && port=${host##*:}
-  out=$(printf '%s' "$req" | MSYS_NO_PATHCONV=1 openssl s_client -quiet -connect "${host%%:*}:$port" \
-    -servername "${host%%:*}" -cert "$cert" -key "$key" -CAfile den-network-ca.pem \
+  # Unlike curl, s_client checks the chain but not the name unless asked: check it here.
+  local verify_name=(-verify_hostname "$name")
+  [[ $name =~ ^[0-9.]+$ ]] && verify_name=(-verify_ip "$name")
+  out=$(printf '%s' "$req" | MSYS_NO_PATHCONV=1 openssl s_client -quiet -connect "$name:$port" \
+    -servername "$name" "${verify_name[@]}" -cert "$cert" -key "$key" -CAfile den-network-ca.pem \
     -verify_return_error 2>/dev/null) || true
   local status
   status=$(head -n 1 <<<"$out" | awk '{print $2}')
