@@ -54,6 +54,7 @@ Las contribuciones son bienvenidas: lee [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - [docs/es/INSTALL.md](INSTALL.md) — **instalación en un servidor** con `sudo ./install.sh` y requisitos del VPS
 - [docs/es/guides/operator.md](guides/operator.md) — la plataforma explicada para el operador y el regulador (versión para proyectar: `operator.html`)
 - [docs/es/guides/entities.md](guides/entities.md) — qué designa, dispone y hace cada entidad participante (versión para proyectar: `entities.html`). La guía de las proveedoras (nodo, instalación y publicación) está en el repositorio del kit: `docs/es/guides/providers.md`
+- [docs/es/guides/walkthrough.md](guides/walkthrough.md) — el recorrido completo, paso a paso: cuentas, alta, nodo, publicación, acceso y primera consulta, tal como lo hacen las personas
 - [docs/es/DEPLOYMENT.md](DEPLOYMENT.md) — despliegue de cada componente (desarrollo y piloto)
 - [docs/es/OPERATIONS.md](OPERATIONS.md) — puesta en marcha, rutina de operación, respaldos y problemas frecuentes
 - [docs/es/AUTHZ.md](AUTHZ.md) — matriz de autorización (generada)

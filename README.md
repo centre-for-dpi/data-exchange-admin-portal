@@ -54,6 +54,7 @@ Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) before openin
 - [docs/INSTALL.md](docs/INSTALL.md) — **installing on a server** with `sudo ./install.sh`, and VPS requirements
 - [docs/guides/operator.md](docs/guides/operator.md) — the platform explained for the operator and the regulator (presentation version: `operator.html`)
 - [docs/guides/entities.md](docs/guides/entities.md) — what each participating entity designates, provides and does (presentation version: `entities.html`). The guide for providers (node, installation and publication) is in the kit repository: `docs/guides/providers.md`
+- [docs/guides/walkthrough.md](docs/guides/walkthrough.md) — the full walkthrough, step by step: accounts, onboarding, node, publication, access and the first lookup, as the people involved do it
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deployment of each component (development and pilot)
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — go-live, operating routine, backups and common problems
 - [docs/AUTHZ.md](docs/AUTHZ.md) — authorization matrix (generated)
