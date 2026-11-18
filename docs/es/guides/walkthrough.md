@@ -281,7 +281,7 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.crt --key <CLIENT_ID>.key \
 | Invitaciones vacía | El correo no es idéntico al de la solicitud, o no está verificado | Registra la cuenta con el correo exacto |
 | "No pudimos completar la operación" al subir el documento del alta | (Operador) el API no puede escribir en su carpeta de documentos | En el `.env` del portal, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, y recrea el contenedor del API (`docker compose ... up -d --no-build --no-deps api`) |
 | No aparece un rol de plataforma | La persona no ha entrado nunca al portal | Que entre una vez y repetir `platform-role grant` |
-| No se puede aprobar la API (409) | Las validaciones automáticas fallaron | Mira la ficha de la versión; corrige y **Repetir validaciones** |
+| **Aprobar** está deshabilitado, o "La versión no se aprobó" | Las validaciones automáticas no han pasado (siguen en curso o fallaron) | La ficha de la versión dice qué significa cada falla y qué intentar; corrige y **Repetir validaciones** |
 | Validación con **504** (tiempo agotado) | El gateway no llega al nodo por el túnel | En el nodo: `sudo /opt/den-node/install.sh status` (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: `sudo /opt/den-node/install.sh stop` y `start` |
 | `subject name is expected to be in the format /type0=value0…` | Git Bash convirtió `/CN=…` en una ruta | Usa `./entity-check.sh csr`, o borra la clave a medio crear y repite con `MSYS_NO_PATHCONV=1` |
 | El portal rechaza el CSR | El `CN` no es el Client ID, o la clave no es ECDSA P-256/P-384 ni RSA 2048–4096 | Genera otro con el Client ID exacto |
@@ -297,5 +297,5 @@ Encontrado en el ensayo y anotado en el backlog del portal (sección P):
 - **P-04** Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.
 - **P-05** Que la pantalla de la aplicación muestre un comando de CSR que funcione en Linux, Git Bash y PowerShell (o remita a `entity-check.sh`).
 - **P-06** El `.env` del despliegue manda los documentos a una carpeta donde el API no puede escribir (el arreglo provisional está en la tabla de problemas).
-- **P-07** Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.
+- **P-07** ✔ Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.
 - **P-08** Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.

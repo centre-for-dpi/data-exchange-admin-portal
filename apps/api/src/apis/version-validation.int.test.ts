@@ -218,14 +218,32 @@ describe('validations when a version goes to review (M4-06)', () => {
     const { apiId, versionId } = await submitted();
     const approve = () =>
       request('POST', `/review/api-versions/${versionId}/approve`, 'ana.operadora', {});
-    // Still running.
-    expect((await approve()).statusCode).toBe(409);
+    // Still running: a 409 that says why (P-07), not a generic conflict.
+    const pending = await approve();
+    expect(pending.statusCode).toBe(409);
+    expect(pending.headers['content-type']).toContain('application/problem+json');
+    expect(pending.json()).toMatchObject({
+      code: 'conflict',
+      errors: [{ path: '', key: 'validations_pending' }],
+    });
 
     const validation = app.get(VersionValidationService);
     await validation.run(versionId, fixed('passed', 'failed'));
     const failed = await approve();
     expect(failed.statusCode).toBe(409);
+    expect(failed.json()).toMatchObject({
+      code: 'conflict',
+      errors: [{ path: '', key: 'validations_failed' }],
+    });
     expect(failed.json<{ detail: string }>().detail).toContain('failed');
+    // Refused: still in review, and no approval recorded.
+    const still = await prisma.apiVersion.findUniqueOrThrow({ where: { id: versionId } });
+    expect(still.status).toBe('in_review');
+    expect(
+      await prisma.auditEvent.count({
+        where: { targetId: versionId, action: { startsWith: 'api_version.approved' } },
+      }),
+    ).toBe(0);
     const audited = await prisma.auditEvent.findFirstOrThrow({
       where: { targetId: versionId, action: 'api_version.validated' },
     });

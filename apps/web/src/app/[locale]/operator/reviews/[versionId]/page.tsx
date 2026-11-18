@@ -11,6 +11,7 @@ import { Notice } from '../../../../../components/ui/notice';
 import { Card, EmptyState, Page, PageHeader, Section } from '../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../lib/api';
 import { localize } from '../../../../../lib/localize';
+import { approvalBlock } from '../../../../../lib/validation-hints';
 import { getViewer } from '../../../../../lib/viewer';
 
 interface PageProps {
@@ -113,7 +114,10 @@ export default async function ReviewPage({ params }: PageProps) {
           </Notice>
         ) : canDecide ? (
           <div className="card p-6 md:p-8">
-            <DecisionForms versionId={versionId} />
+            <DecisionForms
+              versionId={versionId}
+              approvalBlock={approvalBlock(review.version.validation)}
+            />
           </div>
         ) : (
           <EmptyState>{t('operator.review.readOnly')}</EmptyState>

@@ -282,7 +282,7 @@ curl -sS --cacert network-ca.pem --cert <CLIENT_ID>.crt --key <CLIENT_ID>.key \
 | Invitations is empty | The email is not identical to the request's, or not verified | Register the account with the exact email |
 | "We could not complete the operation" uploading the onboarding document | (Operator) the API cannot write to its documents folder | In the portal's `.env`, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, and recreate the API container (`docker compose ... up -d --no-build --no-deps api`) |
 | A platform role does not show | The person never signed in | Have them sign in once and run `platform-role grant` again |
-| The API cannot be approved (409) | The automatic validations failed | See the version sheet; fix it and **Run validations again** |
+| **Approve** is disabled, or "The version was not approved" | The automatic validations have not passed (still running, or failed) | The version sheet says what each failure means and what to try; fix it and **Run validations again** |
 | Validation with **504** (timeout) | The gateway does not reach the node through the tunnel | On the node: `sudo /opt/den-node/install.sh status` (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: `sudo /opt/den-node/install.sh stop` and `start` |
 | `subject name is expected to be in the format /type0=value0…` | Git Bash turned `/CN=…` into a path | Use `./entity-check.sh csr`, or delete the half-made key and repeat with `MSYS_NO_PATHCONV=1` |
 | The portal rejects the CSR | The `CN` is not the Client ID, or the key is not ECDSA P-256/P-384 or RSA 2048–4096 | Make another one with the exact Client ID |
@@ -298,5 +298,5 @@ Found in the rehearsal and recorded in the portal's backlog (section P):
 - **P-04** Offering only the service types the country allows (the node and X-Road), with clear names.
 - **P-05** The application page showing a CSR command that works on Linux, Git Bash and PowerShell (or pointing to `entity-check.sh`).
 - **P-06** The deployment's `.env` sends documents to a folder the API cannot write (the workaround is in the table above).
-- **P-07** Not letting a version be approved with failed validations, and explaining what to do with each failure.
+- **P-07** ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.
 - **P-08** Disabling the pilot's demo accounts and making the verification link last longer.

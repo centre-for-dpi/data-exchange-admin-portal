@@ -241,6 +241,86 @@
         "failed": "failed",
         "error": "error",
         "skipped": "skipped"
+      },
+      "whatToTry": "What to try:",
+      "hints": {
+        "health": {
+          "rootAnswered": {
+            "meaning": "The service answered HTTP {http} at its root. That is fine: any answer that is not a 5xx proves the gateway reaches the service, and many services have nothing at their root."
+          },
+          "unreachableNode": {
+            "meaning": "HTTP {http} comes from the gateway, not from the service: it could not reach the entity's node, or the node did not answer in time. Usually the node is off, its tunnel is down, or the service is not running on the node.",
+            "next": "Check the node's status and last heartbeat (above, and in My entity → Kit nodes), that its tunnel is up on the entity's server, and that the service runs on the node at this service path. Then run the validations again."
+          },
+          "unreachableDirect": {
+            "meaning": "HTTP {http} comes from the gateway, not from the service: it could not reach the service's URL, or the service did not answer in time (DNS, firewall or TLS certificate).",
+            "next": "Check that the URL answers from outside the entity's network, that its firewall lets the gateway in, and its TLS certificate. Then run the validations again."
+          },
+          "unreachableXroad": {
+            "meaning": "HTTP {http} comes from the gateway, not from the service: it got no answer through the X-Road Security Server.",
+            "next": "Check the operator's Security Server, and that the service is registered in X-Road and allowed for the network's client. Then run the validations again."
+          },
+          "serviceError": {
+            "meaning": "The gateway reached the service, but the service answered HTTP {http} at its root: it is running and failing.",
+            "next": "Check the service's logs. Its root only needs to answer without a 5xx: a 404 is fine. Then run the validations again."
+          },
+          "timeout": {
+            "meaning": "The gateway did not answer within 15 seconds: the service is very slow or the connection to it hangs.",
+            "next": "Check that the service (or the node and its tunnel) answers quickly. Then run the validations again."
+          },
+          "gatewayDown": {
+            "meaning": "The portal could not reach the gateway. This is a problem of the platform, not of the service.",
+            "next": "The operator checks that the gateway (APISIX) is running and reachable from the portal's API. Then run the validations again."
+          },
+          "noRoute": {
+            "meaning": "The gateway did not receive the verification route of this version in time.",
+            "next": "The operator looks for errors on this version in the gateway sync console. Then run the validations again."
+          },
+          "notConfigured": {
+            "meaning": "This deployment has no validation token (DEN_VALIDATION_TOKEN), so the healthcheck cannot run.",
+            "next": "The operator sets it in the deployment and restarts the API. Then run the validations again."
+          },
+          "unknown": {
+            "meaning": "The healthcheck failed for a reason the portal does not recognize.",
+            "next": "Run the validations again. If it keeps failing, the operator checks the API's logs."
+          }
+        },
+        "contract": {
+          "mismatch": {
+            "meaning": "The sandbox answered differently from what the OpenAPI declares in {count, plural, one {this operation} other {these operations}}: {operations}.",
+            "next": "Fix the sandbox service so that it answers as the OpenAPI declares. If the document is the one that is wrong, the operator requests changes and the provider uploads a corrected one. Then run the validations again."
+          },
+          "runnerDown": {
+            "meaning": "The contract-test service (contract-runner) did not answer. This is a problem of the platform, not of the service.",
+            "next": "The operator checks the contract-runner service. Then run the validations again."
+          },
+          "timeout": {
+            "meaning": "The contract test took longer than allowed: the sandbox answers too slowly or not at all.",
+            "next": "Check that the sandbox (its node and tunnel, or its URL) answers quickly. Then run the validations again."
+          },
+          "couldNotStart": {
+            "meaning": "Schemathesis could not start testing: usually the sandbox is not reachable through the gateway, or requests cannot be generated from the OpenAPI.",
+            "next": "Check the sandbox (its node and tunnel, or its URL) and the operations of the OpenAPI document. Then run the validations again."
+          },
+          "noOperations": {
+            "meaning": "The OpenAPI declares no operation the contract test could call.",
+            "next": "Check the document's paths and operations. Then run the validations again."
+          },
+          "noSandbox": {
+            "meaning": "The version declares no sandbox, so the contract test did not run. This does not block the approval."
+          },
+          "runnerNotConfigured": {
+            "meaning": "This deployment has no contract-test service, so the test did not run. This does not block the approval."
+          },
+          "unknown": {
+            "meaning": "The contract test failed for a reason the portal does not recognize.",
+            "next": "Run the validations again. If it keeps failing, the operator checks the API's logs."
+          }
+        }
+      },
+      "operation": {
+        "serverError": "the sandbox answered a server error",
+        "mismatch": "the answer does not match the OpenAPI (status code, content type or response schema)"
       }
     }
   },
@@ -271,7 +351,11 @@
       "approve": "Approve",
       "changesComment": "What must change",
       "requestChanges": "Request changes",
-      "decided": "This version is no longer in review."
+      "decided": "This version is no longer in review.",
+      "approveBlocked": {
+        "pending": "You can approve once the automatic validations have passed. They are still running: reload the page in a moment.",
+        "failed": "You cannot approve: the automatic validations failed (above, what each failure means). The provider fixes the service and runs them again, or you request changes."
+      }
     },
     "entitiesTitle": "Entity onboarding to review",
     "entitiesEmpty": "There are no onboarding requests to review.",
@@ -1546,7 +1630,9 @@
       "explain_revocation": "Explain why access is revoked (10+ characters).",
       "reference_legal_order": "Reference the legal order.",
       "file_name_format": "A file name without path separators or control characters.",
-      "too_many_open_requests": "You already have {max} open requests: wait for a decision before creating another."
+      "too_many_open_requests": "You already have {max} open requests: wait for a decision before creating another.",
+      "validations_pending": "The version was not approved: the automatic validations have not finished yet. Wait a moment and reload the page.",
+      "validations_failed": "The version was not approved: its automatic validations failed. The provider must fix the service and run them again."
     },
     "codes": {
       "validation_failed": "Check the data you sent.",

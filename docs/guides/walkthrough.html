@@ -582,7 +582,7 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_I
 <tr><td>Invitations is empty</td><td class="wrap">The email is not identical to the request's, or not verified</td><td class="wrap">Register the account with the exact email</td></tr>
 <tr><td>"We could not complete the operation" uploading the onboarding document</td><td class="wrap">(Operator) the API cannot write to its documents folder</td><td class="wrap">In the portal's <code>.env</code>, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, and recreate the API container (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
 <tr><td>A platform role does not show</td><td class="wrap">The person never signed in</td><td class="wrap">Have them sign in once and run <code>platform-role grant</code> again</td></tr>
-<tr><td>The API cannot be approved (409)</td><td class="wrap">The automatic validations failed</td><td class="wrap">See the version sheet; fix it and <b>Run validations again</b></td></tr>
+<tr><td><b>Approve</b> is disabled, or "The version was not approved"</td><td class="wrap">The automatic validations have not passed (still running, or failed)</td><td class="wrap">The version sheet says what each failure means and what to try; fix it and <b>Run validations again</b></td></tr>
 <tr><td>Validation with <b>504</b> (timeout)</td><td class="wrap">The gateway does not reach the node through the tunnel</td><td class="wrap">On the node: <code>sudo /opt/den-node/install.sh status</code> (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: <code>sudo /opt/den-node/install.sh stop</code> and <code>start</code></td></tr>
 <tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash turned <code>/CN=…</code> into a path</td><td class="wrap">Use <code>./entity-check.sh csr</code>, or delete the half-made key and repeat with <code>MSYS_NO_PATHCONV=1</code></td></tr>
 <tr><td>The portal rejects the CSR</td><td class="wrap">The <code>CN</code> is not the Client ID, or the key is not ECDSA P-256/P-384 or RSA 2048–4096</td><td class="wrap">Make another one with the exact Client ID</td></tr>
@@ -600,7 +600,7 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_I
 <li><b>P-04</b> Offering only the service types the country allows (the node and X-Road), with clear names.</li>
 <li><b>P-05</b> The application page showing a CSR command that works on Linux, Git Bash and PowerShell (or pointing to <code>entity-check.sh</code>).</li>
 <li><b>P-06</b> The deployment's <code>.env</code> sends documents to a folder the API cannot write (the workaround is in the table above).</li>
-<li><b>P-07</b> Not letting a version be approved with failed validations, and explaining what to do with each failure.</li>
+<li><b>P-07</b> ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.</li>
 <li><b>P-08</b> Disabling the pilot's demo accounts and making the verification link last longer.</li>
 </ul>
     </section>

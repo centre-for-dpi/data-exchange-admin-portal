@@ -1,5 +1,11 @@
-import { type ApiVersionDetail, xroadServicePath } from '@den/contracts';
+import { type ApiVersionDetail, type VersionValidation, xroadServicePath } from '@den/contracts';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import {
+  contractHint,
+  failedOperations,
+  healthcheckHint,
+  operationHint,
+} from '../../lib/validation-hints';
 import { Badge, StatusBadge } from '../ui/badge';
 import { Notice } from '../ui/notice';
 import { Section } from '../ui/page';
@@ -13,6 +19,36 @@ import { dataSubjectLabel } from './data-subject';
 /** Badge tone of the validations: running is pending, failed is rejected. */
 const validationTone = (status: string): string =>
   status === 'passed' ? 'approved' : status === 'failed' ? 'rejected' : 'pending';
+
+type ContractOperation = NonNullable<VersionValidation['contract']>['operations'][number];
+
+/** The Schemathesis check codes and the status received, for whoever digs further. */
+const operationDetails = (op: ContractOperation): string =>
+  [...op.codes, ...(op.receivedStatus ? [`HTTP ${op.receivedStatus}`] : [])].join(', ');
+
+/** What a validation result means and, for a failure, what to try (P-07). */
+function ValidationHint({
+  failed,
+  meaning,
+  next,
+  whatToTry,
+}: {
+  failed: boolean;
+  meaning: string;
+  next?: string;
+  whatToTry: string;
+}) {
+  return (
+    <Notice tone={failed ? 'danger' : 'info'} className="space-y-1">
+      <p>{meaning}</p>
+      {next ? (
+        <p>
+          <strong>{whatToTry}</strong> {next}
+        </p>
+      ) : null}
+    </Notice>
+  );
+}
 
 export async function VersionSheet({
   version,
@@ -35,6 +71,13 @@ export async function VersionSheet({
 
   const yesNo = (value: boolean, tone: 'info' | 'warning') =>
     value ? <Badge tone={tone}>{t('version.detail.yes')}</Badge> : t('version.detail.no');
+
+  // What each validation result means and what to try (P-07).
+  const health = version.validation?.healthcheck ?? null;
+  const contract = version.validation?.contract ?? null;
+  const healthHint = health ? healthcheckHint(health, version.upstream.type) : null;
+  const contractKey = contract ? contractHint(contract) : null;
+  const hintNext = (key: string): string | undefined => (t.has(key) ? t(key) : undefined);
 
   return (
     <>
@@ -79,33 +122,62 @@ export async function VersionSheet({
                 {t(`version.validation.status.${version.validation.status}`)}
               </StatusBadge>
             </p>
-            {version.validation.healthcheck ? (
-              <p className="text-sm">
-                {t('version.validation.healthcheck', {
-                  status: t(`version.validation.check.${version.validation.healthcheck.status}`),
-                  http: version.validation.healthcheck.httpStatus ?? '—',
-                  ms: version.validation.healthcheck.latencyMs ?? '—',
-                })}
-              </p>
+            {health ? (
+              <div className="space-y-2 text-sm" data-testid="validation-healthcheck">
+                <p>
+                  {t('version.validation.healthcheck', {
+                    status: t(`version.validation.check.${health.status}`),
+                    http: health.httpStatus ?? '—',
+                    ms: health.latencyMs ?? '—',
+                  })}
+                </p>
+                {healthHint ? (
+                  <ValidationHint
+                    failed={health.status === 'failed'}
+                    meaning={t(`version.validation.hints.health.${healthHint}.meaning`, {
+                      http: health.httpStatus ?? '—',
+                    })}
+                    next={hintNext(`version.validation.hints.health.${healthHint}.next`)}
+                    whatToTry={t('version.validation.whatToTry')}
+                  />
+                ) : null}
+              </div>
             ) : null}
-            {version.validation.contract ? (
-              <div className="space-y-2 text-sm">
+            {contract ? (
+              <div className="space-y-2 text-sm" data-testid="validation-contract">
                 <p>
                   {t('version.validation.contract', {
-                    status: t(`version.validation.check.${version.validation.contract.status}`),
+                    status: t(`version.validation.check.${contract.status}`),
                   })}
-                  {version.validation.contract.reason
-                    ? ` (${version.validation.contract.reason})`
-                    : ''}
                 </p>
-                {version.validation.contract.operations.length ? (
+                {contractKey ? (
+                  <ValidationHint
+                    failed={contract.status === 'failed' || contract.status === 'error'}
+                    meaning={t(`version.validation.hints.contract.${contractKey}.meaning`, {
+                      count: failedOperations(contract).length,
+                      operations: failedOperations(contract).join(', '),
+                    })}
+                    next={hintNext(`version.validation.hints.contract.${contractKey}.next`)}
+                    whatToTry={t('version.validation.whatToTry')}
+                  />
+                ) : null}
+                {contract.operations.length ? (
                   <ul className="list-disc space-y-1 pl-5">
-                    {version.validation.contract.operations.map((op) => (
+                    {contract.operations.map((op) => (
                       <li key={op.operation}>
                         <span className="font-mono">{op.operation}</span>:{' '}
-                        {op.passed
-                          ? t('version.validation.check.passed')
-                          : `${op.codes.join(', ')}${op.receivedStatus ? ` (HTTP ${op.receivedStatus})` : ''}`}
+                        {op.passed ? (
+                          t('version.validation.check.passed')
+                        ) : (
+                          <>
+                            {t(`version.validation.operation.${operationHint(op)}`)}
+                            {operationDetails(op) ? (
+                              <span className="font-mono text-muted-foreground">
+                                {` (${operationDetails(op)})`}
+                              </span>
+                            ) : null}
+                          </>
+                        )}
                       </li>
                     ))}
                   </ul>

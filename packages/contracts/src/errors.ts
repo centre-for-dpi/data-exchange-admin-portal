@@ -92,6 +92,10 @@ export const FieldErrorKey = {
   /** The antivirus found something in an uploaded document (M6-08). */
   DocumentInfected: 'document_infected',
   TooManyOpenRequests: 'too_many_open_requests',
+  /** Approving a version whose automatic validations are still running (M4-06, P-07). */
+  ValidationsPending: 'validations_pending',
+  /** Approving a version whose automatic validations failed (M4-06, P-07). */
+  ValidationsFailed: 'validations_failed',
 } as const;
 
 export type FieldErrorKey = (typeof FieldErrorKey)[keyof typeof FieldErrorKey];

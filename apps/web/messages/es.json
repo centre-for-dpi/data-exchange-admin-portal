@@ -241,6 +241,86 @@
         "failed": "fallida",
         "error": "error",
         "skipped": "omitida"
+      },
+      "whatToTry": "Qué intentar:",
+      "hints": {
+        "health": {
+          "rootAnswered": {
+            "meaning": "El servicio respondió HTTP {http} en su raíz. Está bien: cualquier respuesta que no sea 5xx prueba que el gateway llega al servicio, y muchos servicios no tienen nada en su raíz."
+          },
+          "unreachableNode": {
+            "meaning": "El HTTP {http} lo da el gateway, no el servicio: no pudo llegar al nodo de la entidad, o el nodo no respondió a tiempo. Casi siempre el nodo está apagado, su túnel caído o el servicio no corre en el nodo.",
+            "next": "Revisa el estado y el último heartbeat del nodo (arriba, y en Mi entidad → Nodos del kit), que su túnel esté arriba en el servidor de la entidad y que el servicio corra en el nodo en esta ruta. Luego repite las validaciones."
+          },
+          "unreachableDirect": {
+            "meaning": "El HTTP {http} lo da el gateway, no el servicio: no pudo llegar a la URL del servicio, o el servicio no respondió a tiempo (DNS, firewall o certificado TLS).",
+            "next": "Revisa que la URL responda desde fuera de la red de la entidad, que su firewall deje entrar al gateway y su certificado TLS. Luego repite las validaciones."
+          },
+          "unreachableXroad": {
+            "meaning": "El HTTP {http} lo da el gateway, no el servicio: no obtuvo respuesta a través del Security Server de X-Road.",
+            "next": "Revisa el Security Server del operador, y que el servicio esté registrado en X-Road y autorizado para el cliente de la red. Luego repite las validaciones."
+          },
+          "serviceError": {
+            "meaning": "El gateway llegó al servicio, pero el servicio respondió HTTP {http} en su raíz: está corriendo y falla.",
+            "next": "Revisa los logs del servicio. Su raíz solo tiene que responder sin un 5xx: un 404 está bien. Luego repite las validaciones."
+          },
+          "timeout": {
+            "meaning": "El gateway no respondió en 15 segundos: el servicio es muy lento o la conexión con él se queda colgada.",
+            "next": "Revisa que el servicio (o el nodo y su túnel) responda rápido. Luego repite las validaciones."
+          },
+          "gatewayDown": {
+            "meaning": "El portal no pudo llegar al gateway. Es un problema de la plataforma, no del servicio.",
+            "next": "El operador revisa que el gateway (APISIX) esté corriendo y que el API del portal llegue a él. Luego repite las validaciones."
+          },
+          "noRoute": {
+            "meaning": "El gateway no recibió a tiempo la ruta de verificación de esta versión.",
+            "next": "El operador busca errores de esta versión en la consola de sincronización del gateway. Luego repite las validaciones."
+          },
+          "notConfigured": {
+            "meaning": "Este despliegue no tiene token de validación (DEN_VALIDATION_TOKEN), así que el healthcheck no puede correr.",
+            "next": "El operador lo configura en el despliegue y reinicia el API. Luego repite las validaciones."
+          },
+          "unknown": {
+            "meaning": "El healthcheck falló por una razón que el portal no reconoce.",
+            "next": "Repite las validaciones. Si sigue fallando, el operador revisa los logs del API."
+          }
+        },
+        "contract": {
+          "mismatch": {
+            "meaning": "El sandbox respondió distinto de lo que declara el OpenAPI en {count, plural, one {esta operación} other {estas operaciones}}: {operations}.",
+            "next": "Corrige el servicio del sandbox para que responda como declara el OpenAPI. Si el que está mal es el documento, el operador solicita cambios y el proveedor sube uno corregido. Luego repite las validaciones."
+          },
+          "runnerDown": {
+            "meaning": "El servicio de pruebas de contrato (contract-runner) no respondió. Es un problema de la plataforma, no del servicio.",
+            "next": "El operador revisa el servicio contract-runner. Luego repite las validaciones."
+          },
+          "timeout": {
+            "meaning": "La prueba de contrato tardó más de lo permitido: el sandbox responde muy lento o no responde.",
+            "next": "Revisa que el sandbox (su nodo y su túnel, o su URL) responda rápido. Luego repite las validaciones."
+          },
+          "couldNotStart": {
+            "meaning": "Schemathesis no pudo empezar a probar: casi siempre el sandbox no es alcanzable a través del gateway, o no se pueden generar peticiones desde el OpenAPI.",
+            "next": "Revisa el sandbox (su nodo y su túnel, o su URL) y las operaciones del documento OpenAPI. Luego repite las validaciones."
+          },
+          "noOperations": {
+            "meaning": "El OpenAPI no declara ninguna operación que la prueba de contrato pueda llamar.",
+            "next": "Revisa las rutas y operaciones del documento. Luego repite las validaciones."
+          },
+          "noSandbox": {
+            "meaning": "La versión no declara sandbox, así que la prueba de contrato no corrió. Esto no bloquea la aprobación."
+          },
+          "runnerNotConfigured": {
+            "meaning": "Este despliegue no tiene servicio de pruebas de contrato, así que la prueba no corrió. Esto no bloquea la aprobación."
+          },
+          "unknown": {
+            "meaning": "La prueba de contrato falló por una razón que el portal no reconoce.",
+            "next": "Repite las validaciones. Si sigue fallando, el operador revisa los logs del API."
+          }
+        }
+      },
+      "operation": {
+        "serverError": "el sandbox respondió un error del servidor",
+        "mismatch": "la respuesta no coincide con el OpenAPI (código de estado, tipo de contenido o esquema de la respuesta)"
       }
     }
   },
@@ -271,7 +351,11 @@
       "approve": "Aprobar",
       "changesComment": "Qué debe cambiar",
       "requestChanges": "Pedir cambios",
-      "decided": "Esta versión ya no está en revisión."
+      "decided": "Esta versión ya no está en revisión.",
+      "approveBlocked": {
+        "pending": "Podrás aprobar cuando las validaciones automáticas estén superadas. Todavía están en curso: recarga la página en un momento.",
+        "failed": "No puedes aprobar: las validaciones automáticas fallaron (arriba, qué significa cada falla). El proveedor corrige el servicio y las repite, o tú solicitas cambios."
+      }
     },
     "entitiesTitle": "Altas de entidades por revisar",
     "entitiesEmpty": "No hay solicitudes de alta por revisar.",
@@ -1546,7 +1630,9 @@
       "explain_revocation": "Explica por qué se revoca el acceso (10 caracteres o más).",
       "reference_legal_order": "Cita la orden legal.",
       "file_name_format": "Un nombre de archivo sin separadores de ruta ni caracteres de control.",
-      "too_many_open_requests": "Ya tienes {max} solicitudes abiertas: espera una decisión antes de crear otra."
+      "too_many_open_requests": "Ya tienes {max} solicitudes abiertas: espera una decisión antes de crear otra.",
+      "validations_pending": "La versión no se aprobó: las validaciones automáticas todavía no terminan. Espera un momento y recarga la página.",
+      "validations_failed": "La versión no se aprobó: sus validaciones automáticas fallaron. El proveedor debe corregir el servicio y repetirlas."
     },
     "codes": {
       "validation_failed": "Revisa los datos enviados.",

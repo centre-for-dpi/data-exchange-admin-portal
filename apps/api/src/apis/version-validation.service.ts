@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { type VersionValidation, versionValidationSchema } from '@den/contracts';
+import { FieldErrorKey, type VersionValidation, versionValidationSchema } from '@den/contracts';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import { ConflictError } from '../common/errors.js';
@@ -253,16 +253,22 @@ export class VersionValidationService implements OnApplicationBootstrap {
     return report;
   }
 
-  /** The operator's gate (M4-06): approving needs validations that passed. */
+  /**
+   * The operator's gate (M4-06): approving needs validations that passed. The 409 names why
+   * (P-07), so the portal never words a refused approval as a generic conflict.
+   */
   static assertPassed(validationReport: unknown): void {
     if (!validationEnabled()) return;
     const report = storedValidation(validationReport);
-    if (report?.status !== 'passed') {
+    if (report?.status === 'passed') return;
+    if (report?.status === 'failed') {
       throw new ConflictError(
-        report?.status === 'failed'
-          ? 'The automatic validations failed: the provider must fix them and run them again'
-          : 'The automatic validations have not finished yet',
+        'The automatic validations failed: the provider must fix them and run them again',
+        { key: FieldErrorKey.ValidationsFailed },
       );
     }
+    throw new ConflictError('The automatic validations have not finished yet', {
+      key: FieldErrorKey.ValidationsPending,
+    });
   }
 }
