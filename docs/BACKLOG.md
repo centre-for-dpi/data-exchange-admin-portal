@@ -918,3 +918,9 @@ Stories that came out of rehearsing the full onboarding by hand on the demo netw
   - Versions already published with a now-disallowed type keep working and are flagged to the operator (version sheet and sync console), who decides.
   - A portal ADR records the decision: the node is the default channel, why, and how a country enables `direct`.
   - Tests: config validation, 400 per disallowed type on create and revise, the form per configuration (one type, several), the flag on existing versions, authorization, i18n es/en, axe.
+- [ ] **P-05 — A CSR command that works where people run it**
+  - The command on the application page fails in Git Bash, the usual shell on Windows: MSYS turns `-subj "/CN=<client id>"` into `C:/Program Files/Git/CN=...`, OpenSSL rejects it, and the private key is left behind without its CSR.
+  - Keep OpenSSL on the application's own server: the key is born where it is used and never travels. A key generated in the browser is easier but lands on someone's laptop and is exposed to any flaw in the portal, so it is not offered.
+  - Tabs for Linux/macOS, Windows with Git Bash (`MSYS_NO_PATHCONV=1` prefix, harmless elsewhere) and Windows with PowerShell (OpenSSL path). Each one: `umask 077` (or the PowerShell equivalent) so the key is readable only by its owner, file names from the client ID, refusing to overwrite an existing key, and a check before pasting: `openssl req -in <file>.csr -noout -subject` shows `CN=<client id>`.
+  - An optional script of a few lines (`den-csr.sh <client id>`) downloadable from the page, doing the same; short enough to read before running it.
+  - Tests: the rendered commands per tab with a real client ID, run in CI on Linux; i18n es/en; axe on the page.
