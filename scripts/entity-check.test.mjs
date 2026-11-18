@@ -49,6 +49,30 @@ describe('entity-check.sh csr', () => {
     expect(existsSync(join(r.dir, `${id}.csr`))).toBe(false);
   });
 
+  it('check does not stop at the DNS step where getent is missing (Git Bash on Windows)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'den-check-'));
+    const r = spawnSync('bash', [script, 'check', '127.0.0.1', '127.0.0.1'], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).not.toMatch(/no resuelve/);
+    expect(r.stderr).toMatch(/No llego a https:\/\/127\.0\.0\.1/);
+  });
+
+  it('call accepts the certificate as the portal downloads it (<client id>.pem)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'den-call-'));
+    for (const f of [`${id}.key`, `${id}.pem`, 'den-network-ca.pem'])
+      writeFileSync(join(dir, f), 'x');
+    const r = spawnSync(
+      'bash',
+      [script, 'call', '127.0.0.1', '127.0.0.1:9', id, '/x/y/v1/z/1', 'eligibility_check', 'u-1'],
+      { cwd: dir, encoding: 'utf8', env: { ...process.env, CLIENT_SECRET: 'secret' } },
+    );
+    expect(r.stderr).not.toMatch(/Faltan/);
+    expect(r.stderr).toMatch(/No se pudo pedir el token/);
+  });
+
   it('refuses a client id with characters that could change the command', () => {
     const r = csr('den-app; rm -rf /');
     expect(r.status).not.toBe(0);

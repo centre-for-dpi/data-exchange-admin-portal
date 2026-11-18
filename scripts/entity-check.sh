@@ -37,10 +37,15 @@ network_ca() { # portal → ./den-network-ca.pem
 
 cmd_check() {
   local portal=${1:?portal-host} gateway=${2:?gateway-host} name ips out
-  for name in "$portal" "$gateway"; do
-    ips=$(getent ahostsv4 "$name" 2>/dev/null | awk '{print $1}' | sort -u | xargs || true)
-    [[ -n $ips ]] && ok "DNS: $name → $ips" || fail "DNS: $name no resuelve desde este servidor"
-  done
+  # getent is not in Git Bash on Windows: there the HTTPS checks that follow test the names instead.
+  if command -v getent >/dev/null 2>&1; then
+    for name in "$portal" "$gateway"; do
+      ips=$(getent ahostsv4 "$name" 2>/dev/null | awk '{print $1}' | sort -u | xargs || true)
+      [[ -n $ips ]] && ok "DNS: $name → $ips" || fail "DNS: $name no resuelve desde este servidor"
+    done
+  else
+    info "DNS: sin getent en este sistema; las conexiones siguientes comprueban los nombres."
+  fi
 
   if curl -fsS --max-time 15 -o /dev/null "https://$portal/api/v1/health"; then
     ok "Salida HTTPS al portal (https://$portal)"
@@ -92,10 +97,13 @@ cmd_csr() {
 cmd_call() {
   local portal=${1:?portal-host} gateway=${2:?gateway-host} id=${3:?client_id} path=${4:?path} purpose=${5:?purpose}
   local end_user=${6-} secret=${CLIENT_SECRET-} token code body
-  [[ -r $id.crt && -r $id.key ]] || fail "Faltan $id.crt y $id.key en este directorio."
+  # The portal downloads the certificate as <client_id>.pem; <client_id>.crt works too.
+  local cert=$id.crt
+  [[ -r $cert ]] || cert=$id.pem
+  [[ -r $cert && -r $id.key ]] || fail "Faltan $id.pem (o $id.crt) y $id.key en este directorio."
   network_ca "$portal"
   if [[ -z $secret ]]; then read -r -s -p "Secreto de la aplicación $id: " secret; echo; fi
-  local tls=(--cert "$id.crt" --key "$id.key" --cacert den-network-ca.pem)
+  local tls=(--cert "$cert" --key "$id.key" --cacert den-network-ca.pem)
 
   # Secret and token go to curl in a config on stdin (-K -): never in argv, where ps shows them.
   body=$(curl_quote "user = $id:$secret" | curl -sS -K - --max-time 20 "${tls[@]}" -d grant_type=client_credentials \
