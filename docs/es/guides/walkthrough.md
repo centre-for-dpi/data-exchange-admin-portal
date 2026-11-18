@@ -218,7 +218,7 @@ openssl req -in <CLIENT_ID>.csr -noout -subject      # debe mostrar: subject=CN=
 
 `MSYS_NO_PATHCONV=1` es para **Git Bash en Windows**, que si no convierte `/CN=…` en una ruta (`C:/Program Files/Git/CN=…`): OpenSSL lo rechaza y deja la clave creada sin CSR. En Linux y macOS no hace nada. El `CN` debe ser **exactamente** el Client ID.
 
-En la aplicación, **Certificado de cliente (mTLS)**: pega el CSR completo (de `-----BEGIN CERTIFICATE REQUEST-----` a `-----END CERTIFICATE REQUEST-----`) **→ Solicitar certificado → Descargar**. Guarda el certificado como `<CLIENT_ID>.crt` junto a la clave.
+En la aplicación, **Certificado de cliente (mTLS)**: pega el CSR completo (de `-----BEGIN CERTIFICATE REQUEST-----` a `-----END CERTIFICATE REQUEST-----`) **→ Solicitar certificado → Descargar**. Se descarga como `<CLIENT_ID>.pem`: déjalo con ese nombre junto a la clave.
 
 ### 8.4 Pedir acceso
 
@@ -243,7 +243,7 @@ En la aplicación, **Certificado de cliente (mTLS)**: pega el CSR completo (de `
 
 ## 10. La primera consulta
 
-Desde el servidor de la aplicación, en la carpeta con `<CLIENT_ID>.key` y `<CLIENT_ID>.crt`:
+Desde el servidor de la aplicación, en la carpeta con `<CLIENT_ID>.key` y `<CLIENT_ID>.pem`. En Windows, en **Git Bash** (no en PowerShell):
 
 ```bash
 ./entity-check.sh check portal.example.org gateway.example.org        # llega a la red y guarda su raíz
@@ -251,17 +251,17 @@ Desde el servidor de la aplicación, en la carpeta con `<CLIENT_ID>.key` y `<CLI
   /civil-registry/certificados-afiliacion/v1/certificados/1000000001 eligibility_check funcionario-123
 ```
 
-El script pide el secreto sin mostrarlo (o lo lee de `CLIENT_SECRET`), pide el token con el certificado, hace la consulta con la finalidad y el funcionario, y explica la respuesta. El secreto y el token nunca van en la línea de comandos.
+El script pide el secreto sin mostrarlo (o lo lee de `CLIENT_SECRET`), pide el token con el certificado, hace la consulta con la finalidad y el funcionario, y explica la respuesta. El secreto y el token nunca van en la línea de comandos. El `curl` de Git para Windows (y el `curl.exe` de Windows) usa Schannel, que no puede usar un certificado y una clave PEM: ahí el script hace la petición con OpenSSL, que Git para Windows también trae.
 
-Lo mismo con `curl`, paso a paso:
+Lo mismo con `curl`, paso a paso (Linux o macOS; en Windows usa el script):
 
 ```bash
 curl -fsS https://portal.example.org/api/v1/pki/ca -o red-ca.pem      # la raíz de la red
 read -rs CLIENT_SECRET                                                 # pégalo: no queda en el historial
-TOKEN=$(curl -fsS --cacert red-ca.pem --cert <CLIENT_ID>.crt --key <CLIENT_ID>.key \
+TOKEN=$(curl -fsS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
   -u "<CLIENT_ID>:$CLIENT_SECRET" -d grant_type=client_credentials \
   https://gateway.example.org/oauth/token | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
-curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.crt --key <CLIENT_ID>.key \
+curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-DEN-Purpose: eligibility_check" \
   -H "X-DEN-End-User: funcionario-123" \
@@ -284,6 +284,8 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.crt --key <CLIENT_ID>.key \
 | **Aprobar** está deshabilitado, o "La versión no se aprobó" | Las validaciones automáticas no han pasado (siguen en curso o fallaron) | La ficha de la versión dice qué significa cada falla y qué intentar; corrige y **Repetir validaciones** |
 | Validación con **504** (tiempo agotado) | El gateway no llega al nodo por el túnel | En el nodo: `sudo /opt/den-node/install.sh status` (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: `sudo /opt/den-node/install.sh stop` y `start` |
 | `subject name is expected to be in the format /type0=value0…` | Git Bash convirtió `/CN=…` en una ruta | Usa `./entity-check.sh csr`, o borra la clave a medio crear y repite con `MSYS_NO_PATHCONV=1` |
+| `schannel: Failed to import cert file` | El `curl` de Windows (Schannel) no puede usar el certificado y la clave PEM | Usa `./entity-check.sh call` en Git Bash, que ahí va por OpenSSL |
+| `bash` no se reconoce (PowerShell) | Windows no trae bash propio | Abre **Git Bash** y ejecuta ahí los comandos |
 | El portal rechaza el CSR | El `CN` no es el Client ID, o la clave no es ECDSA P-256/P-384 ni RSA 2048–4096 | Genera otro con el Client ID exacto |
 | Los registros del nodo dicen `(unknown)` | El servicio no tiene su OpenAPI en el nodo | `install.sh service remove <servicio>` y agregarlo de nuevo con el OpenAPI |
 

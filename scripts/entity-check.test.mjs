@@ -73,6 +73,35 @@ describe('entity-check.sh csr', () => {
     expect(r.stderr).toMatch(/No se pudo pedir el token/);
   });
 
+  it('call goes through OpenSSL when curl is Schannel-only (Git for Windows), not through curl', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'den-call-schannel-'));
+    for (const f of [`${id}.key`, `${id}.pem`, 'den-network-ca.pem'])
+      writeFileSync(join(dir, f), 'x');
+    // A stand-in curl that reports a Schannel-only build and fails like it does with a PEM key.
+    const fake = mkdtempSync(join(tmpdir(), 'den-fake-curl-'));
+    const bin = join(fake, 'curl');
+    writeFileSync(
+      bin,
+      '#!/usr/bin/env bash\nif [[ $1 == -V ]]; then echo "curl 8.18.0 (x86_64-w64-mingw32) libcurl/8.18.0 Schannel zlib/1.3"; exit 0; fi\necho "CURL_USED_FOR_REQUEST" >&2\nexit 58\n',
+    );
+    chmodSync(bin, 0o755);
+    const r = spawnSync(
+      'bash',
+      [script, 'call', '127.0.0.1', '127.0.0.1:9', id, '/x/y/v1/z/1', 'eligibility_check'],
+      {
+        cwd: dir,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          CLIENT_SECRET: 'secret',
+          PATH: `${fake}${delimiter}${process.env.PATH}`,
+        },
+      },
+    );
+    expect(r.stderr).not.toMatch(/CURL_USED_FOR_REQUEST/);
+    expect(r.stderr).toMatch(/No se pudo pedir el token/);
+  });
+
   it('refuses a client id with characters that could change the command', () => {
     const r = csr('den-app; rm -rf /');
     expect(r.status).not.toBe(0);

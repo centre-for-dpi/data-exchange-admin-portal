@@ -528,7 +528,7 @@ MSYS_NO_PATHCONV=1 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 
   -keyout &lt;CLIENT_ID&gt;.key -out &lt;CLIENT_ID&gt;.csr -subj "/CN=&lt;CLIENT_ID&gt;"
 openssl req -in &lt;CLIENT_ID&gt;.csr -noout -subject      # debe mostrar: subject=CN=&lt;CLIENT_ID&gt;</code></pre></div>
 <p><code>MSYS_NO_PATHCONV=1</code> es para <b>Git Bash en Windows</b>, que si no convierte <code>/CN=…</code> en una ruta (<code>C:/Program Files/Git/CN=…</code>): OpenSSL lo rechaza y deja la clave creada sin CSR. En Linux y macOS no hace nada. El <code>CN</code> debe ser <b>exactamente</b> el Client ID.</p>
-<p>En la aplicación, <b>Certificado de cliente (mTLS)</b>: pega el CSR completo (de <code>-----BEGIN CERTIFICATE REQUEST-----</code> a <code>-----END CERTIFICATE REQUEST-----</code>) <b>→ Solicitar certificado → Descargar</b>. Guarda el certificado como <code>&lt;CLIENT_ID&gt;.crt</code> junto a la clave.</p>
+<p>En la aplicación, <b>Certificado de cliente (mTLS)</b>: pega el CSR completo (de <code>-----BEGIN CERTIFICATE REQUEST-----</code> a <code>-----END CERTIFICATE REQUEST-----</code>) <b>→ Solicitar certificado → Descargar</b>. Se descarga como <code>&lt;CLIENT_ID&gt;.pem</code>: déjalo con ese nombre junto a la clave.</p>
 <h3>8.4 Pedir acceso</h3>
 <p><b>Catálogo →</b> la API <b>→ Solicitar acceso:</b></p>
 <div class="tablewrap"><table class="t"><thead><tr><th>Campo</th><th>Qué poner</th></tr></thead><tbody>
@@ -550,18 +550,18 @@ openssl req -in &lt;CLIENT_ID&gt;.csr -noout -subject      # debe mostrar: subje
 
     <section id="10-la-primera-consulta">
       <h2><span class="num">10</span>La primera consulta</h2>
-<p>Desde el servidor de la aplicación, en la carpeta con <code>&lt;CLIENT_ID&gt;.key</code> y <code>&lt;CLIENT_ID&gt;.crt</code>:</p>
+<p>Desde el servidor de la aplicación, en la carpeta con <code>&lt;CLIENT_ID&gt;.key</code> y <code>&lt;CLIENT_ID&gt;.pem</code>. En Windows, en <b>Git Bash</b> (no en PowerShell):</p>
 <div class="code"><button class="copy" type="button">Copiar</button><pre><code>./entity-check.sh check portal.example.org gateway.example.org        # llega a la red y guarda su raíz
 ./entity-check.sh call portal.example.org gateway.example.org &lt;CLIENT_ID&gt; \
   /civil-registry/certificados-afiliacion/v1/certificados/1000000001 eligibility_check funcionario-123</code></pre></div>
-<p>El script pide el secreto sin mostrarlo (o lo lee de <code>CLIENT_SECRET</code>), pide el token con el certificado, hace la consulta con la finalidad y el funcionario, y explica la respuesta. El secreto y el token nunca van en la línea de comandos.</p>
-<p>Lo mismo con <code>curl</code>, paso a paso:</p>
+<p>El script pide el secreto sin mostrarlo (o lo lee de <code>CLIENT_SECRET</code>), pide el token con el certificado, hace la consulta con la finalidad y el funcionario, y explica la respuesta. El secreto y el token nunca van en la línea de comandos. El <code>curl</code> de Git para Windows (y el <code>curl.exe</code> de Windows) usa Schannel, que no puede usar un certificado y una clave PEM: ahí el script hace la petición con OpenSSL, que Git para Windows también trae.</p>
+<p>Lo mismo con <code>curl</code>, paso a paso (Linux o macOS; en Windows usa el script):</p>
 <div class="code"><button class="copy" type="button">Copiar</button><pre><code>curl -fsS https://portal.example.org/api/v1/pki/ca -o red-ca.pem      # la raíz de la red
 read -rs CLIENT_SECRET                                                 # pégalo: no queda en el historial
-TOKEN=$(curl -fsS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_ID&gt;.key \
+TOKEN=$(curl -fsS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt;.key \
   -u "&lt;CLIENT_ID&gt;:$CLIENT_SECRET" -d grant_type=client_credentials \
   https://gateway.example.org/oauth/token | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
-curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_ID&gt;.key \
+curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt;.key \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-DEN-Purpose: eligibility_check" \
   -H "X-DEN-End-User: funcionario-123" \
@@ -584,6 +584,8 @@ curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_ID&gt
 <tr><td><b>Aprobar</b> está deshabilitado, o "La versión no se aprobó"</td><td class="wrap">Las validaciones automáticas no han pasado (siguen en curso o fallaron)</td><td class="wrap">La ficha de la versión dice qué significa cada falla y qué intentar; corrige y <b>Repetir validaciones</b></td></tr>
 <tr><td>Validación con <b>504</b> (tiempo agotado)</td><td class="wrap">El gateway no llega al nodo por el túnel</td><td class="wrap">En el nodo: <code>sudo /opt/den-node/install.sh status</code> (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: <code>sudo /opt/den-node/install.sh stop</code> y <code>start</code></td></tr>
 <tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash convirtió <code>/CN=…</code> en una ruta</td><td class="wrap">Usa <code>./entity-check.sh csr</code>, o borra la clave a medio crear y repite con <code>MSYS_NO_PATHCONV=1</code></td></tr>
+<tr><td><code>schannel: Failed to import cert file</code></td><td class="wrap">El <code>curl</code> de Windows (Schannel) no puede usar el certificado y la clave PEM</td><td class="wrap">Usa <code>./entity-check.sh call</code> en Git Bash, que ahí va por OpenSSL</td></tr>
+<tr><td><code>bash</code> no se reconoce (PowerShell)</td><td class="wrap">Windows no trae bash propio</td><td class="wrap">Abre <b>Git Bash</b> y ejecuta ahí los comandos</td></tr>
 <tr><td>El portal rechaza el CSR</td><td class="wrap">El <code>CN</code> no es el Client ID, o la clave no es ECDSA P-256/P-384 ni RSA 2048–4096</td><td class="wrap">Genera otro con el Client ID exacto</td></tr>
 <tr><td>Los registros del nodo dicen <code>(unknown)</code></td><td class="wrap">El servicio no tiene su OpenAPI en el nodo</td><td class="wrap"><code>install.sh service remove &lt;servicio&gt;</code> y agregarlo de nuevo con el OpenAPI</td></tr>
 </tbody></table></div>

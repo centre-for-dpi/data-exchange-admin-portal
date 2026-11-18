@@ -29,6 +29,46 @@ curl_quote() {
   printf '%s = "%s"\n' "$key" "$value"
 }
 
+# Git for Windows ships a curl built only on Schannel, which cannot use a PEM client certificate and
+# key (not even repackaged as PKCS#12, with an EC key). There the mTLS requests go through
+# `openssl s_client`, which Git for Windows also ships.
+curl_can_mtls() {
+  local v
+  v=$(curl -V 2>/dev/null | head -n 1)
+  ! grep -q Schannel <<<"$v" || grep -qi openssl <<<"$v"
+}
+
+# mtls_request <host[:port]> <path> <cert> <key> <form-body or ""> [header...] → body, newline, status.
+# Headers are function arguments, not a command's argv: secrets in them never show in ps.
+mtls_request() {
+  local host=$1 path=$2 cert=$3 key=$4 data=$5; shift 5
+  local h out
+  if curl_can_mtls; then
+    local cfg=''
+    for h in "$@"; do cfg+=$(curl_quote "header = $h")$'\n'; done
+    [[ -n $data ]] && cfg+=$(curl_quote "data = $data")$'\n'
+    printf '%s' "$cfg" | curl -sS -K - --max-time 30 --cert "$cert" --key "$key" \
+      --cacert den-network-ca.pem -w '\n%{http_code}' "https://$host$path"
+    return
+  fi
+  # HTTP/1.0: the answer comes whole, never chunked, and the server closes the connection.
+  local method=GET crlf=$'\r\n'
+  [[ -n $data ]] && method=POST
+  local req="$method $path HTTP/1.0${crlf}Host: ${host%%:*}${crlf}"
+  for h in "$@"; do req+="$h$crlf"; done
+  [[ -n $data ]] && req+="Content-Type: application/x-www-form-urlencoded${crlf}Content-Length: ${#data}${crlf}"
+  req+="$crlf$data"
+  local port=443
+  [[ $host == *:* ]] && port=${host##*:}
+  out=$(printf '%s' "$req" | MSYS_NO_PATHCONV=1 openssl s_client -quiet -connect "${host%%:*}:$port" \
+    -servername "${host%%:*}" -cert "$cert" -key "$key" -CAfile den-network-ca.pem \
+    -verify_return_error 2>/dev/null) || true
+  local status
+  status=$(head -n 1 <<<"$out" | awk '{print $2}')
+  [[ $status =~ ^[0-9]{3}$ ]] || return 1
+  printf '%s\n%s' "${out#*$crlf$crlf}" "$status"
+}
+
 network_ca() { # portal → ./den-network-ca.pem
   [[ -s den-network-ca.pem ]] && return 0
   curl -fsS --max-time 15 -o den-network-ca.pem "https://$1/api/v1/pki/ca" ||
@@ -91,7 +131,7 @@ cmd_csr() {
   ok "Llave privada: $id.key (permisos 600; NUNCA sale de este servidor)"
   ok "Solicitud de certificado: $id.csr"
   info "Pega el contenido de $id.csr en la ficha de la aplicación → Certificado de cliente (mTLS),"
-  info "y guarda el certificado descargado como $id.crt junto a la llave."
+  info "y deja el certificado descargado ($id.pem) junto a la llave."
 }
 
 cmd_call() {
@@ -103,19 +143,21 @@ cmd_call() {
   [[ -r $cert && -r $id.key ]] || fail "Faltan $id.pem (o $id.crt) y $id.key en este directorio."
   network_ca "$portal"
   if [[ -z $secret ]]; then read -r -s -p "Secreto de la aplicación $id: " secret; echo; fi
-  local tls=(--cert "$cert" --key "$id.key" --cacert den-network-ca.pem)
-
-  # Secret and token go to curl in a config on stdin (-K -): never in argv, where ps shows them.
-  body=$(curl_quote "user = $id:$secret" | curl -sS -K - --max-time 20 "${tls[@]}" -d grant_type=client_credentials \
-    "https://$gateway/oauth/token") || fail "No se pudo pedir el token a https://$gateway/oauth/token"
+  # Secret and token travel on stdin (a curl config or the request itself): never in argv, where ps
+  # shows them. openssl base64 reads the pair from a pipe, too.
+  local basic
+  basic=$(printf '%s:%s' "$id" "$secret" | openssl base64 -A)
+  body=$(mtls_request "$gateway" /oauth/token "$cert" "$id.key" grant_type=client_credentials \
+    "Authorization: Basic $basic") || fail "No se pudo pedir el token a https://$gateway/oauth/token"
+  body=${body%$'\n'*}
   token=$(sed -n 's/.*"access_token" *: *"\([^"]*\)".*/\1/p' <<<"$body")
   [[ -n $token ]] || fail "El gateway no dio token: $body"
   ok "Token obtenido (5 min, ligado al certificado de $id)"
 
-  local headers=(-H "X-DEN-Purpose: $purpose")
-  [[ -n $end_user ]] && headers+=(-H "X-DEN-End-User: $end_user")
-  body=$(curl_quote "header = Authorization: Bearer $token" |
-    curl -sS -K - --max-time 30 "${tls[@]}" "${headers[@]}" -w '\n%{http_code}' "https://$gateway/${path#/}")
+  local headers=("Authorization: Bearer $token" "X-DEN-Purpose: $purpose")
+  [[ -n $end_user ]] && headers+=("X-DEN-End-User: $end_user")
+  body=$(mtls_request "$gateway" "/${path#/}" "$cert" "$id.key" "" "${headers[@]}") ||
+    fail "No llego a https://$gateway/${path#/}"
   code=${body##*$'\n'}
   body=${body%$'\n'*}
   case $code in

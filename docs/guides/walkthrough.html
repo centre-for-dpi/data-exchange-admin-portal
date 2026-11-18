@@ -528,7 +528,7 @@ MSYS_NO_PATHCONV=1 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 
   -keyout &lt;CLIENT_ID&gt;.key -out &lt;CLIENT_ID&gt;.csr -subj "/CN=&lt;CLIENT_ID&gt;"
 openssl req -in &lt;CLIENT_ID&gt;.csr -noout -subject      # must show: subject=CN=&lt;CLIENT_ID&gt;</code></pre></div>
 <p><code>MSYS_NO_PATHCONV=1</code> is for <b>Git Bash on Windows</b>, which otherwise turns <code>/CN=…</code> into a path (<code>C:/Program Files/Git/CN=…</code>): OpenSSL rejects it and leaves the key without a CSR. On Linux and macOS it does nothing. The <code>CN</code> must be <b>exactly</b> the Client ID.</p>
-<p>In the application, <b>Client certificate (mTLS)</b>: paste the whole CSR (from <code>-----BEGIN CERTIFICATE REQUEST-----</code> to <code>-----END CERTIFICATE REQUEST-----</code>) <b>→ Request certificate → Download</b>. Save it as <code>&lt;CLIENT_ID&gt;.crt</code> next to the key.</p>
+<p>In the application, <b>Client certificate (mTLS)</b>: paste the whole CSR (from <code>-----BEGIN CERTIFICATE REQUEST-----</code> to <code>-----END CERTIFICATE REQUEST-----</code>) <b>→ Request certificate → Download</b>. It downloads as <code>&lt;CLIENT_ID&gt;.pem</code>: keep it with that name next to the key.</p>
 <h3>8.4 Request access</h3>
 <p><b>Catalogue →</b> the API <b>→ Request access:</b></p>
 <div class="tablewrap"><table class="t"><thead><tr><th>Field</th><th>What to enter</th></tr></thead><tbody>
@@ -550,19 +550,19 @@ openssl req -in &lt;CLIENT_ID&gt;.csr -noout -subject      # must show: subject=
 
     <section id="10-the-first-lookup">
       <h2><span class="num">10</span>The first lookup</h2>
-<p>From the application's server, in the folder with <code>&lt;CLIENT_ID&gt;.key</code> and <code>&lt;CLIENT_ID&gt;.crt</code>:</p>
+<p>From the application's server, in the folder with <code>&lt;CLIENT_ID&gt;.key</code> and <code>&lt;CLIENT_ID&gt;.pem</code>. On Windows, in <b>Git Bash</b> (not PowerShell):</p>
 <div class="code"><button class="copy" type="button">Copy</button><pre><code>./entity-check.sh check portal.example.org gateway.example.org        # reaches the network and saves its root
 ./entity-check.sh call portal.example.org gateway.example.org &lt;CLIENT_ID&gt; \
   /civil-registry/certificados-afiliacion/v1/certificados/1000000001 eligibility_check official-123</code></pre></div>
-<p>The script asks for the secret without showing it (or reads <code>CLIENT_SECRET</code>), requests the token with the certificate, makes the lookup with the purpose and the official, and explains the answer. The secret and the token never go on the command line.</p>
-<p>The same with <code>curl</code>, step by step:</p>
+<p>The script asks for the secret without showing it (or reads <code>CLIENT_SECRET</code>), requests the token with the certificate, makes the lookup with the purpose and the official, and explains the answer. The secret and the token never go on the command line. The <code>curl</code> of Git for Windows (and the <code>curl.exe</code> of Windows) uses Schannel, which cannot use a PEM certificate and key: there the script makes the request with OpenSSL, which Git for Windows also brings.</p>
+<p>The same with <code>curl</code>, step by step (Linux or macOS; on Windows use the script):</p>
 <div class="code"><button class="copy" type="button">Copy</button><pre><code>curl -fsS https://portal.example.org/api/v1/pki/ca -o network-ca.pem   # the network's root
 read -rs CLIENT_SECRET                                                 # paste it: it stays out of the history
-TOKEN=$(curl -fsS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_ID&gt;.key \
+TOKEN=$(curl -fsS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt;.key \
   -u "&lt;CLIENT_ID&gt;:$CLIENT_SECRET" -d grant_type=client_credentials \
   https://gateway.example.org/oauth/token | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
 
-curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_ID&gt;.key \
+curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt;.key \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-DEN-Purpose: eligibility_check" \
   -H "X-DEN-End-User: official-123" \
@@ -585,6 +585,8 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.crt --key &lt;CLIENT_I
 <tr><td><b>Approve</b> is disabled, or "The version was not approved"</td><td class="wrap">The automatic validations have not passed (still running, or failed)</td><td class="wrap">The version sheet says what each failure means and what to try; fix it and <b>Run validations again</b></td></tr>
 <tr><td>Validation with <b>504</b> (timeout)</td><td class="wrap">The gateway does not reach the node through the tunnel</td><td class="wrap">On the node: <code>sudo /opt/den-node/install.sh status</code> (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: <code>sudo /opt/den-node/install.sh stop</code> and <code>start</code></td></tr>
 <tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash turned <code>/CN=…</code> into a path</td><td class="wrap">Use <code>./entity-check.sh csr</code>, or delete the half-made key and repeat with <code>MSYS_NO_PATHCONV=1</code></td></tr>
+<tr><td><code>schannel: Failed to import cert file</code></td><td class="wrap">Windows' <code>curl</code> (Schannel) cannot use the PEM certificate and key</td><td class="wrap">Use <code>./entity-check.sh call</code> in Git Bash, which goes through OpenSSL there</td></tr>
+<tr><td><code>bash</code> is not recognized (PowerShell)</td><td class="wrap">Windows has no bash of its own</td><td class="wrap">Open <b>Git Bash</b> and run the commands there</td></tr>
 <tr><td>The portal rejects the CSR</td><td class="wrap">The <code>CN</code> is not the Client ID, or the key is not ECDSA P-256/P-384 or RSA 2048–4096</td><td class="wrap">Make another one with the exact Client ID</td></tr>
 <tr><td>The node's logs say <code>(unknown)</code></td><td class="wrap">The service has no OpenAPI on the node</td><td class="wrap"><code>install.sh service remove &lt;service&gt;</code> and add it again with the OpenAPI</td></tr>
 </tbody></table></div>
