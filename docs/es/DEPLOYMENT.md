@@ -119,6 +119,8 @@ Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen toke
   - Llega con el realm en una instalación nueva. En un Keycloak que ya importó el realm se aplica con `node scripts/keycloak-portal-mfa.mjs` (`OPERATIONS.md §5.3`).
   - Sin el flujo, Keycloak no puede dar `acr=mfa`, y esos roles reciben 403 `mfa_required` en todo el portal.
   - Los usuarios semilla con rol crítico traen el código de `DEN_DEMO_TOTP_SECRET`. En producción no hay usuarios semilla: cada persona enrola su app la primera vez.
+- **Enlace de verificación (P-08).** Los enlaces de verificación del correo y de restablecimiento de contraseña de `den-portal` duran 60 minutos (`actionTokenGeneratedByUserLifespan: 3600`; Keycloak trae 5). En un Keycloak que ya importó el realm lo aplica `node scripts/keycloak-portal-mfa.mjs`; en el piloto, `sudo ./install.sh realms`, que corre `update`.
+- **Usuarios de demo en un piloto (P-08).** La semilla los carga en cada arranque del API (`DEN_ALLOW_SEED=true`). Cuando la gente del operador tiene sus roles, `node dist/admin/demo-users-cli.js disable` en el contenedor del API (`sudo ./install.sh demo-users disable`) los desactiva en Keycloak y en el portal; desde entonces la semilla los deja desactivados. Usa `KEYCLOAK_URL` y el administrador de `master` (`OPERATIONS.md §2.3`).
 - **Certificado de cliente de las aplicaciones (M3-10, ADR-0022).** Arranca con el proveedor x509 `nginx` y `trust-proxy-verification` (`--spi-x509cert-lookup--…`, en el compose): lee de `SSL_CLIENT_CERT` el certificado que APISIX ya verificó en la ruta de token del gateway. Por eso ninguna otra vía hacia Keycloak debe dejar pasar esa cabecera ni `ssl-client-verify` (§5.2).
 - Detalle de los tres realms y los usuarios semilla: `infra/keycloak/README.md`.
 
@@ -512,6 +514,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
      - Desde ese momento, una aplicación sin certificado vigente no puede llamar: cada desarrollador emite el suyo desde la ficha de su aplicación (M3-01).
   6. Con M3-05, durante los primeros 10–20 s tras arrancar el API nuevo, las llamadas permitidas pueden dar 500: las rutas ya llevan `limit-count` y OPA todavía tiene el bundle anterior, sin `X-DEN-Rate-Limit`. Se corrige solo con la siguiente descarga del bundle. Si no se tolera, hacer la actualización en una ventana de mantenimiento.
 - **Al pasar a M6-06 (respaldos con pgBackRest)**, sobre un piloto anterior: agregar a `.env` `PGBACKREST_REPO1_CIPHER_PASS` (32 caracteres al azar) y guardar una copia fuera del servidor. `install.sh` lo hace solo si falta, al instalar o actualizar. Si la actualización la corre el `install.sh` anterior, Compose se detiene pidiendo la variable: basta volver a ejecutar `sudo ./install.sh update`. Al arrancar, PostgreSQL se reinicia con el archivado activo y `pgbackrest` toma el primer respaldo completo.
+- **P-08 (enlace de verificación y usuarios de demo)**, sobre cualquier piloto anterior: `sudo ./install.sh update` aplica el enlace de 60 minutos al realm existente (`install.sh realms`; con `docker compose` a mano, `node scripts/keycloak-portal-mfa.mjs`, `OPERATIONS.md §5.3`). Los usuarios de demo siguen como están hasta que el operador corre `sudo ./install.sh demo-users disable` (`OPERATIONS.md §2.3`).
 - **P-06 (carpeta de documentos)**, sobre cualquier despliegue anterior: `.env` traía `DEN_DOCUMENTS_DIR=data/documents` y toda subida fallaba. El overlay de despliegue fija ahora `/var/lib/den/documents` para el API e `install.sh update` corrige `.env`; con `docker compose` a mano, cambiar la línea en `.env` y recrear el API. No se guardó nada, así que no hay nada que mover.
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
@@ -550,7 +553,7 @@ En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.d
 
 | Tema | Piloto (hoy) | Producción (objetivo, `ARCHITECTURE.md §11`) |
 | :-- | :-- | :-- |
-| Datos iniciales | Siempre carga el seed: entidades ficticias y usuarios de demo, incluidos administradores de plataforma | Sin datos de demo. El primer `platform_admin` sale de `DEN_BOOTSTRAP_ADMIN_EMAIL` (§9.3) |
+| Datos iniciales | Siempre carga el seed: entidades ficticias y usuarios de demo, incluidos administradores de plataforma, hasta que el operador los desactiva (`install.sh demo-users disable`, `OPERATIONS.md §2.3`) | Sin datos de demo. El primer `platform_admin` sale de `DEN_BOOTSTRAP_ADMIN_EMAIL` (§9.3) |
 | Keycloak | `start-dev`, misma instancia de PostgreSQL | Clúster en modo producción, base propia |
 | CA | CA de desarrollo en un volumen | Raíz fuera de línea, intermedia en HSM |
 | TSA | sigstore con clave en archivo | TSA acreditada del país |

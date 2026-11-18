@@ -122,7 +122,8 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 
 - las entidades reales se dan de alta desde el portal (autorregistro y solicitud de alta, o alta directa por el `platform_admin`);
 - las entidades ficticias sirven para practicar;
-- antes de un uso real, las personas del operador tienen cuentas propias: cada una se registra en el portal, verifica su correo y entra una vez, y después el servidor le da el rol con `sudo ./install.sh platform-role grant <correo> <rol>` (`platform_admin`, `platform_reviewer`, `regulator` o `auditor`; `list` muestra quién tiene cuál y `revoke` lo quita). En producción no hay usuarios semilla.
+- antes de un uso real, las personas del operador tienen cuentas propias: cada una se registra en el portal, verifica su correo y entra una vez, y después el servidor le da el rol con `sudo ./install.sh platform-role grant <correo> <rol>` (`platform_admin`, `platform_reviewer`, `regulator` o `auditor`; `list` muestra quién tiene cuál y `revoke` lo quita). En producción no hay usuarios semilla;
+- cuando tienen sus roles, con al menos un `platform_admin` propio del operador, `sudo ./install.sh demo-users disable` desactiva los usuarios de demo: ya no pueden entrar, pierden sus roles de plataforma y la semilla los deja así en cada reinicio. Queda auditado y no hay comando para deshacerlo; después el ensayo de la demo ya no corre en esa instalación (`OPERATIONS.md §2.3`).
 
 ## 7. Comandos del día a día
 
@@ -134,7 +135,9 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 | `sudo ./install.sh logs [servicio]` | Logs (p. ej. `logs api`) |
 | `sudo ./install.sh backup` | Respaldo completo de pgBackRest y copia en `backups/<fecha>/`: volcados de `den` y `keycloak`, el repositorio de respaldos (cifrado), los volúmenes de la CA, la TSA, documentos y app ciudadana, y `.env`. Los respaldos diarios ya corren solos (`OPERATIONS.md §6`) |
 | `sudo ./install.sh restore [instante]` | Restaura la base al último estado archivado, o al instante dado (`"2026-11-20 14:30:00-05"`). Detiene y arranca todo |
-| `sudo ./install.sh update` | Respaldo, `git pull --ff-only`, recompilación y reinicio |
+| `sudo ./install.sh update` | Respaldo, `git pull --ff-only`, recompilación, reinicio y la configuración de los realms en Keycloak (`realms`) |
+| `sudo ./install.sh realms` | Aplica la configuración de `infra/keycloak/*-realm.json` a los realms que Keycloak ya importó: flujo de login, políticas, el enlace de verificación de 60 minutos. Idempotente (`OPERATIONS.md §5.3`) |
+| `sudo ./install.sh demo-users list` / `disable` | El estado de los usuarios de demo; `disable` les impide entrar y les quita los roles de plataforma, auditado, cuando la gente del operador ya tiene los suyos (§6) |
 | `sudo ./install.sh stop` / `start` | Detiene o arranca todo, sin perder datos |
 
 Equivalente con Compose, para los comandos de `OPERATIONS.md`, con el proxy incluido:

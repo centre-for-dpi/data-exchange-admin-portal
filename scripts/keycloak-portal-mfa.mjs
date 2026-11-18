@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Applies the second-factor setup of infra/keycloak/den-portal-realm.json (M3-08, ADR-0021) and
-// the hardening of M6-01 (password policy, events, exact redirect URIs of the portal and the
-// citizens' folder) to a Keycloak that imported the realms before: --import-realm skips them.
+// Applies the second-factor setup of infra/keycloak/den-portal-realm.json (M3-08, ADR-0021), the
+// hardening of M6-01 (password policy, events, exact redirect URIs of the portal and the
+// citizens' folder) and the lifespan of the verification link (P-08) to a Keycloak that imported
+// the realms before: --import-realm skips them. `install.sh update` runs it (`install.sh realms`).
 //
 //   node scripts/keycloak-portal-mfa.mjs              # realm settings and the login flow
 //   node scripts/keycloak-portal-mfa.mjs --demo-otp   # also the demo users' TOTP (dev and demo only)
@@ -10,7 +11,7 @@
 // browser flow `den-browser` from the file and binds it. With --demo-otp, each seed user that has
 // an OTP credential in the file and none in Keycloak is re-imported from the file (same id, the
 // password of DEN_DEMO_USER_PASSWORD and the code of DEN_DEMO_TOTP_SECRET): Keycloak's admin API
-// cannot add an OTP credential to an existing user.
+// cannot add an OTP credential to an existing user. A disabled one is left alone.
 //
 // Uses KEYCLOAK_URL, KEYCLOAK_ADMIN_USER and KEYCLOAK_ADMIN_PASSWORD from the environment or the
 // repo-root .env (master realm administrator).
@@ -88,10 +89,15 @@ await admin('PUT', '', {
   passwordPolicy: realmFile.passwordPolicy,
   adminEventsEnabled: realmFile.adminEventsEnabled,
   adminEventsDetailsEnabled: realmFile.adminEventsDetailsEnabled,
+  // P-08: how long the e-mail verification and password reset links last (Keycloak: 5 minutes).
+  actionTokenGeneratedByUserLifespan: realmFile.actionTokenGeneratedByUserLifespan,
   // Unbound while the flow is rebuilt: a bound flow cannot be deleted.
   ...(current.browserFlow === flowAlias ? { browserFlow: 'browser' } : {}),
 });
-console.log(`${realm}: acr.loa.map, OTP and password policies, and the events applied`);
+console.log(
+  `${realm}: acr.loa.map, OTP and password policies, the events and the ` +
+    `${realmFile.actionTokenGeneratedByUserLifespan / 60}-minute verification link applied`,
+);
 
 // 1b. The exact redirect URIs of the clients (M6-01), from this file and the citizens' realm.
 const resolveFile = (file) =>
@@ -182,11 +188,17 @@ console.log(`${realm}: browser flow ${flowAlias} rebuilt and bound`);
 // 3. Demo users' one-time codes (never in production: the seed users do not exist there).
 if (demoOtp) {
   for (const user of realmFile.users.filter((u) => u.credentials?.some((c) => c.type === 'otp'))) {
-    const credentials = await admin('GET', `/users/${user.id}/credentials`);
-    if (!credentials) {
+    const existing = await admin('GET', `/users/${user.id}`);
+    if (!existing) {
       console.log(`${realm}: ${user.username} does not exist, skipped`);
       continue;
     }
+    // Disabled by the operator (install.sh demo-users disable, P-08): re-importing would enable it.
+    if (existing.enabled === false) {
+      console.log(`${realm}: ${user.username} is disabled, skipped`);
+      continue;
+    }
+    const credentials = await admin('GET', `/users/${user.id}/credentials`);
     if (credentials.some((c) => c.type === 'otp')) continue;
     await admin('POST', '/partialImport', { ifResourceExists: 'OVERWRITE', users: [user] });
     console.log(`${realm}: ${user.username} re-imported with the demo one-time code`);

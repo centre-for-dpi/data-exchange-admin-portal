@@ -752,7 +752,8 @@
       },
       "user": {
         "registered": "Cuenta registrada",
-        "created": "Usuario creado"
+        "created": "Usuario creado",
+        "disabled": "Cuenta desactivada"
       },
       "platform_role": {
         "granted": "Rol de plataforma asignado",

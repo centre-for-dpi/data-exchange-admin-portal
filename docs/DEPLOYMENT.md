@@ -119,6 +119,8 @@ If Keycloak goes down, nobody can sign in and applications cannot get new tokens
   - It ships with the realm on a new installation. On a Keycloak that has already imported the realm, apply it with `node scripts/keycloak-portal-mfa.mjs` (`OPERATIONS.md §5.3`).
   - Without the flow, Keycloak cannot issue `acr=mfa`, and those roles get 403 `mfa_required` across the whole portal.
   - The seed users with a critical role come with the code from `DEN_DEMO_TOTP_SECRET`. In production there are no seed users: each person enrolls their app the first time.
+- **Verification link (P-08).** The email verification and password reset links of `den-portal` last 60 minutes (`actionTokenGeneratedByUserLifespan: 3600`; Keycloak's default is 5). On a Keycloak that has already imported the realm, `node scripts/keycloak-portal-mfa.mjs` applies it; in the pilot, `sudo ./install.sh realms`, which `update` runs.
+- **Demo users in a pilot (P-08).** The seed loads them on every start of the API (`DEN_ALLOW_SEED=true`). Once the operator's people have their roles, `node dist/admin/demo-users-cli.js disable` in the API container (`sudo ./install.sh demo-users disable`) disables them in Keycloak and the portal; the seed then leaves them disabled. It uses `KEYCLOAK_URL` and the `master` administrator (`OPERATIONS.md §2.3`).
 - **Application client certificate (M3-10, ADR-0022).** It starts with the `nginx` x509 provider and `trust-proxy-verification` (`--spi-x509cert-lookup--…`, in the compose file): it reads from `SSL_CLIENT_CERT` the certificate that APISIX has already verified on the gateway's token route. That is why no other path to Keycloak may let that header, or `ssl-client-verify`, through (§5.2).
 - Details of the three realms and the seed users: `infra/keycloak/README.md`.
 
@@ -511,6 +513,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
      - From then on, an application without a valid certificate cannot call: each developer issues their own from their application's page (M3-01).
   6. With M3-05, during the first 10–20 s after the new API starts, allowed calls may return 500: the routes already carry `limit-count` and OPA still has the previous bundle, without `X-DEN-Rate-Limit`. It fixes itself with the next bundle download. If that cannot be tolerated, do the update in a maintenance window.
 - **When moving to M6-06 (backups with pgBackRest)**, on an earlier pilot: add `PGBACKREST_REPO1_CIPHER_PASS` (32 random characters) to `.env` and keep a copy off the server. `install.sh` does this by itself if it is missing, on install or update. If the update is run by the previous `install.sh`, Compose stops and asks for the variable: just run `sudo ./install.sh update` again. On startup, PostgreSQL restarts with archiving on and `pgbackrest` takes the first full backup.
+- **P-08 (verification link and demo users)**, on any earlier pilot: `sudo ./install.sh update` applies the 60-minute link to the existing realm (`install.sh realms`; with plain `docker compose`, `node scripts/keycloak-portal-mfa.mjs`, `OPERATIONS.md §5.3`). The demo users stay as they are until the operator runs `sudo ./install.sh demo-users disable` (`OPERATIONS.md §2.3`).
 - **P-06 (documents folder)**, on any earlier deployment: `.env` carried `DEN_DOCUMENTS_DIR=data/documents`, and every upload failed. The deploy overlay now sets `/var/lib/den/documents` for the API and `install.sh update` corrects `.env`; with plain `docker compose`, change the line in `.env` and recreate the API. Nothing was stored, so there is nothing to move.
 - A change in `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` or `infra/step-ca/*` is mounted from the repo: restarting that service is enough (`up -d <service>` or `restart <service>`).
 
@@ -549,7 +552,7 @@ In development OPA and `fluent-bit-transparency` reach the API on the host throu
 
 | Topic | Pilot (today) | Production (target, `ARCHITECTURE.md §11`) |
 | :-- | :-- | :-- |
-| Initial data | Always loads the seed: fictitious entities and demo users, including platform administrators | No demo data. The first `platform_admin` comes from `DEN_BOOTSTRAP_ADMIN_EMAIL` (§9.3) |
+| Initial data | Always loads the seed: fictitious entities and demo users, including platform administrators, until the operator disables them (`install.sh demo-users disable`, `OPERATIONS.md §2.3`) | No demo data. The first `platform_admin` comes from `DEN_BOOTSTRAP_ADMIN_EMAIL` (§9.3) |
 | Keycloak | `start-dev`, same PostgreSQL instance | Cluster in production mode, its own database |
 | CA | Development CA in a volume | Offline root, intermediate in an HSM |
 | TSA | sigstore with a key in a file | The country's accredited TSA |

@@ -90,9 +90,10 @@ Overall status at a glance: `dc ps` (all `running`, and `healthy` those that hav
 | Entities | The requester registers and requests onboarding for their entity; a `platform_reviewer` or `platform_admin` approves it (`entity_review.decide`) and the requester becomes `entity_admin`. The `platform_admin` can also create them from the console (`entity_admin.create`) and suspend, reactivate or offboard them (`entity_admin.decide`) | Immediately |
 | People in an entity | The `entity_admin` invites them by email and assigns roles (ADR-0018) | Immediately; roles are read on every request |
 | Platform roles | The seed gives them to the demo users (`infra/keycloak/README.md`). The operator's own people get theirs from the server's command line, after they register and sign in once: `sudo ./install.sh platform-role grant <email> <role>` in the pilot, `node dist/admin/platform-roles-cli.js grant <email> <role>` in the API container elsewhere (`revoke`, `list`). Audited (`platform_role.granted`, `platform_role.revoked`); the last `platform_admin` cannot be revoked | Immediately; the second factor is asked at the person's next sign-in |
-| Self-registration | Realm `den-portal`: `registrationAllowed` and `verifyEmail` | Already active on new realms; on an existing one, §5.3 |
+| Demo users (pilot) | `sudo ./install.sh demo-users disable [--reason "..."]`, `node dist/admin/demo-users-cli.js disable` in the API container elsewhere (`list` shows their state). Each demo user of the realm file is disabled in Keycloak (sessions ended) and in the portal, and loses its platform roles; audited (`user.disabled`, `platform_role.revoked`). It refuses while no active `platform_admin` other than the demo users exists, and changes nothing if Keycloak does not answer. It needs `KEYCLOAK_ADMIN_USER` and `KEYCLOAK_ADMIN_PASSWORD` in the API container (the pilot's `.env` has them). No command undoes it | Immediately; the seed leaves them disabled on every start |
+| Self-registration | Realm `den-portal`: `registrationAllowed` and `verifyEmail`; the verification link lasts 60 minutes (`actionTokenGeneratedByUserLifespan`, P-08) | Already active on new realms; on an existing one, §5.3 |
 
-> **Warning.** The pilot always loads the demo seed, with fictitious entities and demo users that keep their platform roles. Giving the operator's people their own accounts and roles with the command above does not remove them, so a pilot is still a demonstration environment, not a production one (`DEPLOYMENT.md §8`).
+> **Warning.** The pilot always loads the demo seed, with fictitious entities and demo users that keep their platform roles. Giving the operator's people their own accounts and roles with the command above does not remove them: `demo-users disable` does, once they have them. Even then a pilot is a demonstration environment, not a production one (`DEPLOYMENT.md §8`). After it, the demo rehearsal (§2.2) no longer runs on that installation.
 
 ## 3. API background processes
 
@@ -274,6 +275,8 @@ node scripts/keycloak-client-policies.mjs     # KEYCLOAK_URL and the master admi
 
 On the pilot, `KEYCLOAK_URL` is the public URL (`$DEN_PUBLIC_URL/auth`). Check: in the Keycloak console, realm `den-gateway` → Client policies, `den-secret-rotation` appears as active.
 
+**With `install.sh` (pilot).** `sudo ./install.sh realms` runs this script and `keycloak-portal-mfa.mjs` (without `--demo-otp`) in a Node container on the Compose network, with the internal Keycloak URL (`DEN_GATEWAY_KEYCLOAK_URL`) and the `master` administrator of `.env`. `sudo ./install.sh update` runs it after restarting; if it fails, it says so and the update goes on.
+
 **Second factor (M3-08, ADR-0021).** The `den-browser` login flow and the level map are also applied from the JSON, with an idempotent script:
 
 ```bash
@@ -282,7 +285,8 @@ node scripts/keycloak-portal-mfa.mjs              # flow, acr map and OTP policy
 node scripts/keycloak-portal-mfa.mjs --demo-otp   # also the demo users' codes
 ```
 
-- `--demo-otp` is for development and the pilot only. It reimports from the JSON, with the same id, each seed user with a critical role that does not yet have a code: it sets the password from `DEN_DEMO_USER_PASSWORD` and the code from `DEN_DEMO_TOTP_SECRET` again.
+- `--demo-otp` is for development and the pilot only. It reimports from the JSON, with the same id, each seed user with a critical role that does not yet have a code: it sets the password from `DEN_DEMO_USER_PASSWORD` and the code from `DEN_DEMO_TOTP_SECRET` again. A demo user disabled in Keycloak (`demo-users disable`) is skipped, so it is not enabled again.
+- **Verification link (P-08).** The same script sets how long the email verification and password reset links last (`actionTokenGeneratedByUserLifespan`, 60 minutes; Keycloak's default is 5).
 - Check: in the Keycloak console, realm `den-portal` → Authentication, `den-browser` is bound to the browser flow. `pnpm demo:otp` prints the current code for the demo users and the key for an authenticator app.
 - **Credential notice.** Keycloak writes to the account owner when a password or a second factor is set or removed, and keeps those events for 90 days (realm `den-portal` → Events). If someone says they did not enroll the second factor mentioned in the notice, treat it as an incident: disable the account in Keycloak, delete the OTP credential and reset the password before enabling it again.
 - **Lost second factor.** The Keycloak administrator deletes the person's OTP credential (Users → the person → Credentials). The next time the portal asks for the code, Keycloak asks them to enroll a new app. First verify the identity of whoever asks for it, through a channel other than the account's email.

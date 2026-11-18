@@ -433,6 +433,8 @@ details.faq[open] summary { color: var(--gov); }
       </div>
       <p>The second factor is a TOTP code from an authenticator app. Nobody approves what they themselves requested: the portal separates duties.</p>
       <p>No screen grants platform roles yet. Each person of the operator registers in the portal, verifies the address and signs in once; then, on the server, <code>sudo ./install.sh platform-role grant &lt;email&gt; &lt;role&gt;</code> gives the role, audited (<code>list</code> shows who has which, <code>revoke</code> takes it away).</p>
+      <p>The pilot always loads the demo users (<code>pablo.plataforma</code>, <code>ana.operadora</code> and the others in <code>infra/keycloak/README.md</code>), with their platform roles and the installer's demo password. Once the operator's own people have their roles, with at least one <code>platform_admin</code> of its own, disable them: <code>sudo ./install.sh demo-users disable</code>. They can no longer sign in (disabled in Keycloak), they lose their platform roles, and the seed leaves them that way on every restart and update. It is audited, it refuses while the only active <code>platform_admin</code> is a demo user, and no command undoes it; <code>demo-users list</code> shows their state. From then on the demo rehearsal (<code>DEMO.md</code>) no longer runs on that installation.</p>
+      <p>The email verification link lasts 60 minutes (Keycloak's default is 5). <code>sudo ./install.sh update</code> applies it, with the rest of the realm settings, to an installation made before; <code>sudo ./install.sh realms</code> does only that.</p>
     </section>
 
     <section id="arquitectura">
@@ -919,7 +921,7 @@ sudo ./install.sh</code></pre></div>
       </ol>
       <div class="callout info">
         <b>Demo data and the first administrator</b>
-        <p>The pilot always loads three fictitious entities and the demo users. That is how the first <code>platform_admin</code> (<code>pablo.plataforma</code>) exists. Real entities are registered from the portal; the fictitious ones are for practice. In production there are no seed users: the first <code>platform_admin</code> is whoever signs in first with the address in <code>DEN_BOOTSTRAP_ADMIN_EMAIL</code>, verified by Keycloak, while the network has none. This is audited, and the value is deleted afterwards.</p>
+        <p>The pilot always loads three fictitious entities and the demo users. That is how the first <code>platform_admin</code> (<code>pablo.plataforma</code>) exists. Real entities are registered from the portal; the fictitious ones are for practice. In production there are no seed users: the first <code>platform_admin</code> is whoever signs in first with the address in <code>DEN_BOOTSTRAP_ADMIN_EMAIL</code>, verified by Keycloak, while the network has none. This is audited, and the value is deleted afterwards. Once the operator's own people have their roles, <code>sudo ./install.sh demo-users disable</code> disables the demo users for good.</p>
       </div>
     </section>
 
@@ -953,7 +955,8 @@ sudo ./install.sh</code></pre></div>
         <div class="cmd"><code>sudo ./install.sh logs api</code><button class="copy" type="button">Copy</button><span>Logs for one service (<code>api</code>, <code>apisix</code>, <code>keycloak</code>, <code>edge</code>…), or for all of them with no argument.</span></div>
         <div class="cmd"><code>sudo ./install.sh backup</code><button class="copy" type="button">Copy</button><span>Full backup and a copy in <code>backups/&lt;date&gt;/</code>: dumps of <code>den</code> and <code>keycloak</code>, the (encrypted) backup repository, the volumes for the CA, the TSA, documents and the citizen app, and <code>.env</code>. The files go off the server. Daily backups already run on their own.</span></div>
         <div class="cmd"><code>sudo ./install.sh restore</code><button class="copy" type="button">Copy</button><span>Restores the database to the latest archived state; with a point in time (<code>"2026-11-20 14:30:00-05"</code>), to that moment. It stops and starts everything.</span></div>
-        <div class="cmd"><code>sudo ./install.sh update</code><button class="copy" type="button">Copy</button><span>Backup, <code>git pull --ff-only</code>, rebuild and restart.</span></div>
+        <div class="cmd"><code>sudo ./install.sh update</code><button class="copy" type="button">Copy</button><span>Backup, <code>git pull --ff-only</code>, rebuild, restart and the realm settings in Keycloak (<code>realms</code> on its own).</span></div>
+        <div class="cmd"><code>sudo ./install.sh demo-users disable</code><button class="copy" type="button">Copy</button><span>Once the operator's people have their roles: the demo users can no longer sign in and lose their platform roles, audited. It refuses without a <code>platform_admin</code> of the operator's own; <code>demo-users list</code> shows their state.</span></div>
         <div class="cmd"><code>sudo ./install.sh stop</code><button class="copy" type="button">Copy</button><span>Stops everything without losing data; <code>start</code> starts it again.</span></div>
       </div>
       <ul class="ticks">
@@ -1001,7 +1004,7 @@ sudo ./install.sh</code></pre></div>
             <tr><td>Email</td><td class="wrap">Mailpit</td><td class="wrap">The operator's SMTP</td></tr>
             <tr><td>Secrets</td><td class="wrap"><code>.env</code> on disk</td><td class="wrap">Secrets manager (OpenBao)</td></tr>
             <tr><td>Citizen identity</td><td class="wrap">Simulated (<code>den-citizens</code>)</td><td class="wrap">The country's own</td></tr>
-            <tr><td>Initial data</td><td class="wrap">Fictitious entities and demo users</td><td class="wrap">No demo data; the first administrator via <code>DEN_BOOTSTRAP_ADMIN_EMAIL</code></td></tr>
+            <tr><td>Initial data</td><td class="wrap">Fictitious entities and demo users, disabled once the operator's people have their roles</td><td class="wrap">No demo data; the first administrator via <code>DEN_BOOTSTRAP_ADMIN_EMAIL</code></td></tr>
             <tr><td>Antivirus</td><td class="wrap">Optional (step 5)</td><td class="wrap">Enabled, with two replicas</td></tr>
             <tr><td>Backups</td><td class="wrap">Automatic with pgBackRest on the same server; the off-server copy with <code>install.sh backup</code></td><td class="wrap">Automatic, to the operator's object storage (Barman Cloud)</td></tr>
             <tr><td>Metrics and alerts</td><td class="wrap">Prometheus, Alertmanager and Grafana on the same server; notifications to Mailpit</td><td class="wrap">The same, with the operator's SMTP</td></tr>

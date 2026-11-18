@@ -35,7 +35,8 @@ const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJ
  * Idempotent development seed (M1-01): fictitious entities, the Keycloak seed users with their
  * roles, and the purpose catalogue from the country configuration. It only creates what is missing
  * (and refreshes config-sourced purposes); it never deletes or overwrites changes made in the
- * portal. Every change is audited in the same transaction (CLAUDE.md, rule 4).
+ * portal, and gives no roles to a disabled account. Every change is audited in the same
+ * transaction (CLAUDE.md, rule 4).
  */
 export async function runSeed(
   prisma: PrismaService,
@@ -136,6 +137,7 @@ export async function runSeed(
     }
 
     // Users, platform roles and memberships.
+    const disabled: string[] = [];
     for (const realmUser of input.realmUsers) {
       let user = await tx.user.findUnique({ where: { keycloakSub: realmUser.id } });
       if (!user) {
@@ -157,6 +159,13 @@ export async function runSeed(
           after: user,
         });
         summary.created.users += 1;
+      }
+
+      // A disabled account stays as it is: in a pilot the operator disables the demo users once
+      // its own people have their roles (P-08), and the seed runs again on every start.
+      if (user.status !== 'active') {
+        disabled.push(realmUser.username);
+        continue;
       }
 
       const userRoles = roles[realmUser.username];
@@ -206,6 +215,9 @@ export async function runSeed(
         });
         summary.created.memberships += 1;
       }
+    }
+    if (disabled.length > 0) {
+      summary.warnings.push(`disabled, roles not granted: ${disabled.join(', ')}`);
     }
   });
 

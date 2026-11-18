@@ -17,6 +17,7 @@
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
+  "actionTokenGeneratedByUserLifespan": 3600,
   "smtpServer": {
     "host": "mailpit",
     "port": "1025",

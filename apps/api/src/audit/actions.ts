@@ -8,6 +8,7 @@ export const AUDIT_ACTIONS = [
   // Session and people
   'user.registered',
   'user.created',
+  'user.disabled',
   'platform_role.granted',
   'platform_role.revoked',
   'notification_preference.updated',

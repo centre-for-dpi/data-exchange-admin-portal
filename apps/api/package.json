@@ -21,6 +21,7 @@
     "test:dist": "node scripts/smoke-dist.mjs",
     "traffic:simulate": "tsx src/analytics/simulate-traffic.ts",
     "platform-roles": "tsx src/admin/platform-roles-cli.ts",
+    "demo-users": "tsx src/admin/demo-users-cli.ts",
     "load:seed": "tsx src/load/scale-seed.ts"
   },
   "dependencies": {

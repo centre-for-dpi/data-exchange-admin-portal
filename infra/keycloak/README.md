@@ -9,6 +9,7 @@ At startup, Keycloak imports (`--import-realm`) the `*-realm.json` files in this
 - Client `den-portal-web`: confidential, Authorization Code + PKCE S256, no password grant. The access token carries `aud = den-portal-api` and lasts 5 minutes.
 - Self-registration with mandatory email verification (ADR-0018): you cannot sign in without confirming your email. A new account has no roles; it can only request onboarding for an entity and accept invitations addressed to its email. Brute-force protection; verification and recovery emails through Mailpit.
   - On a Keycloak that has already imported the realm, apply the change without deleting data: `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh update realms/den-portal -s registrationAllowed=true -s verifyEmail=true` (after `kcadm.sh config credentials`).
+- The verification and password reset links last 60 minutes (`actionTokenGeneratedByUserLifespan`; Keycloak's default is 5, P-08). On a Keycloak that has already imported the realm: `node scripts/keycloak-portal-mfa.mjs`.
 - Seed users with fixed IDs (the database seed links them by `keycloakSub`). Password: `DEN_DEMO_USER_PASSWORD` (defaults to `demo`, development only). **Roles do not live here**: the seed assigns them in PostgreSQL (ADR-0004).
 
 | User | ID (`sub`) | Role planned in the seed |
@@ -26,6 +27,7 @@ At startup, Keycloak imports (`--import-realm`) the `*-realm.json` files in this
   - The seed users with those roles (`ana`, `lucia`, `marta`, `pablo`, `sofia`) come with an OTP credential using the key `DEN_DEMO_TOTP_SECRET`. The key is used as is, as UTF-8 bytes, not base32. `pnpm demo:otp` gives the current code and the key in base32 for an authenticator app.
   - Every time a credential (password or second factor) is set or removed, Keycloak writes to the account owner and keeps the event for 90 days. The `email` listener is limited to those events with the startup option `--spi-events-listener--email--include-events` (compose), so a failed login does not generate an email. This is the mitigation for enrollment on first use (`ARCHITECTURE.md §3.1`).
   - On a Keycloak that has already imported the realm, apply it without deleting data: `node scripts/keycloak-portal-mfa.mjs --demo-otp`.
+- **In a pilot (P-08)**, once the operator's people have their platform roles, `sudo ./install.sh demo-users disable` disables these users in Keycloak and in the portal and revokes their platform roles; the seed and `--demo-otp` leave them disabled afterwards.
 
 ## Realm `den-gateway` (consumer applications)
 

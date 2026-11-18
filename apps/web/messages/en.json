@@ -752,7 +752,8 @@
       },
       "user": {
         "registered": "Account registered",
-        "created": "User created"
+        "created": "User created",
+        "disabled": "Account disabled"
       },
       "platform_role": {
         "granted": "Platform role granted",

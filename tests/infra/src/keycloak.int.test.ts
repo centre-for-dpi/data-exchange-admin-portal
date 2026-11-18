@@ -79,6 +79,25 @@ describe('realm den-portal (M0-03)', () => {
     expect(discovery.issuer).toBe(`${keycloakUrl()}/realms/den-portal`);
     expect(webUrl()).toMatch(/^https?:\/\//);
   });
+
+  it('gives the e-mail verification link an hour (P-08; scripts/keycloak-portal-mfa.mjs)', async () => {
+    const login = await fetch(`${keycloakUrl()}/realms/master/protocol/openid-connect/token`, {
+      method: 'POST',
+      body: new URLSearchParams({
+        grant_type: 'password',
+        client_id: 'admin-cli',
+        username: env('KEYCLOAK_ADMIN_USER'),
+        password: env('KEYCLOAK_ADMIN_PASSWORD'),
+      }),
+    });
+    const { access_token: adminToken } = (await login.json()) as { access_token: string };
+    const realm = (await (
+      await fetch(`${keycloakUrl()}/admin/realms/den-portal`, {
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+    ).json()) as { actionTokenGeneratedByUserLifespan?: number };
+    expect(realm.actionTokenGeneratedByUserLifespan).toBe(3600);
+  });
 });
 
 describe('realm den-portal: second factor (M3-08)', () => {

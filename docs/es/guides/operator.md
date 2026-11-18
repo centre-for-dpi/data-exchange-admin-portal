@@ -64,6 +64,10 @@ Los roles críticos (plataforma y `data_steward`) exigen **segundo factor** (có
 
 Ninguna pantalla da todavía los roles de plataforma. Cada persona del operador se registra en el portal, verifica su correo y entra una vez; después, en el servidor, `sudo ./install.sh platform-role grant <correo> <rol>` le da el rol, auditado (`list` muestra quién tiene cuál y `revoke` lo quita).
 
+El piloto siempre carga los usuarios de demo (`pablo.plataforma`, `ana.operadora` y los demás de `infra/keycloak/README.md`), con sus roles de plataforma y la contraseña de demo del instalador. Cuando la gente del operador tenga sus roles, con al menos un `platform_admin` propio, se desactivan con `sudo ./install.sh demo-users disable`. Ya no pueden entrar (quedan desactivados en Keycloak), pierden sus roles de plataforma y la semilla los deja así en cada reinicio y actualización. Queda auditado, se niega mientras el único `platform_admin` activo sea un usuario de demo y ningún comando lo deshace; `demo-users list` muestra su estado. Desde entonces el ensayo de la demo (`DEMO.md`) ya no corre en esa instalación.
+
+El enlace de verificación del correo dura 60 minutos (Keycloak trae 5). `sudo ./install.sh update` lo aplica, con el resto de la configuración de los realms, a una instalación hecha antes; `sudo ./install.sh realms` hace solo eso.
+
 ## 3. Arquitectura: dos planos
 
 ```mermaid
@@ -233,6 +237,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
    - credenciales (`sudo ./install.sh credentials`) a las personas que correspondan;
    - el segundo factor de los usuarios de demo enrolado en el teléfono de quien los usará (`sudo ./install.sh otp` da la clave).
 4. **Comprobar:** `sudo ./install.sh status` y el recorrido de `DEMO.md`.
+5. **Después:** cuando la gente del operador tenga sus roles, desactivar los usuarios de demo (`sudo ./install.sh demo-users disable`, §2).
 
 **Quién custodia qué después de la instalación:**
 
@@ -251,7 +256,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 - **Diario** (`OPERATIONS.md §4.1`): servicios sanos (`sudo ./install.sh status`), nada fuera de sincronía con el gateway, cadena de auditoría íntegra (Consola → Auditoría → "Verificar integridad"), registro de transparencia íntegro.
 - **Respaldos:** la base se respalda sola (pgBackRest): cada cambio queda archivado a los pocos minutos y hay un respaldo cada día, con un mes de historia. `sudo ./install.sh backup` antes de cada actualización y con regularidad, para llevar una copia fuera del servidor. Guarda también fuera del servidor la clave `PGBACKREST_REPO1_CIPHER_PASS` del `.env`: sin ella no se restaura nada.
 - **Restaurar:** `sudo ./install.sh restore` vuelve al último estado; `sudo ./install.sh restore "2026-11-20 14:30:00-05"`, a ese instante (`OPERATIONS.md §6`).
-- **Actualizar:** `sudo ./install.sh update`, que respalda, actualiza, recompila y reinicia.
+- **Actualizar:** `sudo ./install.sh update`, que respalda, actualiza, recompila, reinicia y aplica a Keycloak la configuración de los realms (`sudo ./install.sh realms` por separado).
 - **Runbook del operador** (`RUNBOOK.md`): alta de una entidad hasta su primera API publicada, suspensión y baja; incidentes con severidades y un procedimiento por caso; rotación de la CA intermedia, planificada y de emergencia; revocación masiva de certificados.
 - **Revocación masiva de certificados:** Consola → Revocación masiva de certificados, solo `platform_admin` con segundo factor. Filtra por entidad, por fecha de emisión y por intermedia, muestra una vista previa y revoca solo si el conjunto no cambió. Cada certificado deja de servir en menos de 60 segundos y los desarrolladores reciben un aviso. No se deshace.
 - **Clave de firma del gateway:** el portal la rota sola cada 90 días; la anterior sigue en el JWKS para que lo archivado siga verificando. Si se compromete, se rota de inmediato como comprometida (`POST /api/v1/admin/gateway-signing-keys/rotate`) y se avisa a los proveedores (`RUNBOOK.md §2.2`).
@@ -271,7 +276,7 @@ Detalle completo en [`INSTALL.md`](../INSTALL.md). Resumen:
 | Correo | Mailpit | SMTP del operador |
 | Secretos | `.env` en disco | Gestor de secretos (OpenBao) |
 | Identidad ciudadana | Simulada (`den-citizens`) | La del país |
-| Datos iniciales | Entidades ficticias y usuarios de demo | Sin datos de demo; el primer `platform_admin` es quien entra primero con la dirección de `DEN_BOOTSTRAP_ADMIN_EMAIL`, verificada por Keycloak (`DEPLOYMENT.md §9`) |
+| Datos iniciales | Entidades ficticias y usuarios de demo, que se desactivan cuando la gente del operador tiene sus roles (`install.sh demo-users disable`) | Sin datos de demo; el primer `platform_admin` es quien entra primero con la dirección de `DEN_BOOTSTRAP_ADMIN_EMAIL`, verificada por Keycloak (`DEPLOYMENT.md §9`) |
 | Antivirus | Opcional (paso 5 del instalador) | Activado, con dos réplicas |
 | Respaldos | Automáticos con pgBackRest en el mismo servidor; la copia fuera de él con `install.sh backup` | Automáticos al almacenamiento de objetos del operador (Barman Cloud) |
 | Métricas y alertas | Prometheus, Alertmanager y Grafana en el mismo servidor; avisos a Mailpit | Los mismos, con el SMTP del operador y almacenamiento de métricas de larga duración |

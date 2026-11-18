@@ -18,6 +18,11 @@
 #   sudo ./install.sh platform-role grant|revoke <email> <role> [--reason "..."] | list
 #                                  # platform roles of the operator's own people, audited;
 #                                  # the person registers and signs in once first
+#   sudo ./install.sh demo-users list|disable [--reason "..."] [--yes]
+#                                  # the seed's demo users: disable them (Keycloak and portal,
+#                                  # audited) once your own people have their platform roles
+#   sudo ./install.sh realms       # the realm files' settings on the existing realms (update
+#                                  # runs it): login flow, policies, 60-minute verification link
 #
 # Re-running the install keeps the existing .env: secrets of a running deployment never change
 # under it (database passwords, signing key, subject key; DEPLOYMENT.md §4.1).
@@ -509,6 +514,7 @@ summary() {
   info "Código de segundo factor: sudo ./install.sh otp"
   info "Estado:                   sudo ./install.sh status"
   info "Siguiente paso: docs/INSTALL.md §5 (verificación de punta a punta) y docs/es/guides/operator.md"
+  info "Usuarios de demo: cuando tu gente tenga sus roles (platform-role grant), desactívalos con sudo ./install.sh demo-users disable"
 }
 
 cmd_install() {
@@ -560,6 +566,7 @@ cmd_credentials() {
   [[ $(env_get DEN_INSTALL_OBSERVABILITY) == true ]] &&
     printf '  %-34s %s\n' "Grafana (/grafana):" "admin / $(env_get GRAFANA_ADMIN_PASSWORD)"
   info "Código de segundo factor de los usuarios de demo: sudo ./install.sh otp"
+  info "Si ya los desactivaste (demo-users disable), no entran: sudo ./install.sh demo-users list"
 }
 
 # Platform roles (operator, reviewer, regulator, auditor) for the operator's own people: no screen
@@ -568,6 +575,48 @@ cmd_platform_role() {
   require_install
   [[ $# -ge 1 ]] || fail "Uso: ./install.sh platform-role grant|revoke <correo> <rol> [--reason \"motivo\"] | list"
   dc exec -T api node --enable-source-maps dist/admin/platform-roles-cli.js "$@"
+  [[ $1 == grant ]] &&
+    info "Cuando tu gente tenga sus roles, desactiva los usuarios de demo: sudo ./install.sh demo-users disable"
+  return 0
+}
+
+# The seed's demo users (pablo.plataforma, ana.operadora...) keep their platform roles and the demo
+# password. Once the operator's own people have theirs, `disable` stops them signing in (Keycloak)
+# and revokes their roles in the portal, audited; the seed leaves them disabled (P-08). It refuses
+# while no platform_admin of the operator's own is active.
+cmd_demo_users() {
+  require_install
+  local cli=(dc exec -T api node --enable-source-maps dist/admin/demo-users-cli.js)
+  case ${1:-} in
+    list) "${cli[@]}" list ;;
+    disable)
+      shift
+      local args=() yes=false
+      for a in "$@"; do [[ $a == --yes ]] && yes=true || args+=("$a"); done
+      if [[ $yes != true ]]; then
+        "${cli[@]}" list
+        warn "Los usuarios de demo del portal (no los ciudadanos de la app demo) dejarán de entrar y perderán sus roles de plataforma. No hay comando para volver atrás."
+        warn "El ensayo automático (scripts/demo.mjs) y los códigos de 'otp' dejan de servir en esta instalación."
+        yes_no "¿Desactivarlos?" n || exit 0
+      fi
+      "${cli[@]}" disable "${args[@]}"
+      ;;
+    *) fail "Uso: sudo ./install.sh demo-users list | disable [--reason \"motivo\"] [--yes]" ;;
+  esac
+}
+
+# The settings of infra/keycloak/*-realm.json on realms Keycloak imported before (--import-realm
+# skips existing realms): login flow and second factor, password policy, events, redirect URIs,
+# the 60-minute verification link (P-08) and the secret rotation policy. Idempotent; it reaches
+# Keycloak on the Compose network as the master administrator of .env.
+cmd_realms() {
+  require_install
+  local url s
+  url=$(env_get DEN_GATEWAY_KEYCLOAK_URL); url=${url:-http://keycloak:8080/auth}
+  for s in keycloak-portal-mfa.mjs keycloak-client-policies.mjs; do
+    docker run --rm --network den_default -v "$ROOT:/w:ro" -w /w -e KEYCLOAK_URL="$url"       "$NODE_IMAGE" node "scripts/$s" || return 1
+  done
+  ok "Realms de Keycloak al día con infra/keycloak"
 }
 
 cmd_otp() {
@@ -624,6 +673,7 @@ cmd_update() {
   ensure_env_additions
   write_edge
   dc up -d --build --wait --wait-timeout 1800
+  cmd_realms || warn "No pude aplicar la configuración de los realms de Keycloak. Reintenta: sudo ./install.sh realms"
   ok "Actualizado a $(git log -1 --format='%h %s')"
   warn "Revisa en DEPLOYMENT.md §5.4 si la versión pide pasos manuales (realms, variables nuevas)."
 }
@@ -661,8 +711,10 @@ case ${1:-install} in
   update) cmd_update ;;
   images) shift; cmd_images "${1:-}" ;;
   platform-role) shift; cmd_platform_role "$@" ;;
+  demo-users) shift; cmd_demo_users "$@" ;;
+  realms) cmd_realms ;;
   stop) require_install; dc stop ;;
   start) require_install; dc up -d --wait --wait-timeout 900 ;;
-  -h | --help | help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help | help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) fail "Comando desconocido: $1 (ver ./install.sh help)" ;;
 esac

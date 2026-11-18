@@ -27,6 +27,7 @@ interface RealmFile {
   }>;
   defaultDefaultClientScopes?: string[];
   accessTokenLifespan?: number;
+  actionTokenGeneratedByUserLifespan?: number;
   attributes?: Record<string, string>;
   browserFlow?: string;
   otpPolicyCodeReusable?: boolean;
@@ -93,6 +94,17 @@ describe('realm den-portal', () => {
   it('allows self-registration only with a verified e-mail (ADR-0018)', () => {
     expect(realm.registrationAllowed).toBe(true);
     expect(realm.verifyEmail).toBe(true);
+  });
+
+  it("gives the verification link an hour, not Keycloak's 5 minutes (P-08)", () => {
+    expect(realm.actionTokenGeneratedByUserLifespan).toBe(3600);
+  });
+
+  it("the realm update script applies the link's lifespan to an existing realm (P-08)", () => {
+    const script = readFileSync(fromRoot('scripts/keycloak-portal-mfa.mjs'), 'utf8');
+    expect(script).toContain(
+      'actionTokenGeneratedByUserLifespan: realmFile.actionTokenGeneratedByUserLifespan',
+    );
   });
 });
 
