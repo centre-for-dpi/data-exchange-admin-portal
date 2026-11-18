@@ -1,0 +1,54 @@
+import { spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join, resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const script = resolve(import.meta.dirname, 'entity-check.sh');
+
+/** Runs `entity-check.sh csr <id>` in a fresh directory, optionally with extra PATH entries first. */
+function csr(id, { pathFirst } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'den-csr-'));
+  const env = { ...process.env };
+  if (pathFirst) env.PATH = `${pathFirst}${delimiter}${env.PATH}`;
+  const result = spawnSync('bash', [script, 'csr', id], { cwd: dir, encoding: 'utf8', env });
+  return { ...result, dir };
+}
+
+const subjectOf = (file) =>
+  spawnSync('openssl', ['req', '-in', file, '-noout', '-subject'], { encoding: 'utf8' }).stdout.trim();
+
+describe('entity-check.sh csr', () => {
+  const id = 'den-app-01a1efe4-c982-7e65-8855-7ea59c07bb55';
+
+  it('makes the key and a CSR naming exactly the client id, also from Git Bash on Windows', () => {
+    const r = csr(id);
+    expect(r.status, r.stderr).toBe(0);
+    expect(subjectOf(join(r.dir, `${id}.csr`))).toBe(`subject=CN=${id}`);
+    expect(readFileSync(join(r.dir, `${id}.key`), 'utf8')).toMatch(/BEGIN PRIVATE KEY/);
+    if (process.platform !== 'win32') {
+      expect(statSync(join(r.dir, `${id}.key`)).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  it('leaves no half-made key behind and says why when OpenSSL fails', () => {
+    // A stand-in openssl that fails the way a rejected subject does.
+    const fake = mkdtempSync(join(tmpdir(), 'den-fake-openssl-'));
+    const bin = join(fake, 'openssl');
+    writeFileSync(
+      bin,
+      '#!/usr/bin/env bash\necho "req: subject name is expected to be in the format /type0=value0" >&2\nexit 1\n',
+    );
+    chmodSync(bin, 0o755);
+    const r = csr(id, { pathFirst: fake });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/subject name is expected/);
+    expect(existsSync(join(r.dir, `${id}.key`))).toBe(false);
+    expect(existsSync(join(r.dir, `${id}.csr`))).toBe(false);
+  });
+
+  it('refuses a client id with characters that could change the command', () => {
+    const r = csr('den-app; rm -rf /');
+    expect(r.status).not.toBe(0);
+  });
+});

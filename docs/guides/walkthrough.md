@@ -198,18 +198,25 @@ Same as steps 2 to 4. If one person will hold every role, they put their own ema
 
 ### 8.3 The application's certificate (mTLS)
 
-The private key is generated **on the server where the application will run** and never leaves it; only the request (CSR) goes to the portal.
+The private key is generated **on the server where the application will run** and never leaves it; only the request (CSR) goes to the portal. The easiest way is the portal repository's `entity-check.sh` script, which the operator hands to the entities:
+
+```bash
+./entity-check.sh csr <CLIENT_ID>      # makes <CLIENT_ID>.key (readable only by its owner) and <CLIENT_ID>.csr
+cat <CLIENT_ID>.csr
+```
+
+It works the same on Linux, macOS and Git Bash on Windows, refuses to overwrite an existing key, checks that the CSR names exactly the Client ID and, if OpenSSL fails, says why without leaving a half-made key.
+
+Without the script, the equivalent command is:
 
 ```bash
 umask 077
 MSYS_NO_PATHCONV=1 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
   -keyout <CLIENT_ID>.key -out <CLIENT_ID>.csr -subj "/CN=<CLIENT_ID>"
 openssl req -in <CLIENT_ID>.csr -noout -subject      # must show: subject=CN=<CLIENT_ID>
-cat <CLIENT_ID>.csr
 ```
 
-- `MSYS_NO_PATHCONV=1` is for **Git Bash on Windows**, which otherwise turns `/CN=…` into a path (`C:/Program Files/Git/CN=…`); OpenSSL rejects it and leaves the key without a CSR: delete it and try again. On Linux and macOS it does nothing.
-- The `CN` must be **exactly** the Client ID.
+`MSYS_NO_PATHCONV=1` is for **Git Bash on Windows**, which otherwise turns `/CN=…` into a path (`C:/Program Files/Git/CN=…`): OpenSSL rejects it and leaves the key without a CSR. On Linux and macOS it does nothing. The `CN` must be **exactly** the Client ID.
 
 In the application, **Client certificate (mTLS)**: paste the whole CSR (from `-----BEGIN CERTIFICATE REQUEST-----` to `-----END CERTIFICATE REQUEST-----`) **→ Request certificate → Download**. Save it as `<CLIENT_ID>.crt` next to the key.
 
@@ -236,11 +243,20 @@ In the application, **Client certificate (mTLS)**: paste the whole CSR (from `--
 
 ## 10. The first lookup
 
-From the application's server, with the key, the certificate, the Client ID and the secret:
+From the application's server, in the folder with `<CLIENT_ID>.key` and `<CLIENT_ID>.crt`:
+
+```bash
+./entity-check.sh check portal.example.org gateway.example.org        # reaches the network and saves its root
+./entity-check.sh call portal.example.org gateway.example.org <CLIENT_ID> \
+  /civil-registry/certificados-afiliacion/v1/certificados/1000000001 eligibility_check official-123
+```
+
+The script asks for the secret without showing it (or reads `CLIENT_SECRET`), requests the token with the certificate, makes the lookup with the purpose and the official, and explains the answer. The secret and the token never go on the command line.
+
+The same with `curl`, step by step:
 
 ```bash
 curl -fsS https://portal.example.org/api/v1/pki/ca -o network-ca.pem   # the network's root
-
 read -rs CLIENT_SECRET                                                 # paste it: it stays out of the history
 TOKEN=$(curl -fsS --cacert network-ca.pem --cert <CLIENT_ID>.crt --key <CLIENT_ID>.key \
   -u "<CLIENT_ID>:$CLIENT_SECRET" -d grant_type=client_credentials \
@@ -268,7 +284,7 @@ curl -sS --cacert network-ca.pem --cert <CLIENT_ID>.crt --key <CLIENT_ID>.key \
 | A platform role does not show | The person never signed in | Have them sign in once and run `platform-role grant` again |
 | The API cannot be approved (409) | The automatic validations failed | See the version sheet; fix it and **Run validations again** |
 | Validation with **504** (timeout) | The gateway does not reach the node through the tunnel | On the node: `sudo /opt/den-node/install.sh status` (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: `sudo /opt/den-node/install.sh stop` and `start` |
-| `subject name is expected to be in the format /type0=value0…` | Git Bash turned `/CN=…` into a path | Delete the half-made key and repeat with `MSYS_NO_PATHCONV=1` |
+| `subject name is expected to be in the format /type0=value0…` | Git Bash turned `/CN=…` into a path | Use `./entity-check.sh csr`, or delete the half-made key and repeat with `MSYS_NO_PATHCONV=1` |
 | The portal rejects the CSR | The `CN` is not the Client ID, or the key is not ECDSA P-256/P-384 or RSA 2048–4096 | Make another one with the exact Client ID |
 | The node's logs say `(unknown)` | The service has no OpenAPI on the node | `install.sh service remove <service>` and add it again with the OpenAPI |
 
@@ -280,7 +296,7 @@ Found in the rehearsal and recorded in the portal's backlog (section P):
 - **P-02** A warning when the node serves a contract other than the published one.
 - **P-03** The kit bundle, its checksum and the commands on the portal's nodes page.
 - **P-04** Offering only the service types the country allows (the node and X-Road), with clear names.
-- **P-05** A CSR command that works the same on Linux, Git Bash and PowerShell.
+- **P-05** The application page showing a CSR command that works on Linux, Git Bash and PowerShell (or pointing to `entity-check.sh`).
 - **P-06** The deployment's `.env` sends documents to a folder the API cannot write (the workaround is in the table above).
 - **P-07** Not letting a version be approved with failed validations, and explaining what to do with each failure.
 - **P-08** Disabling the pilot's demo accounts and making the verification link last longer.

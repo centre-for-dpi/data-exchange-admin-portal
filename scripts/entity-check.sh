@@ -72,8 +72,17 @@ cmd_csr() {
   local id=${1:?client_id}
   [[ $id =~ ^[A-Za-z0-9._-]+$ ]] || fail "client_id inválido: $id"
   [[ -e $id.key ]] && fail "$id.key ya existe: no la sobrescribo."
-  (umask 077 && openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-    -keyout "$id.key" -out "$id.csr" -subj "/CN=$id" 2>/dev/null)
+  # MSYS_NO_PATHCONV: Git Bash on Windows turns "/CN=..." into a Windows path before OpenSSL sees
+  # it; elsewhere the variable does nothing. On any failure, no half-made key is left behind.
+  if ! (umask 077 && MSYS_NO_PATHCONV=1 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
+    -nodes -keyout "$id.key" -out "$id.csr" -subj "/CN=$id"); then
+    rm -f "$id.key" "$id.csr"
+    fail "OpenSSL no pudo crear la solicitud (ver el mensaje anterior); no quedó ninguna llave a medias."
+  fi
+  if [[ $(openssl req -in "$id.csr" -noout -subject 2>/dev/null) != "subject=CN=$id" ]]; then
+    rm -f "$id.key" "$id.csr"
+    fail "La solicitud no nombra a $id; no quedó ninguna llave a medias."
+  fi
   ok "Llave privada: $id.key (permisos 600; NUNCA sale de este servidor)"
   ok "Solicitud de certificado: $id.csr"
   info "Pega el contenido de $id.csr en la ficha de la aplicación → Certificado de cliente (mTLS),"
