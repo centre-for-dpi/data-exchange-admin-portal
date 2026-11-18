@@ -16,7 +16,9 @@ function csr(id, { pathFirst } = {}) {
 }
 
 const subjectOf = (file) =>
-  spawnSync('openssl', ['req', '-in', file, '-noout', '-subject'], { encoding: 'utf8' }).stdout.trim();
+  spawnSync('openssl', ['req', '-in', file, '-noout', '-subject'], {
+    encoding: 'utf8',
+  }).stdout.trim();
 
 describe('entity-check.sh csr', () => {
   const id = 'den-app-01a1efe4-c982-7e65-8855-7ea59c07bb55';
