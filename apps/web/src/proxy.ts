@@ -1,14 +1,21 @@
-import type { NextFetchEvent, NextRequest } from 'next/server';
+import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { auth } from './auth';
 import { routing } from './i18n/routing';
 import { contentSecurityPolicy, newNonce, originOf } from './lib/security-headers';
+import { homePathFor, requiresSession } from './lib/session-routes';
 
 const intl = createMiddleware(routing);
 
 // auth() runs the jwt callback on every navigation, so an access token close to expiry is
 // refreshed and the session cookie rewritten before server components call the API.
-const withAuth = auth((request) => intl(request));
+const withAuth = auth((request) => {
+  // No session (never signed in, or expired): the home page offers "Sign in"; a 404 would not.
+  if (!request.auth && requiresSession(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL(homePathFor(request.nextUrl.pathname), request.nextUrl));
+  }
+  return intl(request);
+});
 
 /**
  * Auth.js hands the handler a request with the public origin (AUTH_URL). Behind a reverse proxy
