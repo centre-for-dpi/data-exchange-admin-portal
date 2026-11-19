@@ -148,7 +148,7 @@ Since M5-06, the alerts in `ARCHITECTURE.md §9` reach the operator by email (Al
 | `DenQueueBacklog` | API logs; SQL 2 (§4.2) |
 | `DenTransparencyRecordsDropped` | `dc logs api` ("Transparency records dropped", counts by reason). `invalid`: a gateway or Fluent Bit sending a format the collector does not know (versions out of step); `unknown_subscription` or `route_mismatch`: records that do not match what OPA authorized, possibly forged on the `logs` network |
 | `DenTransparencyUnsealed` | `dc logs api` (the sealer: "Transparency sealing round failed", or `DEN_TRANSPARENCY_SIGNING_JWK is not set`); the API's worker is on (`DEN_WORKER`) |
-| `DenTransparencyUnstamped` | `dc logs api` ("Checkpoint N not stamped yet"); that the API reaches `DEN_TSA_URL` |
+| `DenTransparencyUnstamped` | `dc logs api` ("Checkpoint N not stamped yet"); that the API reaches `DEN_TSA_URL` and that its stamps chain to `DEN_TSA_ROOTS_FILE` |
 
 ### 4.2 Diagnostic queries
 

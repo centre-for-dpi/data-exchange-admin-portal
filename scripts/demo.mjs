@@ -419,11 +419,15 @@ async function main() {
   );
   const { verifyReceipt, certificatesInPem } = await import(pathToFileURL(verifierPath).href);
   const jwks = await (await fetch(`${API}/transparency/jwks`)).json();
+  // The TSA's roots pinned by file (ADR-0032), or the development TSA's own chain.
+  const tsaRootsFile = env('DEN_TSA_ROOTS_FILE', '');
   const tsaRootUrl = env(
     'CITIZEN_APP_TSA_ROOT_URL',
-    `${env('DEN_TSA_URL', 'http://localhost:3004')}/api/v1/timestamp/certchain`,
+    `${env('DEN_TSA_URL', 'http://localhost:3004').replace(/\/+$/, '')}/api/v1/timestamp/certchain`,
   );
-  const tsaChain = await (await fetch(tsaRootUrl)).text();
+  const tsaChain = tsaRootsFile
+    ? readFileSync(tsaRootsFile, 'utf8')
+    : await (await fetch(tsaRootUrl)).text();
   const result = await verifyReceipt(receipt, { jwks, tsaRoots: certificatesInPem(tsaChain) });
   expect(result.valid, `the receipt does not verify: ${result.errors.join('; ')}`);
   ok(

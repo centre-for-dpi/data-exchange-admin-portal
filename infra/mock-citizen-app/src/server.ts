@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import cookie from '@fastify/cookie';
 import formbody from '@fastify/formbody';
 import { getCountryConfig } from '@den/config';
@@ -157,7 +158,10 @@ export function buildServer(
     if (material && Date.now() - material.at < PUBLIC_MATERIAL_TTL_MS) return material;
     const [jwks, chain] = await Promise.all([
       fetchFn(config.portal.jwksUrl).then((r) => r.json() as Promise<JSONWebKeySet>),
-      fetchFn(config.portal.tsaRootUrl).then((r) => r.text()),
+      // Pinned roots, when configured: nothing about the TSA's trust is downloaded (ADR-0032).
+      config.portal.tsaRootsFile
+        ? readFile(config.portal.tsaRootsFile, 'utf8')
+        : fetchFn(config.portal.tsaRootUrl).then((r) => r.text()),
     ]);
     material = { at: Date.now(), jwks, roots: certificatesInPem(chain) };
     return material;
@@ -537,7 +541,7 @@ export function buildServer(
       <p>
         ${t.cli}<br /><code
           >den-verify-receipt comprobante-${id}.json --jwks ${config.portal.jwksUrl} --tsa-root
-          ${config.portal.tsaRootUrl}</code
+          ${config.portal.tsaRootsFile ? 'tsa-root.pem' : config.portal.tsaRootUrl}</code
         >
       </p>
       <p><a href="${base}/consultas">${t.back}</a></p>`;

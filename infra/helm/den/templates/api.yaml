@@ -75,6 +75,7 @@ spec:
             - { name: tmp, mountPath: /tmp }
             - { name: documents, mountPath: /var/lib/den/documents }
             - { name: db-ca, mountPath: /var/run/den/db-ca, readOnly: true }
+            - { name: tsa-roots, mountPath: /etc/den/tsa, readOnly: true }
             {{- if .Values.opensearch.enabled }}
             - { name: internal-ca, mountPath: /var/run/den/internal-ca, readOnly: true }
             {{- end }}
@@ -95,6 +96,19 @@ spec:
         {{- end }}
         - name: documents
           persistentVolumeClaim: { claimName: {{ include "den.name" "api-documents" }} }
+        # The accredited TSA's trust roots, pinned by configuration (ADR-0032).
+        - name: tsa-roots
+          configMap: { name: {{ include "den.name" "api-tsa" }} }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "den.name" "api-tsa" }}
+  labels:
+    {{- include "den.labels" $c | nindent 4 }}
+data:
+  roots.pem: |
+    {{- required "api.tsa.trustedRoots: the PEM roots of the accredited TSA" .Values.api.tsa.trustedRoots | nindent 4 }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

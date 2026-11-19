@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { loadCountryConfig } from '@den/config';
 import {
@@ -10,7 +11,7 @@ import {
   transparencyReceiptSchema,
   transparencyVerificationSchema,
 } from '@den/contracts';
-import { verifyReceipt } from '@den/transparency-verifier';
+import { certificatesInPem, verifyReceipt } from '@den/transparency-verifier';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, createTestIssuer, type TestIssuer } from '../../../test/test-auth.js';
@@ -20,7 +21,7 @@ import { routeId } from '../../reconcilers/apisix/desired-state.js';
 import { readRealmUsers } from '../../seed/realm.js';
 import { runSeed } from '../../seed/seed.js';
 import { TransparencyEvidenceService } from './transparency-evidence.service.js';
-import { TsaClient } from './tsa.client.js';
+import { TsaClient, tsaSettings } from './tsa.client.js';
 
 const openapi = readFileSync(
   resolve(import.meta.dirname, '../../../../../infra/mock-providers/salud/openapi.yaml'),
@@ -307,6 +308,52 @@ describe('transparency evidence (MT-04)', () => {
       ).toBe(0);
       await evidence.sealPending();
       await evidence.stampPending();
+    });
+
+    it('stamps through an RFC 3161 TSA at its full URL, trusting only pinned roots (M-14)', async () => {
+      const development = tsaSettings();
+      const chain = certificatesInPem(await (await fetch(development.chainUrl ?? '')).text());
+      const dir = mkdtempSync(join(tmpdir(), 'den-tsa-roots-'));
+      const roots = join(dir, 'roots.pem');
+      const saved = { url: process.env.DEN_TSA_URL, roots: process.env.DEN_TSA_ROOTS_FILE };
+      try {
+        // The TSA as any RFC 3161 one: its full URL, and only its root, from a file.
+        process.env.DEN_TSA_URL = development.url;
+        process.env.DEN_TSA_ROOTS_FILE = roots;
+        writeFileSync(roots, chain.at(-1) ?? '');
+        const [id] = await ingest(1);
+        const [seq] = await evidence.sealPending();
+        expect(await evidence.stampPending()).toContain(seq);
+        const receipt = transparencyReceiptSchema.parse(
+          (await call('GET', `/transparency/records/${id}/receipt`, 'sofia.auditora')).json(),
+        );
+        const jwks = (await call('GET', '/transparency/jwks')).json<{ keys: [] }>();
+        expect(
+          await verifyReceipt(receipt, { jwks, tsaRoots: [chain.at(-1) ?? ''] }),
+        ).toMatchObject({ valid: true });
+
+        // Another root pinned: the same TSA's stamps are not trusted, the batch stays pending.
+        const other = JSON.parse(
+          readFileSync(
+            resolve(
+              import.meta.dirname,
+              '../../../../../packages/transparency-verifier/src/__fixtures__/receipt-fixture.json',
+            ),
+            'utf8',
+          ),
+        ) as { otherRoot: string };
+        process.env.DEN_TSA_ROOTS_FILE = join(dir, 'other.pem');
+        writeFileSync(process.env.DEN_TSA_ROOTS_FILE, other.otherRoot);
+        await ingest(1);
+        const [pending] = await evidence.sealPending();
+        expect(await evidence.stampPending()).not.toContain(pending);
+      } finally {
+        process.env.DEN_TSA_URL = saved.url;
+        if (saved.roots === undefined) delete process.env.DEN_TSA_ROOTS_FILE;
+        else process.env.DEN_TSA_ROOTS_FILE = saved.roots;
+        rmSync(dir, { recursive: true, force: true });
+      }
+      while ((await evidence.stampPending()).length > 0);
     });
 
     it('keeps a batch pending while the TSA does not answer, and stamps it later', async () => {

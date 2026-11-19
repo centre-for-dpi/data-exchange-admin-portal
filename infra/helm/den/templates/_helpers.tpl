@@ -175,6 +175,10 @@ Bit run in every gateway pod, on 127.0.0.1).
 {{- end }}
 - { name: DEN_STEP_CA_URL, value: {{ printf "https://%s:9000" (include "den.name" "step-ca") | quote }} }
 - { name: DEN_STEP_CA_ROOT_FINGERPRINT, value: {{ required "stepCa.rootFingerprint: the SHA-256 of the network's root" .Values.stepCa.rootFingerprint | quote }} }
+# The accredited TSA (ADR-0032): its full URL, and its roots pinned in the den-api-tsa ConfigMap.
+- { name: DEN_TSA_URL, value: {{ required "api.tsa.url: the full URL of the accredited RFC 3161 TSA" .Values.api.tsa.url | quote }} }
+- { name: DEN_TSA_ROOTS_FILE, value: /etc/den/tsa/roots.pem }
+- { name: DEN_TSA_REQUIRE_INDEPENDENT, value: {{ .Values.api.tsa.requireIndependent | quote }} }
 {{- range $name, $value := .Values.api.env }}
 - { name: {{ $name }}, value: {{ $value | quote }} }
 {{- end }}

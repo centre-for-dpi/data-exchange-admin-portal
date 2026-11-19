@@ -73,11 +73,18 @@ api:
     storageClass: ''
     size: 20Gi
     accessMode: ReadWriteMany
+  # The country's accredited RFC 3161 time-stamping authority (ADR-0016, ADR-0032): the full URL
+  # requests are POSTed to, and its trust roots (PEM: the root, plus intermediates its tokens do
+  # not carry), pinned here and never downloaded from the TSA. Both required. The API refuses to
+  # start if they are the development TSA's (requireIndependent).
+  tsa:
+    url: ''
+    trustedRoots: ''
+    requireIndependent: true
   # Non-secret settings (see .env.example); the secrets come from den-api.
   env:
     DEN_MAIL_FROM: no-reply@den.example.org
     DEN_SMTP_URL: smtp://smtp.example.org:587
-    DEN_TSA_URL: https://tsa.example.org
     DEN_TRANSPARENCY_LOG_ID: den-transparency
     DEN_GATEWAY_NODES: '2'
   resources:

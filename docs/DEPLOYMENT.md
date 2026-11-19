@@ -201,6 +201,13 @@ It also signs the kit nodes' certificates when they enroll and when they renew (
 - `fluent-bit-transparency` (`infra/fluent-bit/transparency.yaml`): TCP input 5170 in JSON, Lua filter `transparency.lua`, HTTP output to `${DEN_TRANSPARENCY_COLLECTOR_HOST}:${DEN_TRANSPARENCY_COLLECTOR_PORT}/api/v1/internal/subject-access` with `Bearer ${DEN_TRANSPARENCY_INGEST_TOKEN}`. Disk buffer (`transparency-buffer`, up to 1 GB) and unlimited retries: if the API goes down, the records wait.
 - `tsa-init` creates the development TSA's chain once, in `tsa-data` (`infra/tsa/init.sh`). `tsa` is sigstore timestamp-server with that key. In production the country's accredited TSA is used (`DEN_TSA_URL`).
 - The TSA chain is public: `GET /api/v1/timestamp/certchain`.
+- **The development TSA is not independent (ADR-0032, M-14).** The operator runs it and holds its key: with it, the operator could rewrite the register and stamp it again. Without `DEN_TSA_ROOTS_FILE` the API trusts the chain this TSA serves about itself, and with `NODE_ENV=production` (the pilot's images) it logs at every start that the guarantee of ADR-0016 does not hold. `DEN_TSA_REQUIRE_INDEPENDENT=true` makes it refuse to start instead.
+- **Connecting the country's accredited TSA** (any RFC 3161 TSA):
+  1. `DEN_TSA_URL`: the full URL of its RFC 3161 endpoint, as it publishes it (for example `https://tsa.example.org/tsr`); requests are POSTed to it as is.
+  2. `DEN_TSA_ROOTS_FILE`: a PEM file in the API container with its root (and any intermediate its tokens do not carry), taken from the accreditation's publication, never from the TSA's endpoint. In the pilot, mount it read-only in the `api` service with an override of `docker-compose.deploy.yml` (`volumes: ['/etc/den/tsa-roots.pem:/etc/den/tsa-roots.pem:ro']`).
+  3. `DEN_TSA_REQUIRE_INDEPENDENT=true`.
+  4. Verifiers: publish the same roots. The reference citizen app takes them with `CITIZEN_APP_TSA_ROOTS_FILE` (mounted the same way) or `CITIZEN_APP_TSA_ROOT_URL` (where the accreditation publishes them); `den-verify-receipt` with `--tsa-root`.
+  5. Keep `tsa-data` and its backup: stamps issued earlier by the development TSA only verify against its chain.
 
 **Role of `fluent-bit-errors` in the deployment (M5-01).** It receives the nginx error log from APISIX over syslog. A real error, for example a provider that does not respond, carries the request line and the upstream URI, with the ID number in the path. This service masks them (`infra/fluent-bit/gateway-errors.lua`) and writes the result to its output: **the operator reads the gateway's errors with `docker logs den-fluent-bit-errors-1`, not in APISIX**. APISIX depends on it to start, because nginx resolves the syslog server's name when it reads its configuration. If this service goes down, errors are lost (UDP) and traffic is not affected.
 
@@ -284,7 +291,7 @@ It also serves the data subject API that the citizen app consumes.
 It shows what a real citizen app must implement; it is not a product.
 
 - Demo prop (MT-07). Its public URL (`DEN_CITIZEN_APP_URL`) sets the base path: in the pilot, `/citizen-app`.
-- Main variables: `DEN_CITIZEN_APP_URL`, `DEN_CITIZEN_ISSUER`, `DEN_CITIZEN_APP_CLIENT_SECRET`, `CITIZEN_APP_WEBHOOK_SECRET` (required), `CITIZEN_APP_PORTAL_API_URL`, `CITIZEN_APP_JWKS_URL`, `CITIZEN_APP_TSA_ROOT_URL`, `CITIZEN_APP_SMTP_HOST/PORT`, `CITIZEN_APP_DATA_FILE`.
+- Main variables: `DEN_CITIZEN_APP_URL`, `DEN_CITIZEN_ISSUER`, `DEN_CITIZEN_APP_CLIENT_SECRET`, `CITIZEN_APP_WEBHOOK_SECRET` (required), `CITIZEN_APP_PORTAL_API_URL`, `CITIZEN_APP_JWKS_URL`, `CITIZEN_APP_TSA_ROOT_URL`, `CITIZEN_APP_TSA_ROOTS_FILE` (ADR-0032), `CITIZEN_APP_SMTP_HOST/PORT`, `CITIZEN_APP_DATA_FILE`.
 - It stores citizens' email addresses and alert links in `citizen-app-data` (`alerts.json`).
 
 ### 3.13 Test providers (`infra/mock-providers`)
@@ -379,7 +386,9 @@ Other gateway variables (M3): `DEN_GATEWAY_NODES` (how many APISIX nodes serve t
 | `APISIX_ADMIN_URL` | `http://localhost:9180` | `http://apisix:9180` |
 | `OPA_PORTAL_URL` | `http://host.docker.internal:4000/api/v1/opa` | `http://api:4000/api/v1/opa` |
 | `DEN_TRANSPARENCY_COLLECTOR_HOST` | `host.docker.internal` | `api` |
-| `DEN_TSA_URL` | `http://localhost:3004` | `http://tsa:3004` |
+| `DEN_TSA_URL` | `http://localhost:3004` | `http://tsa:3004` (the accredited TSA's full URL, §3.7) |
+| `DEN_TSA_ROOTS_FILE` | empty (development TSA) | empty; the accredited TSA's roots (§3.7) |
+| `DEN_TSA_REQUIRE_INDEPENDENT` | `false` | `false`; `true` with the accredited TSA |
 | `DEN_STEP_CA_URL` | `https://localhost:9000` | `https://step-ca:9000` |
 | `DEN_STEP_CA_ROOT_FILE` | empty | `/var/lib/den/step-ca/root_ca.crt` |
 | `DEN_WEB_URL`, `AUTH_URL` | `http://localhost:3000` | `${DEN_PUBLIC_URL}` |
@@ -564,7 +573,7 @@ In development OPA and `fluent-bit-transparency` reach the API on the host throu
 | Initial data | Always loads the seed: fictitious entities and demo users, including platform administrators, until the operator disables them (`install.sh demo-users disable`, `OPERATIONS.md §2.3`) | No demo data. The first `platform_admin` comes from `DEN_BOOTSTRAP_ADMIN_EMAIL` (§9.3) |
 | Keycloak | `start-dev`, same PostgreSQL instance | Cluster in production mode, its own database |
 | CA | Development CA in a volume | Offline root, intermediate in an HSM |
-| TSA | sigstore with a key in a file | The country's accredited TSA |
+| TSA | sigstore with a key in a file; the API warns at every start (ADR-0032) | The country's accredited TSA, its roots pinned (`DEN_TSA_ROOTS_FILE`) |
 | etcd | One node, no TLS | Cluster of 3 with mTLS |
 | OpenSearch | No security, no retention | Security plugin, retention policy |
 | Mail | Mailpit | The operator's SMTP |
@@ -635,6 +644,7 @@ Helm only reads files inside the chart. `pnpm helm:sync` copies into `infra/helm
 
 Besides `country`, `publicUrl`, `gatewayHost` and `gatewayPublicUrl`:
 - `stepCa.rootFingerprint` and `stepCa.pkiSecret` (§9.3);
+- `api.tsa.url` and `api.tsa.trustedRoots`: the full URL of the accredited RFC 3161 TSA and its PEM roots, mounted in the API as `DEN_TSA_ROOTS_FILE` (ADR-0032). Both are required, and `api.tsa.requireIndependent` (default `true`) makes the API refuse to start with the development TSA's root. `DEN_TSA_URL` no longer goes in `api.env`;
 - `postgres.backup.destinationPath` (`s3://<bucket>/<path>`) and, with the operator's own storage, `endpointURL` and `endpointCASecret`. Without `destinationPath` the chart does not install; backups are only disabled on purpose (`postgres.backup.enabled=false`, as in kind);
 - `keycloak.smtp` (the realm's server and sender) and `prometheus.alertmanager.config` (server, sender and recipients of the alerts);
 - with ingress-nginx, `ingress.annotations` with `nginx.ingress.kubernetes.io/proxy-body-size` large enough for the PDF uploads and the kit bundle the operator mirrors (P-03; its default is 1 MiB). `/kit/<version>/` goes to the web through `/` like any page;

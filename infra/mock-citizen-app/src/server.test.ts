@@ -22,6 +22,7 @@ const config: CitizenAppConfig = {
     apiUrl: 'https://portal.test',
     jwksUrl: 'https://portal.test/api/v1/transparency/jwks',
     tsaRootUrl: 'https://tsa.test/api/v1/timestamp/certchain',
+    tsaRootsFile: null,
   },
   webhookSecret: secret,
   smtp: { host: 'localhost', port: 1025, from: 'avisos@citizen-app.test' },

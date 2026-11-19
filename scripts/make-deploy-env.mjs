@@ -160,6 +160,9 @@ const set = {
   OPA_PORTAL_URL: 'http://api:4000/api/v1/opa',
   DEN_TRANSPARENCY_COLLECTOR_HOST: 'api',
   DEN_TSA_URL: 'http://tsa:3004',
+  // The pilot stamps with the development TSA: the API says so at every start. With the accredited
+  // TSA, its full URL above, DEN_TSA_ROOTS_FILE and true here (DEPLOYMENT.md §3.7, ADR-0032).
+  DEN_TSA_REQUIRE_INDEPENDENT: 'false',
   DEN_STEP_CA_URL: 'https://step-ca:9000',
   // The step-ca volume is mounted read-only in the API container (docker-compose.deploy.yml).
   DEN_STEP_CA_ROOT_FILE: '/var/lib/den/step-ca/root_ca.crt',

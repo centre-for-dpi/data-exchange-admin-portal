@@ -105,6 +105,12 @@ ensure_env_additions() {
       info "Nueva credencial interna en .env: $key."
     fi
   done
+  # The TSA's trust (M-14, ADR-0032), new in this version: the pilot stamps with the development
+  # TSA and the API says so at start. With the accredited one: DEN_TSA_URL, DEN_TSA_ROOTS_FILE, true.
+  if [[ -z $(env_get DEN_TSA_REQUIRE_INDEPENDENT) ]]; then
+    env_set DEN_TSA_REQUIRE_INDEPENDENT false
+    info "DEN_TSA_REQUIRE_INDEPENDENT=false en .env: la TSA es la de desarrollo (DEPLOYMENT.md §3.7)."
+  fi
   # Earlier .env files carried the development value (data/documents), which the API cannot write.
   if [[ $(env_get DEN_DOCUMENTS_DIR) != /var/lib/den/documents ]]; then
     env_set DEN_DOCUMENTS_DIR /var/lib/den/documents

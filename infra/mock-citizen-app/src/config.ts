@@ -30,12 +30,30 @@ export interface CitizenAppConfig {
      */
     jwksUrl: string;
     tsaRootUrl: string;
+    /**
+     * The TSA's roots pinned in a PEM file (ADR-0032): the accredited TSA's, as its accreditation
+     * publishes them. When set, tsaRootUrl is not used. Without it, the chain is fetched from
+     * tsaRootUrl, which by default is the development TSA's own (it vouches for itself).
+     */
+    tsaRootsFile: string | null;
   };
   /** Standard Webhooks secret shared with the portal (DEN_CITIZEN_APPS). */
   webhookSecret: string;
   smtp: { host: string; port: number; from: string };
   /** Where the app keeps which alert id belongs to which of its users. */
   dataFile: string;
+}
+
+/**
+ * Why the app's trust in time-stamps is the development TSA's, or null (M-14): no roots pinned
+ * by file, and the chain comes from the endpoint the development TSA serves about itself.
+ */
+export function developmentTsaTrust(config: CitizenAppConfig): string | null {
+  if (config.portal.tsaRootsFile) return null;
+  return config.portal.tsaRootUrl.endsWith('/api/v1/timestamp/certchain')
+    ? `the TSA's chain is fetched from the development TSA itself (${config.portal.tsaRootUrl}); ` +
+        "pin the accredited TSA's roots with CITIZEN_APP_TSA_ROOTS_FILE"
+    : null;
 }
 
 /** Loads the repo-root .env in development, as apps/web and apps/api do. */
@@ -70,7 +88,10 @@ export function configFromEnv(): CitizenAppConfig {
     process.env.DEN_API_URL ??
     'http://localhost:4000'
   ).replace(/\/+$/, '');
-  const tsaUrl = (process.env.DEN_TSA_URL ?? 'http://localhost:3004').replace(/\/+$/, '');
+  // The development TSA's base (sigstore timestamp-server); see tsaSettings in the API.
+  const tsaUrl = (process.env.DEN_TSA_URL ?? 'http://localhost:3004')
+    .replace(/\/+$/, '')
+    .replace(/\/api\/v1\/timestamp$/, '');
   return {
     publicUrl,
     basePath: new URL(publicUrl).pathname.replace(/\/+$/, ''),
@@ -89,6 +110,7 @@ export function configFromEnv(): CitizenAppConfig {
       apiUrl,
       jwksUrl: process.env.CITIZEN_APP_JWKS_URL ?? `${apiUrl}/api/v1/transparency/jwks`,
       tsaRootUrl: process.env.CITIZEN_APP_TSA_ROOT_URL ?? `${tsaUrl}/api/v1/timestamp/certchain`,
+      tsaRootsFile: process.env.CITIZEN_APP_TSA_ROOTS_FILE?.trim() || null,
     },
     webhookSecret: required('CITIZEN_APP_WEBHOOK_SECRET'),
     smtp: {

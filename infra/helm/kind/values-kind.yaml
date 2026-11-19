@@ -18,6 +18,22 @@ secrets:
 
 api:
   replicas: 1
+  # No TSA in kind: batches stay pending. A placeholder root (a test certificate of
+  # packages/transparency-verifier's fixtures), only so the chart renders and the API starts.
+  tsa:
+    url: https://tsa.example.org/tsr
+    requireIndependent: true
+    trustedRoots: |
+      -----BEGIN CERTIFICATE-----
+      MIIBbDCCAROgAwIBAgIQD8LnekFKKRrUHtii0bPcXDAKBggqhkjOPQQDAjAVMRMw
+      EQYDVQQDEwpPdGhlciBSb290MB4XDTI2MTExMzEzMDExOVoXDTM2MTExMDEzMDEx
+      OVowFTETMBEGA1UEAxMKT3RoZXIgUm9vdDBZMBMGByqGSM49AgEGCCqGSM49AwEH
+      A0IABARLdhHJH4aTtYWMDc9j7A5Ma1uydsD7la6RrHXbb9BXBFQUMR31QxER20PO
+      A+0/c/xrOaPQDcUg+GAgmHA0zWCjRTBDMA4GA1UdDwEB/wQEAwIBBjASBgNVHRMB
+      Af8ECDAGAQH/AgEBMB0GA1UdDgQWBBRefX5H0QzKMWpi9FKF9IyVDLeeIjAKBggq
+      hkjOPQQDAgNHADBEAiAuMeIDpoT3CsNR3COrgS1/raUMkPChM8nnYjIUXq/HxQIg
+      WIsMgD3tzxQQmqBnyfndgt8V/aWJ99icH+eT6OCGDkk=
+      -----END CERTIFICATE-----
   trustProxy: 10.0.0.0/8
   documents: { accessMode: ReadWriteOnce, size: 1Gi }
   resources: { requests: { cpu: 100m, memory: 384Mi }, limits: { memory: 1Gi } }
