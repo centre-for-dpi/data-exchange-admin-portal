@@ -9,11 +9,12 @@ import { InvalidTransitionError } from '../../common/errors.js';
  *   active <-> suspended, active -> revoked, active -> expired
  *   pending_* -> withdrawn (the requester gives up)
  *   pending_provider -> info_requested -> pending_provider (the steward asks, the requester answers)
+ *   info_requested -> rejected (only the system, when the API version is retired)
  *   approved | active | suspended -> expired (validUntil passed, M2-06)
  */
 const TRANSITIONS: Record<SubscriptionStatus, readonly SubscriptionStatus[]> = {
   pending_provider: ['pending_regulator', 'approved', 'rejected', 'withdrawn', 'info_requested'],
-  info_requested: ['pending_provider', 'withdrawn'],
+  info_requested: ['pending_provider', 'withdrawn', 'rejected'],
   pending_regulator: ['approved', 'rejected', 'withdrawn'],
   approved: ['active', 'revoked', 'expired'],
   active: ['suspended', 'revoked', 'expired'],

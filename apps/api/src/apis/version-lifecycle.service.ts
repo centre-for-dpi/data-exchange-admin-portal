@@ -16,7 +16,7 @@ import { ApisService } from './apis.service.js';
 
 const SYSTEM = { type: 'system' as const, id: 'system:version-lifecycle' };
 /** Subscriptions that still hold or may get access; the rest are already closed. */
-const PENDING: SubscriptionStatus[] = ['pending_provider', 'pending_regulator'];
+const PENDING: SubscriptionStatus[] = ['pending_provider', 'pending_regulator', 'info_requested'];
 const GRANTED: SubscriptionStatus[] = ['approved', 'active', 'suspended'];
 
 /**

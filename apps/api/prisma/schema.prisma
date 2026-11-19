@@ -535,6 +535,8 @@ model ApiVersion {
 
   @@unique([apiId, major, minor])
   @@unique([apiId, version])
+  /// One version per major until it is retired (ADR-0019), also under concurrent creation.
+  @@unique([apiId, major], map: "api_version_one_live_per_major", where: raw("(status <> 'retired'::api_version_status)"))
   @@index([status])
   @@map("api_version")
 }
@@ -730,6 +732,10 @@ model Subscription {
   /// second index allows one live renewal per subscription.
   @@unique([applicationId, apiVersionId, purposeCode], map: "subscription_one_live_per_purpose", where: raw("((status = ANY (ARRAY['pending_provider'::subscription_status, 'info_requested'::subscription_status, 'pending_regulator'::subscription_status, 'approved'::subscription_status, 'active'::subscription_status, 'suspended'::subscription_status])) AND (renews_subscription_id IS NULL))"))
   @@unique([renewsSubscriptionId], map: "subscription_one_live_renewal", where: raw("(status = ANY (ARRAY['pending_provider'::subscription_status, 'info_requested'::subscription_status, 'pending_regulator'::subscription_status, 'approved'::subscription_status, 'active'::subscription_status, 'suspended'::subscription_status]))"))
+  /// One open request (waiting for a decision) per application, version and purpose, renewals
+  /// included: the index above leaves renewals out because a renewal lives next to the active
+  /// subscription it renews, but a renewal and a new request cannot both be waiting (B-06).
+  @@unique([applicationId, apiVersionId, purposeCode], map: "subscription_one_open_request_per_purpose", where: raw("(status = ANY (ARRAY['pending_provider'::subscription_status, 'info_requested'::subscription_status, 'pending_regulator'::subscription_status]))"))
   @@index([apiVersionId, status])
   @@index([status, validUntil])
   @@map("subscription")

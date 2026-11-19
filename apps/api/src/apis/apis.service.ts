@@ -453,7 +453,11 @@ export class ApisService {
       return this.detailOf(version);
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictError(`Version ${data.version} already exists for this API`);
+        // Either the exact version exists or another live version holds the major (the database
+        // index api_version_one_live_per_major covers a race the check above cannot).
+        throw new ConflictError(
+          `Version ${data.version} already exists for this API, or major ${major} already has a live version`,
+        );
       }
       throw error;
     }
