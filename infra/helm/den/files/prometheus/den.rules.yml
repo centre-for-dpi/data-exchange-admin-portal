@@ -109,3 +109,23 @@ groups:
         annotations:
           summary: 'El registro de transparencia descarta consultas ({{ $labels.reason }})'
           description: '{{ $value | humanize }} registros descartados en 10 minutos: los ciudadanos no verán esas consultas. Ver los logs del API.'
+
+      - alert: DenTransparencyUnsealed
+        # Records waiting for their batch beyond a few sealing rounds (B-19): no receipt for them.
+        expr: max(den_transparency_unsealed_oldest_seconds) > 300
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Hay consultas sin sellar en el registro de transparencia'
+          description: 'La más antigua espera su lote desde hace {{ $value | humanizeDuration }}: ver los logs del API (sellador, DEN_TRANSPARENCY_SIGNING_JWK).'
+
+      - alert: DenTransparencyUnstamped
+        # Sealed batches the TSA has not stamped (B-19): their time rests on the operator's word.
+        expr: max(den_transparency_unstamped_oldest_seconds) > 900
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Hay lotes de transparencia sin sello de tiempo'
+          description: 'El más antiguo espera a la TSA desde hace {{ $value | humanizeDuration }}: la TSA no responde o rechaza las peticiones (DEN_TSA_URL).'

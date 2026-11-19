@@ -61,6 +61,8 @@ describe("the API's metrics endpoint (M5-06)", () => {
       'den_nodes',
       'den_certificate_soonest_expiry_seconds',
       'den_transparency_records_dropped_total',
+      'den_transparency_unsealed_oldest_seconds',
+      'den_transparency_unstamped_oldest_seconds',
       'den_api_process_cpu_seconds_total',
     ]) {
       expect(text, gauge).toContain(`# TYPE ${gauge}`);

@@ -205,3 +205,46 @@ tests:
       - eval_time: 15m
         alertname: DenTransparencyRecordsDropped
         exp_alerts: []
+
+  - name: transparency records waiting for their batch
+    interval: 1m
+    input_series:
+      - series: 'den_transparency_unsealed_oldest_seconds{job="api",instance="api:4000"}'
+        values: '0 0 600 660 720 780 840 900 960 1020 1080'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: DenTransparencyUnsealed
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: 'Hay consultas sin sellar en el registro de transparencia'
+              description: 'La más antigua espera su lote desde hace 16m 0s: ver los logs del API (sellador, DEN_TRANSPARENCY_SIGNING_JWK).'
+
+  - name: transparency records sealed within a few rounds
+    interval: 1m
+    input_series:
+      - series: 'den_transparency_unsealed_oldest_seconds{job="api",instance="api:4000"}'
+        values: '0 8 0 9 0 7 0 8 0 9 0'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: DenTransparencyUnsealed
+        exp_alerts: []
+
+  - name: transparency batches waiting for the TSA
+    interval: 1m
+    input_series:
+      - series: 'den_transparency_unstamped_oldest_seconds{job="api",instance="api:4000"}'
+        values: '1000+60x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DenTransparencyUnstamped
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'Hay lotes de transparencia sin sello de tiempo'
+              description: 'El más antiguo espera a la TSA desde hace 22m 40s: la TSA no responde o rechaza las peticiones (DEN_TSA_URL).'
+      - eval_time: 3m
+        alertname: DenTransparencyUnstamped
+        exp_alerts: []

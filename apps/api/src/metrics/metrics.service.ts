@@ -34,8 +34,9 @@ export function metricsTokenMatches(authorization: string | undefined): boolean 
 /**
  * The API's Prometheus metrics (ARCHITECTURE.md §9, M5-06): request latency per endpoint, and,
  * read from PostgreSQL at each scrape, the background queue, the reconcilers' sync state, how far
- * OPA's bundle is behind, the nodes and the soonest certificate expiry; and the records the
- * transparency collector dropped. Labels are route
+ * OPA's bundle is behind, the nodes and the soonest certificate expiry, and how long the
+ * transparency register has records waiting for a batch or batches waiting for the TSA; and the
+ * records the transparency collector dropped. Labels are route
  * templates, states and kinds: never ids, never personal data.
  */
 @Injectable()
@@ -132,6 +133,34 @@ export class MetricsService {
         const rows = await this.prisma.node.groupBy({ by: ['status'], _count: { _all: true } });
         nodes.reset();
         for (const r of rows) nodes.set({ status: r.status }, r._count._all);
+      }),
+    });
+
+    // Completeness of the transparency register (B-19): a record without a batch has no receipt,
+    // and a batch without the TSA's stamp rests on the operator's word.
+    const unsealed = new Gauge({
+      name: 'den_transparency_unsealed_oldest_seconds',
+      help: 'Seconds the oldest record of the transparency register has waited for its batch; 0 when none waits.',
+      registers,
+      collect: safely('den_transparency_unsealed_oldest_seconds', async () => {
+        // The sealer's queue, by its index (M-15).
+        const [row] = await this.prisma.$queryRaw<Array<{ age: number | null }>>`
+          SELECT extract(epoch FROM now() - min(received_at))::float8 AS age
+          FROM transparency_pending`;
+        unsealed.set(Math.max(0, row?.age ?? 0));
+      }),
+    });
+
+    const unstamped = new Gauge({
+      name: 'den_transparency_unstamped_oldest_seconds',
+      help: 'Seconds the oldest sealed batch of the transparency register has waited for the TSA; 0 when none waits.',
+      registers,
+      collect: safely('den_transparency_unstamped_oldest_seconds', async () => {
+        const [row] = await this.prisma.$queryRaw<Array<{ age: number | null }>>`
+          SELECT extract(epoch FROM now() - min(c.sealed_at))::float8 AS age
+          FROM transparency_checkpoint c
+          WHERE NOT EXISTS (SELECT 1 FROM transparency_timestamp t WHERE t.checkpoint_seq = c.seq)`;
+        unstamped.set(Math.max(0, row?.age ?? 0));
       }),
     });
 

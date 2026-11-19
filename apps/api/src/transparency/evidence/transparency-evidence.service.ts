@@ -76,6 +76,12 @@ const intervalMs = () => {
   return (Number.isFinite(s) && s >= 1 ? s : 10) * 1000;
 };
 const logId = () => process.env.DEN_TRANSPARENCY_LOG_ID ?? 'den-transparency';
+/**
+ * How long a record may wait for its batch, and a batch for its stamp, before the register is
+ * reported incomplete (B-19): a few sealing rounds, never less than 5 and 15 minutes.
+ */
+export const sealGraceMs = () => Math.max(5 * 60_000, 3 * intervalMs());
+export const stampGraceMs = () => Math.max(15 * 60_000, 6 * intervalMs());
 
 /**
  * Verifiable evidence of the transparency register (ADR-0016, MT-04).
@@ -306,6 +312,8 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
    * Re-checks the whole register: the checkpoint chain and signatures, every batch's root from its
    * leaves, every stamp, and every record against its leaf. Detects altered, deleted and inserted
    * records and batches. Records past retention may be gone: their leaves keep the batch whole.
+   * Valid only when nothing was tampered with and nothing is overdue (B-19): a record without a
+   * batch has no receipt, and a batch without a stamp rests on the operator's word.
    */
   async verify(options: { fromSeq?: number } = {}): Promise<TransparencyVerification> {
     // From a checkpoint on: a monitor that already checked the earlier ones only checks what is
@@ -326,6 +334,8 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
       include: { timestamp: true, leaves: { orderBy: { leafIndex: 'asc' } } },
     });
     let pendingTimestamps = 0;
+    let overdueTimestamps = 0;
+    const stampedBy = Date.now() - stampGraceMs();
     let previousHash: string | null =
       fromSeq > 1
         ? ((
@@ -375,6 +385,7 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
       }
       if (!cp.timestamp) {
         pendingTimestamps++;
+        if (cp.sealedAt.getTime() < stampedBy) overdueTimestamps++;
       } else if (tsaRoots) {
         try {
           await verifyTimestampToken(
@@ -459,18 +470,30 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
       }
     }
 
-    const [{ unsealed } = { unsealed: 0n }] = await this.prisma.$queryRaw<
-      Array<{ unsealed: bigint }>
-    >`SELECT count(*) AS unsealed FROM subject_access_record r
+    // Against the register itself, not the sealer's queue: the full re-check trusts no shortcut.
+    const sealedBy = new Date(Date.now() - sealGraceMs());
+    const [{ unsealed, overdue } = { unsealed: 0n, overdue: 0n }] = await this.prisma.$queryRaw<
+      Array<{ unsealed: bigint; overdue: bigint }>
+    >`SELECT count(*) AS unsealed, count(*) FILTER (WHERE r.received_at < ${sealedBy}) AS overdue
+      FROM subject_access_record r
       WHERE NOT EXISTS (SELECT 1 FROM transparency_leaf l WHERE l.record_id = r.id)`;
 
+    const status =
+      problems.length > 0
+        ? 'invalid'
+        : tsaRoots === null || overdue > 0n || overdueTimestamps > 0
+          ? 'incomplete'
+          : 'valid';
     return {
-      valid: problems.length === 0 && tsaRoots !== null,
+      valid: status === 'valid',
+      status,
       checkpoints: checkpoints.length,
       records: records.size,
       purged,
       unsealed: Number(unsealed),
+      overdueUnsealed: Number(overdue),
       pendingTimestamps,
+      overdueTimestamps,
       timestampsChecked: tsaRoots !== null,
       problems,
     };

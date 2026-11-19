@@ -103,17 +103,28 @@ export const transparencyProblemKindSchema = z.enum([
   'timestamp_invalid',
 ]);
 
-/** Result of re-checking the whole register: batches, chain, signatures, stamps and records. */
+/**
+ * Result of re-checking the whole register: batches, chain, signatures, stamps and records.
+ * `status`: `invalid` when anything was tampered with (`problems`); `incomplete` when nothing was,
+ * but the register cannot be vouched for whole (B-19): records waiting for a batch, or batches
+ * waiting for the TSA, longer than the sealer needs, or stamps not checked. `valid` only then.
+ */
 export const transparencyVerificationSchema = z.object({
+  /** True only when `status` is `valid`. */
   valid: z.boolean(),
+  status: z.enum(['valid', 'incomplete', 'invalid']),
   checkpoints: z.number().int(),
   records: z.number().int(),
   /** Records purged by retention: their leaves remain, so the batches still verify. */
   purged: z.number().int(),
   /** Records not sealed yet. */
   unsealed: z.number().int(),
+  /** Of them, received longer ago than the sealer needs: the sealer is not keeping up or stopped. */
+  overdueUnsealed: z.number().int(),
   /** Checkpoints still waiting for the TSA. */
   pendingTimestamps: z.number().int(),
+  /** Of them, sealed longer ago than the TSA retries need: the TSA is down or refusing. */
+  overdueTimestamps: z.number().int(),
   /** False when the TSA certificates could not be fetched: the stamps were not checked. */
   timestampsChecked: z.boolean(),
   problems: z.array(

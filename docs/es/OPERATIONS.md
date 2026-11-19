@@ -130,7 +130,7 @@ Todos corren dentro del proceso `api`. Con `DEN_WORKER=off` no corre ninguno.
 | Outbox | SQL 2 | Sin filas pendientes de más de un minuto |
 | Bundle de OPA | `dc exec api wget -qO- 'http://opa:8181/health?bundles'` | 200 |
 | Cadena de auditoría | Consola → Auditoría → "Verificar integridad", o `GET /api/v1/audit/verify` (`audit.read`) | Cadena íntegra; cada día cerrado con su anclaje |
-| Registro de transparencia | `GET /api/v1/transparency/verify` (`audit.read`); `?fromSeq=N` para revisar solo lo nuevo | Sin registros alterados, borrados antes de tiempo ni insertados |
+| Registro de transparencia | `GET /api/v1/transparency/verify` (`audit.read`); `?fromSeq=N` para revisar solo lo nuevo | `status: valid`: sin registros alterados, borrados antes de tiempo ni insertados (si no, `invalid`), y ninguno atrasado en lote o sello (si no, `incomplete`) |
 | Búfer de Fluent Bit | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/metrics` | Sin reintentos acumulados |
 | Disco | `docker system df -v` | Volúmenes `den_*` con margen |
 
@@ -147,6 +147,8 @@ Desde M5-06 las alertas de `ARCHITECTURE.md §9` llegan por correo al operador (
 | `DenCertificateExpiring` | La renovación automática falló: logs del API y `dc ps step-ca` |
 | `DenQueueBacklog` | Logs del API; SQL 2 (§4.2) |
 | `DenTransparencyRecordsDropped` | `dc logs api` ("Transparency records dropped", conteos por motivo). `invalid`: un gateway o un Fluent Bit que envía un formato que el colector no conoce (versiones desfasadas); `unknown_subscription` o `route_mismatch`: registros que no corresponden a lo que OPA autorizó, posiblemente falsificados en la red `logs` |
+| `DenTransparencyUnsealed` | `dc logs api` (el sellador: "Transparency sealing round failed", o `DEN_TRANSPARENCY_SIGNING_JWK is not set`); que el worker del API esté encendido (`DEN_WORKER`) |
+| `DenTransparencyUnstamped` | `dc logs api` ("Checkpoint N not stamped yet"); que el API alcance `DEN_TSA_URL` |
 
 ### 4.2 Consultas de diagnóstico
 

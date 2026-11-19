@@ -130,7 +130,7 @@ They all run inside the `api` process. With `DEN_WORKER=off`, none of them runs.
 | Outbox | SQL 2 | No rows pending for more than a minute |
 | OPA bundle | `dc exec api wget -qO- 'http://opa:8181/health?bundles'` | 200 |
 | Audit chain | Console → Audit → "Verify integrity", or `GET /api/v1/audit/verify` (`audit.read`) | Chain intact; each closed day with its anchor |
-| Transparency log | `GET /api/v1/transparency/verify` (`audit.read`); `?fromSeq=N` to review only what is new | No records tampered with, deleted early or inserted |
+| Transparency log | `GET /api/v1/transparency/verify` (`audit.read`); `?fromSeq=N` to review only what is new | `status: valid`: no records tampered with, deleted early or inserted (`invalid` otherwise), and none overdue for a batch or a stamp (`incomplete` otherwise) |
 | Fluent Bit buffer | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/metrics` | No accumulated retries |
 | Disk | `docker system df -v` | `den_*` volumes with headroom |
 
@@ -147,6 +147,8 @@ Since M5-06, the alerts in `ARCHITECTURE.md §9` reach the operator by email (Al
 | `DenCertificateExpiring` | Automatic renewal failed: API logs and `dc ps step-ca` |
 | `DenQueueBacklog` | API logs; SQL 2 (§4.2) |
 | `DenTransparencyRecordsDropped` | `dc logs api` ("Transparency records dropped", counts by reason). `invalid`: a gateway or Fluent Bit sending a format the collector does not know (versions out of step); `unknown_subscription` or `route_mismatch`: records that do not match what OPA authorized, possibly forged on the `logs` network |
+| `DenTransparencyUnsealed` | `dc logs api` (the sealer: "Transparency sealing round failed", or `DEN_TRANSPARENCY_SIGNING_JWK is not set`); the API's worker is on (`DEN_WORKER`) |
+| `DenTransparencyUnstamped` | `dc logs api` ("Checkpoint N not stamped yet"); that the API reaches `DEN_TSA_URL` |
 
 ### 4.2 Diagnostic queries
 

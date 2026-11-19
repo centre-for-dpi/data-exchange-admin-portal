@@ -50,7 +50,7 @@ describe('alert rules and Alertmanager configuration (M5-06)', () => {
       '/p/rules/den.rules.yml',
     ]);
     expect(rules.status, rules.out).toBe(0);
-    expect(rules.out).toContain('10 rules found');
+    expect(rules.out).toContain('12 rules found');
     const alertmanager = docker([
       'run',
       '--rm',

@@ -317,7 +317,58 @@ describe('transparency evidence (MT-04)', () => {
     it('finds the register whole', async () => {
       const result = await verification();
       expect(result.problems).toEqual([]);
-      expect(result).toMatchObject({ valid: true, timestampsChecked: true, unsealed: 0 });
+      expect(result).toMatchObject({
+        valid: true,
+        status: 'valid',
+        timestampsChecked: true,
+        unsealed: 0,
+        overdueUnsealed: 0,
+        overdueTimestamps: 0,
+      });
+    });
+
+    it('is not valid while a record waits too long for its batch (B-19)', async () => {
+      const [id] = await ingest(1);
+      // Just received: the sealer has a few rounds to take it.
+      expect(await verification()).toMatchObject({ valid: true, status: 'valid' });
+      expect((await verification()).unsealed).toBeGreaterThanOrEqual(1);
+      await tampered(
+        `UPDATE subject_access_record SET received_at = now() - interval '1 hour' WHERE id = '${id}'`,
+        `UPDATE subject_access_record SET received_at = now() WHERE id = '${id}'`,
+        async () => {
+          const result = await verification();
+          expect(result.problems).toEqual([]);
+          expect(result).toMatchObject({ valid: false, status: 'incomplete' });
+          expect(result.overdueUnsealed).toBeGreaterThanOrEqual(1);
+        },
+      );
+      await evidence.sealPending();
+      await evidence.stampPending();
+      expect(await verification()).toMatchObject({ valid: true, overdueUnsealed: 0 });
+    });
+
+    it('is not valid while a batch waits too long for its stamp (B-19)', async () => {
+      const tsaUrl = process.env.DEN_TSA_URL;
+      await ingest(1);
+      process.env.DEN_TSA_URL = 'http://127.0.0.1:9';
+      try {
+        const [seq] = await evidence.sealPending();
+        expect(await evidence.stampPending()).toEqual([]);
+        await tampered(
+          `UPDATE transparency_checkpoint SET sealed_at = sealed_at - interval '1 hour' WHERE seq = ${seq}`,
+          `UPDATE transparency_checkpoint SET sealed_at = sealed_at + interval '1 hour' WHERE seq = ${seq}`,
+          async () => {
+            const result = await verification();
+            expect(result.problems).toEqual([]);
+            expect(result).toMatchObject({ valid: false, status: 'incomplete' });
+            expect(result.overdueTimestamps).toBeGreaterThanOrEqual(1);
+          },
+        );
+      } finally {
+        process.env.DEN_TSA_URL = tsaUrl;
+      }
+      await evidence.stampPending();
+      expect(await verification()).toMatchObject({ valid: true, overdueTimestamps: 0 });
     });
 
     it('detects an altered record', async () => {
@@ -327,9 +378,11 @@ describe('transparency evidence (MT-04)', () => {
         `UPDATE subject_access_record SET purpose_code = 'other_purpose' WHERE id = '${id}'`,
         `UPDATE subject_access_record SET purpose_code = 'eligibility_check' WHERE id = '${id}'`,
         async () => {
-          expect((await verification()).problems).toContainEqual(
+          const result = await verification();
+          expect(result.problems).toContainEqual(
             expect.objectContaining({ kind: 'record_altered', recordId: id }),
           );
+          expect(result).toMatchObject({ valid: false, status: 'invalid' });
         },
       );
       expect((await verification()).valid).toBe(true);
