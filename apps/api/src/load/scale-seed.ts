@@ -126,6 +126,7 @@ export async function seedScale(
               status: 'published',
               openapiSpec: parsed.spec as Prisma.InputJsonObject,
               openapiSha256: parsed.sha256,
+              openapiSha256Variants: parsed.sha256Variants,
               lintReport: parsed.report,
               upstreamType: 'node',
               upstream: { type: 'node', servicePath: options.servicePath },

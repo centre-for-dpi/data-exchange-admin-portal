@@ -77,7 +77,7 @@ test.describe('bootcamp simulation (M4 closing, M4-08)', () => {
     await page.getByLabel('Nombre del nodo').fill(nodeName);
     await page.getByRole('button', { name: 'Registrar y emitir token' }).click();
     startMockNode((await page.getByTestId('enrollment-token').textContent()) ?? '');
-    const nodeRow = page.getByRole('row', { name: new RegExp(nodeName) });
+    const nodeRow = page.getByTestId('node-list').getByRole('row', { name: new RegExp(nodeName) });
     try {
       await expect(async () => {
         await page.reload();

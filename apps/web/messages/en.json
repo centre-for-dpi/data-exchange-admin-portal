@@ -719,7 +719,8 @@
         "openapi_replaced": "OpenAPI document replaced",
         "purposes_changed": "Allowed purposes changed",
         "validated": "Automatic validations finished",
-        "validation_requested": "Automatic validations requested again"
+        "validation_requested": "Automatic validations requested again",
+        "node_contract_changed": "Contract served by the node changed"
       },
       "application": {
         "created": "Application created"
@@ -1086,7 +1087,8 @@
       "certificate_expiring": "The client certificate of {application} expires on {date}",
       "certificate_revoked": "The operator revoked the client certificate of {application}: issue a new one",
       "entity_status_changed": "{entity} {decision, select, suspended {was suspended on the network} reactivated {was reactivated on the network} other {was offboarded from the network}}",
-      "node_offline": "Node {node} of {entity} has sent no heartbeat for 5 minutes"
+      "node_offline": "Node {node} of {entity} has sent no heartbeat for 5 minutes",
+      "api_contract_differs": "Node {node} serves {api} {version} with an OpenAPI other than the published one"
     },
     "kindNames": {
       "invitation_received": "Invitations to an entity",
@@ -1107,7 +1109,8 @@
       "certificate_expiring": "Certificates about to expire",
       "certificate_revoked": "Certificates revoked by the operator",
       "entity_status_changed": "Suspension or offboarding of your entity",
-      "node_offline": "Nodes offline"
+      "node_offline": "Nodes offline",
+      "api_contract_differs": "Nodes serving another contract"
     },
     "unreadSuffix": "{count, plural, one {: one unread} other {: # unread}}"
   },
@@ -1297,6 +1300,28 @@
     "decommission": "Decommission",
     "decommissionFor": "Decommission {name}",
     "decommissionConfirm": "Decommission node {name}? It stops working for good: its certificate and tunnel are revoked."
+  },
+  "nodeContract": {
+    "title": "Contract the node serves",
+    "lead": "In every heartbeat the node reports the SHA-256 of each service’s OpenAPI; it is compared with the published version’s. It never blocks traffic: the gateway keeps routing by the published contract.",
+    "nodesTitle": "Contract of the published versions",
+    "consoleTitle": "Nodes not serving the published contract",
+    "consoleLead": "Published versions whose node serves an OpenAPI other than the published one, or reports none. Traffic keeps flowing; the entity decides whether to publish a new version or go back to the published contract.",
+    "version": "API and version",
+    "column": "Contract",
+    "status": {
+      "matches": "Matches the published one",
+      "differs": "Differs from the published one",
+      "not_reported": "Not reported"
+    },
+    "matches": "The node serves the published OpenAPI on {path}.",
+    "differs": "The node serves an OpenAPI other than the published one on {path}.",
+    "differsNext": "Traffic keeps flowing with the published contract. If the change is deliberate, publish a revision or a new version with the OpenAPI the node serves; if not, put the published OpenAPI back on the node.",
+    "notReportedNoOpenapi": "The node’s service {service} does not report its OpenAPI, so it cannot be compared with the published one (the node’s logs show its routes as “(unknown)”). For an entity’s own API behind the node, set the OpenAPI file in the service’s “openapi” and restart the node; for an instant API, check that the service starts.",
+    "notReportedNoService": "The node declares no service on {path}. Check the version’s service path and the node’s configuration.",
+    "since": "Differs since",
+    "expected": "Published SHA-256",
+    "reported": "Node’s SHA-256"
   },
   "bootcamp": {
     "title": "Bootcamp readiness",

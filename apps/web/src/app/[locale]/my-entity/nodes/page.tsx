@@ -8,6 +8,7 @@ import {
   ReissueTokenForm,
   RevokeTokenButton,
 } from '../../../../components/nodes/node-forms';
+import { NodeContractBadge, NodeContractDetails } from '../../../../components/nodes/node-contract';
 import { StatusBadge } from '../../../../components/ui/badge';
 import { EmptyState, Page, PageHeader, Section } from '../../../../components/ui/page';
 import { Link } from '../../../../i18n/navigation';
@@ -38,6 +39,11 @@ export default async function EntityNodesPage({ params }: PageProps) {
   const nodes = await apiGet(`/entities/${active.entity.id}/nodes`, nodeListSchema);
   const when = (value: string | null) =>
     value ? format.dateTime(new Date(value), { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  // P-02: the published versions each node serves, differing ones first.
+  const rank = { differs: 0, not_reported: 1, matches: 2 } as const;
+  const contracts = nodes.items
+    .flatMap((node) => node.contracts.map((contract) => ({ node, contract })))
+    .sort((a, b) => rank[a.contract.status] - rank[b.contract.status]);
 
   return (
     <Page>
@@ -55,7 +61,7 @@ export default async function EntityNodesPage({ params }: PageProps) {
         {nodes.items.length === 0 ? (
           <EmptyState>{t('nodes.empty')}</EmptyState>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" data-testid="node-list">
             <table className="data-table">
               <thead>
                 <tr>
@@ -142,6 +148,43 @@ export default async function EntityNodesPage({ params }: PageProps) {
           </div>
         )}
       </Section>
+      {contracts.length > 0 ? (
+        <Section title={t('nodeContract.nodesTitle')} description={t('nodeContract.lead')}>
+          <div className="table-wrap" data-testid="node-contracts">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('nodeContract.version')}</th>
+                  <th scope="col">{t('nodes.name')}</th>
+                  <th scope="col">{t('nodeContract.column')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contracts.map(({ node, contract }) => (
+                  <tr key={contract.apiVersionId}>
+                    <td>
+                      <Link
+                        href={`/my-apis/${contract.apiId}/versions/${contract.apiVersionId}`}
+                        className="link"
+                      >
+                        {contract.apiName} {contract.version}
+                      </Link>
+                      <span className="block font-mono text-sm text-muted-foreground">
+                        {contract.servicePath}
+                      </span>
+                    </td>
+                    <td className="text-sm">{node.name}</td>
+                    <td className="space-y-2">
+                      <NodeContractBadge status={contract.status} />
+                      <NodeContractDetails contract={contract} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      ) : null}
       {canManage ? (
         <Section title={t('nodes.create.title')} description={t('nodes.create.lead')}>
           <div className="card max-w-3xl p-6 md:p-8">

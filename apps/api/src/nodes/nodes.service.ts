@@ -7,9 +7,8 @@ import {
   type IssuedEnrollmentToken,
   type NetworkNode,
   type NodeDetail,
-  type NodeService,
   type NodeSummary,
-  nodeServiceSchema,
+  type NodeVersionContract,
 } from '@den/contracts';
 import { z } from 'zod';
 import { type AuditActor, AuditService } from '../audit/audit.service.js';
@@ -21,6 +20,8 @@ import { assertTransition } from '../domain/node/state-machine.js';
 import type { NodeEnrollmentToken, Node as NodeRow } from '../generated/prisma/client.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { OutboxService } from '../outbox/outbox.service.js';
+import { nodeContracts } from './node-contracts.js';
+import { storedServices } from './node-status.js';
 import { queueGatewaySyncForNode } from './node-versions.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconciler.js';
@@ -55,12 +56,6 @@ export function tokenView(t: NodeEnrollmentToken, now = new Date()): EnrollmentT
   };
 }
 
-/** The services a node declared, as stored (validated again: jsonb is not trusted blindly). */
-export function storedServices(value: unknown): NodeService[] {
-  const parsed = z.array(nodeServiceSchema).safeParse(value);
-  return parsed.success ? parsed.data : [];
-}
-
 const healthSchema = z.object({
   status: z.enum(['ok', 'degraded', 'failing']),
   detail: z.string().optional(),
@@ -72,7 +67,7 @@ export function storedHealth(value: unknown): NodeSummary['health'] {
   return parsed.success ? parsed.data : null;
 }
 
-export function nodeView(node: NodeWithTokens): NodeSummary {
+export function nodeView(node: NodeWithTokens, contracts: NodeVersionContract[] = []): NodeSummary {
   const latest = [...node.enrollmentTokens].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   )[0];
@@ -87,6 +82,7 @@ export function nodeView(node: NodeWithTokens): NodeSummary {
     certificateNotAfter: iso(node.certificateNotAfter),
     services: storedServices(node.services),
     health: storedHealth(node.health),
+    contracts,
     createdAt: node.createdAt.toISOString(),
     enrollmentToken: latest ? tokenView(latest) : null,
   };
@@ -117,7 +113,8 @@ export class NodesService {
       orderBy: { createdAt: 'desc' },
       take: 500,
     })) as NodeWithTokens[];
-    return { items: nodes.map(nodeView) };
+    const contracts = await this.contractsOf(nodes.map((n) => n.id));
+    return { items: nodes.map((n) => nodeView(n, contracts.get(n.id))) };
   }
 
   private async load(entityId: string, nodeId: string, tx?: Tx): Promise<NodeWithTokens> {
@@ -131,7 +128,11 @@ export class NodesService {
 
   async get(entityId: string, nodeId: string): Promise<NodeDetail> {
     const node = await this.load(entityId, nodeId);
-    return { ...nodeView(node), enrollmentTokens: node.enrollmentTokens.map((t) => tokenView(t)) };
+    const contracts = await this.contractsOf([node.id]);
+    return {
+      ...nodeView(node, contracts.get(node.id)),
+      enrollmentTokens: node.enrollmentTokens.map((t) => tokenView(t)),
+    };
   }
 
   /** Every node of the network, for the operator console (SPEC.md §6). */
@@ -144,7 +145,20 @@ export class NodesService {
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 2_000,
     });
-    return { items: nodes.map((n) => ({ ...nodeView(n), entity: n.entity })) };
+    const contracts = await this.contractsOf(nodes.map((n) => n.id));
+    return {
+      items: nodes.map((n) => ({ ...nodeView(n, contracts.get(n.id)), entity: n.entity })),
+    };
+  }
+
+  /** Served versions on these nodes with their contract check (P-02), by node id. */
+  private async contractsOf(nodeIds: string[]): Promise<Map<string, NodeVersionContract[]>> {
+    const byNode = new Map<string, NodeVersionContract[]>();
+    for (const row of await nodeContracts(this.prisma, { nodeIds })) {
+      const { nodeId, nodeName: _name, entityName: _entity, ...contract } = row;
+      byNode.set(nodeId, [...(byNode.get(nodeId) ?? []), contract]);
+    }
+    return byNode;
   }
 
   /** Creates the token inside `tx` and audits it. The caller returns the token once. */

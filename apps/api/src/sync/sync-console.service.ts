@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import type { DisallowedUpstream, SyncPage, SyncQuery } from '@den/contracts';
+import type { DisallowedUpstream, NodeContractIssue, SyncPage, SyncQuery } from '@den/contracts';
 import { OPENSEARCH_SYNC_TOPIC } from '../analytics/access-log-index.js';
 import { allowedUpstreamTypes, disallowedUpstreamTypes } from '../apis/upstream-types.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
 import { NotFoundError } from '../common/errors.js';
+import { nodeContracts } from '../nodes/node-contracts.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -46,7 +47,7 @@ export class SyncConsoleService {
           ? { status: query.status }
           : {}),
     };
-    const [summary, recentDrift, rows, disallowedUpstreams] = await Promise.all([
+    const [summary, recentDrift, rows, disallowedUpstreams, contracts] = await Promise.all([
       this.prisma.syncState.groupBy({ by: ['system', 'status'], _count: { _all: true } }),
       this.prisma.syncState.count({ where: { driftDetectedAt: { gte: dayAgo } } }),
       this.prisma.syncState.findMany({
@@ -56,6 +57,7 @@ export class SyncConsoleService {
         ...(query.cursor ? { cursor: { target: query.cursor }, skip: 1 } : {}),
       }),
       this.disallowedUpstreams(),
+      this.nodeContractIssues(),
     ]);
     const items = rows.slice(0, query.limit);
     return {
@@ -77,7 +79,20 @@ export class SyncConsoleService {
       })),
       nextCursor: rows.length > query.limit ? (items.at(-1)?.target ?? null) : null,
       disallowedUpstreams,
+      nodeContracts: contracts,
     };
+  }
+
+  /**
+   * Published versions whose node serves another contract or reports none (P-02), the differing
+   * ones first. Traffic is not affected: the gateway keeps routing by the published contract.
+   */
+  private async nodeContractIssues(): Promise<NodeContractIssue[]> {
+    const rows = await nodeContracts(this.prisma, {});
+    const rank = { differs: 0, not_reported: 1, matches: 2 } as const;
+    return rows
+      .filter((r) => r.status !== 'matches')
+      .sort((a, b) => rank[a.status] - rank[b.status] || a.apiName.localeCompare(b.apiName));
   }
 
   /**

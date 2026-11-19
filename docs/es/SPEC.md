@@ -206,6 +206,7 @@ enrollment_issued → enrolled → online ⇄ offline
 3. El nodo envía heartbeat cada 60 s con versión y servicios expuestos. Sin heartbeat por 5 min → `offline` y alerta a los administradores de la entidad y al operador. El siguiente heartbeat lo devuelve a `online`.
 4. El nodo renueva su certificado antes de que venza. `entity_admin` o `platform_admin` pueden dar de baja un nodo (`decommissioned`): deja de funcionar para siempre.
 5. Las APIs con upstream `node` muestran el estado del nodo.
+6. **Contrato que sirve el nodo (P-02).** Para cada versión publicada (u obsoleta) en un nodo, el portal compara el SHA-256 que el nodo informa en su heartbeat para el servicio en el `servicePath` de la versión con el `openapiSha256` de la versión publicada: **coincide**, **distinto** (con ambos hashes y desde cuándo) o **sin informar** (no hay servicio en esa ruta, o el servicio no tiene OpenAPI en el nodo, cuyos registros muestran entonces rutas `(unknown)`). Se muestra en la ficha de la versión (proveedor y revisor), en la página de nodos de la entidad y en la consola de sincronización del operador. El paso de coincide a distinto avisa a los `api_publisher` y `entity_admin` de la entidad; todo cambio de estado se audita. Nunca bloquea el tráfico: el gateway sigue enrutando con el contrato publicado.
 
 **Preparación del bootcamp (M4-07).** Antes del bootcamp, cada entidad confirma cinco requisitos: un servidor para el nodo, un usuario de solo lectura de la base de datos, salida a internet por 443, los responsables designados (se calcula: miembros con `api_publisher` y `data_steward`) y el caso de uso. Los marca el `entity_admin` (o el operador) y el operador ve el avance de todas las entidades.
 
@@ -245,7 +246,7 @@ enrollment_issued → enrolled → online ⇄ offline
 
 ## 7. Notificaciones
 
-En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobada/rechazada, API enviada a revisión / cambios solicitados / publicada, nueva solicitud de acceso, solicitud aprobada/rechazada/con preguntas, suscripción suspendida/revocada/por vencer, certificado por vencer, certificado revocado por el operador (revocación masiva, M6-07), nodo offline, versión de API en deprecación. Cada usuario elige qué recibe por correo (los de seguridad no se pueden desactivar).
+En el portal y por correo. Eventos mínimos: invitación a entidad, alta aprobada/rechazada, API enviada a revisión / cambios solicitados / publicada, nueva solicitud de acceso, solicitud aprobada/rechazada/con preguntas, suscripción suspendida/revocada/por vencer, certificado por vencer, certificado revocado por el operador (revocación masiva, M6-07), nodo offline, nodo que sirve para una versión un contrato distinto del publicado (P-02), versión de API en deprecación. Cada usuario elige qué recibe por correo (los de seguridad no se pueden desactivar).
 
 ## 8. Indicadores (vienen de la propuesta de la red)
 

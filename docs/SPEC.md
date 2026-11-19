@@ -206,6 +206,7 @@ enrollment_issued → enrolled → online ⇄ offline
 3. The node sends a heartbeat every 60 s with its version and exposed services. No heartbeat for 5 min → `offline` and an alert to the entity's administrators and to the operator. The next heartbeat brings it back to `online`.
 4. The node renews its certificate before it expires. `entity_admin` or `platform_admin` can decommission a node (`decommissioned`): it stops working for good.
 5. APIs with a `node` upstream show the node's status.
+6. **Contract the node serves (P-02).** For each published (or deprecated) version on a node, the portal compares the SHA-256 the node reports in its heartbeat for the service on the version's `servicePath` with the published version's `openapiSha256`: **matches**, **differs** (with both hashes and since when) or **not reported** (no service on that path, or the service has no OpenAPI on the node, whose logs then show `(unknown)` routes). It is shown on the version sheet (provider and reviewer), on the entity's node page and in the operator's sync console. The change from matches to differs notifies the entity's `api_publisher`s and `entity_admin`s; every change of status is audited. It never blocks traffic: the gateway keeps routing by the published contract.
 
 **Bootcamp preparation (M4-07).** Before the bootcamp, each entity confirms five requirements: a server for the node, a read-only database user, outbound internet access on 443, the designated officers (computed: members with `api_publisher` and `data_steward`) and the use case. The `entity_admin` (or the operator) checks them off, and the operator sees the progress of every entity.
 
@@ -245,7 +246,7 @@ enrollment_issued → enrolled → online ⇄ offline
 
 ## 7. Notifications
 
-In the portal and by email. Minimum events: invitation to an entity, registration approved/rejected, API submitted for review / changes requested / published, new access request, request approved/rejected/with questions, subscription suspended/revoked/about to expire, certificate about to expire, certificate revoked by the operator (mass revocation, M6-07), node offline, API version being deprecated. Each user chooses what they receive by email (security notices cannot be turned off).
+In the portal and by email. Minimum events: invitation to an entity, registration approved/rejected, API submitted for review / changes requested / published, new access request, request approved/rejected/with questions, subscription suspended/revoked/about to expire, certificate about to expire, certificate revoked by the operator (mass revocation, M6-07), node offline, a node serving a version's contract other than the published one (P-02), API version being deprecated. Each user chooses what they receive by email (security notices cannot be turned off).
 
 ## 8. Indicators (taken from the network proposal)
 

@@ -6,6 +6,7 @@ import {
   healthcheckHint,
   operationHint,
 } from '../../lib/validation-hints';
+import { NodeContractBadge, NodeContractDetails } from '../nodes/node-contract';
 import { Badge, StatusBadge } from '../ui/badge';
 import { Notice } from '../ui/notice';
 import { Section } from '../ui/page';
@@ -126,6 +127,28 @@ export async function VersionSheet({
           </dd>
         </dl>
       </div>
+
+      {version.nodeContract ? (
+        // P-02: does the node serve the published contract? Never blocks traffic.
+        <Section title={t('nodeContract.title')} description={t('nodeContract.lead')}>
+          <Notice
+            tone={
+              version.nodeContract.status === 'differs'
+                ? 'warning'
+                : version.nodeContract.status === 'matches'
+                  ? 'success'
+                  : 'neutral'
+            }
+            className="space-y-2"
+            data-testid="node-contract"
+          >
+            <p>
+              <NodeContractBadge status={version.nodeContract.status} />
+            </p>
+            <NodeContractDetails contract={version.nodeContract} />
+          </Notice>
+        </Section>
+      ) : null}
 
       {version.validation ? (
         <Section title={t('version.validation.title')} description={t('version.validation.lead')}>

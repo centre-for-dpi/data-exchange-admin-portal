@@ -52,6 +52,8 @@ export const NOTIFICATION_TEXTS: Record<MailLocale, Record<NotificationKind, Tex
     certificate_revoked: (p) =>
       `El operador revocó el certificado de cliente de ${p.application}: emite uno nuevo`,
     node_offline: (p) => `El nodo ${p.node} de ${p.entity} no envía heartbeat hace 5 minutos`,
+    api_contract_differs: (p) =>
+      `El nodo ${p.node} sirve para ${p.api} ${p.version} un OpenAPI distinto del publicado`,
   },
   en: {
     invitation_received: (p) => `You were invited to ${p.entity}`,
@@ -83,6 +85,8 @@ export const NOTIFICATION_TEXTS: Record<MailLocale, Record<NotificationKind, Tex
     certificate_revoked: (p) =>
       `The operator revoked the client certificate of ${p.application}: issue a new one`,
     node_offline: (p) => `Node ${p.node} of ${p.entity} has sent no heartbeat for 5 minutes`,
+    api_contract_differs: (p) =>
+      `Node ${p.node} serves ${p.api} ${p.version} with an OpenAPI other than the published one`,
   },
 };
 

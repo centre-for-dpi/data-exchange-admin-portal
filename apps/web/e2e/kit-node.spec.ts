@@ -78,7 +78,9 @@ test.describe('upstream on a kit node (M4-04)', () => {
     await admin.goto('/my-entity/nodes');
     admin.once('dialog', (dialog) => void dialog.accept());
     await admin.getByRole('button', { name: `Dar de baja ${node}` }).click();
-    await expect(admin.getByRole('row', { name: new RegExp(node) })).toContainText('Dado de baja');
+    await expect(
+      admin.getByTestId('node-list').getByRole('row', { name: new RegExp(node) }),
+    ).toContainText('Dado de baja');
     await expect
       .poll(async () => (await probeGateway(url)).status, { timeout: 30_000, intervals: [1_000] })
       .toBe(404);

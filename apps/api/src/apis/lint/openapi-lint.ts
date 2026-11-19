@@ -6,6 +6,7 @@ import spectralParsers from '@stoplight/spectral-parsers';
 import spectralRefResolver from '@stoplight/spectral-ref-resolver';
 import spectralRulesets from '@stoplight/spectral-rulesets';
 import { parseDocument } from 'yaml';
+import { openapiHashVariants } from '../../domain/node/contract.js';
 import type { DataSubject, LintIssue, LintReport, Operation } from '@den/contracts';
 
 const { Spectral, Document, createRulesetFunction } = spectralCore;
@@ -174,6 +175,8 @@ export interface ParsedOpenApi {
   /** The document as JSON (what is stored and served). */
   spec: Record<string, unknown>;
   sha256: string;
+  /** The same text's other byte forms a node may hold (P-02, openapiHashVariants). */
+  sha256Variants: string[];
   report: LintReport;
   /** Operations declared in the document (input for subscriptions and OPA routes). */
   operations: Operation[];
@@ -363,9 +366,16 @@ function preflight(source: string): LintIssue[] {
 
 export async function lintOpenApi(source: string, options: LintOptions): Promise<ParsedOpenApi> {
   const sha256 = createHash('sha256').update(source).digest('hex');
+  const sha256Variants = openapiHashVariants(source);
   const rejected = preflight(source);
   if (rejected.length > 0) {
-    return { spec: {}, sha256, report: { valid: false, issues: rejected }, operations: [] };
+    return {
+      spec: {},
+      sha256,
+      sha256Variants,
+      report: { valid: false, issues: rejected },
+      operations: [],
+    };
   }
 
   const document = new Document(source, Yaml, 'openapi.yaml');
@@ -431,6 +441,7 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
   return {
     spec,
     sha256,
+    sha256Variants,
     report: { valid: !issues.some((i) => i.severity === 'error'), issues },
     operations: listOperations(spec),
   };

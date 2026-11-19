@@ -10,6 +10,7 @@ import type {
   CreateApiInput,
   CreateApiVersionInput,
   LintReport,
+  NodeContract,
   PaginationQuery,
 } from '@den/contracts';
 import {
@@ -29,6 +30,7 @@ import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
+import { nodeContracts } from '../nodes/node-contracts.js';
 import { nodeIdOf, upstreamNodes } from '../nodes/node-status.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
 import { storedValidation, VersionValidationService } from './version-validation.service.js';
@@ -210,10 +212,26 @@ export class ApisService {
     const nodes = nodeId
       ? await upstreamNodes(this.prisma, [{ upstream: v.upstream, entityId }])
       : null;
-    return this.toVersionDetail(v, (nodeId && nodes?.get(nodeId)) || null);
+    // P-02: what the node serves against the published contract (served versions only).
+    const [contract] = nodeId ? await nodeContracts(this.prisma, { versionIds: [v.id] }) : [];
+    const nodeContract: NodeContract | null = contract
+      ? {
+          status: contract.status,
+          servicePath: contract.servicePath,
+          serviceName: contract.serviceName,
+          expectedSha256: contract.expectedSha256,
+          reportedSha256: contract.reportedSha256,
+          since: contract.since,
+        }
+      : null;
+    return this.toVersionDetail(v, (nodeId && nodes?.get(nodeId)) || null, nodeContract);
   }
 
-  toVersionDetail(v: VersionRow, node: UpstreamNode | null = null): ApiVersionDetail {
+  toVersionDetail(
+    v: VersionRow,
+    node: UpstreamNode | null = null,
+    nodeContract: NodeContract | null = null,
+  ): ApiVersionDetail {
     return {
       id: v.id,
       apiId: v.apiId,
@@ -228,6 +246,7 @@ export class ApisService {
         v.upstream as { type?: unknown } | null,
         v.sandboxUpstream as { type?: unknown } | null,
       ]),
+      nodeContract,
       validation: storedValidation(v.validationReport),
       exposedFields: v.exposedFields as ApiVersionDetail['exposedFields'],
       allowedPurposes: v.allowedPurposes.map((p) => p.purposeCode).sort(),
@@ -405,6 +424,7 @@ export class ApisService {
             status: 'draft',
             openapiSpec: parsed.spec as Prisma.InputJsonObject,
             openapiSha256: parsed.sha256,
+            openapiSha256Variants: parsed.sha256Variants,
             lintReport: parsed.report,
             upstreamType: data.upstream.type,
             upstream: data.upstream,
@@ -467,6 +487,7 @@ export class ApisService {
         data: {
           openapiSpec: parsed.spec as Prisma.InputJsonObject,
           openapiSha256: parsed.sha256,
+          openapiSha256Variants: parsed.sha256Variants,
           lintReport: parsed.report,
         },
       });
@@ -548,6 +569,7 @@ export class ApisService {
             version,
             openapiSpec: parsed.spec as Prisma.InputJsonObject,
             openapiSha256: parsed.sha256,
+            openapiSha256Variants: parsed.sha256Variants,
             lintReport: parsed.report,
           },
         });

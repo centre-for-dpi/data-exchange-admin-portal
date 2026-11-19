@@ -56,6 +56,8 @@ export const AUDIT_ACTIONS = [
   'api_version.retired',
   'api_version.validated',
   'api_version.validation_requested',
+  // What the kit node serves against the published contract (P-02)
+  'api_version.node_contract_changed',
   // Applications and credentials
   'application.created',
   'credential.created',

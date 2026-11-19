@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { upstreamTypeSchema } from './apis.js';
+import { nodeVersionContractSchema } from './nodes.js';
 
 /** Systems the portal reconciles (sync_state.system). */
 export const SYNC_SYSTEMS = ['apisix', 'keycloak', 'opa', 'wireguard', 'opensearch'] as const;
@@ -49,6 +50,14 @@ export const disallowedUpstreamSchema = z.object({
 });
 export type DisallowedUpstream = z.infer<typeof disallowedUpstreamSchema>;
 
+/** A published version whose node does not report its contract (P-02). */
+export const nodeContractIssueSchema = nodeVersionContractSchema.extend({
+  entityName: z.string(),
+  nodeId: z.uuid(),
+  nodeName: z.string(),
+});
+export type NodeContractIssue = z.infer<typeof nodeContractIssueSchema>;
+
 export const syncPageSchema = z.object({
   summary: z.array(
     z.object({
@@ -63,6 +72,11 @@ export const syncPageSchema = z.object({
   nextCursor: z.string().nullable(),
   /** Versions not yet retired whose upstream type is no longer accepted (P-04). */
   disallowedUpstreams: z.array(disallowedUpstreamSchema),
+  /**
+   * Published versions whose node serves another contract (`differs`) or reports none
+   * (`not_reported`), differing ones first (P-02).
+   */
+  nodeContracts: z.array(nodeContractIssueSchema),
 });
 export type SyncPage = z.infer<typeof syncPageSchema>;
 

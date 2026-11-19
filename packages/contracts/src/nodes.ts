@@ -66,6 +66,38 @@ export const nodeServiceSchema = z.strictObject({
 });
 export type NodeService = z.infer<typeof nodeServiceSchema>;
 
+/** What a node serves for a published version, against its contract (P-02). */
+export const NODE_CONTRACT_STATUSES = ['matches', 'differs', 'not_reported'] as const;
+export const nodeContractStatusSchema = z.enum(NODE_CONTRACT_STATUSES);
+export type NodeContractStatus = z.infer<typeof nodeContractStatusSchema>;
+
+/**
+ * The SHA-256 the node reports for the service on a version's servicePath, against the published
+ * version's (P-02). Shown to the provider, the reviewer and the operator; it never blocks traffic.
+ */
+export const nodeContractSchema = z.object({
+  status: nodeContractStatusSchema,
+  servicePath: z.string(),
+  /** The node's service on that path; null when the node declares none there. */
+  serviceName: z.string().nullable(),
+  /** SHA-256 of the published OpenAPI document. */
+  expectedSha256: z.string(),
+  /** What the node reports; null when it reports nothing for that path. */
+  reportedSha256: z.string().nullable(),
+  /** When the current status was first seen at a heartbeat; null until a heartbeat records it. */
+  since: z.iso.datetime().nullable(),
+});
+export type NodeContract = z.infer<typeof nodeContractSchema>;
+
+/** A published version a node serves, with its contract check (node page, sync console). */
+export const nodeVersionContractSchema = nodeContractSchema.extend({
+  apiVersionId: z.uuid(),
+  apiId: z.uuid(),
+  apiName: z.string(),
+  version: z.string(),
+});
+export type NodeVersionContract = z.infer<typeof nodeVersionContractSchema>;
+
 export const nodeSummarySchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -84,6 +116,8 @@ export const nodeSummarySchema = z.object({
       checkedAt: z.iso.datetime(),
     })
     .nullable(),
+  /** Published versions this node serves and whether it reports their contract (P-02). */
+  contracts: z.array(nodeVersionContractSchema),
   createdAt: z.iso.datetime(),
   /** Most recent enrollment token, if any. */
   enrollmentToken: enrollmentTokenSchema.nullable(),

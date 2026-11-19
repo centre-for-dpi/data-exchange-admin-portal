@@ -27,6 +27,8 @@ export const NOTIFICATION_KINDS = {
   /** The operator revoked it (M6-07): the application must ask for a new one. */
   certificate_revoked: { security: true, email: true },
   node_offline: { security: false, email: true },
+  /** A node stopped serving a version's published contract (P-02). */
+  api_contract_differs: { security: false, email: true },
 } as const satisfies Record<string, { security: boolean; email: boolean }>;
 
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;

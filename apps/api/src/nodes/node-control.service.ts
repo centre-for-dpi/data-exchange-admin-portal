@@ -36,6 +36,7 @@ import type { Node as NodeRow } from '../generated/prisma/client.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { OutboxService } from '../outbox/outbox.service.js';
+import { recordNodeContracts } from './node-contracts.js';
 import { queueGatewaySyncForNode } from './node-versions.js';
 import { QueueService } from '../queue/queue.service.js';
 import { WIREGUARD_SYNC_TOPIC } from '../reconcilers/wireguard/wireguard.reconciler.js';
@@ -364,6 +365,9 @@ export class NodeControlService implements OnApplicationBootstrap, OnApplication
           after: { services: data.services, servicePort: data.servicePort },
         });
       }
+      // P-02: does the node serve the published contract of each version on it? Recorded only
+      // when that changes; never touches the routes.
+      await recordNodeContracts(tx, this.audit, nodeActor(node), node, data.services, now);
     });
     return {
       status: comesOnline ? ('online' as const) : node.status,

@@ -213,6 +213,8 @@ In the sync console (`/operator/sync`, M5-07), a `platform_admin` retries an obj
 
 The console also lists, under "Versions on a channel no longer accepted", the versions whose upstream type the country configuration (`features.upstreams`) or the deployment (X-Road settings) no longer accepts (P-04, ADR-0029). They keep working. The operator decides: keep them, ask the entity for a new version through the node (the old one cannot be revised), or accept the type again in the country configuration, which needs a new API image.
 
+Under "Nodes not serving the published contract", the console lists the published versions whose node reports, for the version's service path, an OpenAPI other than the published one (with both SHA-256 and since when), or none (P-02, `ARCHITECTURE.md §10`). Traffic is not affected: the gateway keeps routing by the published contract. The entity's publishers and admins are notified when a version goes from matching to differing, and see the same on the version sheet and the node page. What to do is the entity's call: publish a revision or a new version with what the node serves, or put the published OpenAPI back on the node. "Not reported" means the node declares no service on that path, or the service has no OpenAPI on the node (its log shows `(unknown)` routes): the entity sets `openapi` in the service's file on the node.
+
 ### 5.2.1 Synthetic traffic for demos
 
 `pnpm traffic:simulate [--from YYYY-MM-DD] [--days 30] [--scale 1] [--seed 42]` generates a month of simulated calls from the active production subscriptions, to show the indicators, the usage and the exchange map without real traffic. The calls follow a business-day and office-hours pattern, with denials and their reasons, and provider errors.

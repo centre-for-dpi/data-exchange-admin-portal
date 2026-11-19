@@ -18,6 +18,8 @@ export const NOTIFYING_ACTIONS: ReadonlySet<string> = new Set([
   'api_version.changes_requested',
   'api_version.published',
   'api_version.deprecated',
+  // Only matches → differs notifies (notification-rules.ts).
+  'api_version.node_contract_changed',
   'subscription.requested',
   'subscription.renewal_requested',
   'subscription.info_provided',

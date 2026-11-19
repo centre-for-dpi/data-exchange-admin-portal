@@ -719,7 +719,8 @@
         "openapi_replaced": "Documento OpenAPI reemplazado",
         "purposes_changed": "Finalidades permitidas cambiadas",
         "validated": "Validaciones automáticas terminadas",
-        "validation_requested": "Validaciones automáticas pedidas otra vez"
+        "validation_requested": "Validaciones automáticas pedidas otra vez",
+        "node_contract_changed": "Cambió el contrato que sirve el nodo"
       },
       "application": {
         "created": "Aplicación creada"
@@ -1086,7 +1087,8 @@
       "certificate_expiring": "El certificado de cliente de {application} vence el {date}",
       "certificate_revoked": "El operador revocó el certificado de cliente de {application}: emite uno nuevo",
       "entity_status_changed": "{entity} {decision, select, suspended {fue suspendida en la red} reactivated {fue reactivada en la red} other {fue dada de baja de la red}}",
-      "node_offline": "El nodo {node} de {entity} no envía heartbeat hace 5 minutos"
+      "node_offline": "El nodo {node} de {entity} no envía heartbeat hace 5 minutos",
+      "api_contract_differs": "El nodo {node} sirve para {api} {version} un OpenAPI distinto del publicado"
     },
     "kindNames": {
       "invitation_received": "Invitaciones a una entidad",
@@ -1107,7 +1109,8 @@
       "certificate_expiring": "Certificados por vencer",
       "certificate_revoked": "Certificados revocados por el operador",
       "entity_status_changed": "Suspensión o baja de tu entidad",
-      "node_offline": "Nodos sin conexión"
+      "node_offline": "Nodos sin conexión",
+      "api_contract_differs": "Nodos que sirven otro contrato"
     },
     "unreadSuffix": "{count, plural, one {: uno sin leer} other {: # sin leer}}"
   },
@@ -1297,6 +1300,28 @@
     "decommission": "Dar de baja",
     "decommissionFor": "Dar de baja {name}",
     "decommissionConfirm": "¿Dar de baja el nodo {name}? Deja de funcionar para siempre: su certificado y su túnel se anulan."
+  },
+  "nodeContract": {
+    "title": "Contrato que sirve el nodo",
+    "lead": "El nodo informa en cada heartbeat el SHA-256 del OpenAPI de cada servicio; se compara con el de la versión publicada. Nunca bloquea el tráfico: el gateway sigue enrutando con el contrato publicado.",
+    "nodesTitle": "Contrato de las versiones publicadas",
+    "consoleTitle": "Nodos que no sirven el contrato publicado",
+    "consoleLead": "Versiones publicadas cuyo nodo sirve un OpenAPI distinto del publicado o no informa ninguno. El tráfico sigue pasando; la entidad decide si publica una versión nueva o vuelve al contrato publicado.",
+    "version": "API y versión",
+    "column": "Contrato",
+    "status": {
+      "matches": "Coincide con el publicado",
+      "differs": "Distinto del publicado",
+      "not_reported": "Sin informar"
+    },
+    "matches": "El nodo sirve en {path} el mismo OpenAPI publicado.",
+    "differs": "El nodo sirve en {path} un OpenAPI distinto del publicado.",
+    "differsNext": "El tráfico sigue pasando con el contrato publicado. Si el cambio es deliberado, publica una revisión o una versión nueva con el OpenAPI que sirve el nodo; si no, vuelve a dejar en el nodo el OpenAPI publicado.",
+    "notReportedNoOpenapi": "El servicio {service} del nodo no informa su OpenAPI, así que no se puede comparar con el publicado (en los registros del nodo sus rutas aparecen como «(unknown)»). En una API propia detrás del nodo, indica el archivo OpenAPI en «openapi» del servicio y reinicia el nodo; en una API instantánea, revisa que el servicio arranque.",
+    "notReportedNoService": "El nodo no declara ningún servicio en {path}. Revisa la ruta del servicio de la versión y la configuración del nodo.",
+    "since": "Distinto desde",
+    "expected": "SHA-256 publicado",
+    "reported": "SHA-256 del nodo"
   },
   "bootcamp": {
     "title": "Preparación del bootcamp",

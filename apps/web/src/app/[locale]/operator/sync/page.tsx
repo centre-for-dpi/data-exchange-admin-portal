@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { inputClass } from '../../../../components/form/field';
+import { NodeContractBadge, NodeContractDetails } from '../../../../components/nodes/node-contract';
 import { RetrySyncButton } from '../../../../components/sync/retry-button';
 import { Badge, type Tone } from '../../../../components/ui/badge';
 import { Button } from '../../../../components/ui/button';
@@ -156,6 +157,44 @@ export default async function SyncConsolePage({ params, searchParams }: PageProp
                         row.types.map((type) => t(`version.detail.upstreamTypeNames.${type}`)),
                         { type: 'conjunction' },
                       )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      ) : null}
+
+      {page.nodeContracts.length > 0 ? (
+        // P-02: nodes serving a contract other than the published one, or reporting none.
+        <Section title={t('nodeContract.consoleTitle')} description={t('nodeContract.consoleLead')}>
+          <div className="table-wrap" data-testid="node-contracts">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('nodeContract.version')}</th>
+                  <th scope="col">{t('syncConsole.disallowedEntity')}</th>
+                  <th scope="col">{t('nodes.name')}</th>
+                  <th scope="col">{t('nodeContract.column')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.nodeContracts.map((row) => (
+                  <tr key={row.apiVersionId}>
+                    <td>
+                      <Link href={`/operator/reviews/${row.apiVersionId}`} className="link">
+                        {row.apiName} {row.version}
+                      </Link>
+                      <span className="block font-mono text-sm text-muted-foreground">
+                        {row.servicePath}
+                      </span>
+                    </td>
+                    <td className="text-sm">{row.entityName}</td>
+                    <td className="text-sm">{row.nodeName}</td>
+                    <td className="space-y-2">
+                      <NodeContractBadge status={row.status} />
+                      <NodeContractDetails contract={row} />
                     </td>
                   </tr>
                 ))}

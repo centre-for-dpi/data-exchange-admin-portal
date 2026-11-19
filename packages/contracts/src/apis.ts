@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ValidationMessage } from './validation-messages.js';
 import { isPublicHostname } from './net.js';
+import { nodeContractSchema } from './nodes.js';
 import { pageOf } from './session.js';
 
 export const CLASSIFICATIONS = ['public', 'internal', 'personal', 'sensitive'] as const;
@@ -304,6 +305,11 @@ export const apiVersionDetailSchema = apiVersionSummarySchema.extend({
    * versions (P-04): the version keeps working, and the operator decides. Empty when all are.
    */
   disallowedUpstreamTypes: z.array(upstreamTypeSchema),
+  /**
+   * Published or deprecated version on a kit node: whether the node reports the published
+   * contract for its servicePath (P-02). Null otherwise.
+   */
+  nodeContract: nodeContractSchema.nullable(),
   /** Automatic validations at submission (M4-06); null until the first run. */
   validation: versionValidationSchema.nullable(),
   exposedFields: z.array(exposedFieldSchema),

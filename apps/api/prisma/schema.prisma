@@ -478,55 +478,60 @@ enum UpstreamType {
 }
 
 model ApiVersion {
-  id               String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  apiId            String           @map("api_id") @db.Uuid
-  api              Api              @relation(fields: [apiId], references: [id])
+  id                    String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  apiId                 String           @map("api_id") @db.Uuid
+  api                   Api              @relation(fields: [apiId], references: [id])
   /// "major.minor"
-  version          String
-  major            Int
-  minor            Int
-  status           ApiVersionStatus @default(draft)
+  version               String
+  major                 Int
+  minor                 Int
+  status                ApiVersionStatus @default(draft)
   /// OpenAPI 3.x document as uploaded and its SHA-256. `json` (not jsonb) keeps the key order of
   /// the document, so paths and operations are shown in the order the provider wrote them.
-  openapiSpec      Json             @map("openapi_spec") @db.Json
-  openapiSha256    String           @map("openapi_sha256")
-  lintReport       Json?            @map("lint_report")
-  upstreamType     UpstreamType     @map("upstream_type")
+  openapiSpec           Json             @map("openapi_spec") @db.Json
+  openapiSha256         String           @map("openapi_sha256")
+  /// SHA-256 of the same text with LF or CRLF line endings, with or without a final newline and
+  /// a UTF-8 BOM (P-02): a node reporting any of them serves the published contract. Empty for
+  /// versions registered before P-02 (only openapiSha256 counts for them).
+  openapiSha256Variants String[]         @default([]) @map("openapi_sha256_variants")
+  lintReport            Json?            @map("lint_report")
+  upstreamType          UpstreamType     @map("upstream_type")
   /// Shape depends on upstreamType (SPEC.md §3.1); validated with zod in packages/contracts.
-  upstream         Json
+  upstream              Json
   /// Test upstream with synthetic data (M4-06, M4-08): the contract test and sandbox
   /// applications go there, never to `upstream`.
-  sandboxUpstream  Json?            @map("sandbox_upstream")
+  sandboxUpstream       Json?            @map("sandbox_upstream")
   /// Last automatic validations at submission (M4-06): healthcheck and contract test, parsed
   /// results only (never a request or response body).
-  validationReport Json?            @map("validation_report")
+  validationReport      Json?            @map("validation_report")
   /// /{entitySlug}/{apiSlug}/v{major}
-  basePath         String           @map("base_path")
+  basePath              String           @map("base_path")
   /// [{ name, personal, sensitive }]: personal data the API exposes (minimization, SPEC.md §5).
-  exposedFields    Json             @default("[]") @map("exposed_fields")
-  legalBasisText   String?          @map("legal_basis_text")
-  legalReferences  String[]         @map("legal_references")
+  exposedFields         Json             @default("[]") @map("exposed_fields")
+  legalBasisText        String?          @map("legal_basis_text")
+  legalReferences       String[]         @map("legal_references")
   /// { availabilityTarget, maxLatencyMs, supportHours }
-  sla              Json?
+  sla                   Json?
   /// Requests per minute per subscription unless the subscription says otherwise.
-  defaultRateLimit Int              @default(600) @map("default_rate_limit")
+  defaultRateLimit      Int              @default(600) @map("default_rate_limit")
   /// User who last sent the version to review (separation of duties: cannot approve it).
-  submittedBy      String?          @map("submitted_by") @db.Uuid
-  submittedAt      DateTime?        @map("submitted_at") @db.Timestamptz(3)
-  publishedAt      DateTime?        @map("published_at") @db.Timestamptz(3)
-  deprecatedAt     DateTime?        @map("deprecated_at") @db.Timestamptz(3)
+  submittedBy           String?          @map("submitted_by") @db.Uuid
+  submittedAt           DateTime?        @map("submitted_at") @db.Timestamptz(3)
+  publishedAt           DateTime?        @map("published_at") @db.Timestamptz(3)
+  deprecatedAt          DateTime?        @map("deprecated_at") @db.Timestamptz(3)
   /// User who deprecated it; the retirement acts on their decision (ADR-0019).
-  deprecatedBy     String?          @map("deprecated_by") @db.Uuid
-  sunsetAt         DateTime?        @map("sunset_at") @db.Timestamptz(3)
-  retiredAt        DateTime?        @map("retired_at") @db.Timestamptz(3)
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdBy        String           @map("created_by")
+  deprecatedBy          String?          @map("deprecated_by") @db.Uuid
+  sunsetAt              DateTime?        @map("sunset_at") @db.Timestamptz(3)
+  retiredAt             DateTime?        @map("retired_at") @db.Timestamptz(3)
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy             String           @map("created_by")
 
   allowedPurposes ApiVersionPurpose[]
   reviews         ApiVersionReview[]
   subscriptions   Subscription[]
   revisions       ApiVersionRevision[]
+  nodeContract    NodeContractCheck?
 
   @@unique([apiId, major, minor])
   @@unique([apiId, version])
@@ -1135,10 +1140,40 @@ model Node {
   createdBy                      String     @map("created_by")
 
   enrollmentTokens NodeEnrollmentToken[]
+  contractChecks   NodeContractCheck[]
 
   @@unique([entityId, name])
   @@index([status])
   @@map("node")
+}
+
+enum NodeContractStatus {
+  matches
+  differs
+  not_reported
+
+  @@map("node_contract_status")
+}
+
+/// Last state seen at a heartbeat of the contract a node serves for a published version (P-02):
+/// the SHA-256 the node reports for the service on the version's servicePath, against the
+/// version's openapiSha256. Written only when something changes, so `since` is when the current
+/// status began (for `differs`, since when it differs). It never affects traffic.
+model NodeContractCheck {
+  apiVersionId   String             @id @map("api_version_id") @db.Uuid
+  apiVersion     ApiVersion         @relation(fields: [apiVersionId], references: [id])
+  nodeId         String             @map("node_id") @db.Uuid
+  node           Node               @relation(fields: [nodeId], references: [id])
+  status         NodeContractStatus
+  /// Name of the node's service on that path; null when the node declares none there.
+  serviceName    String?            @map("service_name")
+  expectedSha256 String             @map("expected_sha256")
+  reportedSha256 String?            @map("reported_sha256")
+  since          DateTime           @map("since") @db.Timestamptz(3)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([nodeId])
+  @@map("node_contract_check")
 }
 
 enum EnrollmentTokenStatus {

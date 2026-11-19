@@ -17,6 +17,7 @@ export interface ResolvedNotification {
 interface Event {
   action: string;
   targetId: string;
+  before?: unknown;
   after: unknown;
 }
 
@@ -181,6 +182,26 @@ export async function resolveNotification(
               consumers.map((c) => stillMembers(prisma, c.application.entityId, [c.requestedBy])),
             )
           ).flat(),
+        };
+      }
+      case 'api_version.node_contract_changed': {
+        // Only when the node stops serving the published contract it served (P-02).
+        if (
+          field(event.before, 'status') !== 'matches' ||
+          field(event.after, 'status') !== 'differs'
+        ) {
+          return null;
+        }
+        const nodeId = field(event.after, 'nodeId');
+        const node =
+          typeof nodeId === 'string'
+            ? await prisma.node.findUnique({ where: { id: nodeId }, select: { name: true } })
+            : null;
+        return {
+          kind: 'api_contract_differs',
+          params: { ...params, node: node?.name ?? '—' },
+          link: providerLink,
+          recipients: await membersWith(prisma, v.api.entityId, ['api_publisher', 'entity_admin']),
         };
       }
       default:
