@@ -125,6 +125,32 @@ describe('session and entity context (M1-02)', () => {
         await prisma.auditEvent.count({ where: { action: 'user.registered', actorId: newSub } }),
       ).toBe(1);
     });
+
+    it('survives the first requests of a new person arriving at once (B-21)', async () => {
+      const newSub = randomUUID();
+      const email = `race.${newSub.slice(0, 8)}@example.org`;
+      const token = await issuer.token(newSub, { email, name: 'Carrera Inicial' });
+      const results = await Promise.all(
+        Array.from({ length: 8 }, () => call('/api/v1/me', undefined, token)),
+      );
+      expect(results.map((r) => r.statusCode)).toEqual(Array(8).fill(200));
+      expect(await prisma.user.count({ where: { keycloakSub: newSub } })).toBe(1);
+      expect(
+        await prisma.auditEvent.count({ where: { action: 'user.registered', actorId: newSub } }),
+      ).toBe(1);
+    });
+
+    it('still refuses a different identity that arrives with a registered e-mail', async () => {
+      const first = randomUUID();
+      const email = `dup.${first.slice(0, 8)}@example.org`;
+      await call('/api/v1/me', undefined, await issuer.token(first, { email }));
+      const other = await call(
+        '/api/v1/me',
+        undefined,
+        await issuer.token(randomUUID(), { email }),
+      );
+      expect(other.statusCode).toBe(409);
+    });
   });
 
   describe('GET /entities/:entityId (entity.read)', () => {

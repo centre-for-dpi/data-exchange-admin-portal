@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { EntityRole, PlatformRole } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import { ConflictError, ForbiddenError } from '../common/errors.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requiresMfa } from './authz.policy.js';
 import { bootstrapPlatformAdmin } from './bootstrap-admin.js';
@@ -56,7 +57,17 @@ export class PrincipalService {
       this.prisma.user.findUnique({ where: { keycloakSub: identity.sub }, include });
     let user = await find();
     if (!user) {
-      await this.register(identity, requestId);
+      try {
+        await this.register(identity, requestId);
+      } catch (error) {
+        // Two first requests of the same person at once (the web fires several on sign-in): the
+        // other one registered them between our read and our insert. Whoever lost reads the
+        // user the winner created (B-21); a different account with the same e-mail stays a 409.
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) {
+          throw error;
+        }
+        if (!(await find())) throw new ConflictError('Another account already uses this e-mail');
+      }
       user = await find();
     }
     if (!user) throw new ForbiddenError('The user could not be registered');
