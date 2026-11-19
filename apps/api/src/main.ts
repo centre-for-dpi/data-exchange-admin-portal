@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { CountryConfigError, getCountryConfig } from '@den/config';
 import { createApp } from './app.js';
 import { allowedUpstreamTypes } from './apis/upstream-types.js';
+import { assertApiSecretsAreNotExamples } from './common/example-secrets.js';
 import { loadDevEnv } from './dev-env.js';
 
 const DEFAULT_PORT = 4000;
@@ -20,6 +21,13 @@ async function bootstrap(): Promise<void> {
       process.exit(1);
     }
     throw error;
+  }
+  // M-25: in production, no secret may keep the public value of .env.example.
+  try {
+    assertApiSecretsAreNotExamples();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
   }
   // P-04: a country that only accepts xroad needs the deployment's X-Road settings, or providers
   // could not publish anything.

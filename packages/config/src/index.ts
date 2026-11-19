@@ -10,6 +10,14 @@ export {
   resolveCountryCode,
   type LoadOptions,
 } from './load.js';
+export {
+  ExampleSecretError,
+  assertNoExampleSecrets,
+  exampleSecretsInUse,
+  isDeployed,
+  parseDotenv,
+  readEnvExample,
+} from './example-secrets.js';
 export { documentNumberFormats, isCanonicalDocumentNumber } from './document-numbers.js';
 export {
   DEFAULT_UPSTREAMS,

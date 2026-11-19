@@ -1,9 +1,19 @@
+import { assertNoExampleSecrets, isDeployed } from '@den/config';
 import { createTransport } from 'nodemailer';
 import { configFromEnv, developmentTsaTrust, loadRootEnv } from './config.js';
 import { buildServer } from './server.js';
 import { AlertStore } from './store.js';
 
 loadRootEnv();
+// M-25: deployed, its two secrets cannot keep the public values of .env.example.
+try {
+  assertNoExampleSecrets(['DEN_CITIZEN_APP_CLIENT_SECRET', 'CITIZEN_APP_WEBHOOK_SECRET'], {
+    production: isDeployed(process.env.DEN_CITIZEN_APP_URL),
+  });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+}
 const config = configFromEnv();
 const transport = createTransport({
   host: config.smtp.host,
