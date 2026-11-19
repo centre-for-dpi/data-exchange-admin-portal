@@ -38,7 +38,7 @@ import { requiresRegulator } from '../domain/approval.js';
 import { assertEntityActive } from '../domain/entity/active.js';
 import { assertTransition, LIVE_STATUSES } from '../domain/subscription/state-machine.js';
 import { Prisma } from '../generated/prisma/client.js';
-import { DocumentsService } from '../documents/documents.service.js';
+import { assertReplacementAllowed, DocumentsService } from '../documents/documents.service.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
@@ -98,6 +98,18 @@ const readOnlyOperations = (spec: unknown): string[] =>
 function assertProviderStep(from: SubscriptionStatus, to: SubscriptionStatus): void {
   if (from !== 'pending_provider') throw new InvalidTransitionError('subscription', from, to);
   assertTransition(from, to);
+}
+
+/**
+ * Versions whose route exists at the gateway. A request on any other version (retired, or never
+ * served) can no longer be answered or approved (ADR-0019 point 4, M-07).
+ */
+const SERVED_VERSION_STATUSES: readonly string[] = ['published', 'deprecated'];
+
+function assertVersionServed(s: { apiVersion: { status: string } }): void {
+  if (!SERVED_VERSION_STATUSES.includes(s.apiVersion.status)) {
+    throw new ConflictError('The API version is no longer served');
+  }
 }
 
 /** Decisions the requesting entity takes on its own request (M2-06). */
@@ -227,26 +239,54 @@ export class SubscriptionsService {
   }
 
   /**
+   * A sandbox renewal is approved at once only while the chain of renewals behind it is shorter
+   * than `features.sandbox.autoApproveMaxRenewals`; after that the provider decides (B-08).
+   * A first request (no renewal) is always within the cap.
+   */
+  private async sandboxRenewalsWithinCap(
+    tx: Tx,
+    created: { renewsSubscriptionId: string | null },
+  ): Promise<boolean> {
+    const max = getCountryConfig().features.sandbox.autoApproveMaxRenewals;
+    let depth = 0;
+    let parent = created.renewsSubscriptionId;
+    while (parent) {
+      depth += 1;
+      if (depth > max) return false;
+      const row = await tx.subscription.findUnique({
+        where: { id: parent },
+        select: { renewsSubscriptionId: true },
+      });
+      parent = row?.renewsSubscriptionId ?? null;
+    }
+    return true;
+  }
+
+  /**
    * Approves a sandbox application's request at once (SPEC.md §4.4, M4-08): what was asked for,
    * from now, for the months asked. The decision is the system's, recorded as such.
    */
   private async autoApproveSandbox(
     tx: Tx,
     created: Prisma.SubscriptionGetPayload<object>,
-    openapiSpec: unknown,
+    version: { openapiSpec: unknown; defaultRateLimit: number },
     requestId?: string,
   ): Promise<void> {
     const operations =
       created.requestedOperations.length > 0
         ? created.requestedOperations
-        : readOnlyOperations(openapiSpec);
+        : readOnlyOperations(version.openapiSpec);
     const now = new Date();
     const changes = {
       status: 'approved' as const,
       approvedOperations: operations,
       validFrom: now,
       validUntil: addMonths(now, created.requestedValidityMonths),
-      rateLimitPerMinute: created.requestedRateLimit,
+      // Nobody reviewed the request, so it cannot raise the limit above the version's default (B-08).
+      rateLimitPerMinute:
+        created.requestedRateLimit === null
+          ? null
+          : Math.min(created.requestedRateLimit, version.defaultRateLimit),
     };
     assertTransition(created.status, 'approved');
     await tx.subscription.updateMany({ where: { id: created.id }, data: changes });
@@ -488,7 +528,9 @@ export class SubscriptionsService {
           after: created,
           requestId,
         });
-        if (autoApprove) await this.autoApproveSandbox(tx, created, version.openapiSpec, requestId);
+        if (autoApprove && (await this.sandboxRenewalsWithinCap(tx, created))) {
+          await this.autoApproveSandbox(tx, created, version, requestId);
+        }
         return created.id;
       });
       return this.getForConsumer(entityId, id);
@@ -550,6 +592,9 @@ export class SubscriptionsService {
       where: {
         id: s.id,
         status: s.status,
+        // Also the version we read: a request that went away and came back to the same status
+        // meanwhile (A -> B -> A) is not the one the decider looked at (B-05).
+        updatedAt: s.updatedAt,
         requestedBy: { not: principal.userId },
         application: { createdBy: { not: principal.userId } },
       },
@@ -575,6 +620,7 @@ export class SubscriptionsService {
       ? 'pending_regulator'
       : 'approved';
     assertProviderStep(before.status, next);
+    assertVersionServed(before);
     this.assertNotRequester(principal, before);
 
     // The approval may only narrow the request.
@@ -740,8 +786,10 @@ export class SubscriptionsService {
   }
 
   /**
-   * A renewal may only be granted while the subscription it renews is active: a suspended or
-   * revoked subscription must not come back through its renewal. Runs inside the granting
+   * A renewal may only be granted while the subscription it renews is active, or expired: a
+   * suspended or revoked subscription must not come back through its renewal, but one that simply
+   * reached its validUntil while the renewal was being decided is exactly what a renewal is for
+   * (SPEC.md §4.4 step 6, M-06). The renewal then starts at the decision. Runs inside the granting
    * transaction and locks the original row, the same row suspension and revocation update, so
    * the two serialize: whichever commits second sees the other's result.
    */
@@ -751,8 +799,8 @@ export class SubscriptionsService {
       SELECT status::text AS status FROM subscription
       WHERE id = ${s.renewsSubscriptionId}::uuid
       FOR UPDATE`;
-    if (original?.status !== 'active') {
-      throw new ConflictError('The subscription this request renews is not active');
+    if (original?.status !== 'active' && original?.status !== 'expired') {
+      throw new ConflictError('The subscription this request renews is not active or expired');
     }
   }
 
@@ -849,6 +897,16 @@ export class SubscriptionsService {
       throw new ConflictError('The agreement can only change before the provider decides');
     }
     await this.prisma.$transaction(async (tx) => {
+      // Replaced agreements stay (the provider may have read them): the replacements are capped.
+      assertReplacementAllowed(
+        await tx.auditEvent.count({
+          where: {
+            action: 'subscription.agreement_attached',
+            targetType: 'subscription',
+            targetId: subscriptionId,
+          },
+        }),
+      );
       const document = await this.documents.storePdf(tx, {
         ownerEntityId: entityId,
         kind: 'agreement',
@@ -910,7 +968,7 @@ export class SubscriptionsService {
   ): Promise<void> {
     assertTransition(before.status, to);
     const changed = await tx.subscription.updateMany({
-      where: { id: before.id, status: before.status },
+      where: { id: before.id, status: before.status, updatedAt: before.updatedAt },
       data: { status: to, ...decision.data },
     });
     if (changed.count === 0) throw new ConflictError('The request changed meanwhile; reload it');
@@ -981,6 +1039,7 @@ export class SubscriptionsService {
     if (before.status !== 'info_requested') {
       throw new ConflictError('The provider has not asked for information on this request');
     }
+    assertVersionServed(before);
     await this.prisma.$transaction((tx) =>
       this.decide(tx, before, 'pending_provider', {
         kind: 'info_provided',
@@ -1069,6 +1128,10 @@ export class SubscriptionsService {
   ): Promise<SubscriptionDetail> {
     const { comment } = reactivateSubscriptionSchema.parse(input);
     const before = await this.loadForProvider(acting.entityId, subscriptionId);
+    // Only a suspension is lifted: `approved -> active` is the policy bundle's confirmation (M-05).
+    if (before.status !== 'suspended') {
+      throw new InvalidTransitionError('subscription', before.status, 'active');
+    }
     const suspension = [...before.decisions].reverse().find((d) => d.decision === 'suspended');
     if (suspension && suspension.decidedByEntityId === null && acting.via === 'membership') {
       throw new ForbiddenError('The operator or the regulator suspended it; only they can lift it');

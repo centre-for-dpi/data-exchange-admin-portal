@@ -288,7 +288,7 @@ export class RegulatorService {
     await this.prisma.$transaction(async (tx) => {
       await this.subscriptions.lockRenewedStillActive(tx, before);
       const changed = await tx.subscription.updateMany({
-        where: { id: subscriptionId, status: 'pending_regulator' },
+        where: { id: subscriptionId, status: 'pending_regulator', updatedAt: before.updatedAt },
         data: { status: 'approved', validFrom: now, validUntil },
       });
       if (changed.count === 0) throw new ConflictError('The request changed meanwhile; reload it');
@@ -338,7 +338,7 @@ export class RegulatorService {
 
     await this.prisma.$transaction(async (tx) => {
       const changed = await tx.subscription.updateMany({
-        where: { id: subscriptionId, status: 'pending_regulator' },
+        where: { id: subscriptionId, status: 'pending_regulator', updatedAt: before.updatedAt },
         data: { status: 'rejected' },
       });
       if (changed.count === 0) throw new ConflictError('The request changed meanwhile; reload it');

@@ -125,8 +125,9 @@ describe('sandbox applications and the sandbox route (M4-08)', () => {
     return createdApplicationSchema.parse(res.json()).application;
   }
 
-  const ask = (applicationId: string, apiVersionId: string) =>
+  const ask = (applicationId: string, apiVersionId: string, extra: object = {}) =>
     request('POST', `/entities/${programas}/subscriptions`, 'carlos.dev', {
+      ...extra,
       applicationId,
       apiVersionId,
       purposeCode: 'eligibility_check',
@@ -156,6 +157,40 @@ describe('sandbox applications and the sandbox route (M4-08)', () => {
     expect(client?.subscriptions.map((s) => s.route)).toEqual([sandboxRouteId(versionId)]);
     expect(data.routes[sandboxRouteId(versionId)]).toMatchObject({ sandbox: true });
     expect(data.routes[sandboxRouteId(versionId)]?.operations[0]?.pathRegex).toContain('/sandbox/');
+  });
+
+  it('the automatic approval never raises the rate limit above the version default (B-08)', async () => {
+    const { versionId } = await published(true);
+    const { defaultRateLimit } = await prisma.apiVersion.findUniqueOrThrow({
+      where: { id: versionId },
+    });
+    const res = await ask((await application('sandbox')).id, versionId, {
+      requestedRateLimit: defaultRateLimit + 1000,
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const detail = subscriptionDetailSchema.parse(res.json());
+    expect(detail.status).toBe('approved');
+    const row = await prisma.subscription.findUniqueOrThrow({ where: { id: detail.id } });
+    expect(row.rateLimitPerMinute).toBe(defaultRateLimit);
+  });
+
+  it('sandbox renewals are approved at once only up to the cap; then the provider decides (B-08)', async () => {
+    const max = loadCountryConfig({ code: 'co' }).features.sandbox.autoApproveMaxRenewals;
+    const { versionId } = await published(true);
+    const sandboxApp = await application('sandbox');
+    let current = subscriptionDetailSchema.parse((await ask(sandboxApp.id, versionId)).json());
+    for (let n = 1; n <= max; n++) {
+      expect(current.status).toBe('approved');
+      await prisma.subscription.update({ where: { id: current.id }, data: { status: 'active' } });
+      const res = await ask(sandboxApp.id, versionId, { renewsSubscriptionId: current.id });
+      expect(res.statusCode, res.body).toBe(201);
+      current = subscriptionDetailSchema.parse(res.json());
+    }
+    expect(current.status).toBe('approved');
+    await prisma.subscription.update({ where: { id: current.id }, data: { status: 'active' } });
+    const beyond = await ask(sandboxApp.id, versionId, { renewsSubscriptionId: current.id });
+    expect(beyond.statusCode, beyond.body).toBe(201);
+    expect(subscriptionDetailSchema.parse(beyond.json()).status).toBe('pending_provider');
   });
 
   it('a production request still waits for the provider; it never goes to the sandbox', async () => {

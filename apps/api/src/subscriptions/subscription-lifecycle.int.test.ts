@@ -237,6 +237,48 @@ describe('subscription lifecycle (M2-06)', () => {
     ).toBe(403);
   });
 
+  it('reactivate only lifts a suspension: an approved or active subscription answers 409 (M-05)', async () => {
+    const r = await requested();
+    await call('POST', provider(r.id, '/approve'), 'lucia.datos', {});
+    expect(await statusOf(r.id)).toBe('approved');
+    expect((await call('POST', provider(r.id, '/reactivate'), 'lucia.datos', {})).statusCode).toBe(
+      409,
+    );
+    expect(await statusOf(r.id)).toBe('approved');
+    expect(await actions(r.id)).not.toContain('subscription.reactivated');
+    // Another entity's steward does not see it at all.
+    expect(
+      (
+        await call(
+          'POST',
+          `/entities/${programas}/access-requests/${r.id}/reactivate`,
+          'carlos.dev',
+          {},
+        )
+      ).statusCode,
+    ).toBe(403);
+  });
+
+  it('a request waiting for information cannot be answered or approved once its version is retired (M-07)', async () => {
+    const { id } = await requested();
+    await call('POST', provider(id, '/request-info'), 'lucia.datos', {
+      comment: '¿Para qué programa usará los datos?',
+    });
+    await prisma.apiVersion.update({ where: { id: versionId }, data: { status: 'retired' } });
+    try {
+      expect(
+        (
+          await call('POST', consumer(id, '/provide-info'), 'carlos.dev', {
+            comment: 'Para el programa de subsidios.',
+          })
+        ).statusCode,
+      ).toBe(409);
+      expect(await statusOf(id)).toBe('info_requested');
+    } finally {
+      await prisma.apiVersion.update({ where: { id: versionId }, data: { status: 'published' } });
+    }
+  });
+
   it('a suspension by the regulator can only be lifted by a platform role', async () => {
     const { id } = await active();
     const res = await call('POST', provider(id, '/suspend'), 'marta.regulador', {
@@ -395,6 +437,15 @@ describe('subscription lifecycle (M2-06)', () => {
       const res = await call('POST', provider(renewal, '/approve'), 'lucia.datos', {});
       expect(res.statusCode).toBe(409);
       expect(await statusOf(renewal)).toBe('pending_provider');
+    });
+
+    it('a renewal decided after the original expired is still approved (M-06)', async () => {
+      const { id, applicationId } = await active();
+      const renewal = await renew(id, applicationId);
+      await prisma.subscription.update({ where: { id }, data: { status: 'expired' } });
+      const res = await call('POST', provider(renewal, '/approve'), 'lucia.datos', {});
+      expect(res.statusCode, res.body).toBe(200);
+      expect(await statusOf(renewal)).toBe('approved');
     });
 
     it('keeps the application, version and purpose, and only renews active subscriptions', async () => {

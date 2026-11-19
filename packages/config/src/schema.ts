@@ -166,7 +166,15 @@ export const countryConfigSchema = z.strictObject({
   features: z.strictObject({
     publicCatalog: z.boolean(),
     mtls: z.strictObject({ required: z.boolean() }),
-    sandbox: z.strictObject({ autoApprove: z.boolean() }),
+    sandbox: z.strictObject({
+      autoApprove: z.boolean(),
+      /**
+       * Renewals of a sandbox subscription that are still approved at once (B-08); past that, the
+       * provider decides. A sandbox subscription is renewed by chaining requests, so without a
+       * cap one never needs anyone's approval again.
+       */
+      autoApproveMaxRenewals: z.number().int().min(0).default(3),
+    }),
     approval: z.strictObject({ regulatorForSensitive: z.boolean() }),
     lint: z.strictObject({ noIdInQuery: z.boolean() }),
     /**
