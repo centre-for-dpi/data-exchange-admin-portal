@@ -62,7 +62,7 @@ flowchart LR
 
 Critical roles (platform roles and `data_steward`) require a **second factor** (a TOTP code from an authenticator app). Nobody approves what they themselves requested (separation of duties).
 
-No screen grants platform roles yet. Each person of the operator registers in the portal, verifies the address and signs in once; then, on the server, `sudo ./install.sh platform-role grant <email> <role>` gives the role, audited (`list` shows who has which, `revoke` takes it away).
+Each person of the operator registers in the portal, verifies the address and signs in once. The first `platform_admin` is granted on the server, with `sudo ./install.sh platform-role grant <email> <role>`, audited (`list` shows who has which, `revoke` takes it away; the command also serves for recovery). From then on, that administrator grants and revokes the other roles, and disables or enables accounts, from **Operator console → Platform roles and accounts**, with a reason that goes to the audit log.
 
 The pilot always loads the demo users (`pablo.plataforma`, `ana.operadora` and the others in `infra/keycloak/README.md`), with their platform roles and the installer's demo password. Once the operator's own people have their roles, with at least one `platform_admin` of its own, disable them: `sudo ./install.sh demo-users disable`. They can no longer sign in (disabled in Keycloak), they lose their platform roles, and the seed leaves them that way on every restart and update. It is audited, it refuses while the only active `platform_admin` is a demo user, and no command undoes it; `demo-users list` shows their state. From then on the demo rehearsal (`DEMO.md`) no longer runs on that installation.
 

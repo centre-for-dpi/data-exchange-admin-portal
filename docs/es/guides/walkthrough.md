@@ -30,17 +30,17 @@ Una misma persona puede tener varios papeles en su entidad (en la consumidora de
 
 ## Antes de empezar
 
-- **Una app autenticadora** en el celular (Google Authenticator, Microsoft Authenticator u otra TOTP). La piden los roles críticos: los de plataforma y el responsable de datos.
+- **Una app autenticadora** en el celular (Google Authenticator, Microsoft Authenticator u otra TOTP). La piden los roles críticos: los de plataforma, la administración de la entidad y el responsable de datos.
 - **Contraseña:** al menos 12 caracteres, distinta del usuario y del correo, sin repetir las últimas 5.
 - **El enlace del correo de verificación dura 60 minutos** (antes de P-08 eran 5; `sudo ./install.sh update` lo aplica a una instalación existente). Ten el correo abierto antes de registrarte. En una red de prueba, los correos del portal llegan al buzón de pruebas (`/mail`), no a internet: ahí puedes usar direcciones inventadas.
 - **Usa una ventana privada por persona** si haces varios papeles desde el mismo equipo, para no mezclar sesiones.
 
 ## 1. El equipo del operador
 
-Ninguna pantalla da todavía los roles de plataforma (`platform_admin`, `platform_reviewer`, `regulator`, `auditor`): se dan desde el servidor del portal.
+Los roles de plataforma (`platform_admin`, `platform_reviewer`, `regulator`, `auditor`) se dan de dos formas: el **primer** `platform_admin`, desde el servidor del portal, y de ahí en adelante esa persona da los demás desde **Consola del operador → Roles de plataforma y cuentas**.
 
 1. **Cada persona del operador** abre el portal, pulsa **Iniciar sesión → Registrarse**, llena usuario, correo, nombre y contraseña, **verifica el correo** y **entra una vez**. El portal le dirá que aún no tiene roles: es lo esperado. Entrar una vez es lo que la crea dentro del portal.
-2. **Quien administra el servidor del portal** le da su rol:
+2. **Quien administra el servidor del portal** le da su rol (siempre para el primer `platform_admin`, y para recuperar el acceso):
 
    ```bash
    sudo ./install.sh platform-role grant <correo> platform_reviewer --reason "Equipo de revisión"
@@ -49,6 +49,8 @@ Ninguna pantalla da todavía los roles de plataforma (`platform_admin`, `platfor
    ```
 
    Roles: `platform_admin` (equipo técnico: todo lo operativo), `platform_reviewer` (revisa y aprueba altas y APIs), `regulator` (supervisa y aprueba lo sensible), `auditor` (consulta la bitácora). El cambio queda en la bitácora de auditoría con el motivo. Para quitarlo: `revoke`. El comando no deja la red sin ningún `platform_admin`. Si tu instalación no tiene el comando, actualiza el portal a una versión que lo incluya.
+
+   **Desde la consola:** cuando un `platform_admin` ya tiene su segundo factor, **Consola del operador → Roles de plataforma y cuentas →** el correo de la persona, el rol y el motivo **→ Dar el rol**. La misma pantalla muestra quién tiene cada rol, lo quita y desactiva o activa una cuenta; todo queda en la bitácora con el nombre de quien lo hizo y el motivo.
 3. **La persona vuelve a entrar.** Keycloak le muestra un **código QR**: lo escanea con la app autenticadora y escribe el código de 6 dígitos. Desde ahí ve la **Consola del operador**.
 4. **Cuando el equipo propio ya tiene sus roles**, quien administra el servidor desactiva las cuentas de demostración que trae el piloto (tienen roles de plataforma y la contraseña de demostración):
 
@@ -89,7 +91,7 @@ Ninguna pantalla da todavía los roles de plataforma (`platform_admin`, `platfor
 2. Revisa los datos, el documento y que los correos sean institucionales.
 3. **Decisión del operador:** **Aprobar el alta**, **Pedir correcciones** (el solicitante lee el comentario) o **Rechazar** (definitivo; libera el identificador).
 
-Al aprobar, quien pidió el alta queda como **administradora** y cada responsable recibe una **invitación** por correo, que vence a los 14 días.
+Al aprobar, quien pidió el alta queda como **administradora** y cada responsable recibe una **invitación** por correo, que vence a los 14 días. En su siguiente página, a la administradora se le pide configurar el segundo factor (QR), como al responsable de datos.
 
 ## 4. Los responsables aceptan su invitación
 
@@ -268,7 +270,7 @@ Para terminar: `sudo /opt/den-node/install.sh doctor`. Todo en ✔; el único av
 
 ### 6.3 Enviar a revisión
 
-**Enviar a revisión:** el portal ejecuta las **validaciones automáticas**, que llaman al servicio a través del gateway, el túnel y el nodo. Si fallan, la ficha dice cuál y por qué; corrige y pulsa **Validaciones automáticas → Repetir validaciones**.
+**Enviar a revisión:** el portal ejecuta las **validaciones automáticas**, que llaman al servicio a través del gateway, el túnel y el nodo. Si fallan, la ficha dice cuál y por qué; corrige y pulsa **Validaciones automáticas → Repetir validaciones**. Se pueden repetir una vez cada 5 minutos por versión (y hasta 10 veces por hora por entidad); antes de eso, el portal dice cuántos minutos esperar.
 
 ## 7. El operador aprueba la API
 
@@ -357,7 +359,7 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 | "El correo ya existe" al registrarse | La cuenta se creó; solo falta verificarla | Lo mismo: inicia sesión y reenvía la verificación |
 | Invitaciones vacía | El correo no es idéntico al de la solicitud, o no está verificado | Registra la cuenta con el correo exacto |
 | "No pudimos completar la operación" al subir el documento del alta | (Operador, instalaciones anteriores a P-06) el API no puede escribir en su carpeta de documentos | `sudo ./install.sh update` lo corrige. A mano: en el `.env` del portal, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, y recrea el contenedor del API (`docker compose ... up -d --no-build --no-deps api`) |
-| No aparece un rol de plataforma | La persona no ha entrado nunca al portal | Que entre una vez y repetir `platform-role grant` |
+| No aparece un rol de plataforma | La persona no ha entrado nunca al portal | Que entre una vez y volver a darlo (consola o `platform-role grant`) |
 | **Aprobar** está deshabilitado, o "La versión no se aprobó" | Las validaciones automáticas no han pasado (siguen en curso o fallaron) | La ficha de la versión dice qué significa cada falla y qué intentar; corrige y **Repetir validaciones** |
 | Validación con **504** (tiempo agotado) | El gateway no llega al nodo por el túnel | En el nodo: `sudo /opt/den-node/install.sh status` (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: `sudo /opt/den-node/install.sh stop` y `start` |
 | `subject name is expected to be in the format /type0=value0…` | Git Bash convirtió `/CN=…` en una ruta (comando escrito a mano) | Usa la pestaña **Windows: Git Bash** de la página de la aplicación, o `bash entity-check.sh csr` |
@@ -372,9 +374,9 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 
 ## Lo que todavía falta en el producto
 
-Encontrado en el ensayo y anotado en el backlog del portal (sección P):
+Los pendientes del ensayo (sección P del backlog) están todos resueltos:
 
-- **P-01** ✔ Roles de plataforma desde el comando del servidor (falta una pantalla en la consola).
+- **P-01** ✔ Roles de plataforma desde el comando del servidor y, desde R-05, desde **Consola del operador → Roles de plataforma y cuentas**.
 - **P-02** ✔ Aviso cuando el nodo sirve un contrato distinto del publicado.
 - **P-03** ✔ El paquete del kit, su huella y los comandos en la pantalla de nodos del portal.
 - **P-04** ✔ Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.
@@ -382,3 +384,9 @@ Encontrado en el ensayo y anotado en el backlog del portal (sección P):
 - **P-06** ✔ El `.env` del despliegue mandaba los documentos a una carpeta donde el API no puede escribir.
 - **P-07** ✔ Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.
 - **P-08** ✔ Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.
+
+Sigue abierto, de la revisión general de 2026-11 (sección R del backlog):
+
+- **Editar una versión devuelta para cambios:** la pantalla del portal solo reemplaza su OpenAPI. Sus campos, finalidades, base legal y servicio ya se pueden cambiar por el API del portal, pero todavía no hay formulario para eso.
+- **R-09 (web):** tras cinco minutos sin actividad, la primera página puede fallar como si la sesión hubiera terminado (al recargarla funciona); las fechas salen en UTC y no en la zona horaria del país; las páginas de error y de "no encontrado" no están traducidas; el aviso de que la sesión va a terminar llega tarde.
+- **R-11:** algunos documentos técnicos (arquitectura, especificación, despliegue) todavía describen comportamientos que el código ya cambió; se están alineando.

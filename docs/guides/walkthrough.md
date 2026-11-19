@@ -30,17 +30,17 @@ One person can hold several roles in their entity (in this example's consumer, o
 
 ## Before you start
 
-- **An authenticator app** on a phone (Google Authenticator, Microsoft Authenticator or any TOTP app). Critical roles need it: the platform roles and the data steward.
+- **An authenticator app** on a phone (Google Authenticator, Microsoft Authenticator or any TOTP app). Critical roles need it: the platform roles, the entity administrator and the data steward.
 - **Password:** at least 12 characters, different from the username and the email, not one of the last 5.
 - **The verification link lasts 60 minutes** (5 before P-08; `sudo ./install.sh update` applies it to an existing installation). Have the mailbox open before registering. On a test network the portal's emails go to the test mailbox (`/mail`), not to the internet: made-up addresses work there.
 - **Use one private window per person** when playing several roles from the same computer, so sessions do not mix.
 
 ## 1. The operator's team
 
-No screen grants the platform roles yet (`platform_admin`, `platform_reviewer`, `regulator`, `auditor`): they are granted on the portal's server.
+The platform roles (`platform_admin`, `platform_reviewer`, `regulator`, `auditor`) are granted in two ways: the **first** `platform_admin` on the portal's server, and from then on that administrator grants the rest from **Operator console → Platform roles and accounts**.
 
 1. **Each person of the operator** opens the portal, clicks **Sign in → Register**, fills in username, email, name and password, **verifies the email** and **signs in once**. The portal says they have no roles yet: expected. Signing in once is what creates them in the portal.
-2. **Whoever administers the portal's server** grants the role:
+2. **Whoever administers the portal's server** grants the role (always for the first `platform_admin`, and for recovery):
 
    ```bash
    sudo ./install.sh platform-role grant <email> platform_reviewer --reason "Review team"
@@ -49,6 +49,8 @@ No screen grants the platform roles yet (`platform_admin`, `platform_reviewer`, 
    ```
 
    Roles: `platform_admin` (technical team: everything operational), `platform_reviewer` (reviews and approves onboarding and APIs), `regulator` (oversees and approves what is sensitive), `auditor` (reads the audit log). The change is recorded in the audit log with its reason. To take it away: `revoke`. The command never leaves the network without a `platform_admin`. If your installation does not have the command, update the portal to a version that includes it.
+
+   **From the console:** once a `platform_admin` has the second factor, **Operator console → Platform roles and accounts →** the person's email, the role and the reason **→ Grant the role**. The same screen lists who holds each role, revokes it and disables or enables an account; everything is audited with the administrator's name and the reason.
 3. **The person signs in again.** Keycloak shows a **QR code**: they scan it with the authenticator app and type the 6-digit code. From then on they see the **Operator console**.
 4. **Once the operator's own team has its roles**, whoever runs the server disables the demo accounts the pilot ships with (they hold platform roles and the demo password):
 
@@ -89,7 +91,7 @@ No screen grants the platform roles yet (`platform_admin`, `platform_reviewer`, 
 2. Check the data, the document and that the emails are institutional.
 3. **Operator decision:** **Approve the onboarding**, **Request corrections** (the requester reads the comment) or **Reject** (final; frees the identifier).
 
-On approval, the requester becomes the **administrator** and each officer receives an **invitation** by email, which expires after 14 days.
+On approval, the requester becomes the **administrator** and each officer receives an **invitation** by email, which expires after 14 days. On their next page the administrator is asked to set up the second factor (QR), like the data steward.
 
 ## 4. The officers accept their invitation
 
@@ -268,7 +270,7 @@ To finish: `sudo /opt/den-node/install.sh doctor`. Everything ✔; the only acce
 
 ### 6.3 Send for review
 
-**Send for review:** the portal runs the **automatic validations**, which call the service through the gateway, the tunnel and the node. If they fail, the sheet says which and why; fix it and click **Automatic validations → Run validations again**.
+**Send for review:** the portal runs the **automatic validations**, which call the service through the gateway, the tunnel and the node. If they fail, the sheet says which and why; fix it and click **Automatic validations → Run validations again**. They can be run again once every 5 minutes per version (and up to 10 times an hour per entity); sooner, the portal says how many minutes to wait.
 
 ## 7. The operator approves the API
 
@@ -358,7 +360,7 @@ curl -sS --cacert network-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 | "Email already exists" when registering | The account was created; only the verification is missing | The same: sign in and resend the verification |
 | Invitations is empty | The email is not identical to the request's, or not verified | Register the account with the exact email |
 | "We could not complete the operation" uploading the onboarding document | (Operator, installations before P-06) the API cannot write to its documents folder | `sudo ./install.sh update` fixes it. By hand: in the portal's `.env`, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, and recreate the API container (`docker compose ... up -d --no-build --no-deps api`) |
-| A platform role does not show | The person never signed in | Have them sign in once and run `platform-role grant` again |
+| A platform role does not show | The person never signed in | Have them sign in once and grant it again (console or `platform-role grant`) |
 | **Approve** is disabled, or "The version was not approved" | The automatic validations have not passed (still running, or failed) | The version sheet says what each failure means and what to try; fix it and **Run validations again** |
 | Validation with **504** (timeout) | The gateway does not reach the node through the tunnel | On the node: `sudo /opt/den-node/install.sh status` (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: `sudo /opt/den-node/install.sh stop` and `start` |
 | `subject name is expected to be in the format /type0=value0…` | Git Bash turned `/CN=…` into a path (a command typed by hand) | Use the **Windows: Git Bash** tab on the application's page, or `bash entity-check.sh csr` |
@@ -373,9 +375,9 @@ curl -sS --cacert network-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 
 ## What the product still lacks
 
-Found in the rehearsal and recorded in the portal's backlog (section P):
+The rehearsal's follow-ups (backlog section P) are all done:
 
-- **P-01** ✔ Platform roles from the server's command line (a console screen is still missing).
+- **P-01** ✔ Platform roles from the server's command line and, since R-05, from **Operator console → Platform roles and accounts**.
 - **P-02** ✔ A warning when the node serves a contract other than the published one.
 - **P-03** ✔ The kit bundle, its checksum and the commands on the portal's nodes page.
 - **P-04** ✔ Offering only the service types the country allows (the node and X-Road), with clear names.
@@ -383,3 +385,9 @@ Found in the rehearsal and recorded in the portal's backlog (section P):
 - **P-06** ✔ The deployment's `.env` sent documents to a folder the API cannot write.
 - **P-07** ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.
 - **P-08** ✔ Disabling the pilot's demo accounts and making the verification link last longer.
+
+Still open, from the 2026-11 general review (backlog section R):
+
+- **Editing a version sent back for changes:** the portal's screen only replaces its OpenAPI. Its fields, purposes, legal basis and service can already be changed through the portal's API, but there is no form for it yet.
+- **R-09 (web):** after five minutes idle, the first page can fail as if the session had ended (reloading it works); dates show in UTC instead of the country's time zone; the error and "not found" pages are not translated; the notice that the session is ending arrives late.
+- **R-11:** some technical documents (architecture, specification, deployment) still describe behaviour the code has since changed; they are being aligned.

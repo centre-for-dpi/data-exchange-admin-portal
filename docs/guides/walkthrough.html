@@ -380,7 +380,7 @@ details.faq[open] summary { color: var(--gov); }
     <section id="before-you-start">
       <h2>Before you start</h2>
 <ul class="ticks">
-<li><b>An authenticator app</b> on a phone (Google Authenticator, Microsoft Authenticator or any TOTP app). Critical roles need it: the platform roles and the data steward.</li>
+<li><b>An authenticator app</b> on a phone (Google Authenticator, Microsoft Authenticator or any TOTP app). Critical roles need it: the platform roles, the entity administrator and the data steward.</li>
 <li><b>Password:</b> at least 12 characters, different from the username and the email, not one of the last 5.</li>
 <li><b>The verification link lasts 60 minutes</b> (5 before P-08; <code>sudo ./install.sh update</code> applies it to an existing installation). Have the mailbox open before registering. On a test network the portal's emails go to the test mailbox (<code>/mail</code>), not to the internet: made-up addresses work there.</li>
 <li><b>Use one private window per person</b> when playing several roles from the same computer, so sessions do not mix.</li>
@@ -389,13 +389,14 @@ details.faq[open] summary { color: var(--gov); }
 
     <section id="1-the-operator-s-team">
       <h2><span class="num">1</span>The operator's team</h2>
-<p>No screen grants the platform roles yet (<code>platform_admin</code>, <code>platform_reviewer</code>, <code>regulator</code>, <code>auditor</code>): they are granted on the portal's server.</p>
+<p>The platform roles (<code>platform_admin</code>, <code>platform_reviewer</code>, <code>regulator</code>, <code>auditor</code>) are granted in two ways: the <b>first</b> <code>platform_admin</code> on the portal's server, and from then on that administrator grants the rest from <b>Operator console → Platform roles and accounts</b>.</p>
 <ol class="steps">
 <li><span><b>Each person of the operator</b> opens the portal, clicks <b>Sign in → Register</b>, fills in username, email, name and password, <b>verifies the email</b> and <b>signs in once</b>. The portal says they have no roles yet: expected. Signing in once is what creates them in the portal.</span></li>
-<li><span><b>Whoever administers the portal's server</b> grants the role:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo ./install.sh platform-role grant &lt;email&gt; platform_reviewer --reason "Review team"
+<li><span><b>Whoever administers the portal's server</b> grants the role (always for the first <code>platform_admin</code>, and for recovery):<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo ./install.sh platform-role grant &lt;email&gt; platform_reviewer --reason "Review team"
 sudo ./install.sh platform-role grant &lt;email&gt; platform_admin --reason "Technical team"
 sudo ./install.sh platform-role list</code></pre></div>
-<p>Roles: <code>platform_admin</code> (technical team: everything operational), <code>platform_reviewer</code> (reviews and approves onboarding and APIs), <code>regulator</code> (oversees and approves what is sensitive), <code>auditor</code> (reads the audit log). The change is recorded in the audit log with its reason. To take it away: <code>revoke</code>. The command never leaves the network without a <code>platform_admin</code>. If your installation does not have the command, update the portal to a version that includes it.</p></div></span></li>
+<p>Roles: <code>platform_admin</code> (technical team: everything operational), <code>platform_reviewer</code> (reviews and approves onboarding and APIs), <code>regulator</code> (oversees and approves what is sensitive), <code>auditor</code> (reads the audit log). The change is recorded in the audit log with its reason. To take it away: <code>revoke</code>. The command never leaves the network without a <code>platform_admin</code>. If your installation does not have the command, update the portal to a version that includes it.</p>
+<p><b>From the console:</b> once a <code>platform_admin</code> has the second factor, <b>Operator console → Platform roles and accounts →</b> the person's email, the role and the reason <b>→ Grant the role</b>. The same screen lists who holds each role, revokes it and disables or enables an account; everything is audited with the administrator's name and the reason.</p></div></span></li>
 <li><span><b>The person signs in again.</b> Keycloak shows a <b>QR code</b>: they scan it with the authenticator app and type the 6-digit code. From then on they see the <b>Operator console</b>.</span></li>
 <li><span><b>Once the operator's own team has its roles</b>, whoever runs the server disables the demo accounts the pilot ships with (they hold platform roles and the demo password):<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo ./install.sh demo-users list
 sudo ./install.sh demo-users disable --reason "Operator team has its roles"</code></pre></div>
@@ -431,7 +432,7 @@ sudo ./install.sh demo-users disable --reason "Operator team has its roles"</cod
 <li><span>Check the data, the document and that the emails are institutional.</span></li>
 <li><span><b>Operator decision:</b> <b>Approve the onboarding</b>, <b>Request corrections</b> (the requester reads the comment) or <b>Reject</b> (final; frees the identifier).</span></li>
 </ol>
-<p>On approval, the requester becomes the <b>administrator</b> and each officer receives an <b>invitation</b> by email, which expires after 14 days.</p>
+<p>On approval, the requester becomes the <b>administrator</b> and each officer receives an <b>invitation</b> by email, which expires after 14 days. On their next page the administrator is asked to set up the second factor (QR), like the data steward.</p>
     </section>
 
     <section id="4-the-officers-accept-their-invitation">
@@ -562,7 +563,7 @@ sudo docker compose restart den-node</code></pre></div></div></span></li>
 </tbody></table></div>
 <p><b>Create version:</b> the portal lints the contract on upload. Common errors: an identification number in the query (<code>?document=</code>) instead of the path, repeated <code>operationId</code>s, external references, and not declaring whose data it is in personal APIs (<code>x-den-data-subject</code>). The version sheet shows each operation and where its data subject is.</p>
 <h3>6.3 Send for review</h3>
-<p><b>Send for review:</b> the portal runs the <b>automatic validations</b>, which call the service through the gateway, the tunnel and the node. If they fail, the sheet says which and why; fix it and click <b>Automatic validations → Run validations again</b>.</p>
+<p><b>Send for review:</b> the portal runs the <b>automatic validations</b>, which call the service through the gateway, the tunnel and the node. If they fail, the sheet says which and why; fix it and click <b>Automatic validations → Run validations again</b>. They can be run again once every 5 minutes per version (and up to 10 times an hour per entity); sooner, the portal says how many minutes to wait.</p>
     </section>
 
     <section id="7-the-operator-approves-the-api">
@@ -634,7 +635,7 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <tr><td>"Email already exists" when registering</td><td class="wrap">The account was created; only the verification is missing</td><td class="wrap">The same: sign in and resend the verification</td></tr>
 <tr><td>Invitations is empty</td><td class="wrap">The email is not identical to the request's, or not verified</td><td class="wrap">Register the account with the exact email</td></tr>
 <tr><td>"We could not complete the operation" uploading the onboarding document</td><td class="wrap">(Operator, installations before P-06) the API cannot write to its documents folder</td><td class="wrap"><code>sudo ./install.sh update</code> fixes it. By hand: in the portal's <code>.env</code>, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, and recreate the API container (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
-<tr><td>A platform role does not show</td><td class="wrap">The person never signed in</td><td class="wrap">Have them sign in once and run <code>platform-role grant</code> again</td></tr>
+<tr><td>A platform role does not show</td><td class="wrap">The person never signed in</td><td class="wrap">Have them sign in once and grant it again (console or <code>platform-role grant</code>)</td></tr>
 <tr><td><b>Approve</b> is disabled, or "The version was not approved"</td><td class="wrap">The automatic validations have not passed (still running, or failed)</td><td class="wrap">The version sheet says what each failure means and what to try; fix it and <b>Run validations again</b></td></tr>
 <tr><td>Validation with <b>504</b> (timeout)</td><td class="wrap">The gateway does not reach the node through the tunnel</td><td class="wrap">On the node: <code>sudo /opt/den-node/install.sh status</code> (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: <code>sudo /opt/den-node/install.sh stop</code> and <code>start</code></td></tr>
 <tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash turned <code>/CN=…</code> into a path (a command typed by hand)</td><td class="wrap">Use the <b>Windows: Git Bash</b> tab on the application's page, or <code>bash entity-check.sh csr</code></td></tr>
@@ -651,9 +652,9 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 
     <section id="what-the-product-still-lacks">
       <h2>What the product still lacks</h2>
-<p>Found in the rehearsal and recorded in the portal's backlog (section P):</p>
+<p>The rehearsal's follow-ups (backlog section P) are all done:</p>
 <ul class="ticks">
-<li><b>P-01</b> ✔ Platform roles from the server's command line (a console screen is still missing).</li>
+<li><b>P-01</b> ✔ Platform roles from the server's command line and, since R-05, from <b>Operator console → Platform roles and accounts</b>.</li>
 <li><b>P-02</b> ✔ A warning when the node serves a contract other than the published one.</li>
 <li><b>P-03</b> ✔ The kit bundle, its checksum and the commands on the portal's nodes page.</li>
 <li><b>P-04</b> ✔ Offering only the service types the country allows (the node and X-Road), with clear names.</li>
@@ -661,6 +662,12 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <li><b>P-06</b> ✔ The deployment's <code>.env</code> sent documents to a folder the API cannot write.</li>
 <li><b>P-07</b> ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.</li>
 <li><b>P-08</b> ✔ Disabling the pilot's demo accounts and making the verification link last longer.</li>
+</ul>
+<p>Still open, from the 2026-11 general review (backlog section R):</p>
+<ul class="ticks">
+<li><b>Editing a version sent back for changes:</b> the portal's screen only replaces its OpenAPI. Its fields, purposes, legal basis and service can already be changed through the portal's API, but there is no form for it yet.</li>
+<li><b>R-09 (web):</b> after five minutes idle, the first page can fail as if the session had ended (reloading it works); dates show in UTC instead of the country's time zone; the error and "not found" pages are not translated; the notice that the session is ending arrives late.</li>
+<li><b>R-11:</b> some technical documents (architecture, specification, deployment) still describe behaviour the code has since changed; they are being aligned.</li>
 </ul>
     </section>
 
