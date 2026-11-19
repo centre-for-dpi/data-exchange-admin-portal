@@ -478,7 +478,38 @@ sudo ./install.sh                                  # sudo DEN_LANG=es ./install.
 <tr><td>The API's OpenAPI</td><td class="wrap">The path of the <b>same file</b> that will be uploaded to the portal</td></tr>
 </tbody></table></div>
 <p><b>Always give the OpenAPI</b>, although it is optional: with it the node logs which operation was called (without it every lookup is logged as <code>(unknown)</code>), and it sends the portal the checksum of the contract it serves.</p>
-<p><b>Instant API (completo mode):</b> the same command with type <code>instant</code> asks for the engine, the server, the database, the <b>read-only</b> user, the <b>view</b> to publish, the key column and, if the key identifies a person, their document type. The installer generates the OpenAPI in <code>/opt/den-node/config/services/&lt;service&gt;.openapi.json</code>: that is the file uploaded to the portal. Details in the kit's guide (<code>INSTANT-APIS.md</code>).</p>
+<p><b>Instant API (completo mode):</b> for the entity that has no API. The node publishes a <b>view</b> of its database as a lookup by key, <code>GET &lt;service path&gt;/&lt;resource&gt;/&lt;key&gt;</code>, and answers each lookup on the spot: it copies and keeps no data. There are only lookups by key: no listings, filters or writes. Full reference: the kit's guide <code>INSTANT-APIS.md</code>.</p>
+<ol class="steps">
+<li><span><b>The DBA prepares the view.</b> The view is the contract: what is not in it does not go out. Only the columns to share, with simple names (letters, digits and <code>_</code>; rename with <code>AS</code>), and a unique key column (if a key can return several rows, say so in step 3). An index on the key in the source table helps.</span></li>
+<li><span><b>The DBA creates a read-only user</b> with <code>SELECT</code> on that view and nothing else. In PostgreSQL:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>CREATE ROLE den_reader LOGIN PASSWORD '&lt;password&gt;';
+GRANT CONNECT ON DATABASE entity TO den_reader;
+GRANT USAGE ON SCHEMA salud TO den_reader;
+GRANT SELECT ON salud.v_afiliados TO den_reader;</code></pre></div>
+<p>SQL Server, MySQL and Oracle are in <code>INSTANT-APIS.md</code> §2.2. The node's server must reach the database port (<code>5432</code>, <code>1433</code>, <code>3306</code> or <code>1521</code>).</p></div></span></li>
+<li><span><b>Infrastructure adds the service.</b> If the node was installed in canal mode, first <code>sudo /opt/den-node/install.sh mode completo</code> (it keeps its identity and services). Then:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo /opt/den-node/install.sh service</code></pre></div>
+<div class="tablewrap"><table class="t"><thead><tr><th>Question</th><th>Example</th></tr></thead><tbody>
+<tr><td>Type</td><td class="wrap"><code>instant</code></td></tr>
+<tr><td>Service name</td><td class="wrap"><code>afiliacion</code></td></tr>
+<tr><td>Path on the node</td><td class="wrap"><code>/afiliacion</code> (the portal asks for it in 6.2)</td></tr>
+<tr><td>Engine</td><td class="wrap"><code>postgres</code> (or <code>sqlserver</code>, <code>mysql</code>, <code>oracle</code>)</td></tr>
+<tr><td>Database server / Port</td><td class="wrap"><code>db.internal.entity</code> · <code>5432</code></td></tr>
+<tr><td>Database name</td><td class="wrap"><code>entity</code> (in Oracle, the service name, e.g. <code>ORCLPDB1</code>)</td></tr>
+<tr><td>User / password</td><td class="wrap"><code>den_reader</code> and its password (not shown; kept in <code>/opt/den-node/secrets/</code>)</td></tr>
+<tr><td>TLS to the database</td><td class="wrap"><code>require</code> (encrypts); <code>verify</code> also checks the certificate; <code>disable</code> only inside the entity's network</td></tr>
+<tr><td>View or table to expose</td><td class="wrap">The installer lists those the user can read: <code>salud.v_afiliados</code></td></tr>
+<tr><td>Key column</td><td class="wrap"><code>numero_documento</code></td></tr>
+<tr><td>Data subject's document type</td><td class="wrap"><code>CC</code> if the key identifies a person; otherwise <code>none</code>. Required for APIs with personal data</td></tr>
+<tr><td>Several rows per key?</td><td class="wrap"><code>n</code> (or <code>y</code>, e.g. a household with several people: the answer is a list)</td></tr>
+<tr><td>Resource name / entity name in the OpenAPI</td><td class="wrap"><code>-</code> for the ones it proposes (the view's, without <code>v_</code>)</td></tr>
+</tbody></table></div>
+<p>At the end the installer says how the API answers (<code>GET /afiliacion/afiliados/&lt;key&gt;</code>), what goes in the portal (node and service path), and the OpenAPI's path and fingerprint.</p></div></span></li>
+<li><span><b>Review the columns before publishing.</b> The resource brings <b>every</b> column of the view that can be published. In <code>/opt/den-node/config/services/afiliacion.yaml</code>, remove from <code>columns</code> those not to be shared and, if you changed anything, validate, regenerate the OpenAPI and restart:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>cd /opt/den-node
+sudo docker compose exec den-node /den-node validate
+sudo docker compose exec den-node /den-node openapi afiliacion | sudo tee config/services/afiliacion.openapi.json &gt;/dev/null
+sudo docker compose restart den-node</code></pre></div></div></span></li>
+<li><span><b>Take the OpenAPI to the publisher's computer.</b> It is <code>/opt/den-node/config/services/afiliacion.openapi.json</code>; for example, from that computer: <code>scp &lt;user&gt;@&lt;node-server&gt;:/opt/den-node/config/services/afiliacion.openapi.json .</code>. It is the file uploaded in 6.2, unedited: it already follows the network's rules and declares the data subject.</span></li>
+</ol>
+<p>Later: another view on the same database is <code>sudo /opt/den-node/install.sh service resource afiliacion</code>. Any change to the OpenAPI (a resource, a column) needs a new version in the portal; removing a column or changing its type or the key needs a new major version.</p>
 <p>To finish: <code>sudo /opt/den-node/install.sh doctor</code>. Everything ✔; the only acceptable warning is plain <code>http</code> inside the entity's network.</p>
     </section>
 
@@ -587,6 +618,10 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <tr><td><code>bash</code> is not recognized (PowerShell)</td><td class="wrap">Windows has no bash of its own</td><td class="wrap">Open <b>Git Bash</b> and run the commands there</td></tr>
 <tr><td>The portal rejects the CSR</td><td class="wrap">The <code>CN</code> is not the Client ID, or the key is not ECDSA P-256/P-384 or RSA 2048–4096</td><td class="wrap">Make another one with the exact Client ID</td></tr>
 <tr><td>The node's logs say <code>(unknown)</code></td><td class="wrap">The service has no OpenAPI on the node</td><td class="wrap"><code>install.sh service remove &lt;service&gt;</code> and add it again with the OpenAPI</td></tr>
+<tr><td>The installer: "Could not read the database catalog with that user"</td><td class="wrap">Wrong server, port, database, user or password, or a firewall between the node and the database</td><td class="wrap">Check the values and the connection from the node's server to the database port</td></tr>
+<tr><td>The installer does not list the view</td><td class="wrap">The <code>GRANT SELECT</code> on it is missing (in PostgreSQL, also <code>USAGE</code> on the schema)</td><td class="wrap">Step 2 of the instant API</td></tr>
+<tr><td><code>doctor</code>: ✘ the user can write</td><td class="wrap">The database user has <code>INSERT</code>, <code>UPDATE</code> or <code>DELETE</code>, directly or through a role</td><td class="wrap">Leave only <code>SELECT</code> on the views</td></tr>
+<tr><td>The instant API answers 503 to everything</td><td class="wrap">The database does not answer, or the service file no longer matches the view</td><td class="wrap"><code>sudo /opt/den-node/install.sh doctor</code> says which</td></tr>
 </tbody></table></div>
     </section>
 

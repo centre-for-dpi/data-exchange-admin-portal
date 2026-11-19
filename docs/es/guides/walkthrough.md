@@ -153,7 +153,57 @@ sudo /opt/den-node/install.sh service
 
 **Pasa siempre el OpenAPI**, aunque sea opcional: con él, el nodo registra qué operación se pidió (sin él, cada consulta queda como `(unknown)`), y envía al portal la huella del contrato que sirve.
 
-**API instantánea (modo completo):** el mismo comando con tipo `instant` pide el motor, el servidor, la base, el usuario de **solo lectura**, la **vista** a publicar, la columna clave y, si la clave identifica a una persona, su tipo de documento. El instalador genera el OpenAPI en `/opt/den-node/config/services/<servicio>.openapi.json`: ese es el archivo que se sube al portal. Detalle en la guía del kit (`INSTANT-APIS.md`).
+**API instantánea (modo completo):** para la entidad que no tiene API. El nodo publica una **vista** de su base como una consulta por clave, `GET <ruta del servicio>/<recurso>/<clave>`, y responde cada consulta en el momento: no copia ni guarda datos. Solo hay consultas por clave: ni listados, ni filtros, ni escrituras. Referencia completa: la guía del kit `INSTANT-APIS.md`.
+
+1. **El DBA prepara la vista.** La vista es el contrato: lo que no está en ella no sale. Solo las columnas que se van a compartir, con nombres simples (letras, números y `_`; renombra con `AS`), y una columna clave única (si una clave puede traer varias filas, se declara en el paso 3). Conviene un índice sobre la clave en la tabla de origen.
+
+2. **El DBA crea un usuario de solo lectura** con `SELECT` sobre esa vista y nada más. En PostgreSQL:
+
+   ```sql
+   CREATE ROLE den_reader LOGIN PASSWORD '<contraseña>';
+   GRANT CONNECT ON DATABASE entidad TO den_reader;
+   GRANT USAGE ON SCHEMA salud TO den_reader;
+   GRANT SELECT ON salud.v_afiliados TO den_reader;
+   ```
+
+   SQL Server, MySQL y Oracle están en `INSTANT-APIS.md` §2.2. El servidor del nodo debe llegar al puerto de la base (`5432`, `1433`, `3306` o `1521`).
+
+3. **Infraestructura agrega el servicio.** Si el nodo se instaló en modo canal, primero `sudo /opt/den-node/install.sh mode completo` (no pierde la identidad ni los servicios). Luego:
+
+   ```bash
+   sudo /opt/den-node/install.sh service
+   ```
+
+   | Pregunta | Ejemplo |
+   | :-- | :-- |
+   | Tipo | `instant` |
+   | Nombre del servicio | `afiliacion` |
+   | Ruta en el nodo | `/afiliacion` (la pedirá el portal en 6.2) |
+   | Motor | `postgres` (o `sqlserver`, `mysql`, `oracle`) |
+   | Servidor de la base / Puerto | `bd.interna.entidad` · `5432` |
+   | Nombre de la base | `entidad` (en Oracle, el nombre del servicio, por ejemplo `ORCLPDB1`) |
+   | Usuario / contraseña | `den_reader` y su contraseña (no se ve; queda en `/opt/den-node/secrets/`) |
+   | TLS hacia la base | `require` (cifra); `verify` además verifica el certificado; `disable` solo dentro de la red de la entidad |
+   | Vista o tabla a exponer | El instalador lista las que el usuario puede leer: `salud.v_afiliados` |
+   | Columna clave | `numero_documento` |
+   | Tipo de documento del titular | `CC` si la clave identifica a una persona; si no, `ninguno`. Es obligatorio para APIs con datos personales |
+   | ¿Varias filas por clave? | `n` (o `s`, por ejemplo un hogar con varias personas: la respuesta es una lista) |
+   | Nombre del recurso / de la entidad en el OpenAPI | `-` para los que propone (el de la vista sin `v_`) |
+
+   Al terminar, el instalador dice cómo responde la API (`GET /afiliacion/afiliados/<clave>`), lo que va en el portal (nodo y ruta del servicio) y la ruta y la huella del OpenAPI.
+
+4. **Revisa las columnas antes de publicar.** El recurso trae **todas** las columnas de la vista que se pueden publicar. En `/opt/den-node/config/services/afiliacion.yaml`, quita de `columns` las que no se van a compartir y, si cambiaste algo, valida, regenera el OpenAPI y reinicia:
+
+   ```bash
+   cd /opt/den-node
+   sudo docker compose exec den-node /den-node validate
+   sudo docker compose exec den-node /den-node openapi afiliacion | sudo tee config/services/afiliacion.openapi.json >/dev/null
+   sudo docker compose restart den-node
+   ```
+
+5. **Lleva el OpenAPI al equipo de quien publica.** Es `/opt/den-node/config/services/afiliacion.openapi.json`; por ejemplo, desde ese equipo: `scp <usuario>@<servidor-del-nodo>:/opt/den-node/config/services/afiliacion.openapi.json .`. Es el archivo que se sube en 6.2, sin editarlo: ya cumple las reglas de la red y declara al titular.
+
+Después: otra vista sobre la misma base es `sudo /opt/den-node/install.sh service resource afiliacion`. Cualquier cambio del OpenAPI (un recurso, una columna) exige publicar una versión nueva en el portal; quitar una columna o cambiar su tipo o la clave exige una versión mayor.
 
 Para terminar: `sudo /opt/den-node/install.sh doctor`. Todo en ✔; el único aviso aceptable es `http` sin cifrar dentro de la red de la entidad.
 
@@ -287,6 +337,10 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 | `bash` no se reconoce (PowerShell) | Windows no trae bash propio | Abre **Git Bash** y ejecuta ahí los comandos |
 | El portal rechaza el CSR | El `CN` no es el Client ID, o la clave no es ECDSA P-256/P-384 ni RSA 2048–4096 | Genera otro con el Client ID exacto |
 | Los registros del nodo dicen `(unknown)` | El servicio no tiene su OpenAPI en el nodo | `install.sh service remove <servicio>` y agregarlo de nuevo con el OpenAPI |
+| El instalador: "No se pudo leer el catálogo de la base con ese usuario" | Servidor, puerto, base, usuario o contraseña equivocados, o un firewall entre el nodo y la base | Revisa los datos y la conexión desde el servidor del nodo hacia el puerto de la base |
+| El instalador no lista la vista | Falta el `GRANT SELECT` sobre ella (en PostgreSQL, también el `USAGE` sobre el esquema) | Paso 2 de la API instantánea |
+| `doctor`: ✘ el usuario puede escribir | El usuario de la base tiene `INSERT`, `UPDATE` o `DELETE`, directo o por un rol | Deja solo `SELECT` sobre las vistas |
+| La API instantánea responde 503 a todo | La base no responde, o el archivo del servicio ya no coincide con la vista | `sudo /opt/den-node/install.sh doctor` dice cuál de las dos |
 
 ## Lo que todavía falta en el producto
 

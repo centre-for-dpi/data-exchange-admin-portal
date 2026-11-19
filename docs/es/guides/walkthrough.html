@@ -478,7 +478,38 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <tr><td>OpenAPI de la API</td><td class="wrap">La ruta del <b>mismo archivo</b> que se subirá al portal</td></tr>
 </tbody></table></div>
 <p><b>Pasa siempre el OpenAPI</b>, aunque sea opcional: con él, el nodo registra qué operación se pidió (sin él, cada consulta queda como <code>(unknown)</code>), y envía al portal la huella del contrato que sirve.</p>
-<p><b>API instantánea (modo completo):</b> el mismo comando con tipo <code>instant</code> pide el motor, el servidor, la base, el usuario de <b>solo lectura</b>, la <b>vista</b> a publicar, la columna clave y, si la clave identifica a una persona, su tipo de documento. El instalador genera el OpenAPI en <code>/opt/den-node/config/services/&lt;servicio&gt;.openapi.json</code>: ese es el archivo que se sube al portal. Detalle en la guía del kit (<code>INSTANT-APIS.md</code>).</p>
+<p><b>API instantánea (modo completo):</b> para la entidad que no tiene API. El nodo publica una <b>vista</b> de su base como una consulta por clave, <code>GET &lt;ruta del servicio&gt;/&lt;recurso&gt;/&lt;clave&gt;</code>, y responde cada consulta en el momento: no copia ni guarda datos. Solo hay consultas por clave: ni listados, ni filtros, ni escrituras. Referencia completa: la guía del kit <code>INSTANT-APIS.md</code>.</p>
+<ol class="steps">
+<li><span><b>El DBA prepara la vista.</b> La vista es el contrato: lo que no está en ella no sale. Solo las columnas que se van a compartir, con nombres simples (letras, números y <code>_</code>; renombra con <code>AS</code>), y una columna clave única (si una clave puede traer varias filas, se declara en el paso 3). Conviene un índice sobre la clave en la tabla de origen.</span></li>
+<li><span><b>El DBA crea un usuario de solo lectura</b> con <code>SELECT</code> sobre esa vista y nada más. En PostgreSQL:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>CREATE ROLE den_reader LOGIN PASSWORD '&lt;contraseña&gt;';
+GRANT CONNECT ON DATABASE entidad TO den_reader;
+GRANT USAGE ON SCHEMA salud TO den_reader;
+GRANT SELECT ON salud.v_afiliados TO den_reader;</code></pre></div>
+<p>SQL Server, MySQL y Oracle están en <code>INSTANT-APIS.md</code> §2.2. El servidor del nodo debe llegar al puerto de la base (<code>5432</code>, <code>1433</code>, <code>3306</code> o <code>1521</code>).</p></div></span></li>
+<li><span><b>Infraestructura agrega el servicio.</b> Si el nodo se instaló en modo canal, primero <code>sudo /opt/den-node/install.sh mode completo</code> (no pierde la identidad ni los servicios). Luego:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>sudo /opt/den-node/install.sh service</code></pre></div>
+<div class="tablewrap"><table class="t"><thead><tr><th>Pregunta</th><th>Ejemplo</th></tr></thead><tbody>
+<tr><td>Tipo</td><td class="wrap"><code>instant</code></td></tr>
+<tr><td>Nombre del servicio</td><td class="wrap"><code>afiliacion</code></td></tr>
+<tr><td>Ruta en el nodo</td><td class="wrap"><code>/afiliacion</code> (la pedirá el portal en 6.2)</td></tr>
+<tr><td>Motor</td><td class="wrap"><code>postgres</code> (o <code>sqlserver</code>, <code>mysql</code>, <code>oracle</code>)</td></tr>
+<tr><td>Servidor de la base / Puerto</td><td class="wrap"><code>bd.interna.entidad</code> · <code>5432</code></td></tr>
+<tr><td>Nombre de la base</td><td class="wrap"><code>entidad</code> (en Oracle, el nombre del servicio, por ejemplo <code>ORCLPDB1</code>)</td></tr>
+<tr><td>Usuario / contraseña</td><td class="wrap"><code>den_reader</code> y su contraseña (no se ve; queda en <code>/opt/den-node/secrets/</code>)</td></tr>
+<tr><td>TLS hacia la base</td><td class="wrap"><code>require</code> (cifra); <code>verify</code> además verifica el certificado; <code>disable</code> solo dentro de la red de la entidad</td></tr>
+<tr><td>Vista o tabla a exponer</td><td class="wrap">El instalador lista las que el usuario puede leer: <code>salud.v_afiliados</code></td></tr>
+<tr><td>Columna clave</td><td class="wrap"><code>numero_documento</code></td></tr>
+<tr><td>Tipo de documento del titular</td><td class="wrap"><code>CC</code> si la clave identifica a una persona; si no, <code>ninguno</code>. Es obligatorio para APIs con datos personales</td></tr>
+<tr><td>¿Varias filas por clave?</td><td class="wrap"><code>n</code> (o <code>s</code>, por ejemplo un hogar con varias personas: la respuesta es una lista)</td></tr>
+<tr><td>Nombre del recurso / de la entidad en el OpenAPI</td><td class="wrap"><code>-</code> para los que propone (el de la vista sin <code>v_</code>)</td></tr>
+</tbody></table></div>
+<p>Al terminar, el instalador dice cómo responde la API (<code>GET /afiliacion/afiliados/&lt;clave&gt;</code>), lo que va en el portal (nodo y ruta del servicio) y la ruta y la huella del OpenAPI.</p></div></span></li>
+<li><span><b>Revisa las columnas antes de publicar.</b> El recurso trae <b>todas</b> las columnas de la vista que se pueden publicar. En <code>/opt/den-node/config/services/afiliacion.yaml</code>, quita de <code>columns</code> las que no se van a compartir y, si cambiaste algo, valida, regenera el OpenAPI y reinicia:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>cd /opt/den-node
+sudo docker compose exec den-node /den-node validate
+sudo docker compose exec den-node /den-node openapi afiliacion | sudo tee config/services/afiliacion.openapi.json &gt;/dev/null
+sudo docker compose restart den-node</code></pre></div></div></span></li>
+<li><span><b>Lleva el OpenAPI al equipo de quien publica.</b> Es <code>/opt/den-node/config/services/afiliacion.openapi.json</code>; por ejemplo, desde ese equipo: <code>scp &lt;usuario&gt;@&lt;servidor-del-nodo&gt;:/opt/den-node/config/services/afiliacion.openapi.json .</code>. Es el archivo que se sube en 6.2, sin editarlo: ya cumple las reglas de la red y declara al titular.</span></li>
+</ol>
+<p>Después: otra vista sobre la misma base es <code>sudo /opt/den-node/install.sh service resource afiliacion</code>. Cualquier cambio del OpenAPI (un recurso, una columna) exige publicar una versión nueva en el portal; quitar una columna o cambiar su tipo o la clave exige una versión mayor.</p>
 <p>Para terminar: <code>sudo /opt/den-node/install.sh doctor</code>. Todo en ✔; el único aviso aceptable es <code>http</code> sin cifrar dentro de la red de la entidad.</p>
     </section>
 
@@ -586,6 +617,10 @@ curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt
 <tr><td><code>bash</code> no se reconoce (PowerShell)</td><td class="wrap">Windows no trae bash propio</td><td class="wrap">Abre <b>Git Bash</b> y ejecuta ahí los comandos</td></tr>
 <tr><td>El portal rechaza el CSR</td><td class="wrap">El <code>CN</code> no es el Client ID, o la clave no es ECDSA P-256/P-384 ni RSA 2048–4096</td><td class="wrap">Genera otro con el Client ID exacto</td></tr>
 <tr><td>Los registros del nodo dicen <code>(unknown)</code></td><td class="wrap">El servicio no tiene su OpenAPI en el nodo</td><td class="wrap"><code>install.sh service remove &lt;servicio&gt;</code> y agregarlo de nuevo con el OpenAPI</td></tr>
+<tr><td>El instalador: "No se pudo leer el catálogo de la base con ese usuario"</td><td class="wrap">Servidor, puerto, base, usuario o contraseña equivocados, o un firewall entre el nodo y la base</td><td class="wrap">Revisa los datos y la conexión desde el servidor del nodo hacia el puerto de la base</td></tr>
+<tr><td>El instalador no lista la vista</td><td class="wrap">Falta el <code>GRANT SELECT</code> sobre ella (en PostgreSQL, también el <code>USAGE</code> sobre el esquema)</td><td class="wrap">Paso 2 de la API instantánea</td></tr>
+<tr><td><code>doctor</code>: ✘ el usuario puede escribir</td><td class="wrap">El usuario de la base tiene <code>INSERT</code>, <code>UPDATE</code> o <code>DELETE</code>, directo o por un rol</td><td class="wrap">Deja solo <code>SELECT</code> sobre las vistas</td></tr>
+<tr><td>La API instantánea responde 503 a todo</td><td class="wrap">La base no responde, o el archivo del servicio ya no coincide con la vista</td><td class="wrap"><code>sudo /opt/den-node/install.sh doctor</code> dice cuál de las dos</td></tr>
 </tbody></table></div>
     </section>
 

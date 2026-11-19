@@ -153,7 +153,57 @@ sudo /opt/den-node/install.sh service
 
 **Always give the OpenAPI**, although it is optional: with it the node logs which operation was called (without it every lookup is logged as `(unknown)`), and it sends the portal the checksum of the contract it serves.
 
-**Instant API (completo mode):** the same command with type `instant` asks for the engine, the server, the database, the **read-only** user, the **view** to publish, the key column and, if the key identifies a person, their document type. The installer generates the OpenAPI in `/opt/den-node/config/services/<service>.openapi.json`: that is the file uploaded to the portal. Details in the kit's guide (`INSTANT-APIS.md`).
+**Instant API (completo mode):** for the entity that has no API. The node publishes a **view** of its database as a lookup by key, `GET <service path>/<resource>/<key>`, and answers each lookup on the spot: it copies and keeps no data. There are only lookups by key: no listings, filters or writes. Full reference: the kit's guide `INSTANT-APIS.md`.
+
+1. **The DBA prepares the view.** The view is the contract: what is not in it does not go out. Only the columns to share, with simple names (letters, digits and `_`; rename with `AS`), and a unique key column (if a key can return several rows, say so in step 3). An index on the key in the source table helps.
+
+2. **The DBA creates a read-only user** with `SELECT` on that view and nothing else. In PostgreSQL:
+
+   ```sql
+   CREATE ROLE den_reader LOGIN PASSWORD '<password>';
+   GRANT CONNECT ON DATABASE entity TO den_reader;
+   GRANT USAGE ON SCHEMA salud TO den_reader;
+   GRANT SELECT ON salud.v_afiliados TO den_reader;
+   ```
+
+   SQL Server, MySQL and Oracle are in `INSTANT-APIS.md` §2.2. The node's server must reach the database port (`5432`, `1433`, `3306` or `1521`).
+
+3. **Infrastructure adds the service.** If the node was installed in canal mode, first `sudo /opt/den-node/install.sh mode completo` (it keeps its identity and services). Then:
+
+   ```bash
+   sudo /opt/den-node/install.sh service
+   ```
+
+   | Question | Example |
+   | :-- | :-- |
+   | Type | `instant` |
+   | Service name | `afiliacion` |
+   | Path on the node | `/afiliacion` (the portal asks for it in 6.2) |
+   | Engine | `postgres` (or `sqlserver`, `mysql`, `oracle`) |
+   | Database server / Port | `db.internal.entity` · `5432` |
+   | Database name | `entity` (in Oracle, the service name, e.g. `ORCLPDB1`) |
+   | User / password | `den_reader` and its password (not shown; kept in `/opt/den-node/secrets/`) |
+   | TLS to the database | `require` (encrypts); `verify` also checks the certificate; `disable` only inside the entity's network |
+   | View or table to expose | The installer lists those the user can read: `salud.v_afiliados` |
+   | Key column | `numero_documento` |
+   | Data subject's document type | `CC` if the key identifies a person; otherwise `none`. Required for APIs with personal data |
+   | Several rows per key? | `n` (or `y`, e.g. a household with several people: the answer is a list) |
+   | Resource name / entity name in the OpenAPI | `-` for the ones it proposes (the view's, without `v_`) |
+
+   At the end the installer says how the API answers (`GET /afiliacion/afiliados/<key>`), what goes in the portal (node and service path), and the OpenAPI's path and fingerprint.
+
+4. **Review the columns before publishing.** The resource brings **every** column of the view that can be published. In `/opt/den-node/config/services/afiliacion.yaml`, remove from `columns` those not to be shared and, if you changed anything, validate, regenerate the OpenAPI and restart:
+
+   ```bash
+   cd /opt/den-node
+   sudo docker compose exec den-node /den-node validate
+   sudo docker compose exec den-node /den-node openapi afiliacion | sudo tee config/services/afiliacion.openapi.json >/dev/null
+   sudo docker compose restart den-node
+   ```
+
+5. **Take the OpenAPI to the publisher's computer.** It is `/opt/den-node/config/services/afiliacion.openapi.json`; for example, from that computer: `scp <user>@<node-server>:/opt/den-node/config/services/afiliacion.openapi.json .`. It is the file uploaded in 6.2, unedited: it already follows the network's rules and declares the data subject.
+
+Later: another view on the same database is `sudo /opt/den-node/install.sh service resource afiliacion`. Any change to the OpenAPI (a resource, a column) needs a new version in the portal; removing a column or changing its type or the key needs a new major version.
 
 To finish: `sudo /opt/den-node/install.sh doctor`. Everything ✔; the only acceptable warning is plain `http` inside the entity's network.
 
@@ -288,6 +338,10 @@ curl -sS --cacert network-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 | `bash` is not recognized (PowerShell) | Windows has no bash of its own | Open **Git Bash** and run the commands there |
 | The portal rejects the CSR | The `CN` is not the Client ID, or the key is not ECDSA P-256/P-384 or RSA 2048–4096 | Make another one with the exact Client ID |
 | The node's logs say `(unknown)` | The service has no OpenAPI on the node | `install.sh service remove <service>` and add it again with the OpenAPI |
+| The installer: "Could not read the database catalog with that user" | Wrong server, port, database, user or password, or a firewall between the node and the database | Check the values and the connection from the node's server to the database port |
+| The installer does not list the view | The `GRANT SELECT` on it is missing (in PostgreSQL, also `USAGE` on the schema) | Step 2 of the instant API |
+| `doctor`: ✘ the user can write | The database user has `INSERT`, `UPDATE` or `DELETE`, directly or through a role | Leave only `SELECT` on the views |
+| The instant API answers 503 to everything | The database does not answer, or the service file no longer matches the view | `sudo /opt/den-node/install.sh doctor` says which |
 
 ## What the product still lacks
 
