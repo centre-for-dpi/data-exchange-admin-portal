@@ -245,3 +245,14 @@ describe('install.sh: the proxy proves itself to the web (M-27)', { timeout: 30_
     expect(r.stderr).toContain('DEN_WEB_PROXY_TOKEN');
   });
 });
+
+describe('install.sh: update on a pilot whose .env lacks the new variables', () => {
+  // The first update of an older pilot runs the previous installer and stops at Compose, asking
+  // for a variable; the second runs this one, whose backup also starts Compose. The variables must
+  // be there before it.
+  it('adds the .env variables before the backup', () => {
+    const body = fn('cmd_update');
+    expect(body.indexOf('ensure_env_additions')).toBeGreaterThan(-1);
+    expect(body.indexOf('ensure_env_additions')).toBeLessThan(body.indexOf('cmd_backup'));
+  });
+});

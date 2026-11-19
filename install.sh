@@ -997,6 +997,10 @@ cmd_restore() {
 
 cmd_update() {
   require_install; load_env_settings
+  # Before the backup: it starts Compose, which refuses a .env without the variables the code in
+  # this checkout needs (the first update of a pilot from before them, on the previous installer,
+  # stops there, and the second one must not stop at the backup).
+  ensure_env_additions
   cmd_backup
   git pull --ff-only
   # Bash already read this file: the rest runs with the installer just pulled, whose
