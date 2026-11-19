@@ -47,6 +47,7 @@ export const AUDIT_ACTIONS = [
   'api.created',
   'api_version.created',
   'api_version.openapi_replaced',
+  'api_version.updated',
   'api_version.purposes_changed',
   'api_version.submitted',
   'api_version.approved',

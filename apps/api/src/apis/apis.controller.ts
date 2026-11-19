@@ -14,9 +14,12 @@ import {
   type CreateApiVersionInput,
   createApiVersionSchema,
   entityIdParamsSchema,
+  hostProofSchema,
   type PaginationQuery,
   paginationQuerySchema,
   replaceOpenapiSchema,
+  updateApiVersionSchema,
+  type UpdateApiVersionInput,
 } from '@den/contracts';
 import { z } from 'zod';
 import {
@@ -151,6 +154,32 @@ export class ApisController {
     return this.apis.getOpenapi(entity.entityId, apiId, versionId);
   }
 
+  @Put(':apiId/versions/:versionId')
+  @EntityAccess('api.write')
+  @ApiOperation({
+    operationId: 'updateApiVersion',
+    summary: 'Replace what an editable version declares (draft or changes requested)',
+    description:
+      'Replaces the exposed fields, legal basis, purposes and upstreams, and the OpenAPI document ' +
+      'when it is sent, with the validation of version creation. A version in review or beyond ' +
+      'is a 409.',
+    tags: ['apis'],
+    params: apiVersionParamsSchema,
+    body: updateApiVersionSchema,
+    responses: { 200: { description: 'The version', schema: apiVersionDetailSchema } },
+    errors: [400, 401, 403, 404, 409],
+  })
+  updateVersion(
+    @CurrentEntity() entity: EntityContext,
+    @CurrentPrincipal() principal: Principal,
+    @Param('apiId', uuid) apiId: string,
+    @Param('versionId', uuid) versionId: string,
+    @Body(new ZodValidationPipe(updateApiVersionSchema)) body: UpdateApiVersionInput,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.apis.updateVersion(entity.entityId, apiId, versionId, principal, body, request.id);
+  }
+
   @Put(':apiId/versions/:versionId/openapi')
   @EntityAccess('api.write')
   @ApiOperation({
@@ -210,6 +239,28 @@ export class ApisController {
     return this.apis.submit(entity.entityId, apiId, versionId, principal, request.id);
   }
 
+  @Get(':apiId/versions/:versionId/host-proof')
+  @EntityAccess('api.read')
+  @ApiOperation({
+    operationId: 'getApiVersionHostProof',
+    summary: 'What the sandbox host must serve for the contract test to run',
+    description:
+      'For a version whose sandbox upstream is a `direct` host: the URL (/.well-known/den-validation ' +
+      'on that host) and the exact text it must answer with. Without it, the contract test of the ' +
+      'validations fails with "host control not proven".',
+    tags: ['apis'],
+    params: apiVersionParamsSchema,
+    responses: { 200: { description: 'The proof', schema: hostProofSchema } },
+    errors: [401, 403, 404],
+  })
+  getHostProof(
+    @CurrentEntity() entity: EntityContext,
+    @Param('apiId', uuid) apiId: string,
+    @Param('versionId', uuid) versionId: string,
+  ) {
+    return this.apis.hostProof(entity.entityId, apiId, versionId);
+  }
+
   @Post(':apiId/versions/:versionId/validations')
   @HttpCode(200)
   @EntityAccess('api.write')
@@ -218,11 +269,13 @@ export class ApisController {
     summary: 'Run the automatic validations of a version in review again',
     description:
       'Healthcheck of the upstream through the gateway and contract test (Schemathesis) of the ' +
-      'sandbox upstream (M4-06). The operator approves only when they passed.',
+      'sandbox upstream (M4-06). The operator approves only when they passed. A `direct` sandbox ' +
+      "host must prove it is the provider's (see the host proof); asking again is limited by a " +
+      'cooldown per version and a cap per entity and hour (429).',
     tags: ['apis'],
     params: apiVersionParamsSchema,
     responses: { 200: { description: 'The version', schema: apiVersionDetailSchema } },
-    errors: [401, 403, 404, 409],
+    errors: [401, 403, 404, 409, 429],
   })
   revalidate(
     @CurrentEntity() entity: EntityContext,

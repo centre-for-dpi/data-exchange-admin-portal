@@ -21,6 +21,7 @@ const STRICT = new Set([
   '/api/v1/entity-requests/:requestId/designation-document',
   '/api/v1/entities/:entityId/subscriptions/:subscriptionId/agreement',
   '/api/v1/entities/:entityId/apis/:apiId/versions',
+  '/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/validations',
   '/api/v1/entity-requests',
   '/api/v1/entities/:entityId/invitations',
   '/api/v1/nodes/enroll',

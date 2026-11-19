@@ -125,6 +125,19 @@ export const VALIDATION_TOKEN_HEADER = 'X-DEN-Validation';
 export const versionCheckToken = (secret: string, apiVersionId: string): string =>
   createHmac('sha256', secret).update(`den-check:${apiVersionId}`).digest('base64url');
 
+/** Where a provider proves it controls the host of its sandbox (MB-2). */
+export const HOST_CONTROL_PATH = '/.well-known/den-validation';
+
+/**
+ * What a `direct` sandbox host must serve at HOST_CONTROL_PATH: HMAC of DEN_VALIDATION_TOKEN, the
+ * entity and the host. It binds the proof to one entity and one host, so a token seen on a host
+ * proves nothing for another entity or host.
+ */
+export const hostControlToken = (secret: string, entityId: string, host: string): string =>
+  createHmac('sha256', secret)
+    .update(`den-host-control:${entityId}:${host.toLowerCase()}`)
+    .digest('base64url');
+
 /** The gateway's client certificate towards the operator's Security Server (one for X-Road). */
 export const GATEWAY_XROAD_SSL_ID = 'den-ssl-gateway-xroad';
 /** X-Road request headers a consumer could use to steer the Security Server (SPIKE S-5). */

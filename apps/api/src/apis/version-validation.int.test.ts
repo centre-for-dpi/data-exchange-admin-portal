@@ -19,7 +19,12 @@ import {
 } from '../reconcilers/apisix/desired-state.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
-import { type ValidationProbes, VersionValidationService } from './version-validation.service.js';
+import { hostControlToken } from '../reconcilers/apisix/desired-state.js';
+import {
+  GatewayValidationProbes,
+  type ValidationProbes,
+  VersionValidationService,
+} from './version-validation.service.js';
 
 const GATEWAY = `http://127.0.0.1:${process.env.APISIX_HTTP_PORT ?? 9080}`;
 const TOKEN = `m4-06-validation-${randomUUID()}`;
@@ -52,6 +57,9 @@ describe('validations when a version goes to review (M4-06)', () => {
       DEN_VERSION_VALIDATION: 'on',
       DEN_VALIDATION_TOKEN: TOKEN,
       DEN_GATEWAY_INTERNAL_URL: GATEWAY,
+      // Asking again is limited (MB-2); these tests ask often, the limit has its own test.
+      DEN_VALIDATION_COOLDOWN_SECONDS: '0',
+      DEN_VALIDATION_MAX_PER_HOUR: '100000',
       // The runner (if any) runs on the host in development and reaches APISIX there.
       DEN_CONTRACT_RUNNER_GATEWAY_URL: process.env.DEN_CONTRACT_RUNNER_GATEWAY_URL ?? GATEWAY,
     })) {
@@ -273,5 +281,103 @@ describe('validations when a version goes to review (M4-06)', () => {
     expect(report).toMatchObject({ status: 'failed', contract: { status: 'skipped' } });
     const ok = await validation.run(versionId, fixed('passed', 'failed'));
     expect(ok).toMatchObject({ status: 'passed', contract: { status: 'skipped' } });
+  });
+  it('asking again is limited by a cooldown per version and a cap per entity (MB-2)', async () => {
+    const { apiId, versionId } = await submitted();
+    const again = () =>
+      request(
+        'POST',
+        `/entities/${salud}/apis/${apiId}/versions/${versionId}/validations`,
+        'pedro.publicador',
+      );
+    const settings = ['DEN_VALIDATION_COOLDOWN_SECONDS', 'DEN_VALIDATION_MAX_PER_HOUR'] as const;
+    const before = settings.map((k) => process.env[k]);
+    try {
+      process.env.DEN_VALIDATION_COOLDOWN_SECONDS = '300';
+      const tooSoon = await again();
+      expect(tooSoon.statusCode, tooSoon.body).toBe(429);
+      expect(tooSoon.json()).toMatchObject({
+        code: 'rate_limited',
+        errors: [{ key: 'validation_rate_limited' }],
+      });
+      process.env.DEN_VALIDATION_COOLDOWN_SECONDS = '0';
+      process.env.DEN_VALIDATION_MAX_PER_HOUR = '0';
+      expect((await again()).statusCode).toBe(429);
+      process.env.DEN_VALIDATION_MAX_PER_HOUR = '100000';
+      expect((await again()).statusCode).toBe(200);
+    } finally {
+      settings.forEach((k, i) => {
+        if (before[i] === undefined) delete process.env[k];
+        else process.env[k] = before[i];
+      });
+    }
+    // Other members cannot ask, nor other entities reach it.
+    const url = `/entities/${salud}/apis/${apiId}/versions/${versionId}/validations`;
+    expect((await request('POST', url, 'lucia.datos')).statusCode).toBe(403);
+    expect((await request('POST', url, 'carlos.dev')).statusCode).toBe(404);
+  });
+
+  it('a direct sandbox host must prove it is the provider’s before the contract test runs (MB-2)', async () => {
+    const { apiId, versionId } = await submitted();
+    await prisma.apiVersion.update({
+      where: { id: versionId },
+      data: {
+        sandboxUpstream: {
+          type: 'direct',
+          url: 'https://sandbox.proveedor.example/api',
+          mtls: false,
+        },
+      },
+    });
+    const validation = app.get(VersionValidationService);
+    let contractRuns = 0;
+    const probes = (proven: boolean): ValidationProbes => ({
+      ...fixed('passed', 'passed'),
+      hostControl: () => Promise.resolve(proven),
+      contract: () => {
+        contractRuns += 1;
+        return fixed('passed', 'passed').contract(versionId, {});
+      },
+    });
+    const refused = await validation.run(versionId, probes(false));
+    expect(refused).toMatchObject({
+      status: 'failed',
+      contract: { status: 'failed', reason: 'host control not proven' },
+    });
+    expect(contractRuns).toBe(0);
+    expect(await validation.run(versionId, probes(true))).toMatchObject({ status: 'passed' });
+    expect(contractRuns).toBe(1);
+
+    // The provider reads what to serve; it is bound to the entity and the host.
+    const proof = await request(
+      'GET',
+      `/entities/${salud}/apis/${apiId}/versions/${versionId}/host-proof`,
+      'pedro.publicador',
+    );
+    expect(proof.json()).toEqual({
+      required: true,
+      url: 'https://sandbox.proveedor.example/.well-known/den-validation',
+      token: hostControlToken(TOKEN, salud, 'sandbox.proveedor.example'),
+    });
+    expect(hostControlToken(TOKEN, salud, 'sandbox.proveedor.example')).not.toBe(
+      hostControlToken(TOKEN, randomUUID(), 'sandbox.proveedor.example'),
+    );
+    // The real probe never calls a host that resolves to an internal address.
+    expect(
+      await new GatewayValidationProbes().hostControl(salud, {
+        type: 'direct',
+        url: 'https://127.0.0.1/api',
+        mtls: false,
+      }),
+    ).toBe(false);
+    expect(
+      (
+        await request(
+          'GET',
+          `/entities/${salud}/apis/${apiId}/versions/${versionId}/host-proof`,
+          'carlos.dev',
+        )
+      ).statusCode,
+    ).toBe(404);
   });
 });

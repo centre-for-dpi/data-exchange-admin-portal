@@ -9,7 +9,9 @@ import type {
   ApiVersionStatus,
   CreateApiInput,
   CreateApiVersionInput,
+  HostProof,
   LintReport,
+  UpdateApiVersionInput,
   NodeContract,
   PaginationQuery,
 } from '@den/contracts';
@@ -17,23 +19,36 @@ import {
   createApiSchema,
   createApiVersionSchema,
   type Upstream,
+  updateApiVersionSchema,
   upstreamSchema,
 } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
-import { ConflictError, NotFoundError, ValidationError } from '../common/errors.js';
+import {
+  ConflictError,
+  NotFoundError,
+  RateLimitedError,
+  ValidationError,
+} from '../common/errors.js';
 import { breakingChanges } from '../domain/api-version/compatibility.js';
+import { assertClassificationCoversFields } from '../domain/approval.js';
 import { assertEntityActive } from '../domain/entity/active.js';
 import { assertTransition, isEditable } from '../domain/api-version/state-machine.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { OutboxService } from '../outbox/outbox.service.js';
+import { HOST_CONTROL_PATH, hostControlToken } from '../reconcilers/apisix/desired-state.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import { nodeContracts } from '../nodes/node-contracts.js';
 import { nodeIdOf, upstreamNodes } from '../nodes/node-status.js';
 import { scopedRepo } from '../prisma/scoped-repo.js';
-import { storedValidation, VersionValidationService } from './version-validation.service.js';
+import {
+  storedValidation,
+  validationEnabled,
+  validationSettings,
+  VersionValidationService,
+} from './version-validation.service.js';
 import { lintOpenApi, listOperations } from './lint/openapi-lint.js';
 import { assertUpstreamTypeAllowed, disallowedUpstreamTypes } from './upstream-types.js';
 
@@ -363,18 +378,22 @@ export class ApisService {
     }
   }
 
-  async createVersion(
-    entityId: string,
-    apiId: string,
-    principal: Principal,
-    input: CreateApiVersionInput,
-    requestId?: string,
-  ): Promise<ApiVersionDetail> {
-    await assertEntityActive(this.prisma, entityId);
-    const data = createApiVersionSchema.parse(input);
-    const api = await this.findApi(entityId, apiId);
-    const entity = await this.prisma.entity.findUniqueOrThrow({ where: { id: entityId } });
-
+  /**
+   * What createVersion and updateVersion check of what the provider declares: the classification
+   * covers the declared fields (M-20), the purposes exist, and the upstreams are allowed (type
+   * first, P-04, then node or member).
+   */
+  private async assertDeclarationValid(
+    entity: { id: string; xroadMemberClass: string | null; xroadMemberCode: string | null },
+    classification: string,
+    data: {
+      allowedPurposes: string[];
+      exposedFields: unknown;
+      upstream: Upstream;
+      sandboxUpstream?: Upstream | undefined;
+    },
+  ): Promise<void> {
+    assertClassificationCoversFields(classification, data.exposedFields);
     const purposes = await this.prisma.purpose.findMany({
       where: { code: { in: data.allowedPurposes }, active: true },
       select: { code: true },
@@ -398,6 +417,21 @@ export class ApisService {
     if (data.sandboxUpstream) {
       await this.assertUpstreamAllowed(entity, data.sandboxUpstream, 'sandboxUpstream');
     }
+  }
+
+  async createVersion(
+    entityId: string,
+    apiId: string,
+    principal: Principal,
+    input: CreateApiVersionInput,
+    requestId?: string,
+  ): Promise<ApiVersionDetail> {
+    await assertEntityActive(this.prisma, entityId);
+    const data = createApiVersionSchema.parse(input);
+    const api = await this.findApi(entityId, apiId);
+    const entity = await this.prisma.entity.findUniqueOrThrow({ where: { id: entityId } });
+
+    await this.assertDeclarationValid(entity, api.classification, data);
 
     const [major = 0, minor = 0] = data.version.split('.').map(Number);
     // One version per major until it is retired (ADR-0019): compatible changes are revisions of
@@ -461,6 +495,75 @@ export class ApisService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Replaces what the provider declared in an editable version (draft or changes_requested, M-19):
+   * the exposed fields, the legal basis, the purposes, the upstreams and, optionally, the OpenAPI
+   * document. Same validation as createVersion; the version number does not change. Rejected
+   * while the version is in review or beyond: a reviewer decides on what was submitted.
+   */
+  async updateVersion(
+    entityId: string,
+    apiId: string,
+    versionId: string,
+    principal: Principal,
+    input: UpdateApiVersionInput,
+    requestId?: string,
+  ): Promise<ApiVersionDetail> {
+    await assertEntityActive(this.prisma, entityId);
+    const data = updateApiVersionSchema.parse(input);
+    const before = await this.findVersion(entityId, apiId, versionId);
+    if (!isEditable(before.status)) {
+      throw new ConflictError(`A version in status ${before.status} cannot be edited`);
+    }
+    const api = await this.findApi(entityId, apiId);
+    const entity = await this.prisma.entity.findUniqueOrThrow({ where: { id: entityId } });
+    await this.assertDeclarationValid(entity, api.classification, data);
+    const parsed = data.openapi ? await this.lint(data.openapi, api.classification) : undefined;
+    const purposeCodes = [...new Set(data.allowedPurposes)];
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.apiVersion.updateMany({
+        where: { id: versionId, status: before.status, updatedAt: before.updatedAt },
+        data: {
+          ...(parsed
+            ? {
+                openapiSpec: parsed.spec as Prisma.InputJsonObject,
+                openapiSha256: parsed.sha256,
+                openapiSha256Variants: parsed.sha256Variants,
+                lintReport: parsed.report,
+              }
+            : {}),
+          upstreamType: data.upstream.type,
+          upstream: data.upstream,
+          sandboxUpstream: data.sandboxUpstream ?? Prisma.DbNull,
+          exposedFields: data.exposedFields,
+          legalBasisText: data.legalBasisText ?? null,
+          legalReferences: data.legalReferences,
+          defaultRateLimit: data.defaultRateLimit ?? 600,
+        },
+      });
+      if (changed.count === 0) throw new ConflictError('The version changed meanwhile; reload it');
+      await tx.apiVersionPurpose.deleteMany({ where: { apiVersionId: versionId } });
+      await tx.apiVersionPurpose.createMany({
+        data: purposeCodes.map((purposeCode) => ({ apiVersionId: versionId, purposeCode })),
+      });
+      const after = await tx.apiVersion.findUniqueOrThrow({
+        where: { id: versionId },
+        include: VERSION_INCLUDE,
+      });
+      await this.audit.record(tx, {
+        actor: this.actor(principal, entityId),
+        action: 'api_version.updated',
+        target: { type: 'api_version', id: versionId },
+        before: versionSnapshot(before),
+        after: versionSnapshot(after),
+        requestId,
+      });
+      return after;
+    });
+    return this.detailOf(updated);
   }
 
   /** Replaces the OpenAPI document of an editable version and lints it again. */
@@ -752,6 +855,11 @@ export class ApisService {
     const target: ApiVersionStatus = 'in_review';
     assertTransition(before.status, target);
     assertStoredUpstreamsAllowed(before);
+    // Rows from before M-20 may declare personal fields in a lower classification.
+    assertClassificationCoversFields(
+      (await this.findApi(entityId, apiId)).classification,
+      before.exposedFields,
+    );
 
     const report = before.lintReport as LintReport | null;
     if (!report?.valid) {
@@ -791,6 +899,52 @@ export class ApisService {
     return this.detailOf(await this.findVersion(entityId, apiId, updated.id));
   }
 
+  /**
+   * The validations touch a host the provider names (MB-2), before any human has looked at it, so
+   * asking again is limited: a cooldown per version since the last run started, and a cap per
+   * entity and hour (counted from the audit trail).
+   */
+  private async assertValidationAllowed(entityId: string, version: VersionRow): Promise<void> {
+    if (!validationEnabled()) return;
+    const s = validationSettings();
+    const started = storedValidation(version.validationReport)?.startedAt;
+    const waitMs = started ? Date.parse(started) + s.cooldownSeconds * 1000 - Date.now() : 0;
+    let retryMs = waitMs;
+    const recent = await this.prisma.auditEvent.count({
+      where: {
+        action: 'api_version.validation_requested',
+        actorEntityId: entityId,
+        occurredAt: { gt: new Date(Date.now() - 3_600_000) },
+      },
+    });
+    if (recent >= s.maxPerHour) retryMs = Math.max(retryMs, 3_600_000);
+    if (retryMs > 0) {
+      const minutes = Math.max(1, Math.ceil(retryMs / 60_000));
+      throw new RateLimitedError(
+        `Validations were run recently: try again in about ${minutes} minutes`,
+        { key: FieldErrorKey.ValidationRateLimited, params: { minutes } },
+      );
+    }
+  }
+
+  /** What a provider must serve to prove it controls its `direct` sandbox host (MB-2). */
+  async hostProof(entityId: string, apiId: string, versionId: string): Promise<HostProof> {
+    const version = await this.findVersion(entityId, apiId, versionId);
+    const sandbox = version.sandboxUpstream
+      ? upstreamSchema.safeParse(version.sandboxUpstream)
+      : undefined;
+    const token = validationSettings().token;
+    if (!token || !sandbox?.success || sandbox.data.type !== 'direct') {
+      return { required: false, url: null, token: null };
+    }
+    const url = new URL(sandbox.data.url);
+    return {
+      required: true,
+      url: `${url.origin}${HOST_CONTROL_PATH}`,
+      token: hostControlToken(token, entityId, url.hostname),
+    };
+  }
+
   /** Runs the validations again (the provider fixed its service) while the version is in review. */
   async revalidate(
     entityId: string,
@@ -803,6 +957,7 @@ export class ApisService {
     if (version.status !== 'in_review') {
       throw new ConflictError('Only a version in review is validated');
     }
+    await this.assertValidationAllowed(entityId, version);
     await this.prisma.$transaction(async (tx) => {
       await this.audit.record(tx, {
         actor: this.actor(principal, entityId),

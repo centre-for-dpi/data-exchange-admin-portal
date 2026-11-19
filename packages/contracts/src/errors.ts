@@ -89,6 +89,10 @@ export const FieldErrorKey = {
   /** An `xroad` upstream in a deployment without the operator's Security Server (P-04). */
   XroadNotConfigured: 'xroad_not_configured',
   IncompatibleChange: 'incompatible_change',
+  /** Fields declared personal or sensitive in an API classified below `personal` (M-20). */
+  /** A validation was requested again too soon, or too many in an hour (MB-2). */
+  ValidationRateLimited: 'validation_rate_limited',
+  ClassificationBelowFields: 'classification_below_fields',
   RetirementNotice: 'retirement_notice',
   ExportTooLarge: 'export_too_large',
   ManualStepsUseCaseOnly: 'manual_steps_use_case_only',

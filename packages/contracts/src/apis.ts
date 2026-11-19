@@ -193,6 +193,28 @@ export const createApiVersionSchema = z.strictObject({
 });
 export type CreateApiVersionInput = z.input<typeof createApiVersionSchema>;
 
+/**
+ * Replaces what the provider declared in an editable version (draft or changes requested, M-19):
+ * everything `createApiVersionSchema` carries except the version number; the OpenAPI document is
+ * kept when omitted.
+ */
+export const updateApiVersionSchema = createApiVersionSchema
+  .omit({ version: true })
+  .extend({ openapi: openapiSourceSchema.optional() });
+export type UpdateApiVersionInput = z.input<typeof updateApiVersionSchema>;
+
+/**
+ * Proof that the provider controls the host of a `direct` sandbox upstream (MB-2): the contract
+ * test fires up to 20 examples per operation from the operator's network, so it only runs against
+ * a host that serves `token` at `url`.
+ */
+export const hostProofSchema = z.object({
+  required: z.boolean(),
+  url: z.string().nullable(),
+  token: z.string().nullable(),
+});
+export type HostProof = z.infer<typeof hostProofSchema>;
+
 /** Replaces the OpenAPI document of a draft version (re-linted). */
 export const replaceOpenapiSchema = z.strictObject({ openapi: openapiSourceSchema });
 

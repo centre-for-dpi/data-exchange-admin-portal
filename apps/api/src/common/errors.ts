@@ -98,3 +98,10 @@ export class ServiceUnavailableError extends DomainError {
     super(ErrorCode.ServiceUnavailable, message);
   }
 }
+
+/** Too many requests of a business kind (429), with the key and parameters the portal words. */
+export class RateLimitedError extends DomainError {
+  constructor(message: string, reason?: Omit<FieldError, 'path' | 'message'>) {
+    super(ErrorCode.RateLimited, message, reason ? [{ path: '', message, ...reason }] : undefined);
+  }
+}

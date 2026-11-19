@@ -1,5 +1,14 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { FieldErrorKey, type VersionValidation, versionValidationSchema } from '@den/contracts';
+import { timingSafeEqual } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
+import {
+  FieldErrorKey,
+  isPublicAddress,
+  type Upstream,
+  upstreamSchema,
+  type VersionValidation,
+  versionValidationSchema,
+} from '@den/contracts';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service.js';
 import { ConflictError } from '../common/errors.js';
@@ -9,6 +18,8 @@ import { QueueService } from '../queue/queue.service.js';
 import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import {
   checkRoutePath,
+  HOST_CONTROL_PATH,
+  hostControlToken,
   sandboxCheckRoutePath,
   VALIDATION_TOKEN_HEADER,
   versionCheckToken,
@@ -36,6 +47,10 @@ export function validationSettings(env: NodeJS.ProcessEnv = process.env) {
     ),
     maxExamples: Number(env.DEN_CONTRACT_MAX_EXAMPLES ?? 20),
     timeoutSeconds: Number(env.DEN_CONTRACT_TIMEOUT_SECONDS ?? 120),
+    /** Minimum time between two validation runs of one version (MB-2). */
+    cooldownSeconds: Number(env.DEN_VALIDATION_COOLDOWN_SECONDS ?? 300),
+    /** Validations an entity may ask for again per hour (MB-2). */
+    maxPerHour: Number(env.DEN_VALIDATION_MAX_PER_HOUR ?? 10),
   };
 }
 
@@ -64,6 +79,11 @@ const runnerAnswerSchema = z.object({
 /** Health and contract checks against the version's check routes (M4-06). Injectable for tests. */
 export interface ValidationProbes {
   healthcheck(versionId: string): Promise<NonNullable<VersionValidation['healthcheck']>>;
+  /**
+   * Does the host of a `direct` sandbox serve the entity's proof (MB-2)? Optional: a probe that
+   * does not implement it (a test double) treats the host as proven.
+   */
+  hostControl?(entityId: string, upstream: Upstream): Promise<boolean>;
   contract(
     versionId: string,
     openapi: Record<string, unknown>,
@@ -71,6 +91,11 @@ export interface ValidationProbes {
 }
 
 export const VALIDATION_PROBES = Symbol('VALIDATION_PROBES');
+
+const upstreamOf = (value: unknown): Upstream | null => {
+  const parsed = upstreamSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+};
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -124,6 +149,34 @@ export class GatewayValidationProbes implements ValidationProbes {
       }
     }
     return { status: 'failed' as const, httpStatus: null, latencyMs: null, reason: 'no route' };
+  }
+
+  /**
+   * The contract test fuzzes the sandbox from the operator's network, so a `direct` host must
+   * show it is the provider's (MB-2): it serves, over HTTPS at /.well-known/den-validation, the
+   * token of this entity and host (hostControlToken). The name must resolve only to public
+   * addresses (this request leaves from the API's own network); redirects are not followed.
+   */
+  async hostControl(entityId: string, upstream: Upstream): Promise<boolean> {
+    const s = validationSettings();
+    if (!s.token || upstream.type !== 'direct') return false;
+    try {
+      const url = new URL(upstream.url);
+      const addresses = await lookup(url.hostname, { all: true });
+      if (addresses.length === 0 || !addresses.every((a) => isPublicAddress(a.address))) {
+        return false;
+      }
+      const res = await fetch(`${url.origin}${HOST_CONTROL_PATH}`, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return false;
+      const body = Buffer.from((await res.text()).slice(0, 256).trim());
+      const expected = Buffer.from(hostControlToken(s.token, entityId, url.hostname));
+      return body.length === expected.length && timingSafeEqual(body, expected);
+    } catch {
+      return false;
+    }
   }
 
   async contract(versionId: string, openapi: Record<string, unknown>) {
@@ -217,9 +270,18 @@ export class VersionValidationService implements OnApplicationBootstrap {
     const started =
       storedValidation(version.validationReport)?.startedAt ?? new Date().toISOString();
     const healthcheck = await probes.healthcheck(versionId);
-    const contract = version.sandboxUpstream
-      ? await probes.contract(versionId, version.openapiSpec as Record<string, unknown>)
-      : { status: 'skipped' as const, reason: 'no sandbox upstream', operations: [] };
+    const sandbox = upstreamOf(version.sandboxUpstream);
+    const contract = !version.sandboxUpstream
+      ? { status: 'skipped' as const, reason: 'no sandbox upstream', operations: [] }
+      : sandbox?.type === 'direct' &&
+          probes.hostControl &&
+          !(await probes.hostControl(version.api.entityId, sandbox))
+        ? {
+            status: 'failed' as const,
+            reason: 'host control not proven',
+            operations: [],
+          }
+        : await probes.contract(versionId, version.openapiSpec as Record<string, unknown>);
     const passed =
       healthcheck.status === 'passed' &&
       (contract.status === 'passed' || contract.status === 'skipped');

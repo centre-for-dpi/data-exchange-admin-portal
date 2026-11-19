@@ -365,9 +365,138 @@ describe('API registration (M1-03)', () => {
         'POST',
         `/api/v1/entities/${salud}/apis/${api.id}/versions`,
         'pedro.publicador',
-        versionBody(undeclared),
+        {
+          ...versionBody(undeclared),
+          exposedFields: [{ name: 'regimen', personal: false, sensitive: false }],
+        },
       );
       expect(apiVersionDetailSchema.parse(res.json()).lintReport.valid).toBe(true);
+    });
+
+    it('refuses personal or sensitive fields in an API classified below personal (M-20)', async () => {
+      const undeclared = saludOpenapi.replace(
+        /^ {6}(#.*\n {6})?x-den-data-subject:\n( {8}.*\n)+/gm,
+        '',
+      );
+      const created = await request('POST', `/api/v1/entities/${salud}/apis`, 'pedro.publicador', {
+        ...apiBody(`bajas-${run}-${randomUUID().slice(0, 4)}`),
+        classification: 'internal',
+      });
+      const api = apiDetailSchema.parse(created.json());
+      const versions = `/api/v1/entities/${salud}/apis/${api.id}/versions`;
+      for (const field of [
+        { name: 'regimen', personal: true, sensitive: false },
+        { name: 'regimen', personal: false, sensitive: true },
+      ]) {
+        const res = await request('POST', versions, 'pedro.publicador', {
+          ...versionBody(undeclared),
+          exposedFields: [field],
+        });
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.stringify(res.json())).toContain('classification_below_fields');
+      }
+      expect(await prisma.apiVersion.count({ where: { apiId: api.id } })).toBe(0);
+      // A row from before the rule is stopped when it is submitted.
+      const ok = await request('POST', versions, 'pedro.publicador', {
+        ...versionBody(undeclared),
+        exposedFields: [{ name: 'regimen', personal: false, sensitive: false }],
+      });
+      const versionId = ok.json<{ id: string }>().id;
+      await prisma.apiVersion.update({
+        where: { id: versionId },
+        data: { exposedFields: [{ name: 'regimen', personal: true, sensitive: false }] },
+      });
+      const submit = await request('POST', `${versions}/${versionId}/submit`, 'pedro.publicador');
+      expect(submit.statusCode, submit.body).toBe(400);
+    });
+  });
+
+  describe('editing a version that is not in review (M-19)', () => {
+    let apiId = '';
+    let versionId = '';
+    const edit = (username: string, payload: object, id = versionId, entity = salud) =>
+      request('PUT', `/api/v1/entities/${entity}/apis/${apiId}/versions/${id}`, username, payload);
+    const declaration = () => {
+      const { version: _version, ...rest } = versionBody();
+      return rest;
+    };
+
+    beforeAll(async () => {
+      apiId = (await createApi()).id;
+      const res = await request(
+        'POST',
+        `/api/v1/entities/${salud}/apis/${apiId}/versions`,
+        'pedro.publicador',
+        versionBody(),
+      );
+      versionId = res.json<{ id: string }>().id;
+    });
+
+    it('replaces the declaration of a draft and audits it, keeping the OpenAPI when omitted', async () => {
+      const res = await edit('pedro.publicador', {
+        ...declaration(),
+        exposedFields: [{ name: 'regimen', personal: true, sensitive: true }],
+        legalBasisText: 'Base legal corregida.',
+        legalReferences: ['Ley 1581 de 2012'],
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const version = apiVersionDetailSchema.parse(res.json());
+      expect(version).toMatchObject({
+        status: 'draft',
+        version: '1.0',
+        exposedFields: [{ name: 'regimen', personal: true, sensitive: true }],
+        legalBasisText: 'Base legal corregida.',
+        lintReport: { valid: true },
+      });
+      const events = await prisma.auditEvent.findMany({
+        where: { targetId: versionId, action: 'api_version.updated' },
+      });
+      expect(events).toHaveLength(1);
+    });
+
+    it('validates like createVersion', async () => {
+      const bad = (extra: object) => edit('pedro.publicador', { ...declaration(), ...extra });
+      expect((await bad({ allowedPurposes: ['inventado'] })).statusCode).toBe(400);
+      expect((await bad({ upstream: { type: 'node', nodeId: randomUUID() } })).statusCode).toBe(
+        400,
+      );
+      expect(
+        (await bad({ upstream: { type: 'direct', baseUrl: 'http://interno.local' } })).statusCode,
+      ).toBe(400);
+    });
+
+    it('works while changes are requested, and not in review', async () => {
+      const base = `/api/v1/entities/${salud}/apis/${apiId}/versions/${versionId}`;
+      expect((await request('POST', `${base}/submit`, 'pedro.publicador')).statusCode).toBe(200);
+      expect((await edit('pedro.publicador', declaration())).statusCode).toBe(409);
+      const asked = await request(
+        'POST',
+        `/api/v1/review/api-versions/${versionId}/request-changes`,
+        'ana.operadora',
+        { comment: 'Corrija los campos expuestos y la base legal.' },
+      );
+      expect(asked.statusCode, asked.body).toBe(200);
+      const res = await edit('pedro.publicador', {
+        ...declaration(),
+        exposedFields: [{ name: 'estado', personal: true, sensitive: false }],
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toMatchObject({
+        status: 'changes_requested',
+        exposedFields: [{ name: 'estado', personal: true, sensitive: false }],
+      });
+    });
+
+    it('lets only the API publisher edit, and does not reach another entity', async () => {
+      for (const user of ['lucia.datos', 'elena.admin']) {
+        expect((await edit(user, declaration())).statusCode, user).toBe(403);
+      }
+      for (const user of ['carlos.dev', 'ana.operadora']) {
+        expect((await edit(user, declaration())).statusCode, user).toBe(404);
+      }
+      expect((await edit('pedro.publicador', declaration(), versionId, programas)).statusCode).toBe(
+        404,
+      );
     });
   });
 
