@@ -590,6 +590,41 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
   - Con `docker compose` a secas: agrega a mano las variables de arriba (32 caracteres al azar, p. ej. `openssl rand -hex 32`; `DEN_TRUST_PROXY` como en §4.1), fija `TRAEFIK_NETWORK` (ya no tiene valor por omisión) y corre `node scripts/keycloak-portal-mfa.mjs --demo-critical-password` cuando Keycloak esté arriba.
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
+### 5.5 Subir un piloto existente a la versión posterior a la revisión
+
+Para un piloto instalado antes de las correcciones de la revisión general de 2026-11 (historias R-02 a R-10). Ordena los pasos manuales que §5.4 lista por historia; el detalle queda allí y en los ADR enlazados. En una instalación nueva nada de esto aplica. Cuenta con unos 20 minutos (la recompilación) y una ventana corta de 503 en el gateway (paso 6).
+
+1. **Antes de tocar nada.**
+   - Docker Engine 26 o superior y Compose 2.26 o superior (el instalador revisa ambos; los subdirectorios de volumen necesitan Engine 26, B-30). `docker --version`.
+   - Guarda una copia de `.env` **fuera del servidor**: tiene la clave del repositorio de respaldos, y desde esta versión `install.sh backup` ya no la copia (ADR-0034). Después borra el archivo `env` de las carpetas `backups/<fecha>/` anteriores.
+   - Disco libre para recompilar (las imágenes se bajan otra vez, fijadas por digest).
+2. **Si el piloto usa su propio Traefik** (no el proxy incluido, que `install.sh` reescribe solo): antes de actualizar, agrega a su archivo el middleware `den-keycloak-admin` (las direcciones de origen que pueden llegar a la administración de Keycloak) y el router `den-auth-admin` para `/auth/admin` y `/auth/realms/master` (§5.2), o la administración sigue pública (B-28). La tercera pieza, `den-web-from-proxy`, necesita un valor que todavía no existe: hazla después del paso 5.
+3. **Busca los duplicados que la migración nueva rechaza** (R-06, migración `20261214000000_one_live_per_major_and_renewal_purpose`). Agrega dos índices únicos y, si ya hay filas que los rompen, se detiene antes de cambiar nada y las nombra. Búscalas antes:
+
+   ```bash
+   dc exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+     SELECT api_id, major, string_agg(version || ' (' || status::text || ')', ', ') AS versions
+     FROM api_version WHERE status <> 'retired' GROUP BY api_id, major HAVING count(*) > 1;"
+   dc exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+     SELECT application_id, api_version_id, purpose_code, string_agg(id::text, ', ') AS requests
+     FROM subscription WHERE status IN ('pending_provider', 'info_requested', 'pending_regulator')
+     GROUP BY application_id, api_version_id, purpose_code HAVING count(*) > 1;"
+   ```
+
+   Sin filas: sigue. Una versión viva por mayor repetida: retira la sobrante a mano, como dice el mensaje de la migración. La misma solicitud abierta repetida: retira o rechaza la redundante. Nada se borra ni se reescribe solo. Si te lo saltas y la migración falla, la actualización se detiene con ese mensaje: corrige las filas y ejecuta `sudo ./install.sh update` otra vez.
+4. **Primer `sudo ./install.sh update`.** Hace el respaldo, baja el código y, si el instalador que ejecutaste es el viejo, Compose se detiene pidiendo una variable que el código nuevo necesita (por ejemplo `DEN_OPA_DECISION_TOKEN`, `DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD`, `DEN_WEB_PROXY_TOKEN`). Es lo esperado: el instalador viejo no conocía las variables nuevas. El nuevo se vuelve a ejecutar solo después de bajar el código, así que esto pasa como mucho una vez.
+5. **Segundo `sudo ./install.sh update`** (o `start`), ya con el instalador nuevo. Agrega a `.env` los secretos de la versión: `DEN_OPA_DECISION_TOKEN`, `DEN_OPA_ADMIN_TOKEN`, `ETCD_ROOT_PASSWORD` y `APISIX_ETCD_PASSWORD` (R-02, ADR-0031); `DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD` y `DEN_STEP_CA_NODE_PROVISIONER_PASSWORD` (B-16, ADR-0034); `DEN_WEB_PROXY_TOKEN`, `DEN_KEYCLOAK_ADMIN_URL` y los nombres de confianza del proxy en `DEN_TRUST_PROXY` (M-27); `DEN_DEMO_CRITICAL_PASSWORD` (M-29). Rechaza cualquier secreto que aún tenga el valor público del ejemplo. Luego recrea el stack: `migrate` aplica las migraciones como dueño del esquema (los índices de R-06, las comprobaciones de la cadena de auditoría de R-08), etcd activa su autenticación conservando los datos, step-ca da a cada provisioner su propio par de claves (los certificados ya emitidos siguen válidos) y el API arranca como `den_app`. Al final corre `realms` (`sudo ./install.sh realms`, `OPERATIONS.md §5.3`): flujo de login, enlace de verificación de 60 minutos, la contraseña de las cuentas demo críticas y el cambio de nombre del cliente de la app ciudadana. Si avisa que no pudo, ejecútalo a mano cuando Keycloak esté arriba.
+6. **La ventana de 503.** Desde la recreación hasta que el API nuevo arranca y reescribe el gateway (su pasada completa al arrancar, de unos segundos a un minuto), el gateway responde 503: las rutas deben llevar el token de decisión de OPA (R-02) y la clave de fábrica de APISIX sale del keyring, así que un nombre TLS cuya clave estaba cifrada con ella no responde hasta que el API reescribe los objetos (R-04). Prográmalo fuera del horario en que las entidades llaman; no se pierden datos.
+7. **Después.**
+   - `sudo ./install.sh status`: todo sano, y, con el proxy incluido, `/auth/admin` responde 403 desde direcciones que no estén en `DEN_KEYCLOAK_ADMIN_ALLOW`.
+   - `sudo ./install.sh credentials`: muestra las dos contraseñas de demo, la compartida y la de los cinco usuarios demo con un rol crítico.
+   - Los administradores de entidad ahora necesitan el segundo factor (ADR-0035): cada uno registra una aplicación autenticadora en su próximo inicio de sesión, y el operador debería avisarles. Un dispositivo perdido se recupera borrando la credencial OTP en Keycloak (`RUNBOOK.md`).
+   - Las entidades con un sandbox `direct` publican el archivo de control del host o su prueba de contrato falla (R-07, ADR-0036, `DEPLOYMENT.md §4`).
+   - Con tu propio Traefik: lee `DEN_WEB_PROXY_TOKEN` de `.env` y agrega el middleware `den-web-from-proxy`, con ese valor, al router `den-web` (§5.2). Hasta entonces la web no distingue a los visitantes: comparten un límite de tasa y una dirección en la bitácora de auditoría. Traefik recarga su archivo solo.
+   - Con `images <etiqueta>`: las imágenes publicadas deben ser públicas (§9.6), o el servidor sigue compilando.
+
+Notas relacionadas por historia, en §5.4: R-02, R-04 y R-10 (el cambio de nombre de la app ciudadana).
+
 ## 6. Desarrollo local
 
 ```bash

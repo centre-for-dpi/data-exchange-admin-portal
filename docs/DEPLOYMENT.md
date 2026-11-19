@@ -589,6 +589,41 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
   - With plain `docker compose`: add the variables above by hand (32 random characters, e.g. `openssl rand -hex 32`; `DEN_TRUST_PROXY` as in §4.1), set `TRAEFIK_NETWORK` (it no longer has a default), and run `node scripts/keycloak-portal-mfa.mjs --demo-critical-password` once Keycloak is up.
 - A change in `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` or `infra/step-ca/*` is mounted from the repo: restarting that service is enough (`up -d <service>` or `restart <service>`).
 
+### 5.5 Upgrading an existing pilot to the post-review release
+
+For a pilot installed before the 2026-11 general review's fixes (stories R-02 to R-10). It puts in order the manual steps that §5.4 lists per story; the detail stays there and in the ADRs linked. On a fresh install none of this applies. Expect about 20 minutes (the rebuild) and a short window of 503s on the gateway (step 6).
+
+1. **Before touching anything.**
+   - Docker Engine 26 or later and Compose 2.26 or later (the installer checks both; volume subpaths need Engine 26, B-30). `docker --version`.
+   - Keep a copy of `.env` **off the server**: it holds the backup repository's key, and from this release `install.sh backup` no longer copies it (ADR-0034). Then delete the `env` file inside the older `backups/<date>/` folders.
+   - Free disk for a rebuild (the images are pulled again, pinned by digest).
+2. **If the pilot uses its own Traefik** (not the bundled proxy, which `install.sh` rewrites itself): before updating, add to its file the `den-keycloak-admin` middleware (the source addresses allowed to reach Keycloak's administration) and the `den-auth-admin` router for `/auth/admin` and `/auth/realms/master` (§5.2), or the administration stays public (B-28). The third piece, `den-web-from-proxy`, needs a value that does not exist yet: do it after step 5.
+3. **Check for duplicates the new migration refuses** (R-06, migration `20261214000000_one_live_per_major_and_renewal_purpose`). It adds two unique indexes and, if rows already break them, stops before changing anything and names them. Find them first:
+
+   ```bash
+   dc exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+     SELECT api_id, major, string_agg(version || ' (' || status::text || ')', ', ') AS versions
+     FROM api_version WHERE status <> 'retired' GROUP BY api_id, major HAVING count(*) > 1;"
+   dc exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+     SELECT application_id, api_version_id, purpose_code, string_agg(id::text, ', ') AS requests
+     FROM subscription WHERE status IN ('pending_provider', 'info_requested', 'pending_regulator')
+     GROUP BY application_id, api_version_id, purpose_code HAVING count(*) > 1;"
+   ```
+
+   No rows: go on. A live version per major twice: retire the extra one by hand, as the migration's message says. The same open request twice: withdraw or reject the redundant one. Nothing is deleted or rewritten automatically. If you skip this and the migration fails, the update stops with that message: fix the rows and run `sudo ./install.sh update` again.
+4. **First `sudo ./install.sh update`.** It backs up, pulls, and then, if the installer you ran is the old one, Compose stops asking for a variable that the new code needs (for example `DEN_OPA_DECISION_TOKEN`, `DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD`, `DEN_WEB_PROXY_TOKEN`). That is expected: the old installer did not know the new variables. The new one re-runs itself after the pull, so this happens at most once.
+5. **Second `sudo ./install.sh update`** (or `start`), now with the new installer. It adds to `.env` the secrets of the new release: `DEN_OPA_DECISION_TOKEN`, `DEN_OPA_ADMIN_TOKEN`, `ETCD_ROOT_PASSWORD` and `APISIX_ETCD_PASSWORD` (R-02, ADR-0031); `DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD` and `DEN_STEP_CA_NODE_PROVISIONER_PASSWORD` (B-16, ADR-0034); `DEN_WEB_PROXY_TOKEN`, `DEN_KEYCLOAK_ADMIN_URL` and the proxy's trusted names in `DEN_TRUST_PROXY` (M-27); `DEN_DEMO_CRITICAL_PASSWORD` (M-29). It refuses any secret that still has the public example's value. Then it recreates the stack: `migrate` applies the migrations as the schema owner (the R-06 indexes, the R-08 audit-chain checks), etcd turns its authentication on with the data kept, step-ca gives each provisioner its own key pair (issued certificates stay valid), and the API starts as `den_app`. `realms` runs at the end (`sudo ./install.sh realms`, `OPERATIONS.md §5.3`): login flow, the 60-minute verification link, the critical demo accounts' password and the citizen app's client rename. If it warns that it could not, run it by hand when Keycloak is up.
+6. **The 503 window.** From the recreation until the new API has started and rewritten the gateway (its full pass on start, a few seconds to a minute), the gateway answers 503: the routes must carry the OPA decision token (R-02) and APISIX's factory key leaves the keyring, so a TLS name whose key was encrypted with it does not answer until the API rewrites the objects (R-04). Schedule it outside the hours entities call; no data is lost.
+7. **After.**
+   - `sudo ./install.sh status`: everything healthy, and, behind the bundled proxy, `/auth/admin` answers 403 from addresses not in `DEN_KEYCLOAK_ADMIN_ALLOW`.
+   - `sudo ./install.sh credentials`: shows both demo passwords, the shared one and the one of the five demo users with a critical role.
+   - Entity administrators now need the second factor (ADR-0035): each one enrols an authenticator app at the next sign-in, and the operator should warn them. A lost device is recovered by deleting the OTP credential in Keycloak (`RUNBOOK.md`).
+   - Entities with a `direct` sandbox publish the host-control file or their contract test fails (R-07, ADR-0036, `DEPLOYMENT.md §4`).
+   - With your own Traefik: read `DEN_WEB_PROXY_TOKEN` from `.env` and add the `den-web-from-proxy` middleware, with that value, to the `den-web` router (§5.2). Until then the web cannot tell visitors apart: they share one rate limit and one address in the audit log. Traefik reloads its file on its own.
+   - With `images <tag>`: the published images must be public (§9.6), or the server keeps building.
+
+Related notes by story, in §5.4: R-02, R-04 and R-10 (the citizen app's rename).
+
 ## 6. Local development
 
 ```bash
