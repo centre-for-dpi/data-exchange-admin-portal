@@ -62,12 +62,17 @@ jobs:
           labels: |
             org.opencontainers.image.licenses=Apache-2.0
 
-      # 1. Build into the runner's Docker, without publishing.
+      # 1. Build into the runner's Docker, without publishing. A release tag is built without
+      # reading the layer cache: a stale cached layer shipped a vulnerable nginx in den-wg-hub
+      # in v0.2.0, because the base image's fixes never reached a layer already cached. The
+      # build still writes the cache, which step 4 reads, so the published image is the layers
+      # that were scanned. Manual runs keep the cache.
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
+          no-cache: ${{ github.ref_type == 'tag' }}
           load: true
           tags: ${{ matrix.name }}:scan
           labels: ${{ steps.meta.outputs.labels }}
