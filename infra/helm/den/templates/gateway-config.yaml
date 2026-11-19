@@ -25,13 +25,12 @@ data:
       status:
         ip: 0.0.0.0
         port: 7085
-      # The deployment's own keyring for the private keys in etcd (M6-01). The factory key stays
-      # behind it only to read what an older installation wrote.
+      # The deployment's own key for the private keys in etcd (M6-01); not APISIX's public factory
+      # key (B-31): the portal writes every object with a private key again when it starts.
       data_encryption:
         enable_encrypt_fields: true
         keyring:
           - '${{"{{"}}DEN_APISIX_KEYRING{{"}}"}}'
-          - qeddd145sfvddff3
     deployment:
       role: traditional
       role_traditional:

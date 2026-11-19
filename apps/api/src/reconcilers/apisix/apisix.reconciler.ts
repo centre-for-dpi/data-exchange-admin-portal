@@ -107,6 +107,13 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
   /** The full pass in progress in this process, and whether another one was asked for meanwhile. */
   private pass?: Promise<void>;
   private passAgain = false;
+  /**
+   * The objects with a private key (SSL objects, the assertion key) written since this process
+   * started. Each is written once even when it matches (B-31): APISIX encrypts it with the first
+   * key of its keyring, the deployment's own, so nothing stays under a key that left the keyring
+   * (APISIX's public factory key, removed from infra/apisix/config.yaml).
+   */
+  private readonly reencrypted = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -127,6 +134,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
 
   onApplicationShutdown(): void {
     if (this.timer) clearInterval(this.timer);
+  }
+
+  /** An object with a private key not yet written by this process (see `reencrypted`). */
+  private mustReencrypt(id: string): boolean {
+    return !this.reencrypted.has(id);
   }
 
   async handle(data: Record<string, unknown>): Promise<void> {
@@ -552,8 +564,9 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       };
       desiredHash = hash({ ...desired, key: certificate.fingerprint });
       const actual = await this.admin.get('ssls', GATEWAY_XROAD_SSL_ID);
-      if (!actual || !sslMatches(desired, actual)) {
+      if (!actual || !sslMatches(desired, actual) || this.mustReencrypt(GATEWAY_XROAD_SSL_ID)) {
         await this.admin.put('ssls', GATEWAY_XROAD_SSL_ID, desired);
+        this.reencrypted.add(GATEWAY_XROAD_SSL_ID);
       }
       await this.recordSuccess(target, desiredHash);
     } catch (error) {
@@ -592,8 +605,9 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       };
       desiredHash = hash({ ...desired, key: certificate.fingerprint });
       const actual = await this.admin.get('ssls', sslId);
-      if (!actual || !sslMatches(desired, actual)) {
+      if (!actual || !sslMatches(desired, actual) || this.mustReencrypt(sslId)) {
         await this.admin.put('ssls', sslId, desired);
+        this.reencrypted.add(sslId);
       }
       await this.recordSuccess(target, desiredHash);
       return { networkCaPem: certificate.networkCaPem };
@@ -619,8 +633,9 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       desiredHash = hash({ ...desired, key: certificate.fingerprint });
       const actual = await this.admin.get('ssls', GATEWAY_SSL_ID);
       let result: 'created' | 'updated' | 'unchanged' = 'unchanged';
-      if (!actual || !sslMatches(desired, actual)) {
+      if (!actual || !sslMatches(desired, actual) || this.mustReencrypt(GATEWAY_SSL_ID)) {
         await this.admin.put('ssls', GATEWAY_SSL_ID, desired);
+        this.reencrypted.add(GATEWAY_SSL_ID);
         result = actual ? 'updated' : 'created';
       }
       await this.recordSuccess(GATEWAY_TLS_SYNC_TARGET, desiredHash);
@@ -655,12 +670,18 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       const key = await this.signingKeys.current(now);
       desiredHash = hash({ issuer: assertion.issuer, kid: key.kid });
       let result: GatewayResult = 'unchanged';
-      if (!actual || actual.issuer !== assertion.issuer || actual.kid !== key.kid) {
+      if (
+        !actual ||
+        actual.issuer !== assertion.issuer ||
+        actual.kid !== key.kid ||
+        this.mustReencrypt(ASSERTION_PLUGIN)
+      ) {
         await this.admin.put('plugin_metadata', ASSERTION_PLUGIN, {
           issuer: assertion.issuer,
           kid: key.kid,
           private_key: key.privateKeyPem,
         });
+        this.reencrypted.add(ASSERTION_PLUGIN);
         result = actual ? 'updated' : 'created';
       }
       await this.recordSuccess(ASSERTION_SYNC_TARGET, desiredHash);

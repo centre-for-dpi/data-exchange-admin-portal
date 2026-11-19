@@ -106,22 +106,34 @@ describe("APISIX reconciler: the assertion's signing key (M6-10)", () => {
 
   it('puts the current key in the metadata, then leaves it while the kid is the same', async () => {
     const admin = new LaggingApisix(0);
-    expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('created');
+    const reconciler = withAssertion(admin, true);
+    expect(await reconciler.reconcileAssertionKey()).toBe('created');
     expect(admin.objects.get('plugin_metadata/den-assertion')).toEqual({
       issuer: 'https://gw.example',
       kid: 'den-gw-1',
       private_key: PEM,
     });
     // APISIX returns the key encrypted: only issuer and kid are compared.
+    const encrypted = { issuer: 'https://gw.example', kid: 'den-gw-1', private_key: 'encrypted' };
+    admin.objects.set('plugin_metadata/den-assertion', encrypted);
+    expect(await reconciler.reconcileAssertionKey()).toBe('unchanged');
+    kid = 'den-gw-2';
+    expect(await reconciler.reconcileAssertionKey()).toBe('updated');
+    expect(admin.objects.get('plugin_metadata/den-assertion')).toMatchObject({ kid: 'den-gw-2' });
+  });
+
+  it('writes the key once after a restart, so APISIX encrypts it with its current key (B-31)', async () => {
+    const admin = new LaggingApisix(0);
+    kid = 'den-gw-1';
     admin.objects.set('plugin_metadata/den-assertion', {
       issuer: 'https://gw.example',
       kid: 'den-gw-1',
-      private_key: 'encrypted',
+      private_key: 'encrypted with a key that left the keyring',
     });
-    expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('unchanged');
-    kid = 'den-gw-2';
-    expect(await withAssertion(admin, true).reconcileAssertionKey()).toBe('updated');
-    expect(admin.objects.get('plugin_metadata/den-assertion')).toMatchObject({ kid: 'den-gw-2' });
+    const restarted = withAssertion(admin, true);
+    expect(await restarted.reconcileAssertionKey()).toBe('updated');
+    expect(admin.objects.get('plugin_metadata/den-assertion')).toMatchObject({ private_key: PEM });
+    expect(await restarted.reconcileAssertionKey()).toBe('unchanged');
   });
 
   it('removes the key from APISIX when the country turns the assertion off', async () => {

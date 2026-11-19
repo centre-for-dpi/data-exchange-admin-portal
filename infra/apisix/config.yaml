@@ -16,15 +16,13 @@ apisix:
     ip: 0.0.0.0
     port: 7085
   # Private keys in etcd (the gateway's TLS keys, the assertion key of den-assertion) are encrypted
-  # with this keyring (M6-01, S-6). The first key encrypts and is the deployment's own secret
-  # (16 characters, DEN_APISIX_KEYRING); APISIX's factory key, which is public, only stays to read
-  # what was written before it, until the reconciler rewrites those objects (certificate renewal,
-  # at most 90 days): then it is removed from here.
+  # with the deployment's own key (16 characters, DEN_APISIX_KEYRING; M6-01, S-6). APISIX's public
+  # factory key is gone from the keyring (B-31): the portal's reconciler writes every object with a
+  # private key again when it starts, so what that key encrypted before is re-encrypted with this one.
   data_encryption:
     enable_encrypt_fields: true
     keyring:
       - '${{DEN_APISIX_KEYRING}}'
-      - qeddd145sfvddff3
 
 deployment:
   role: traditional
