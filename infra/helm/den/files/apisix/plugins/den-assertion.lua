@@ -1,5 +1,5 @@
 --
--- den-assertion: the gateway's signed assertion to the provider (SPIKE S-6). After OPA decided,
+-- den-assertion: the gateway's signed assertion to the provider (M6-10, ADR-0024; designed in SPIKE S-6). After OPA decided,
 -- it signs what the gateway vouches for (who calls, for what, under which subscription, the
 -- official as its hash, which operation and which request) as a compact JWS (ES256) and sends it
 -- in X-DEN-Assertion. The provider verifies it with the gateway's public keys (JWKS, published by

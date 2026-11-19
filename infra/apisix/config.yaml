@@ -5,7 +5,7 @@ apisix:
   enable_ipv6: false
   # Our own plugins (infra/apisix/plugins, mounted read-only): den-data-subject (ADR-0017),
   # den-client-cert (S-3, M3-02), den-rate-limited (S-2, M3-05), den-header-guard (M3-07) and
-  # den-assertion (SPIKE S-6, prototype).
+  # den-assertion (M6-10, ADR-0024).
   extra_lua_path: /usr/local/apisix/den/?.lua
   ssl:
     enable: true
