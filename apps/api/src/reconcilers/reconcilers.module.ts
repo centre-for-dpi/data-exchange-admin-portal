@@ -13,6 +13,7 @@ import {
 import { GatewaySigningKeysService } from '../assertion/gateway-signing-keys.service.js';
 import { GatewayCertificates } from './apisix/gateway-certificates.js';
 import { HttpKeycloakGatewayAdmin, KEYCLOAK_ADMIN } from './keycloak/keycloak-admin.js';
+import { keycloakAdminUrl } from '../admin/keycloak-users.js';
 import { KeycloakReconciler } from './keycloak/keycloak.reconciler.js';
 import { HUB_AGENT, HttpHubAgent } from './wireguard/hub-agent.js';
 import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
@@ -24,7 +25,7 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
       provide: KEYCLOAK_ADMIN,
       useFactory: () =>
         new HttpKeycloakGatewayAdmin({
-          baseUrl: process.env.KEYCLOAK_URL ?? 'http://localhost:8080',
+          baseUrl: keycloakAdminUrl(),
           realm: 'den-gateway',
           clientId: process.env.DEN_GATEWAY_PROVISIONER_CLIENT_ID ?? 'den-portal-provisioner',
           clientSecret: process.env.DEN_GATEWAY_PROVISIONER_SECRET ?? '',

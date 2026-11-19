@@ -18,15 +18,23 @@ import { fromRoot } from './paths.js';
 
 const seedUsers = (
   JSON.parse(readFileSync(fromRoot('infra/keycloak/den-portal-realm.json'), 'utf8')) as {
-    users: Array<{ id: string; username: string }>;
+    users: Array<{ id: string; username: string; credentials?: Array<{ type: string }> }>;
   }
 ).users;
+/** The demo users with a critical role (an OTP credential) have a password of their own (M-29). */
+const critical = new Set(
+  seedUsers.filter((u) => u.credentials?.some((c) => c.type === 'otp')).map((u) => u.username),
+);
+const passwordOf = (username: string) =>
+  critical.has(username)
+    ? env('DEN_DEMO_CRITICAL_PASSWORD', env('DEN_DEMO_USER_PASSWORD', 'den-demo-password'))
+    : env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
 
 describe('realm den-portal (M0-03)', () => {
   const password = env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
 
   it.each(seedUsers)('$username logs in through apps/web (code + PKCE)', async (user) => {
-    const result = await loginWithAuthorizationCode(user.username, password);
+    const result = await loginWithAuthorizationCode(user.username, passwordOf(user.username));
     expect(result.tokens, result.page?.slice(0, 200)).toBeDefined();
 
     const claims = decodeJwt(result.tokens?.access_token ?? '');
@@ -118,11 +126,13 @@ describe('realm den-portal: second factor (M3-08)', () => {
 
   it('a password login has acr=password; asking for acr=mfa then only asks the code', async () => {
     const jar = new CookieJar();
-    const first = await loginWithAuthorizationCode('lucia.datos', password, { jar });
+    const first = await loginWithAuthorizationCode('lucia.datos', passwordOf('lucia.datos'), {
+      jar,
+    });
     expect(first.forms).toEqual(['kc-form-login']);
     expect(decodeJwt(first.tokens?.access_token ?? '').acr).toBe('password');
 
-    const stepUp = await loginWithAuthorizationCode('lucia.datos', password, {
+    const stepUp = await loginWithAuthorizationCode('lucia.datos', passwordOf('lucia.datos'), {
       jar,
       acr: 'mfa',
       otp: nextCode('lucia.datos'),
@@ -147,33 +157,45 @@ describe('realm den-portal: second factor (M3-08)', () => {
   });
 
   it('a fresh login with acr=mfa asks the password and then the code', async () => {
-    const result = await loginWithAuthorizationCode('marta.regulador', password, {
-      acr: 'mfa',
-      otp: nextCode('marta.regulador'),
-    });
+    const result = await loginWithAuthorizationCode(
+      'marta.regulador',
+      passwordOf('marta.regulador'),
+      {
+        acr: 'mfa',
+        otp: nextCode('marta.regulador'),
+      },
+    );
     expect(result.forms).toEqual(['kc-form-login', 'kc-otp-login-form']);
     expect(decodeJwt(result.tokens?.access_token ?? '').acr).toBe('mfa');
   });
 
   it('refuses a wrong code and a code already used', async () => {
     const wrong = String((Number(totp(demoTotpSecret())) + 1) % 1_000_000).padStart(6, '0');
-    const refused = await loginWithAuthorizationCode('sofia.auditora', password, {
-      acr: 'mfa',
-      otp: wrong,
-    });
+    const refused = await loginWithAuthorizationCode(
+      'sofia.auditora',
+      passwordOf('sofia.auditora'),
+      {
+        acr: 'mfa',
+        otp: wrong,
+      },
+    );
     expect(refused.tokens).toBeUndefined();
     expect(refused.page).toContain('kc-otp-login-form');
 
     const code = nextCode('sofia.auditora');
-    const first = await loginWithAuthorizationCode('sofia.auditora', password, {
+    const first = await loginWithAuthorizationCode('sofia.auditora', passwordOf('sofia.auditora'), {
       acr: 'mfa',
       otp: code,
     });
     expect(first.tokens).toBeDefined();
-    const replay = await loginWithAuthorizationCode('sofia.auditora', password, {
-      acr: 'mfa',
-      otp: code,
-    });
+    const replay = await loginWithAuthorizationCode(
+      'sofia.auditora',
+      passwordOf('sofia.auditora'),
+      {
+        acr: 'mfa',
+        otp: code,
+      },
+    );
     expect(replay.tokens).toBeUndefined();
   });
 

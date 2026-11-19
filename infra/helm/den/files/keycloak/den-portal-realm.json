@@ -25,12 +25,12 @@
     "host": "${KC_SMTP_HOST}",
     "port": "${KC_SMTP_PORT}",
     "from": "${KC_SMTP_FROM}",
-    "fromDisplayName": "Portal DEN",
-    "starttls": "${KC_SMTP_STARTTLS}",
-    "ssl": "${KC_SMTP_SSL}",
+    "fromDisplayName": "${DEN_KEYCLOAK_SMTP_FROM_NAME:Portal DEN}",
     "auth": "true",
     "user": "${KC_SMTP_USER}",
-    "password": "${KC_SMTP_PASSWORD}"
+    "password": "${KC_SMTP_PASSWORD}",
+    "starttls": "${KC_SMTP_STARTTLS}",
+    "ssl": "${KC_SMTP_SSL}"
   },
   "clients": [
     {

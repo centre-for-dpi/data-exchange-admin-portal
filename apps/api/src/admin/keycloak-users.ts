@@ -20,11 +20,11 @@ export class HttpKeycloakUsers implements DemoUsersKeycloak {
     },
   ) {}
 
-  /** From KEYCLOAK_URL and the master administrator; undefined if the credentials are missing. */
+  /** From keycloakAdminUrl() and the master administrator; undefined without the credentials. */
   static fromEnv(env: NodeJS.ProcessEnv = process.env): HttpKeycloakUsers | undefined {
     if (!env.KEYCLOAK_ADMIN_USER || !env.KEYCLOAK_ADMIN_PASSWORD) return undefined;
     return new HttpKeycloakUsers({
-      baseUrl: (env.KEYCLOAK_URL ?? 'http://localhost:8080').replace(/\/+$/, ''),
+      baseUrl: keycloakAdminUrl(env),
       username: env.KEYCLOAK_ADMIN_USER,
       password: env.KEYCLOAK_ADMIN_PASSWORD,
     });
@@ -100,4 +100,16 @@ export class HttpKeycloakUsers implements DemoUsersKeycloak {
     await this.request('POST', `${path}/logout`);
     return wasEnabled ? 'disabled' : 'unchanged';
   }
+}
+
+/**
+ * Where the API reaches Keycloak's Admin API: DEN_KEYCLOAK_ADMIN_URL, inside the Compose network in
+ * the pilot (http://keycloak:8080/auth), because the public proxy does not publish /auth/admin
+ * (B-28); KEYCLOAK_URL otherwise. Tokens are still validated against KEYCLOAK_URL's issuer.
+ */
+export function keycloakAdminUrl(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.DEN_KEYCLOAK_ADMIN_URL || env.KEYCLOAK_URL || 'http://localhost:8080').replace(
+    /\/+$/,
+    '',
+  );
 }

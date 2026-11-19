@@ -21,6 +21,8 @@ export const GATEWAY_HTTP = env('DEN_GATEWAY_HTTP_URL', 'http://localhost:9080')
 export const MTLS = GATEWAY.startsWith('https://');
 export const WEB = env('DEN_WEB_URL', 'http://localhost:3000');
 const PASSWORD = env('DEN_DEMO_USER_PASSWORD', 'den-demo-password');
+// The demo users with a critical role have a password of their own in the pilot (M-29).
+const CRITICAL_PASSWORD = env('DEN_DEMO_CRITICAL_PASSWORD', PASSWORD);
 const TOTP_SECRET = env('DEN_DEMO_TOTP_SECRET', DEFAULT_DEMO_TOTP_SECRET);
 
 /** A step that did not behave as the script promises. */
@@ -135,12 +137,16 @@ export async function login(username, client = PORTAL_CLIENT) {
     keep(res);
     return res;
   };
-  let submitted = await post(action, { username, password: PASSWORD, credentialId: '' });
+  const password = MFA_USERS.has(username) ? CRITICAL_PASSWORD : PASSWORD;
+  let submitted = await post(action, { username, password, credentialId: '' });
   if (mfa && !submitted.headers.get('location')) {
     submitted = await submitOtp(username, await submitted.text(), post);
   }
   const code = new URL(submitted.headers.get('location') ?? 'http://x/').searchParams.get('code');
-  expect(code, `Login failed for ${username} (is DEN_DEMO_USER_PASSWORD right?)`);
+  expect(
+    code,
+    `Login failed for ${username} (are DEN_DEMO_USER_PASSWORD and DEN_DEMO_CRITICAL_PASSWORD right?)`,
+  );
   const { clientId, secret } = client;
   const tokens = await fetch(`${realm}/token`, {
     method: 'POST',

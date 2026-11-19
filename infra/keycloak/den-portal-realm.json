@@ -19,10 +19,15 @@
   "ssoSessionMaxLifespan": 36000,
   "actionTokenGeneratedByUserLifespan": 3600,
   "smtpServer": {
-    "host": "mailpit",
-    "port": "1025",
-    "from": "no-reply@den.example",
-    "fromDisplayName": "Portal DEN"
+    "host": "${DEN_KEYCLOAK_SMTP_HOST:mailpit}",
+    "port": "${DEN_KEYCLOAK_SMTP_PORT:1025}",
+    "from": "${DEN_KEYCLOAK_SMTP_FROM:no-reply@den.example}",
+    "fromDisplayName": "${DEN_KEYCLOAK_SMTP_FROM_NAME:Portal DEN}",
+    "auth": "${DEN_KEYCLOAK_SMTP_AUTH:false}",
+    "user": "${DEN_KEYCLOAK_SMTP_USER:}",
+    "password": "${DEN_KEYCLOAK_SMTP_PASSWORD:}",
+    "starttls": "${DEN_KEYCLOAK_SMTP_STARTTLS:false}",
+    "ssl": "${DEN_KEYCLOAK_SMTP_SSL:false}"
   },
   "clients": [
     {
@@ -73,7 +78,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
+          "value": "${DEN_DEMO_CRITICAL_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
@@ -111,7 +116,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
+          "value": "${DEN_DEMO_CRITICAL_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
@@ -149,7 +154,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
+          "value": "${DEN_DEMO_CRITICAL_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
@@ -171,7 +176,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
+          "value": "${DEN_DEMO_CRITICAL_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {
@@ -193,7 +198,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
+          "value": "${DEN_DEMO_CRITICAL_PASSWORD:den-demo-password}",
           "temporary": false
         },
         {

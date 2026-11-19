@@ -6,12 +6,19 @@
 //
 //   node scripts/keycloak-portal-mfa.mjs              # realm settings and the login flow
 //   node scripts/keycloak-portal-mfa.mjs --demo-otp   # also the demo users' TOTP (dev and demo only)
+//   node scripts/keycloak-portal-mfa.mjs --demo-critical-password
+//                                  # the demo users with a critical role get DEN_DEMO_CRITICAL_PASSWORD
 //
 // Idempotent. It sets the ACR to level-of-authentication map and the OTP policy, rebuilds the
 // browser flow `den-browser` from the file and binds it. With --demo-otp, each seed user that has
 // an OTP credential in the file and none in Keycloak is re-imported from the file (same id, the
-// password of DEN_DEMO_USER_PASSWORD and the code of DEN_DEMO_TOTP_SECRET): Keycloak's admin API
-// cannot add an OTP credential to an existing user. A disabled one is left alone.
+// password of DEN_DEMO_CRITICAL_PASSWORD and the code of DEN_DEMO_TOTP_SECRET): Keycloak's admin
+// API cannot add an OTP credential to an existing user. A disabled one is left alone. With
+// --demo-critical-password, those same users (a critical role, M-29) get DEN_DEMO_CRITICAL_PASSWORD,
+// apart from the one the other demo users share; install.sh runs it once, when it adds the variable.
+//
+// The realm's outgoing mail (M-28): with DEN_KEYCLOAK_SMTP_HOST set, the realm's SMTP server is
+// set from DEN_KEYCLOAK_SMTP_* (as the file reads them on import); without it, left as it is.
 //
 // Uses KEYCLOAK_URL, KEYCLOAK_ADMIN_USER and KEYCLOAK_ADMIN_PASSWORD from the environment or the
 // repo-root .env (master realm administrator).
@@ -24,6 +31,9 @@ if (existsSync(resolve(root, '.env'))) process.loadEnvFile(resolve(root, '.env')
 
 const url = (process.env.KEYCLOAK_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
 const demoOtp = process.argv.includes('--demo-otp');
+const demoCriticalPassword = process.argv.includes('--demo-critical-password');
+// The critical roles' demo password defaults to the shared one (development), as in Compose.
+process.env.DEN_DEMO_CRITICAL_PASSWORD ??= process.env.DEN_DEMO_USER_PASSWORD;
 // Keycloak's own placeholder syntax, ${NAME} or ${NAME:default}, resolved like --import-realm does.
 const raw = readFileSync(resolve(root, 'infra/keycloak/den-portal-realm.json'), 'utf8');
 const realmFile = JSON.parse(
@@ -91,12 +101,15 @@ await admin('PUT', '', {
   adminEventsDetailsEnabled: realmFile.adminEventsDetailsEnabled,
   // P-08: how long the e-mail verification and password reset links last (Keycloak: 5 minutes).
   actionTokenGeneratedByUserLifespan: realmFile.actionTokenGeneratedByUserLifespan,
+  // M-28: the operator's SMTP server, only when .env names one (else the console's stays).
+  ...(process.env.DEN_KEYCLOAK_SMTP_HOST ? { smtpServer: realmFile.smtpServer } : {}),
   // Unbound while the flow is rebuilt: a bound flow cannot be deleted.
   ...(current.browserFlow === flowAlias ? { browserFlow: 'browser' } : {}),
 });
 console.log(
   `${realm}: acr.loa.map, OTP and password policies, the events and the ` +
-    `${realmFile.actionTokenGeneratedByUserLifespan / 60}-minute verification link applied`,
+    `${realmFile.actionTokenGeneratedByUserLifespan / 60}-minute verification link applied` +
+    (process.env.DEN_KEYCLOAK_SMTP_HOST ? `; SMTP ${realmFile.smtpServer.host}` : ''),
 );
 
 // 1b. The exact redirect URIs of the clients (M6-01), from this file and the citizens' realm.
@@ -202,5 +215,27 @@ if (demoOtp) {
     if (credentials.some((c) => c.type === 'otp')) continue;
     await admin('POST', '/partialImport', { ifResourceExists: 'OVERWRITE', users: [user] });
     console.log(`${realm}: ${user.username} re-imported with the demo one-time code`);
+  }
+}
+
+// 4. A password of their own for the demo users with a critical role (M-29): the shared one is
+// handed out at workshops. Disabled users are left alone.
+if (demoCriticalPassword) {
+  const password = process.env.DEN_DEMO_CRITICAL_PASSWORD;
+  if (!password) throw new Error('DEN_DEMO_CRITICAL_PASSWORD is not set');
+  for (const user of realmFile.users.filter((u) => u.credentials?.some((c) => c.type === 'otp'))) {
+    const existing = await admin('GET', `/users/${user.id}`);
+    if (!existing || existing.enabled === false) {
+      console.log(
+        `${realm}: ${user.username} ${existing ? 'is disabled' : 'does not exist'}, skipped`,
+      );
+      continue;
+    }
+    await admin('PUT', `/users/${user.id}/reset-password`, {
+      type: 'password',
+      value: password,
+      temporary: false,
+    });
+    console.log(`${realm}: ${user.username} has the critical roles' demo password`);
   }
 }

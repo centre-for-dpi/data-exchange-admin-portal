@@ -20,6 +20,12 @@ export async function expectNoAccessibilityViolations(page: Page): Promise<void>
 }
 
 /** Seed users with a critical role: the realm gives them a one-time code (M3-08). */
+/** The demo password of a seed user: those with a critical role have their own (M-29). */
+export function demoPassword(username: string): string {
+  const shared = process.env.DEN_DEMO_USER_PASSWORD ?? 'den-demo-password';
+  return MFA_USERS.has(username) ? (process.env.DEN_DEMO_CRITICAL_PASSWORD ?? shared) : shared;
+}
+
 const MFA_USERS = new Set(
   (
     JSON.parse(
@@ -125,7 +131,7 @@ export async function enrollOneTimeCode(page: Page, password: string): Promise<v
 export async function keycloakLogin(page: Page, username: string): Promise<void> {
   await page.waitForURL(/\/realms\/den-portal\//);
   await page.locator('#username').fill(username);
-  await page.locator('#password').fill(process.env.DEN_DEMO_USER_PASSWORD ?? 'den-demo-password');
+  await page.locator('#password').fill(demoPassword(username));
   await page.locator('#kc-login').click();
   if (MFA_USERS.has(username)) await enterOneTimeCode(page, username);
 }

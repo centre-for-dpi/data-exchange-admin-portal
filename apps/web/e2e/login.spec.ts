@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { enterOneTimeCode, expectNoAccessibilityViolations, keycloakLogin, totp } from './helpers';
+import {
+  demoPassword,
+  enterOneTimeCode,
+  expectNoAccessibilityViolations,
+  keycloakLogin,
+  totp,
+} from './helpers';
 
 /** The web's own address, wherever the suite runs (DEN_WEB_URL). */
 const webOrigin = (process.env.DEN_WEB_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
@@ -60,7 +66,7 @@ test.describe('login with Keycloak', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
     await page.locator('#username').fill('lucia.datos');
-    await page.locator('#password').fill(process.env.DEN_DEMO_USER_PASSWORD ?? 'den-demo-password');
+    await page.locator('#password').fill(demoPassword('lucia.datos'));
     await page.locator('#kc-login').click();
 
     // The portal sees the session lacks the second factor and asks Keycloak for it.

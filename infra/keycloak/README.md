@@ -10,7 +10,7 @@ At startup, Keycloak imports (`--import-realm`) the `*-realm.json` files in this
 - Self-registration with mandatory email verification (ADR-0018): you cannot sign in without confirming your email. A new account has no roles; it can only request onboarding for an entity and accept invitations addressed to its email. Brute-force protection; verification and recovery emails through Mailpit.
   - On a Keycloak that has already imported the realm, apply the change without deleting data: `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh update realms/den-portal -s registrationAllowed=true -s verifyEmail=true` (after `kcadm.sh config credentials`).
 - The verification and password reset links last 60 minutes (`actionTokenGeneratedByUserLifespan`; Keycloak's default is 5, P-08). On a Keycloak that has already imported the realm: `node scripts/keycloak-portal-mfa.mjs`.
-- Seed users with fixed IDs (the database seed links them by `keycloakSub`). Password: `DEN_DEMO_USER_PASSWORD` (defaults to `demo`, development only). **Roles do not live here**: the seed assigns them in PostgreSQL (ADR-0004).
+- Seed users with fixed IDs (the database seed links them by `keycloakSub`). Password: `DEN_DEMO_USER_PASSWORD` (`den-demo-password` by default, development only); those with a critical role (an OTP credential) have `DEN_DEMO_CRITICAL_PASSWORD`, the same one in development and a password of their own in a pilot (M-29). The realm's SMTP server comes from `DEN_KEYCLOAK_SMTP_*` (Mailpit by default, M-28). **Roles do not live here**: the seed assigns them in PostgreSQL (ADR-0004).
 
 | User | ID (`sub`) | Role planned in the seed |
 | :-- | :-- | :-- |
