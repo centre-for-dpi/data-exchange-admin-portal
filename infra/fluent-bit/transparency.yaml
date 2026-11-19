@@ -24,6 +24,13 @@ pipeline:
       format: json
       tag: den.transparency
       storage.type: filesystem
+      # APISIX's tcp-logger sends each batch (batch_max_size 100) as one JSON array, and the
+      # input drops any message larger than its buffer, whole and in silence (A-3); the default
+      # (chunk_size, 32 KB) held about 50 records. A record is under 1 KB, and under 9 KB even
+      # from a gateway on the old log format with an oversized X-Request-Id, so 4 MB holds a
+      # full batch several times over. Memory grows in chunk_size steps only as a message needs.
+      # In KB, a bare number: this input reads "4M" as 4 KB.
+      buffer_size: 4096
 
   filters:
     - name: lua

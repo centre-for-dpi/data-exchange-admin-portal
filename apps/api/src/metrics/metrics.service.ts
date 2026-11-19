@@ -1,9 +1,21 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { collectDefaultMetrics, Gauge, Histogram, Registry } from 'prom-client';
+import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
 import { OPA_SYNC_TARGET } from '../opa/opa.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PGBOSS_SCHEMA } from '../queue/queue.service.js';
+
+/**
+ * Why the transparency collector drops a record (SubjectAccessService.ingest). Each one is a
+ * consultation the citizen will not see, so each is counted and alerted on (A-3, A-4).
+ */
+export const TRANSPARENCY_DROP_REASONS = [
+  'invalid',
+  'unknown_subscription',
+  'route_mismatch',
+  'no_subject',
+] as const;
+export type TransparencyDropReason = (typeof TRANSPARENCY_DROP_REASONS)[number];
 
 /** Where Prometheus scrapes the API, outside /api/v1 (the public prefix). */
 export const METRICS_PATH = '/metrics';
@@ -22,7 +34,8 @@ export function metricsTokenMatches(authorization: string | undefined): boolean 
 /**
  * The API's Prometheus metrics (ARCHITECTURE.md §9, M5-06): request latency per endpoint, and,
  * read from PostgreSQL at each scrape, the background queue, the reconcilers' sync state, how far
- * OPA's bundle is behind, the nodes and the soonest certificate expiry. Labels are route
+ * OPA's bundle is behind, the nodes and the soonest certificate expiry; and the records the
+ * transparency collector dropped. Labels are route
  * templates, states and kinds: never ids, never personal data.
  */
 @Injectable()
@@ -30,6 +43,7 @@ export class MetricsService {
   private readonly logger = new Logger(MetricsService.name);
   readonly registry = new Registry();
   private readonly http: Histogram<'method' | 'route' | 'status'>;
+  private readonly transparencyDropped: Counter<'reason'>;
 
   constructor(private readonly prisma: PrismaService) {
     const registers = [this.registry];
@@ -41,6 +55,14 @@ export class MetricsService {
       buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
       registers,
     });
+    this.transparencyDropped = new Counter({
+      name: 'den_transparency_records_dropped_total',
+      help: 'Records of the transparency register the collector dropped, by reason.',
+      labelNames: ['reason'],
+      registers,
+    });
+    // Every reason from 0, so the first drop is an increase Prometheus can see.
+    for (const reason of TRANSPARENCY_DROP_REASONS) this.transparencyDropped.inc({ reason }, 0);
     const safely = (name: string, fn: () => Promise<void>) => async () => {
       try {
         await fn();
@@ -145,6 +167,14 @@ export class MetricsService {
         set('application', application._min.notAfter);
       }),
     });
+  }
+
+  /** Records the transparency collector dropped in one batch, by reason. */
+  countTransparencyDrops(dropped: Partial<Record<TransparencyDropReason, number>>): void {
+    for (const reason of TRANSPARENCY_DROP_REASONS) {
+      const count = dropped[reason] ?? 0;
+      if (count > 0) this.transparencyDropped.inc({ reason }, count);
+    }
   }
 
   /** One API request, by its route template (unmatched paths share one label). */

@@ -146,6 +146,7 @@ Desde M5-06 las alertas de `ARCHITECTURE.md §9` llegan por correo al operador (
 | `DenNodeOffline` | `/operator/nodes`; la entidad dueña del nodo recibe su propio aviso |
 | `DenCertificateExpiring` | La renovación automática falló: logs del API y `dc ps step-ca` |
 | `DenQueueBacklog` | Logs del API; SQL 2 (§4.2) |
+| `DenTransparencyRecordsDropped` | `dc logs api` ("Transparency records dropped", conteos por motivo). `invalid`: un gateway o un Fluent Bit que envía un formato que el colector no conoce (versiones desfasadas); `unknown_subscription` o `route_mismatch`: registros que no corresponden a lo que OPA autorizó, posiblemente falsificados en la red `logs` |
 
 ### 4.2 Consultas de diagnóstico
 

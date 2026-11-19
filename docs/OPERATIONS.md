@@ -146,6 +146,7 @@ Since M5-06, the alerts in `ARCHITECTURE.md §9` reach the operator by email (Al
 | `DenNodeOffline` | `/operator/nodes`; the entity that owns the node gets its own notice |
 | `DenCertificateExpiring` | Automatic renewal failed: API logs and `dc ps step-ca` |
 | `DenQueueBacklog` | API logs; SQL 2 (§4.2) |
+| `DenTransparencyRecordsDropped` | `dc logs api` ("Transparency records dropped", counts by reason). `invalid`: a gateway or Fluent Bit sending a format the collector does not know (versions out of step); `unknown_subscription` or `route_mismatch`: records that do not match what OPA authorized, possibly forged on the `logs` network |
 
 ### 4.2 Diagnostic queries
 

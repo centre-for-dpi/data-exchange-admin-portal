@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { MetricsService, type TransparencyDropReason } from '../metrics/metrics.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { QueueService } from '../queue/queue.service.js';
 import { routeId } from '../reconcilers/apisix/desired-state.js';
@@ -41,7 +42,7 @@ export const gatewayRecordSchema = z.object({
 });
 type GatewayRecord = z.infer<typeof gatewayRecordSchema>;
 
-export type DropReason = 'invalid' | 'unknown_subscription' | 'route_mismatch' | 'no_subject';
+export type DropReason = TransparencyDropReason;
 
 export interface IngestResult {
   accepted: number;
@@ -59,7 +60,8 @@ const PURGE_EVERY_MS = 6 * 60 * 60 * 1000;
  * exposed data, purpose, consumer) and drops anything that does not add up. Duplicates from
  * retries are ignored by the idempotency key (gateway node + nginx request id).
  *
- * Never logs record values: only counts per reason.
+ * Never logs record values: only counts per reason, also on /metrics
+ * (den_transparency_records_dropped_total).
  */
 @Injectable()
 export class SubjectAccessService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -70,6 +72,7 @@ export class SubjectAccessService implements OnApplicationBootstrap, OnApplicati
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly alerts: SubjectAlertsService,
+    private readonly metrics: MetricsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -189,6 +192,9 @@ export class SubjectAccessService implements OnApplicationBootstrap, OnApplicati
     }
     const result = { accepted: count, duplicates: rows.length - count, dropped };
     if (Object.keys(dropped).length > 0) {
+      // A consultation the citizen will not see: counted for the DenTransparencyRecordsDropped
+      // alert (infra/prometheus), never with its values.
+      this.metrics.countTransparencyDrops(dropped);
       this.logger.warn(`Transparency records dropped: ${JSON.stringify(dropped)}`);
     }
     return result;

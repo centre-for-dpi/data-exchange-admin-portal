@@ -96,3 +96,16 @@ groups:
         annotations:
           summary: 'La cola de trabajos en segundo plano se acumula'
           description: '{{ $value }} trabajos esperando desde hace 15 minutos.'
+
+  # Transparency register (ADR-0015, ADR-0016): a consultation that is not recorded, sealed and
+  # stamped is one the citizen cannot see or prove.
+  - name: den-transparency
+    rules:
+      - alert: DenTransparencyRecordsDropped
+        # The collector dropped records of calls the gateway let through (A-3, A-4).
+        expr: sum by (reason) (increase(den_transparency_records_dropped_total[10m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: 'El registro de transparencia descarta consultas ({{ $labels.reason }})'
+          description: '{{ $value | humanize }} registros descartados en 10 minutos: los ciudadanos no verán esas consultas. Ver los logs del API.'

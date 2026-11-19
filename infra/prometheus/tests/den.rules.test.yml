@@ -177,3 +177,31 @@ tests:
             exp_annotations:
               summary: 'La cola de trabajos en segundo plano se acumula'
               description: '150 trabajos esperando desde hace 15 minutos.'
+
+  - name: the transparency collector drops records
+    interval: 1m
+    input_series:
+      - series: 'den_transparency_records_dropped_total{job="api",instance="api:4000",reason="invalid"}'
+        values: '0 0 0 3 3 3 3 3'
+      - series: 'den_transparency_records_dropped_total{job="api",instance="api:4000",reason="no_subject"}'
+        values: '0x7'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: DenTransparencyRecordsDropped
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              reason: invalid
+            exp_annotations:
+              summary: 'El registro de transparencia descarta consultas (invalid)'
+              description: '3 registros descartados en 10 minutos: los ciudadanos no verán esas consultas. Ver los logs del API.'
+
+  - name: no transparency record dropped
+    interval: 1m
+    input_series:
+      - series: 'den_transparency_records_dropped_total{job="api",instance="api:4000",reason="invalid"}'
+        values: '5x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: DenTransparencyRecordsDropped
+        exp_alerts: []
