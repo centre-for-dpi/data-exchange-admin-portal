@@ -248,3 +248,31 @@ tests:
       - eval_time: 3m
         alertname: DenTransparencyUnstamped
         exp_alerts: []
+
+  - name: audit trail with a day that was not anchored
+    interval: 1m
+    input_series:
+      - series: 'den_audit_anchor_overdue_seconds{job="api",instance="api:4000"}'
+        values: '0 0 0 22000+60x30'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: DenAuditAnchorOverdue
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: DenAuditAnchorOverdue
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: 'La bitácora de auditoría tiene un día sin anclar'
+              description: 'El día más antiguo sin anclar terminó hace 6h 28m 40s: ver los logs del API (anclaje, DEN_TSA_URL) y /audit/verify (anclajes con fecha futura).'
+
+  - name: audit trail anchored on time
+    interval: 1m
+    input_series:
+      - series: 'den_audit_anchor_overdue_seconds{job="api",instance="api:4000"}'
+        values: '0 3600 7200 0 3600 7200 0'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: DenAuditAnchorOverdue
+        exp_alerts: []

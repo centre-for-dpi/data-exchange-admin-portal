@@ -129,3 +129,19 @@ groups:
         annotations:
           summary: 'Hay lotes de transparencia sin sello de tiempo'
           description: 'El más antiguo espera a la TSA desde hace {{ $value | humanizeDuration }}: la TSA no responde o rechaza las peticiones (DEN_TSA_URL).'
+
+  # Audit trail (ARCHITECTURE.md §7): the daily anchor is what protects the chain's tail against
+  # whoever owns the database.
+  - name: den-audit
+    rules:
+      - alert: DenAuditAnchorOverdue
+        # A day that ended has no anchor (B-02): the TSA does not answer, the anchoring fails, or an
+        # anchor dated in the future is blocking it. The anchoring runs hourly, so hours of lag are
+        # not a slow job.
+        expr: max(den_audit_anchor_overdue_seconds) > 6 * 3600
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'La bitácora de auditoría tiene un día sin anclar'
+          description: 'El día más antiguo sin anclar terminó hace {{ $value | humanizeDuration }}: ver los logs del API (anclaje, DEN_TSA_URL) y /audit/verify (anclajes con fecha futura).'
