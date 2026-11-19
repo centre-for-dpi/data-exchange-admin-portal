@@ -181,6 +181,10 @@ export const PLATFORM_PERMISSIONS = {
   'kit_release.read': ['platform_admin', 'platform_reviewer'],
   /** Set the kit's current version, correct it and mirror its bundle (operator admin, P-03). */
   'kit_release.manage': ['platform_admin'],
+  /** See who holds each platform role (operator console, M-03). */
+  'platform_role.read': ['platform_admin'],
+  /** Grant and revoke platform roles, and disable or enable a user (M-03). */
+  'platform_role.manage': ['platform_admin'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;
@@ -188,11 +192,13 @@ export const PLATFORM_PERMISSIONS = {
 export type PlatformAction = keyof typeof PLATFORM_PERMISSIONS;
 
 /**
- * Roles that require a second factor (SPEC.md §8, M3-08, ADR-0021): every platform role, which
- * acts on the whole network, and the data steward, who decides who gets an entity's data.
+ * Roles that require a second factor (SPEC.md §8, M3-08, ADR-0021, ADR-0035): every platform role,
+ * which acts on the whole network; the data steward, who decides who gets an entity's data; and
+ * the entity administrator, who decides who holds the steward role and enrolls the entity's nodes
+ * (without it, a stolen administrator password would be a way around the steward's factor, M-02).
  */
 export const MFA_PLATFORM_ROLES: readonly PlatformRole[] = PLATFORM_ROLES;
-export const MFA_ENTITY_ROLES: readonly EntityRole[] = ['data_steward'];
+export const MFA_ENTITY_ROLES: readonly EntityRole[] = ['data_steward', 'entity_admin'];
 
 /**
  * A user with one of those roles (in any entity) needs the second factor for every role-based

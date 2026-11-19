@@ -88,7 +88,11 @@ test.describe('entity onboarding (M2-01)', () => {
     ).toBeVisible();
     await expect(operator.getByText('Activa', { exact: true })).toBeVisible();
 
-    // The applicant is now the entity's administrator (and technical lead).
+    // The applicant is now the entity's administrator (and technical lead). entity_admin needs a
+    // second factor too (ADR-0035): the portal asks for it right away, and a new account sets one
+    // up in Keycloak.
+    await page.goto(requestUrl);
+    await enrollOneTimeCode(page, applicant.password);
     await page.goto(requestUrl);
     await expect(page.getByText(/La entidad fue aprobada/)).toBeVisible();
     await page.goto('/');

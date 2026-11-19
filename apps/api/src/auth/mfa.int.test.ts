@@ -118,28 +118,37 @@ describe('second factor for critical roles (M3-08)', () => {
   });
 
   it('the requirement follows the roles: granting data_steward requires the code next request', async () => {
-    const elena = await prisma.user.findUniqueOrThrow({
-      where: { keycloakSub: sub('elena.admin') },
+    // pedro is an api_publisher: no second factor until he also becomes a data steward.
+    const pedro = await prisma.user.findUniqueOrThrow({
+      where: { keycloakSub: sub('pedro.publicador') },
     });
     const membership = await prisma.membership.findFirstOrThrow({
-      where: { userId: elena.id, entityId: entity.salud },
+      where: { userId: pedro.id, entityId: entity.salud },
     });
-    const url = `/api/v1/entities/${entity.salud}/members`;
-    expect((await call(url, 'elena.admin', 'password')).statusCode).toBe(200);
+    const mfaOf = async () =>
+      meResponseSchema.parse((await call('/api/v1/me', 'pedro.publicador', 'password')).json()).mfa;
+    expect(await mfaOf()).toEqual({ required: false, satisfied: false });
     try {
       await prisma.membership.update({
         where: { id: membership.id },
         data: { roles: [...membership.roles, 'data_steward'] },
       });
-      const res = await call(url, 'elena.admin', 'password');
-      expect(res.statusCode).toBe(403);
-      expect(res.json()).toMatchObject({ code: 'mfa_required' });
-      expect((await call(url, 'elena.admin', 'mfa')).statusCode).toBe(200);
+      expect(await mfaOf()).toEqual({ required: true, satisfied: false });
     } finally {
       await prisma.membership.update({
         where: { id: membership.id },
         data: { roles: membership.roles },
       });
     }
+  });
+
+  it('an entity_admin needs the second factor too: whoever invites stewards must not skip it (M-02)', async () => {
+    const url = `/api/v1/entities/${entity.salud}/members`;
+    const res = await call(url, 'elena.admin', 'password');
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toMatchObject({ code: 'mfa_required' });
+    expect((await call(url, 'elena.admin', 'mfa')).statusCode).toBe(200);
+    const me = meResponseSchema.parse((await call('/api/v1/me', 'elena.admin', 'password')).json());
+    expect(me.mfa).toEqual({ required: true, satisfied: false });
   });
 });

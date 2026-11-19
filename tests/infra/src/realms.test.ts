@@ -245,6 +245,7 @@ describe('realm den-portal: second factor (M3-08, ADR-0021)', () => {
       .sort();
     expect(withOtp).toEqual([
       'ana.operadora',
+      'elena.admin',
       'lucia.datos',
       'marta.regulador',
       'pablo.plataforma',

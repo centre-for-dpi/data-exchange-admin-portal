@@ -220,8 +220,14 @@
       "credentials": [
         {
           "type": "password",
-          "value": "${DEN_DEMO_USER_PASSWORD:den-demo-password}",
+          "value": "${DEN_DEMO_CRITICAL_PASSWORD:den-demo-password}",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Demo",
+          "secretData": "{\"value\": \"${DEN_DEMO_TOTP_SECRET:den-demo-totp-secret}\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ]
     }
