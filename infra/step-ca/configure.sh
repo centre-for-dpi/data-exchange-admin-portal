@@ -6,19 +6,54 @@
 #     token's subject, den-app-<uuid>), key usage for TLS client authentication only; 90 days by
 #     default, the portal asks for lifecycle.certificateValidityDays (capped at 397 days);
 #   - den-gateway-tls, the gateway's TLS server certificate (M3-02), template gateway.tpl: the
-#     gateway host names, server authentication only, 90 days. Development creates it with the
-#     CA's password; the portal renews the certificate before it expires;
+#     gateway host names, server authentication only, 90 days; the portal renews the certificate
+#     before it expires;
 #   - den-nodes, certificates of kit nodes (M4-02), template node.tpl: CN=den-node and the node's
 #     own name den-node-<uuid> as its only DNS name, both from the portal's token; server
 #     authentication (the gateway calls the node) and client authentication (the node calls the
 #     portal's control channel); 90 days, renewed by the node.
+#
+# Each provisioner's key has a password of its own (B-16): DEN_STEP_CA_PROVISIONER_PASSWORD,
+# DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD and DEN_STEP_CA_NODE_PROVISIONER_PASSWORD, the ones the
+# portal's API knows. The CA's own keys stay under STEP_CA_PASSWORD, which the API never gets.
+# Without them (development) every key keeps the CA's password. When one changes, that
+# provisioner gets a new key pair encrypted with it; secrets/<name>.password.sha256 records which
+# password the current key has.
 set -eo pipefail
 STEPPATH="$(step path)"
 CONFIG="${STEPPATH}/config/ca.json"
+CA_PASSWORD_FILE="${STEPPATH}/secrets/password"
 PROVISIONER="${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-den-portal}"
 GATEWAY_PROVISIONER="den-gateway-tls"
 NODE_PROVISIONER="den-nodes"
+CA_PASSWORD="$(cat "${CA_PASSWORD_FILE}")"
+PORTAL_PASSWORD="${DEN_STEP_CA_PROVISIONER_PASSWORD:-${CA_PASSWORD}}"
+GATEWAY_PASSWORD="${DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD:-${PORTAL_PASSWORD}}"
+NODE_PASSWORD="${DEN_STEP_CA_NODE_PROVISIONER_PASSWORD:-${PORTAL_PASSWORD}}"
+umask 077
+PASSWORD_FILE="$(mktemp)"
+trap 'rm -f "${PASSWORD_FILE}"' EXIT
 
+sha256() { printf '%s' "$1" | sha256sum | cut -d ' ' -f 1; }
+
+# key_password NAME PASSWORD: the provisioner's key, encrypted with PASSWORD. Keys made before
+# B-16 (and by the image's init) have the CA's password; another password means a new key pair.
+key_password() {
+  local name=$1 password=$2 state="${STEPPATH}/secrets/$1.password.sha256" want
+  want="$(sha256 "${password}")"
+  [[ -f ${state} ]] || sha256 "${CA_PASSWORD}" >"${state}"
+  [[ $(cat "${state}") == "${want}" ]] && return 0
+  printf '%s' "${password}" >"${PASSWORD_FILE}"
+  # `update --create` cannot replace the key offline (step 0.30): remove the provisioner and add
+  # it again; the templates and durations below are applied to the new one.
+  step ca provisioner remove "${name}" --ca-config="${CONFIG}" >/dev/null
+  step ca provisioner add "${name}" --type JWK --create --password-file "${PASSWORD_FILE}" \
+    --ca-config="${CONFIG}" >/dev/null
+  printf '%s' "${want}" >"${state}"
+  echo "configure.sh: provisioner ${name} has a new key pair (its password changed)"
+}
+
+key_password "${PROVISIONER}" "${PORTAL_PASSWORD}"
 step ca provisioner update "${PROVISIONER}" \
   --ca-config="${CONFIG}" \
   --x509-template=/den/app.tpl \
@@ -27,9 +62,11 @@ step ca provisioner update "${PROVISIONER}" \
   --x509-max-dur=9528h >/dev/null
 
 if ! grep -q "\"name\": \"${GATEWAY_PROVISIONER}\"" "${CONFIG}"; then
+  rm -f "${STEPPATH}/secrets/${GATEWAY_PROVISIONER}.password.sha256"
   step ca provisioner add "${GATEWAY_PROVISIONER}" --type JWK --create \
-    --password-file "${STEPPATH}/secrets/password" --ca-config="${CONFIG}" >/dev/null
+    --password-file "${CA_PASSWORD_FILE}" --ca-config="${CONFIG}" >/dev/null
 fi
+key_password "${GATEWAY_PROVISIONER}" "${GATEWAY_PASSWORD}"
 step ca provisioner update "${GATEWAY_PROVISIONER}" \
   --ca-config="${CONFIG}" \
   --x509-template=/den/gateway.tpl \
@@ -38,8 +75,18 @@ step ca provisioner update "${GATEWAY_PROVISIONER}" \
   --x509-max-dur=2160h >/dev/null
 
 if ! grep -q "\"name\": \"${NODE_PROVISIONER}\"" "${CONFIG}"; then
-  step ca provisioner add "${NODE_PROVISIONER}" --type JWK --create     --password-file "${STEPPATH}/secrets/password" --ca-config="${CONFIG}" >/dev/null
+  rm -f "${STEPPATH}/secrets/${NODE_PROVISIONER}.password.sha256"
+  step ca provisioner add "${NODE_PROVISIONER}" --type JWK --create \
+    --password-file "${CA_PASSWORD_FILE}" --ca-config="${CONFIG}" >/dev/null
 fi
-step ca provisioner update "${NODE_PROVISIONER}"   --ca-config="${CONFIG}"   --x509-template=/den/node.tpl   --x509-min-dur=5m   --x509-default-dur=2160h   --x509-max-dur=2160h >/dev/null
+key_password "${NODE_PROVISIONER}" "${NODE_PASSWORD}"
+step ca provisioner update "${NODE_PROVISIONER}" \
+  --ca-config="${CONFIG}" \
+  --x509-template=/den/node.tpl \
+  --x509-min-dur=5m \
+  --x509-default-dur=2160h \
+  --x509-max-dur=2160h >/dev/null
 
-exec /usr/local/bin/step-ca --password-file "${STEPPATH}/secrets/password" "${CONFIG}"
+rm -f "${PASSWORD_FILE}"
+trap - EXIT
+exec /usr/local/bin/step-ca --password-file "${CA_PASSWORD_FILE}" "${CONFIG}"

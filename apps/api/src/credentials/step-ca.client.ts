@@ -43,7 +43,14 @@ export interface StepCaSettings {
   gatewayProvisioner: string;
   /** Provisioner of kit node certificates (M4-02). */
   nodeProvisioner: string;
+  /** Password of the application provisioner's key; the others' default to it. */
   password: string;
+  /**
+   * Passwords of the other provisioners' keys (B-16): each provisioner has its own, and none is
+   * the one of the CA's keys (STEP_CA_PASSWORD), which the API never gets.
+   */
+  gatewayPassword?: string;
+  nodePassword?: string;
   /** PEM file with the CA's root certificate. */
   rootFile?: string;
   /** SHA-256 of the root certificate (DER), hexadecimal: the CA's `step ca bootstrap` pin. */
@@ -59,6 +66,8 @@ export function stepCaSettings(env: NodeJS.ProcessEnv = process.env): StepCaSett
     gatewayProvisioner: env.DEN_STEP_CA_GATEWAY_PROVISIONER ?? 'den-gateway-tls',
     nodeProvisioner: env.DEN_STEP_CA_NODE_PROVISIONER ?? 'den-nodes',
     password: env.DEN_STEP_CA_PROVISIONER_PASSWORD ?? '',
+    gatewayPassword: env.DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD || undefined,
+    nodePassword: env.DEN_STEP_CA_NODE_PROVISIONER_PASSWORD || undefined,
     rootFile: env.DEN_STEP_CA_ROOT_FILE || undefined,
     rootFingerprint: env.DEN_STEP_CA_ROOT_FINGERPRINT?.toLowerCase().replace(/:/g, '') || undefined,
     trustOnFirstUse: env.NODE_ENV !== 'production',
@@ -202,8 +211,17 @@ export class StepCaClient implements CertificateAuthority {
     return key;
   }
 
+  /** The password of a provisioner's key: its own, or the application provisioner's. */
+  private passwordOf(provisioner: string): string {
+    const { password, gatewayPassword, nodePassword } = this.settings;
+    if (provisioner === this.settings.gatewayProvisioner) return gatewayPassword || password;
+    if (provisioner === this.settings.nodeProvisioner) return nodePassword || password;
+    return password;
+  }
+
   private async loadKey(provisioner: string): Promise<{ key: SigningKey; kid: string }> {
-    const { url, password } = this.settings;
+    const { url } = this.settings;
+    const password = this.passwordOf(provisioner);
     if (!password) throw new Error('step-ca: set DEN_STEP_CA_PROVISIONER_PASSWORD');
     const ca = await this.rootCertificate();
     let found: Provisioner | undefined;
@@ -233,12 +251,7 @@ export class StepCaClient implements CertificateAuthority {
     let ca: string;
     try {
       ca = await this.rootCertificate();
-      const provisioner =
-        input.profile === 'gateway-server'
-          ? this.settings.gatewayProvisioner
-          : input.profile === 'node'
-            ? this.settings.nodeProvisioner
-            : this.settings.provisioner;
+      const provisioner = provisionerOf(input, this.settings);
       const { key, kid } = await this.provisionerKey(provisioner);
       const audience = `${this.settings.url}/1.0/sign`;
       const sans = input.sans?.length ? input.sans : [input.commonName];
@@ -264,6 +277,9 @@ export class StepCaClient implements CertificateAuthority {
       throw new ServiceUnavailableError('The certificate authority is not available');
     }
     if (result.status !== 201 && result.status !== 200) {
+      // A key that the CA no longer has (its password changed and configure.sh made a new pair,
+      // B-16): read it again on the next call.
+      if (result.status === 401) this.keys.delete(provisionerOf(input, this.settings));
       // The portal already checked the CSR: a refusal here is a CA policy or configuration issue.
       this.logger.error(`step-ca refused to sign: HTTP ${result.status} ${result.body}`);
       throw new ServiceUnavailableError(
@@ -283,6 +299,13 @@ export class StepCaClient implements CertificateAuthority {
     checkIssued(chain, ca, input);
     return chain.map((pem) => `${pem.trim()}\n`).join('');
   }
+}
+
+/** The provisioner that signs a request's profile. */
+function provisionerOf(input: SignRequest, settings: StepCaSettings): string {
+  if (input.profile === 'gateway-server') return settings.gatewayProvisioner;
+  if (input.profile === 'node') return settings.nodeProvisioner;
+  return settings.provisioner;
 }
 
 /**
