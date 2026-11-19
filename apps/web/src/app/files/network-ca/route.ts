@@ -1,4 +1,5 @@
 import { PEM_CHAIN_MEDIA_TYPE } from '@den/contracts';
+import { forwardedForHeader } from '../../../lib/client-ip';
 
 const apiUrl = (): string => process.env.DEN_API_URL ?? 'http://localhost:4000';
 
@@ -7,7 +8,10 @@ const apiUrl = (): string => process.env.DEN_API_URL ?? 'http://localhost:4000';
  * it. Served from the portal's origin so the guide can link it.
  */
 export async function GET(): Promise<Response> {
-  const res = await fetch(`${apiUrl()}/api/v1/pki/ca`, { cache: 'no-store' });
+  const res = await fetch(`${apiUrl()}/api/v1/pki/ca`, {
+    cache: 'no-store',
+    headers: await forwardedForHeader(),
+  });
   if (!res.ok) return new Response(null, { status: res.status === 503 ? 503 : 502 });
   return new Response(res.body, {
     status: 200,

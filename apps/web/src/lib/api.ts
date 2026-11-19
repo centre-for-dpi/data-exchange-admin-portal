@@ -1,6 +1,7 @@
 import { getToken } from 'next-auth/jwt';
 import { headers } from 'next/headers';
 import type { z } from 'zod';
+import { forwardedForHeader } from './client-ip';
 import { isMfaRequired, redirectToStepUp } from './step-up';
 
 export class ApiError extends Error {
@@ -35,7 +36,10 @@ export async function apiGet<S extends z.ZodType>(
   options: { anonymous?: boolean } = {},
 ): Promise<z.output<S>> {
   // anonymous: call without a token (public catalogue); otherwise the user's token is required.
-  const headers: Record<string, string> = { accept: 'application/json' };
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    ...(await forwardedForHeader()),
+  };
   if (!options.anonymous) headers.authorization = `Bearer ${await accessToken()}`;
   const url = `${apiUrl()}/api/v1${path}`;
   let res: Response;
@@ -105,6 +109,7 @@ export async function apiSend<S extends z.ZodType>(
       authorization: `Bearer ${await accessToken()}`,
       accept: 'application/json',
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      ...(await forwardedForHeader()),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     cache: 'no-store',
@@ -133,6 +138,7 @@ export async function apiPutBytes<S extends z.ZodType>(
       authorization: `Bearer ${await accessToken()}`,
       accept: 'application/json',
       'content-type': contentType,
+      ...(await forwardedForHeader()),
     },
     body: bytes,
     cache: 'no-store',
@@ -162,6 +168,7 @@ export async function apiPutStream(
       authorization: `Bearer ${await accessToken()}`,
       accept: 'application/json',
       'content-type': contentType,
+      ...(await forwardedForHeader()),
     },
     body,
     // Node's fetch streams a request body only half-duplex.
@@ -173,7 +180,7 @@ export async function apiPutStream(
 /** GET returning the raw response (downloads), with the user's token. */
 export async function apiGetRaw(path: string): Promise<Response> {
   return fetch(`${apiUrl()}/api/v1${path}`, {
-    headers: { authorization: `Bearer ${await accessToken()}` },
+    headers: { authorization: `Bearer ${await accessToken()}`, ...(await forwardedForHeader()) },
     cache: 'no-store',
   });
 }

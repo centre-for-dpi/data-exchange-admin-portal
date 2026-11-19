@@ -1,4 +1,5 @@
 import { KIT_RELEASE_VERSION } from '@den/contracts';
+import { forwardedForHeader } from '../../../../lib/client-ip';
 
 const apiUrl = (): string => process.env.DEN_API_URL ?? 'http://localhost:4000';
 
@@ -24,7 +25,10 @@ export async function GET(
   }
   let res: Response;
   try {
-    res = await fetch(`${apiUrl()}/api/v1/kit/releases/${version}/${file}`, { cache: 'no-store' });
+    res = await fetch(`${apiUrl()}/api/v1/kit/releases/${version}/${file}`, {
+      cache: 'no-store',
+      headers: await forwardedForHeader(),
+    });
   } catch {
     return new Response(null, { status: 502 });
   }

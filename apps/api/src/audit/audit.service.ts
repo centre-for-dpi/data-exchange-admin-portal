@@ -2,6 +2,7 @@ import { NOTIFICATION_TOPIC, NOTIFYING_ACTIONS } from '../notifications/notifyin
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import type { Tx } from '../prisma/prisma.service.js';
+import { requestIp } from '../common/request-context.js';
 import { eventHash } from './chain.js';
 import { sanitizeForAudit } from './sanitize.js';
 
@@ -20,6 +21,7 @@ export interface AuditInput {
   target: { type: string; id: string };
   before?: unknown;
   after?: unknown;
+  /** The caller's address; by default the one of the request being handled (M-27). */
   ip?: string;
   requestId?: string;
 }
@@ -70,7 +72,9 @@ export class AuditService {
       targetId: input.target.id,
       before: toJson(input.before),
       after: toJson(input.after),
-      ip: input.ip ?? null,
+      // A person's or an application's request: its address. The system's events (background
+      // jobs) have none, even when a request set them going.
+      ip: input.ip ?? (input.actor.type === 'system' ? undefined : requestIp()) ?? null,
       requestId: input.requestId ?? null,
     };
     // Events before the chain existed have no hash: the first hashed event is the genesis.

@@ -21,6 +21,8 @@ import {
   SUBJECT_ACCESS_PATH,
 } from './transparency/subject-access.controller.js';
 import { DenLogger, logFormat } from './common/logger.js';
+import { registerRequestContext } from './common/request-context.js';
+import { trustedProxies } from './common/trust-proxy.js';
 
 export const API_PREFIX = 'api/v1';
 /** Maximum JSON body (CLAUDE.md, ARCHITECTURE.md §12). Document uploads get their own limit. */
@@ -60,24 +62,7 @@ const kitBundleUploader = async (token: string): Promise<boolean> => {
   return user?.status === 'active' && user.platformRoles.some(({ role }) => allowed.includes(role));
 };
 
-/**
- * Who may set X-Forwarded-For (DEN_TRUST_PROXY, M6-01): request.ip is then the caller's address,
- * for rate limits and security events. The proxy's addresses or networks, comma-separated
- * (`172.30.0.0/16`), so that another container that reaches the API directly cannot pick the
- * address it is logged and limited under. A number trusts that many hops whoever sends them:
- * only where nothing but the proxy reaches the API. Empty: nobody.
- */
-export function trustedProxies(
-  value: string | undefined,
-): string | ((address: string, hop: number) => boolean) | false {
-  const setting = value?.trim() ?? '';
-  if (!setting || setting === '0') return false;
-  if (/^\d+$/.test(setting)) {
-    const hops = Number(setting);
-    return (_address: string, hop: number) => hop < hops;
-  }
-  return setting;
-}
+export { trustedProxies } from './common/trust-proxy.js';
 
 export function createAdapter(): FastifyAdapter {
   const adapter = new FastifyAdapter({
@@ -86,6 +71,8 @@ export function createAdapter(): FastifyAdapter {
   });
   // The API speaks JSON only: without this, text/plain bodies would reach handlers as strings.
   adapter.getInstance().removeContentTypeParser('text/plain');
+  // The caller's address for the audit log (M-27, SPEC.md §3).
+  registerRequestContext(adapter.getInstance());
   // Security headers on every answer (M6-01, ASVS V3/V4): nothing here is a page to frame or
   // sniff, nor to keep in a shared cache unless the endpoint says so (the network CA does). The
   // Scalar reference writes its own response (hijacked), outside these hooks.
