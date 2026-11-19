@@ -113,6 +113,7 @@ describe('complete audit (M2-09)', () => {
       expect(res.headers['x-den-export-count']).toBe('3');
       const lines = body.toString('utf8').trim().split('\r\n');
       expect(lines[0]).toContain('seq,occurredAt');
+      expect(lines[0]?.split(',')).toContain('ip');
       expect(lines).toHaveLength(4);
       // Formulas are neutralised.
       expect(body.toString('utf8')).not.toMatch(/(^|,)"=/m);
@@ -154,6 +155,8 @@ describe('complete audit (M2-09)', () => {
           prevHash: expect.any(String) as string,
         }),
       );
+      // The address is part of the hash, so an export without it could not be re-hashed.
+      expect(records[0]).toHaveProperty('ip');
     });
 
     it('is only for the operator, the regulator and auditors', async () => {
