@@ -14,6 +14,8 @@ const baseURL = process.env.DEN_WEB_URL ?? 'http://localhost:3000';
  */
 export default defineConfig({
   testDir: './e2e',
+  // The user manual's capture and page checks have their own config (e2e/manual).
+  testIgnore: ['manual/**'],
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
