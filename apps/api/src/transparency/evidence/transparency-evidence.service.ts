@@ -145,17 +145,19 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
     return this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SEAL_LOCK})`;
-        const pending = await tx.$queryRaw<Array<{ id: string }>>`
-          SELECT r.id FROM subject_access_record r
-          WHERE NOT EXISTS (SELECT 1 FROM transparency_leaf l WHERE l.record_id = r.id)
-          ORDER BY r.received_at, r.id
-          LIMIT ${batchMax()}`;
+        // The queue a trigger fills on every insert (M-15), read by its index: the round costs
+        // what is waiting, not the size of the register.
+        const pending = await tx.transparencyPending.findMany({
+          orderBy: [{ receivedAt: 'asc' }, { recordId: 'asc' }],
+          take: batchMax(),
+          select: { recordId: true },
+        });
         if (pending.length === 0) return null;
         const rows = await tx.subjectAccessRecord.findMany({
-          where: { id: { in: pending.map((p) => p.id) } },
+          where: { id: { in: pending.map((p) => p.recordId) } },
         });
         const byId = new Map(rows.map((r) => [r.id, r]));
-        const records = pending.map((p) => byId.get(p.id)).filter((r) => r !== undefined);
+        const records = pending.map((p) => byId.get(p.recordId)).filter((r) => r !== undefined);
         const entries = records.map((r) => leafEntryOf(toAccessRecord(r)));
         const leaves = entries.map(entryLeafHash);
 
@@ -196,6 +198,10 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
             occurredAt: r.occurredAt,
             recordDigest: entries[leafIndex]?.digest ?? null,
           })),
+        });
+        // Out of the queue once they have a leaf: the table's trigger refuses it any earlier.
+        await tx.transparencyPending.deleteMany({
+          where: { recordId: { in: records.map((r) => r.id) } },
         });
         // Anchored in the audit chain too: altering a checkpoint takes breaking both chains.
         await this.audit.record(tx, {

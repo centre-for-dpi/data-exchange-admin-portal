@@ -876,6 +876,8 @@ model SubjectAccessRecord {
   endUserHash      String?       @map("end_user_hash")
   /// HTTP status the consumer received.
   status           Int
+  /// Present while the record waits for the sealer.
+  pending          TransparencyPending?
 
   @@unique([gatewayNode, gatewayRequestId])
   @@index([subjectRef, occurredAt])
@@ -945,6 +947,21 @@ model TransparencyLeaf {
 
   @@unique([checkpointSeq, leafIndex])
   @@map("transparency_leaf")
+}
+
+/// Records the sealer has not put in a batch yet (M-15): what it reads each round, by index,
+/// instead of scanning the whole register for records without a leaf. A trigger on
+/// subject_access_record adds every inserted record, whatever inserted it; a row leaves only once
+/// its record has a leaf (a trigger refuses any other delete, and every UPDATE or TRUNCATE), or
+/// with its record when retention purges it. See the migration transparency_pending.
+model TransparencyPending {
+  recordId   String              @id @map("record_id") @db.Uuid
+  /// The record's received_at: the sealer's order.
+  receivedAt DateTime            @map("received_at") @db.Timestamptz(3)
+  record     SubjectAccessRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([receivedAt, recordId])
+  @@map("transparency_pending")
 }
 
 /// RFC 3161 time-stamp of a checkpoint's JWS by an independent TSA. Separate table so the

@@ -235,6 +235,30 @@ describe('transparency evidence (MT-04)', () => {
       expect(page.items[0]).toMatchObject({ seq, treeSize: 3, timestamp: null });
     });
 
+    it('seals from a queue every new record joins, which it leaves only once sealed (M-15)', async () => {
+      const ids = await ingest(2);
+      const queued = () => prisma.transparencyPending.count({ where: { recordId: { in: ids } } });
+      expect(await queued()).toBe(2);
+      // Taking a record out before it is sealed would hide it from the sealer: refused to the
+      // runtime role and to the owner alike.
+      await expect(
+        prisma.transparencyPending.deleteMany({ where: { recordId: { in: ids } } }),
+      ).rejects.toThrow();
+      await expect(
+        prisma.transparencyPending.updateMany({
+          where: { recordId: ids[0] },
+          data: { receivedAt: new Date(0) },
+        }),
+      ).rejects.toThrow();
+      await expect(prisma.$executeRawUnsafe('TRUNCATE transparency_pending')).rejects.toThrow();
+      await expect(
+        owner.query(`DELETE FROM transparency_pending WHERE record_id = '${ids[0]}'`),
+      ).rejects.toThrow(/only once sealed/);
+      await evidence.sealPending();
+      expect(await queued()).toBe(0);
+      expect(await prisma.transparencyLeaf.count({ where: { recordId: { in: ids } } })).toBe(2);
+    });
+
     it('gives a receipt anyone can verify with the public keys and the TSA certificate', async () => {
       const [id] = await ingest(5);
       await evidence.sealPending();
