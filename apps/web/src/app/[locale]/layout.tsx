@@ -9,7 +9,10 @@ import { SiteFooter } from '../../components/site-footer';
 import { SiteHeader } from '../../components/site-header';
 import { SkipLink } from '../../components/skip-link';
 import { routing } from '../../i18n/routing';
+import { auth } from '../../auth';
+import { sessionIdleSeconds } from '../../lib/session-idle';
 import { getSite } from '../../lib/site';
+import { idleSecondsLeft } from '../../lib/token-refresh';
 import { getViewer } from '../../lib/viewer';
 import '../globals.css';
 
@@ -26,12 +29,6 @@ interface LayoutProps {
   children: ReactNode;
   params: Promise<{ locale: string }>;
 }
-
-/** Keycloak's ssoSessionIdleTimeout of the realm den-portal (30 minutes by default). */
-const sessionIdleSeconds = (): number => {
-  const value = Number(process.env.DEN_SESSION_IDLE_SECONDS);
-  return Number.isInteger(value) && value > 180 ? value : 1800;
-};
 
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { locale } = await params;
@@ -68,7 +65,9 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
           <SiteFooter />
           {/* WCAG 2.2.1 (M6-02): the realm's idle timeout, DEN_SESSION_IDLE_SECONDS. */}
           {(await getViewer()).authenticated ? (
-            <SessionTimeout idleSeconds={sessionIdleSeconds()} />
+            <SessionTimeout
+              remainingSeconds={idleSecondsLeft((await auth())?.refreshedAt, sessionIdleSeconds())}
+            />
           ) : null}
         </NextIntlClientProvider>
       </body>

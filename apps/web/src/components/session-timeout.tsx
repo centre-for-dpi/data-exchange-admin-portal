@@ -1,62 +1,90 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Button } from './ui/button';
 
 const WARN_BEFORE_MS = 2 * 60 * 1000;
 
-/**
- * Warns before the session ends for inactivity and lets the user keep it (WCAG 2.2.1, M6-02).
- * Keycloak ends an SSO session after `idleSeconds` without a token refresh; the portal refreshes
- * on every navigation and form submission, which restart the count here too. "Stay signed in"
- * asks the server for the session, which refreshes the tokens with Keycloak.
- */
-export function SessionTimeout({ idleSeconds }: { idleSeconds: number }) {
-  // A navigation reaches the server, which refreshes the session: the count starts again.
-  return <Countdown key={usePathname()} idleSeconds={idleSeconds} />;
+/** What the server says about the session: seconds left, or null when there is no session. */
+async function sessionRemaining(init?: RequestInit): Promise<number | null | undefined> {
+  try {
+    const response = await fetch('/api/session/keepalive', { cache: 'no-store', ...init });
+    if (response.status === 401) return null;
+    if (!response.ok) return undefined;
+    const body = (await response.json()) as { remainingSeconds?: unknown };
+    return typeof body.remainingSeconds === 'number' ? body.remainingSeconds : undefined;
+  } catch {
+    // Could not ask (network): the caller decides with its own count.
+    return undefined;
+  }
 }
 
-function Countdown({ idleSeconds }: { idleSeconds: number }) {
+/**
+ * Warns before the session ends for inactivity and lets the user keep it (WCAG 2.2.1, M6-02).
+ * Keycloak ends an SSO session after `idleSeconds` without a token refresh. The portal refreshes
+ * the tokens on the server, when a navigation or a form needs a new one, so the browser cannot
+ * know by itself when the session was last renewed: before it warns, and before it declares the
+ * session over, it asks the server how long the session really has left (B-25). "Stay signed in"
+ * makes the server refresh the tokens with Keycloak right then.
+ */
+export function SessionTimeout({ remainingSeconds }: { remainingSeconds: number }) {
   const t = useTranslations('session');
   const [phase, setPhase] = useState<'active' | 'warning' | 'expired'>('active');
-  const [deadline, setDeadline] = useState(() => Date.now() + idleSeconds * 1000);
+  // Our own count, from what the server last said; corrected by asking before each notice.
+  const [deadline, setDeadline] = useState(() => Date.now() + remainingSeconds * 1000);
   const button = useRef<HTMLButtonElement>(null);
   const marker = useRef<HTMLSpanElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const bodyId = useId();
 
-  const restart = useCallback(() => {
-    setDeadline(Date.now() + idleSeconds * 1000);
-    setPhase('active');
-  }, [idleSeconds]);
+  /** Applies what the server answered; true when the notice may go ahead. */
+  const adopt = useCallback((remaining: number | null | undefined): boolean => {
+    if (remaining === null) {
+      setPhase('expired');
+      return false;
+    }
+    if (remaining !== undefined && remaining * 1000 > WARN_BEFORE_MS) {
+      // Renewed since the last count (a page load refreshed the tokens): not yet.
+      setDeadline(Date.now() + remaining * 1000);
+      setPhase('active');
+      return false;
+    }
+    return true;
+  }, []);
 
-  // So does a form submission.
   useEffect(() => {
-    const onSubmit = () => restart();
-    document.addEventListener('submit', onSubmit);
-    return () => document.removeEventListener('submit', onSubmit);
-  }, [restart]);
-
-  useEffect(() => {
+    let cancelled = false;
     const now = Date.now();
     const warn = setTimeout(
       () => {
-        previousFocus.current = document.activeElement as HTMLElement | null;
-        setPhase('warning');
+        void sessionRemaining().then((remaining) => {
+          if (cancelled || !adopt(remaining)) return;
+          previousFocus.current = document.activeElement as HTMLElement | null;
+          setPhase((current) => (current === 'expired' ? current : 'warning'));
+        });
       },
       Math.max(0, deadline - WARN_BEFORE_MS - now),
     );
-    const end = setTimeout(() => setPhase('expired'), Math.max(0, deadline - now));
+    const end = setTimeout(
+      () => {
+        void sessionRemaining().then((remaining) => {
+          if (cancelled) return;
+          if (remaining == null || remaining <= 0) setPhase('expired');
+          else setDeadline(Date.now() + remaining * 1000);
+        });
+      },
+      Math.max(0, deadline - now),
+    );
     // The countdown runs from here (after hydration): tests wait for this to move the clock.
     marker.current?.setAttribute('data-testid', 'session-timeout');
     return () => {
+      cancelled = true;
       clearTimeout(warn);
       clearTimeout(end);
     };
-  }, [deadline]);
+  }, [deadline, adopt]);
 
   // The dialog takes the focus when it appears, and gives it back when the user stays.
   useEffect(() => {
@@ -64,12 +92,13 @@ function Countdown({ idleSeconds }: { idleSeconds: number }) {
   }, [phase]);
 
   const stay = async () => {
-    const response = await fetch('/api/auth/session', { cache: 'no-store' }).catch(() => null);
-    if (!response?.ok) {
+    const remaining = await sessionRemaining({ method: 'POST' });
+    if (remaining === null || remaining === undefined) {
       setPhase('expired');
       return;
     }
-    restart();
+    setDeadline(Date.now() + remaining * 1000);
+    setPhase('active');
     previousFocus.current?.focus();
   };
 

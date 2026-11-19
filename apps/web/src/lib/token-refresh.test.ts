@@ -47,7 +47,29 @@ describe('session token refresh', () => {
     expect(result.error).toBe('RefreshTokenError');
   });
 
-  it('marks the session as failed when there is no refresh token or the network fails', async () => {
+  it('records when the session was refreshed', async () => {
+    const before = Math.floor(Date.now() / 1000);
+    const result = await refreshTokens(
+      { refreshToken: 'r' },
+      options(() => response(200, { access_token: 'a', expires_in: 300 })),
+    );
+    expect(result.refreshedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it('keeps the session when Keycloak cannot be reached: the next request tries again', async () => {
+    const down = (() => Promise.reject(new Error('down'))) as typeof fetch;
+    expect(await refreshTokens({ refreshToken: 'r', expiresAt: 1 }, options(down))).toEqual({
+      refreshToken: 'r',
+      expiresAt: 1,
+    });
+    const unavailable = await refreshTokens(
+      { refreshToken: 'r' },
+      options(() => response(503, {})),
+    );
+    expect(unavailable.error).toBeUndefined();
+  });
+
+  it('marks the session as failed when there is no refresh token', async () => {
     expect(
       (
         await refreshTokens(
@@ -56,9 +78,5 @@ describe('session token refresh', () => {
         )
       ).error,
     ).toBe('RefreshTokenError');
-    const failing = (() => Promise.reject(new Error('down'))) as typeof fetch;
-    expect((await refreshTokens({ refreshToken: 'r' }, options(failing))).error).toBe(
-      'RefreshTokenError',
-    );
   });
 });

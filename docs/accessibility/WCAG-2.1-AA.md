@@ -34,7 +34,7 @@ To audit without failing on the first finding: `DEN_A11Y_REPORT=1 pnpm --filter 
 | # | Finding | Criterion | Fix |
 | :-- | :-- | :-- | :-- |
 | 1 | API validation errors reached Spanish pages in English ("at most 6 months for this classification", zod messages, the `detail` of 409 and 403) | 3.1.2, 3.3.1, 3.3.3 | Every API error carries `key` and `params`, and the web shows them in the user's language. zod errors are written with zod's locale. ADR-0025 |
-| 2 | The session ended after 30 minutes of inactivity without warning, and whatever had been typed was lost | 2.2.1 | A dialog two minutes before, with "Stay signed in", which renews the session with Keycloak (`components/session-timeout.tsx`, `DEN_SESSION_IDLE_SECONDS`) |
+| 2 | The session ended after 30 minutes of inactivity without warning, and whatever had been typed was lost | 2.2.1 | A dialog two minutes before, with "Stay signed in", which renews the session with Keycloak (`components/session-timeout.tsx`, `DEN_SESSION_IDLE_SECONDS`); before warning, and before declaring the session over, it asks the server how long it really has left (`/api/session/keepalive`, B-25) |
 | 3 | With more than one entity, the header selector overflowed at 320 px | 1.4.10 | The selector wraps onto several lines |
 | 4 | The tables on the service page overflowed the page at 320 px | 1.4.10 | Scrolling inside their own container, like the other tables |
 | 5 | The Scalar documentation added a second `h1` to the API page | 1.3.1 | Its headings move down one level (`aria-level`) |

@@ -73,4 +73,43 @@ describe('token refresh in the proxy (M-21)', () => {
     const seenByRender = await decode({ secret: SECRET, salt: COOKIE, token: forwardedSession });
     expect(seenByRender?.accessToken).toBe('NEW');
   });
+
+  it('signs the user out when Keycloak rejects the refresh token (B-25)', async () => {
+    const { encode } = await import('next-auth/jwt');
+    const { NextRequest } = await import('next/server');
+    const expired = await encode({
+      secret: SECRET,
+      salt: COOKIE,
+      token: {
+        sub: 'u1',
+        accessToken: 'OLD-EXPIRED',
+        refreshToken: 'DEAD',
+        expiresAt: Math.floor(Date.now() / 1000) - 600,
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ error: 'invalid_grant' }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' },
+          }),
+        ),
+      ),
+    );
+    const { default: proxy } = await import('./proxy');
+    const response = await proxy(
+      new NextRequest('http://localhost:3000/my-apis', {
+        headers: { cookie: `${COOKIE}=${expired}` },
+      }),
+      {} as never,
+    );
+    // No zombie session: the cookie is deleted and the page for a signed-out visitor follows.
+    const cleared = response!.headers.getSetCookie().find((c) => c.startsWith(`${COOKIE}=`));
+    expect(cleared).toBeTruthy();
+    expect(cleared).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+    expect(response!.status).toBeGreaterThanOrEqual(300);
+    expect(response!.status).toBeLessThan(400);
+  });
 });
