@@ -55,6 +55,8 @@ Un usuario puede pertenecer a varias entidades con roles distintos. Los roles qu
 
 Puede ver la página pública del catálogo **solo** si `features.publicCatalog: true` en la configuración del país, y solo APIs con clasificación `public`. No ve el contacto del responsable de la API (puede ser el correo de una persona) ni el estado de los nodos de la entidad (M6-08).
 
+Quien se registró pero no tiene membresía activa ni rol de plataforma no es miembro de la red (cualquiera puede registrarse): el catálogo lo trata como visitante anónimo, así que ve solo las APIs públicas, y solo si el catálogo público está activo (si no, 403). Las APIs `internal`, `personal` y `sensitive` las ven los miembros de una entidad y los roles de plataforma (ADR-0014, ADR-0036).
+
 ### 2.4 Titular de los datos (ciudadano)
 
 No usa el portal. Ve **quién consultó sus datos**, cuándo, qué dato, para qué y con qué funcionario (como referencia), desde la app ciudadana del país (en Colombia, la Carpeta Ciudadana Digital), autenticado con la identidad digital nacional. También activa avisos y descarga un comprobante verificable de cada consulta. En esta versión solo ve las consultas que pasan por el gateway (ADR-0015).
@@ -143,14 +145,16 @@ published → deprecated → retired
 2. Validaciones automáticas al enviar a revisión (bloqueantes):
    - Lint del OpenAPI con el conjunto de reglas DEN (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), sin dos rutas que puedan coincidir con la misma petición sin que una sea más específica (una ruta literal junto a una con parámetro sí se acepta: gana la literal, `ARCHITECTURE.md §4.2`), descripciones en español.
    - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba (GET a la raíz del servicio; pasa con cualquier respuesta que no sea 5xx).
-   - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo. El sandbox es el servicio de pruebas con datos sintéticos que la versión declara; sin sandbox, la prueba se omite y no bloquea.
+   - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo. El sandbox es el servicio de pruebas con datos sintéticos que la versión declara; sin sandbox, la prueba se omite y no bloquea. Como lanza muchas peticiones contra un host que el proveedor nombra antes de que nadie lo revise, un sandbox `direct` debe probar que el proveedor controla el host: sirve, en `/.well-known/den-validation`, el token que el portal muestra para esa entidad y ese host (si no, la prueba de contrato falla con "host control not proven"). Pedirla de nuevo tiene límites: un enfriamiento por versión (5 minutos) y un tope por entidad (10 por hora), con un 429 más allá (ADR-0036).
 
    Las dos corren en segundo plano al enviar a revisión, y sus resultados acompañan la revisión. El operador solo aprueba si pasaron; el proveedor puede repetirlas después de corregir su servicio. De la prueba de contrato solo se guardan, por operación, los códigos de las verificaciones que fallaron y el código HTTP, nunca un cuerpo.
 3. `platform_reviewer` revisa ficha, clasificación y minimización. Si `classification ∈ {sensitive}` y `features.approval.regulatorForSensitive`, pasa además por `regulator`. El regulador aprueba (se publica) o la devuelve al proveedor con motivo (`changes_requested`). No decide quien ya participó en la versión ni quien pertenece a la entidad proveedora.
 4. Al publicar: se crea la ruta en el gateway en modo "cerrado" (sin suscripciones nadie entra) y la API aparece en el catálogo.
 5. Una versión nueva mayor convive con la anterior. `deprecated` muestra aviso y fecha de retiro; `retired` elimina la ruta, revoca las suscripciones y rechaza las solicitudes pendientes, también las que esperan información (con aviso previo configurable, por defecto 90 días).
 
-Cambios en una versión publicada: solo se permiten cambios compatibles (descripciones, SLA, nuevas operaciones opcionales). Un cambio incompatible exige versión mayor nueva. El lint compara contra la versión publicada y bloquea incompatibilidades.
+Cambios en una versión publicada: solo se permiten cambios compatibles (descripciones, SLA, nuevas operaciones opcionales). Un cambio incompatible exige versión mayor nueva. La comprobación de compatibilidad compara la revisión con el documento publicado de forma recursiva (propiedades anidadas, `items` de arreglos, parámetros, cuerpo de la petición y respuestas) y bloquea las incompatibilidades; lo que no puede comparar (esquemas compuestos que difieren, esquemas demasiado enredados) cuenta como incompatible (ADR-0019).
+
+Una versión en `draft` o `changes_requested` puede corregirse por completo: los campos expuestos, la base legal, las finalidades permitidas, los upstreams y el documento OpenAPI (`PUT` de la versión), con la validación de crearla. Una versión en revisión o más allá no se edita (M-19).
 
 ### 4.3 Aplicaciones y credenciales
 
@@ -222,7 +226,7 @@ enrollment_issued → enrolled → online ⇄ offline
 ## 5. Reglas de negocio transversales
 
 - **Minimización:** el revisor ve los `exposedFields` y debe confirmar que corresponden a las finalidades permitidas. El catálogo muestra qué datos personales expone cada API.
-- **Clasificación:** `public` (datos abiertos), `internal` (no personal, uso interno), `personal` (datos personales), `sensitive` (categorías especiales: salud, etc.). La clasificación decide aprobaciones adicionales, vigencia máxima y si se exige `X-DEN-End-User`.
+- **Clasificación:** `public` (datos abiertos), `internal` (no personal, uso interno), `personal` (datos personales), `sensitive` (categorías especiales: salud, etc.). La clasificación decide aprobaciones adicionales, vigencia máxima y si se exige `X-DEN-End-User`. Como esos controles siguen la clasificación, los campos declarados no pueden decir más que ella: una API `public` o `internal` no puede declarar campos marcados `personal` o `sensitive` (se rechaza al crear o editar una versión y al enviarla a revisión).
 - **Vigencia máxima de suscripción** por clasificación, configurable (por defecto: public 24 m, internal 24 m, personal 12 m, sensitive 6 m).
 - **Nada se borra** en el dominio: las entidades, APIs y suscripciones cambian de estado. La única eliminación física es de documentos adjuntos por orden legal, y se registra en auditoría. La designación o el acuerdo reemplazado no se borra (puede haberse leído ya, y su hash es evidencia): el reemplazo se limita a 5 veces por documento.
 

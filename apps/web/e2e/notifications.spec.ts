@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mailsTo } from './citizen';
+import { mailsTo, mailText } from './citizen';
 import { createApplication, publishNewApi, requestAccess, signIn } from './flows';
 import { expectNoAccessibilityViolations } from './helpers';
 
@@ -28,14 +28,19 @@ test.describe('notifications (M2-08)', () => {
     }).toPass({ timeout: 60_000 });
     await expectNoAccessibilityViolations(steward);
 
-    // The same notice arrived by e-mail (Mailpit), with the link to the request.
+    // The same notice arrived by e-mail (Mailpit), with the link to the request. The subject is
+    // fixed text (B-10); what the consumer named goes only in the body.
     await expect
       .poll(
-        async () =>
-          (await mailsTo('lucia.datos@demo.den.example')).some((m) => m.Subject.includes(appName)),
-        {
-          timeout: 60_000,
+        async () => {
+          for (const m of await mailsTo('lucia.datos@demo.den.example')) {
+            if (m.Subject !== 'Nueva solicitud de acceso') continue;
+            const text = await mailText(m.ID);
+            if (text.includes(`/requests/${id}`)) return text.includes(appName);
+          }
+          return false;
         },
+        { timeout: 60_000 },
       )
       .toBe(true);
 

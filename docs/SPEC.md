@@ -55,6 +55,8 @@ A user can belong to several entities with different roles. The roles that decid
 
 Can see the public catalog page **only** if `features.publicCatalog: true` in the country configuration, and only APIs classified as `public`. They do not see the API owner's contact (it may be a person's email address) or the status of the entity's nodes (M6-08).
 
+A person who signed up but holds no active membership and no platform role is not a member of the network (anyone can register): the catalog treats them as an anonymous visitor, so they see only public APIs, and only when the public catalog is on (otherwise 403). `internal`, `personal` and `sensitive` APIs are visible to members of an entity and to platform roles (ADR-0014, ADR-0036).
+
 ### 2.4 Data subject (citizen)
 
 Does not use the portal. Sees **who queried their data**, when, which data, for what purpose and through which official (as a reference), from the country's citizen app (in Colombia, the Carpeta Ciudadana Digital), authenticated with the national digital identity. They can also turn on alerts and download a verifiable receipt for each query. In this version they only see the queries that go through the gateway (ADR-0015).
@@ -143,14 +145,16 @@ published → deprecated → retired
 2. Automatic validations when submitting for review (blocking):
    - OpenAPI lint with the DEN ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), no two paths that can match the same request with neither more specific (a literal path next to a parameterised one is fine: the literal wins, `ARCHITECTURE.md §4.2`), descriptions in Spanish.
    - Connectivity: the portal asks the node/URL for a `healthcheck` through the gateway in test mode (GET to the service root; it passes with any response that is not a 5xx).
-   - Contract test (Schemathesis) against the sandbox, with a time limit. The sandbox is the test service with synthetic data that the version declares; without a sandbox, the test is skipped and does not block.
+   - Contract test (Schemathesis) against the sandbox, with a time limit. The sandbox is the test service with synthetic data that the version declares; without a sandbox, the test is skipped and does not block. Because it fires many requests at a host the provider names before anyone has reviewed it, a `direct` sandbox must prove the provider controls the host: it serves, at `/.well-known/den-validation`, the token the portal shows for that entity and host (otherwise the contract test fails with "host control not proven"). Asking again is limited: a cooldown per version (5 minutes) and a cap per entity (10 an hour), a 429 beyond them (ADR-0036).
 
    Both run in the background when the version is submitted for review, and their results go with the review. The operator only approves if they passed; the provider can rerun them after fixing their service. From the contract test, only the codes of the failed checks and the HTTP status are stored, per operation, never a body.
 3. `platform_reviewer` reviews the service sheet, the classification and minimization. If `classification ∈ {sensitive}` and `features.approval.regulatorForSensitive`, it also goes through `regulator`. The regulator approves it (it is published) or sends it back to the provider with a reason (`changes_requested`). Nobody who has already taken part in the version, or who belongs to the provider entity, can decide.
 4. On publication: the route is created in the gateway in "closed" mode (without subscriptions nobody gets in) and the API appears in the catalog.
 5. A new major version coexists with the previous one. `deprecated` shows a notice and the retirement date; `retired` removes the route, revokes the subscriptions and rejects the pending requests, those waiting for information included (with configurable advance notice, 90 days by default).
 
-Changes to a published version: only compatible changes are allowed (descriptions, SLA, new optional operations). An incompatible change requires a new major version. The lint compares against the published version and blocks incompatibilities.
+Changes to a published version: only compatible changes are allowed (descriptions, SLA, new optional operations). An incompatible change requires a new major version. The compatibility check compares the revision against the published document recursively (nested properties, array items, parameters, request body and responses) and blocks incompatibilities; what it cannot compare (composed schemas that differ, schemas too intricate) counts as incompatible (ADR-0019).
+
+A version in `draft` or `changes_requested` can be corrected in full: the exposed fields, the legal basis, the allowed purposes, the upstreams and the OpenAPI document (`PUT` of the version), with the validation of creating it. A version in review or beyond cannot be edited (M-19).
 
 ### 4.3 Applications and credentials
 
@@ -222,7 +226,7 @@ enrollment_issued → enrolled → online ⇄ offline
 ## 5. Cross-cutting business rules
 
 - **Minimization:** the reviewer sees the `exposedFields` and must confirm that they match the allowed purposes. The catalog shows which personal data each API exposes.
-- **Classification:** `public` (open data), `internal` (non-personal, internal use), `personal` (personal data), `sensitive` (special categories: health, etc.). The classification determines additional approvals, maximum validity and whether `X-DEN-End-User` is required.
+- **Classification:** `public` (open data), `internal` (non-personal, internal use), `personal` (personal data), `sensitive` (special categories: health, etc.). The classification determines additional approvals, maximum validity and whether `X-DEN-End-User` is required. Since those controls follow the classification, the declared fields cannot say more than it does: an API classified `public` or `internal` cannot declare fields marked `personal` or `sensitive` (rejected when creating or editing a version, and when submitting it).
 - **Maximum subscription validity** per classification, configurable (by default: public 24 months, internal 24 months, personal 12 months, sensitive 6 months).
 - **Nothing is deleted** in the domain: entities, APIs and subscriptions change state. The only physical deletion is of attached documents by legal order, and it is recorded in the audit log. A replaced designation or agreement is not deleted (it may already have been read, and its hash is evidence): replacing is capped at 5 times per document.
 

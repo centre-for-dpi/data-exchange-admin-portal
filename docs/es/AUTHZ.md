@@ -128,7 +128,9 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | GET | `/api/v1/entities/:entityId/apis/:apiId` | entidad: `api.read` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions` | entidad: `api.write` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId` | entidad: `api.read` |
+| PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId` | entidad: `api.write` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/deprecate` | entidad: `api.write` |
+| GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/host-proof` | entidad: `api.read` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.read` |
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entidad: `api.write` |
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/purposes` | entidad: `api.purposes.write` |

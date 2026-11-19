@@ -128,7 +128,9 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | GET | `/api/v1/entities/:entityId/apis/:apiId` | entity: `api.read` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions` | entity: `api.write` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId` | entity: `api.read` |
+| PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId` | entity: `api.write` |
 | POST | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/deprecate` | entity: `api.write` |
+| GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/host-proof` | entity: `api.read` |
 | GET | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entity: `api.read` |
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/openapi` | entity: `api.write` |
 | PUT | `/api/v1/entities/:entityId/apis/:apiId/versions/:versionId/purposes` | entity: `api.purposes.write` |

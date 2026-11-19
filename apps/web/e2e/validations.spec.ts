@@ -57,10 +57,10 @@ test.describe('validations at submission (M4-06)', () => {
     await expect(results).toContainText('POST /afiliados/verificaciones');
     await expectNoAccessibilityViolations(operator);
 
-    // The provider can run them again.
+    // The provider cannot run them again right away (MB-2): the cooldown says so, in Spanish.
     await page.reload();
     await page.getByRole('button', { name: 'Repetir validaciones' }).click();
-    await expect(page.getByTestId('version-validation')).toContainText('En curso');
+    await expect(page.getByText(/corrieron hace poco/)).toBeVisible();
   });
 
   // P-07: a refused approval says so, approve is disabled while the validations have not passed,
