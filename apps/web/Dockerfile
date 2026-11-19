@@ -7,12 +7,15 @@ FROM node:24.22.1-alpine3.24@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c
 RUN npm install --global pnpm@11.15.0
 WORKDIR /repo
 COPY . .
+# The interface languages of the country (country.ui in config/country/<code>.yaml) are fixed at
+# build time: pass DEN_COUNTRY to build for a country; without it the defaults (es, en) apply.
+ARG DEN_COUNTRY=
 # The Auth.js config reads the client secret when a module loads, also while Next collects page
 # data: a placeholder for the build only. The real one comes from the environment at run time.
 RUN pnpm install --frozen-lockfile \
  && pnpm exec turbo run build --filter=@den/web^... \
  && cd apps/web \
- && DEN_PORTAL_WEB_CLIENT_SECRET=build-time-placeholder AUTH_SECRET=build-time-placeholder pnpm build \
+ && DEN_COUNTRY="$DEN_COUNTRY" DEN_PORTAL_WEB_CLIENT_SECRET=build-time-placeholder AUTH_SECRET=build-time-placeholder pnpm build \
  && cd /repo \
  && pnpm --filter @den/web deploy --prod --legacy /out \
  && rm -rf /out/.next && cp -r apps/web/.next /out/.next && rm -rf /out/.next/cache

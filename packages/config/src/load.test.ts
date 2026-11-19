@@ -68,6 +68,7 @@ describe('versioned country files', () => {
       name: 'Colombia',
       locale: 'es-CO',
       timezone: 'America/Bogota',
+      ui: { defaultLocale: 'es', locales: ['es', 'en'] },
     });
     expect(config.authorities.operator.shortName).toBe('AND');
     expect(config.authorities.regulator.shortName).toBe('MinTIC');
@@ -106,6 +107,16 @@ describe('validation', () => {
 
   it('rejects unknown keys so typos do not pass silently', () => {
     expectInvalid(set('features.publicCatalogue', true), /features/, /publicCatalogue/);
+  });
+
+  it('accepts the interface languages and rejects ones without messages', () => {
+    const ok = set('country.ui', { defaultLocale: 'en', locales: ['en'] });
+    expect(parseCountryConfigFile(writeConfig(ok)).country.ui).toEqual({
+      defaultLocale: 'en',
+      locales: ['en'],
+    });
+    expectInvalid(set('country.ui', { defaultLocale: 'fr', locales: ['fr'] }), /country\.ui/);
+    expectInvalid(set('country.ui', { defaultLocale: 'es', locales: ['en'] }), /country\.ui/);
   });
 
   it('rejects an invalid time zone and locale', () => {

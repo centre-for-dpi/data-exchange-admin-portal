@@ -9,6 +9,9 @@ country:
   name: Example Country
   locale: es # BCP 47 locale for dates and numbers, e.g. es-PE, en-KE.
   timezone: UTC # IANA time zone used to display dates (stored in UTC).
+  # Interface languages (optional; each needs apps/web/messages/<code>.json). The web image reads
+  # them when it is built (docker build --build-arg DEN_COUNTRY=xx), see docs/DEPLOYMENT.md.
+  # ui: { defaultLocale: es, locales: [es, en] }
 
 authorities:
   operator: # Runs the gateway and reviews publications.

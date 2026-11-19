@@ -281,6 +281,7 @@ country:
   name: Colombia
   locale: es-CO
   timezone: America/Bogota
+  ui: { defaultLocale: es, locales: [es, en] } # idiomas de la interfaz (opcional; estos son los valores por defecto)
 authorities:
   operator: { name: "Agencia Nacional Digital", shortName: "AND" }
   regulator: { name: "Ministerio de Tecnologías de la Información y las Comunicaciones", shortName: "MinTIC" }

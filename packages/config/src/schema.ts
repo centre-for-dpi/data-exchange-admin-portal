@@ -119,6 +119,20 @@ export type UpstreamType = (typeof UPSTREAM_TYPES)[number];
 /** Without `features.upstreams`: the node, and X-Road where the deployment has its settings. */
 export const DEFAULT_UPSTREAMS: readonly UpstreamType[] = ['node', 'xroad'];
 
+const uiLanguagesSchema = z
+  .strictObject({
+    defaultLocale: z.enum(UI_LOCALES).default('es'),
+    locales: z
+      .array(z.enum(UI_LOCALES))
+      .min(1)
+      .refine((l) => new Set(l).size === l.length, 'must not repeat a language')
+      .default([...UI_LOCALES]),
+  })
+  .refine((ui) => ui.locales.includes(ui.defaultLocale), {
+    message: 'locales must include defaultLocale',
+    path: ['locales'],
+  });
+
 export const countryConfigSchema = z.strictObject({
   country: z.strictObject({
     /** ISO 3166-1 alpha-2, upper case (XX for the example template). */
@@ -128,6 +142,12 @@ export const countryConfigSchema = z.strictObject({
     locale: z.string().refine(isValidLocale, 'must be a valid BCP 47 locale'),
     /** IANA time zone used to display dates (stored in UTC). */
     timezone: z.string().refine(isValidTimeZone, 'must be a valid IANA time zone'),
+    /**
+     * Languages of the portal's interface: those offered and the one the portal opens in. Only
+     * languages that have a messages file (UI_LOCALES); without it, Spanish by default and
+     * English as the other one.
+     */
+    ui: uiLanguagesSchema.default({ defaultLocale: 'es', locales: ['es', 'en'] }),
   }),
   authorities: z.strictObject({
     operator: authoritySchema,

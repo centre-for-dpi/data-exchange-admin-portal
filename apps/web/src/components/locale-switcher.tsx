@@ -9,6 +9,8 @@ export function LocaleSwitcher() {
   const t = useTranslations();
   const pathname = usePathname();
   const current = useLocale();
+  // A country with a single interface language has nothing to switch.
+  if (routing.locales.length < 2) return null;
   return (
     <nav aria-label={t('a11y.language')}>
       <ul className="flex rounded-full border border-border bg-surface-app p-0.5">
