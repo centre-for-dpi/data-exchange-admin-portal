@@ -108,7 +108,7 @@ describe('OpenAPI compatibility (ADR-0019)', () => {
       d.components.schemas.Afiliado.properties.activo = { type: 'string' };
     });
     expect(breakingChanges(base(), retyped)).toEqual([
-      'GET /afiliados/{numero} 200 changed the type of activo',
+      'GET /afiliados/{numero} 200.activo changed its type',
     ]);
   });
 
