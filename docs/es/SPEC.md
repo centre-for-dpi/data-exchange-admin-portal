@@ -129,7 +129,7 @@ active → offboarded
 - **Separación de funciones:** nadie decide sobre una solicitud que presentó o en la que figura como responsable designado.
 - **Alta directa.** `platform_admin` registra la entidad sin solicitud cuando un acto o una decisión ya la incorporó a la red. Indica ese fundamento, que queda en la bitácora, y el administrador de la entidad. La entidad queda activa de inmediato; el administrador y los responsables reciben una invitación por correo. El operador no puede ser el administrador ni uno de los responsables.
 - **Responsables designados.** El responsable de datos recibe `data_steward`. El responsable técnico recibe `api_publisher` y `app_developer`. Si el solicitante se designa a sí mismo, los roles se suman a su membresía sin invitación. Cada invitación vence a los `DEN_INVITATION_TTL_DAYS` días (14 por omisión).
-4. `suspended` bloquea toda publicación nueva y suspende en el gateway todas sus suscripciones como consumidora (no como proveedora, salvo decisión explícita). Lo decide el `platform_admin` con un motivo; reactivar devuelve cada suscripción a su estado. `offboarded` es definitivo: cierra sus suscripciones de ambos lados, retira sus versiones y revoca sus membresías (M2-11).
+4. `suspended` bloquea toda publicación nueva y suspende en el gateway todas sus suscripciones como consumidora (no como proveedora, salvo decisión explícita). Lo decide el `platform_admin` con un motivo; reactivar (solo desde `suspended`; una solicitud de alta en revisión se aprueba, nunca se reactiva) devuelve cada suscripción a su estado. `offboarded` es definitivo: cierra sus suscripciones de ambos lados, retira sus versiones y revoca sus membresías (M2-11).
 
 ### 4.2 Publicación de una versión de API
 
@@ -148,7 +148,7 @@ published → deprecated → retired
    Las dos corren en segundo plano al enviar a revisión, y sus resultados acompañan la revisión. El operador solo aprueba si pasaron; el proveedor puede repetirlas después de corregir su servicio. De la prueba de contrato solo se guardan, por operación, los códigos de las verificaciones que fallaron y el código HTTP, nunca un cuerpo.
 3. `platform_reviewer` revisa ficha, clasificación y minimización. Si `classification ∈ {sensitive}` y `features.approval.regulatorForSensitive`, pasa además por `regulator`. El regulador aprueba (se publica) o la devuelve al proveedor con motivo (`changes_requested`). No decide quien ya participó en la versión ni quien pertenece a la entidad proveedora.
 4. Al publicar: se crea la ruta en el gateway en modo "cerrado" (sin suscripciones nadie entra) y la API aparece en el catálogo.
-5. Una versión nueva mayor convive con la anterior. `deprecated` muestra aviso y fecha de retiro; `retired` elimina la ruta y revoca las suscripciones (con aviso previo configurable, por defecto 90 días).
+5. Una versión nueva mayor convive con la anterior. `deprecated` muestra aviso y fecha de retiro; `retired` elimina la ruta, revoca las suscripciones y rechaza las solicitudes pendientes, también las que esperan información (con aviso previo configurable, por defecto 90 días).
 
 Cambios en una versión publicada: solo se permiten cambios compatibles (descripciones, SLA, nuevas operaciones opcionales). Un cambio incompatible exige versión mayor nueva. El lint compara contra la versión publicada y bloquea incompatibilidades.
 
@@ -177,11 +177,11 @@ pending_provider → info_requested → pending_provider (pregunta del responsab
 3. Si la API es `sensitive` y la política lo exige, pasa además por `regulator`.
 4. `approved → active` ocurre cuando los reconciliadores confirman que el gateway ya tiene los datos de política. El portal muestra "activándose" mientras tanto. Objetivo: menos de 60 segundos.
 5. Suspender o revocar (proveedor, operador o regulador) se refleja en el gateway en menos de 60 segundos.
-6. Renovación: 30 días antes de `validUntil` se notifica al consumidor; la renovación es una nueva solicitud prellenada.
+6. Renovación: 30 días antes de `validUntil` se notifica al consumidor; la renovación es una nueva solicitud prellenada. Vive junto a la suscripción activa que renueva y puede decidirse después de que esta expire (una renovación pedida a tiempo no debe perderse por una decisión lenta; entonces empieza en la decisión); no se puede conceder si la original fue suspendida o revocada, y suspender o revocar la original la cierra. Solo puede haber una solicitud por aplicación, versión y finalidad esperando decisión a la vez, sea renovación o no.
 
 **Reglas**
 - Una aplicación tiene como máximo una suscripción activa por versión de API y finalidad.
-- Sandbox (M4-08): las suscripciones de aplicaciones sandbox se aprueban automáticamente si `features.sandbox.autoApprove` y solo apuntan al upstream de pruebas. Una aplicación sandbox solo puede pedir acceso a versiones que declaran un sandbox, y llama a `/sandbox{basePath}`. El gateway nunca la deja llegar al servicio real, ni a una aplicación de producción llegar al sandbox (`environment_mismatch`). La aprobación automática la decide el sistema y queda en la bitácora.
+- Sandbox (M4-08): las suscripciones de aplicaciones sandbox se aprueban automáticamente si `features.sandbox.autoApprove` y solo apuntan al upstream de pruebas. Nadie revisa esa aprobación, así que el límite de tasa concedido se limita al de la versión por defecto, y solo las primeras `features.sandbox.autoApproveMaxRenewals` renovaciones de una cadena (3 por defecto) se aprueban automáticamente: después decide el proveedor. Una aplicación sandbox solo puede pedir acceso a versiones que declaran un sandbox, y llama a `/sandbox{basePath}`. El gateway nunca la deja llegar al servicio real, ni a una aplicación de producción llegar al sandbox (`environment_mismatch`). La aprobación automática la decide el sistema y queda en la bitácora.
 - Separación de funciones: quien solicita no puede aprobar, aunque tenga ambos roles en entidades distintas. No aplica a revocar ni a suspender: esas acciones solo quitan acceso, y un responsable de datos debe poder cortar el acceso de una aplicación propia comprometida.
 
 ### 4.5 Llamada a una API (lo que el portal hace posible)
@@ -224,7 +224,7 @@ enrollment_issued → enrolled → online ⇄ offline
 - **Minimización:** el revisor ve los `exposedFields` y debe confirmar que corresponden a las finalidades permitidas. El catálogo muestra qué datos personales expone cada API.
 - **Clasificación:** `public` (datos abiertos), `internal` (no personal, uso interno), `personal` (datos personales), `sensitive` (categorías especiales: salud, etc.). La clasificación decide aprobaciones adicionales, vigencia máxima y si se exige `X-DEN-End-User`.
 - **Vigencia máxima de suscripción** por clasificación, configurable (por defecto: public 24 m, internal 24 m, personal 12 m, sensitive 6 m).
-- **Nada se borra** en el dominio: las entidades, APIs y suscripciones cambian de estado. La única eliminación física es de documentos adjuntos por orden legal, y se registra en auditoría.
+- **Nada se borra** en el dominio: las entidades, APIs y suscripciones cambian de estado. La única eliminación física es de documentos adjuntos por orden legal, y se registra en auditoría. La designación o el acuerdo reemplazado no se borra (puede haberse leído ya, y su hash es evidencia): el reemplazo se limita a 5 veces por documento.
 
 ## 6. Pantallas
 
@@ -295,7 +295,7 @@ purposes:
 features:
   publicCatalog: false
   mtls: { required: true }
-  sandbox: { autoApprove: true }
+  sandbox: { autoApprove: true, autoApproveMaxRenewals: 3 }
   approval: { regulatorForSensitive: true }
   lint: { noIdInQuery: true }
   upstreams: [node, xroad]   # ADR-0029: direct es opcional

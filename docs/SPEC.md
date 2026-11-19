@@ -129,7 +129,7 @@ active → offboarded
 - **Separation of duties:** nobody decides on a request they submitted or in which they appear as a designated officer.
 - **Direct registration.** `platform_admin` registers the entity without a request when an act or a decision has already brought it into the network. They state that basis, which is recorded in the audit log, and the entity's administrator. The entity is active immediately; the administrator and the officers receive an invitation by email. The operator cannot be the administrator or one of the officers.
 - **Designated officers.** The data steward receives `data_steward`. The technical lead receives `api_publisher` and `app_developer`. If the requester designates themselves, the roles are added to their membership without an invitation. Each invitation expires after `DEN_INVITATION_TTL_DAYS` days (14 by default).
-4. `suspended` blocks any new publication and suspends in the gateway all of the entity's subscriptions as a consumer (not as a provider, unless explicitly decided). The `platform_admin` decides it, with a reason; reactivating returns each subscription to its previous state. `offboarded` is final: it closes the entity's subscriptions on both sides, retires its versions and revokes its memberships (M2-11).
+4. `suspended` blocks any new publication and suspends in the gateway all of the entity's subscriptions as a consumer (not as a provider, unless explicitly decided). The `platform_admin` decides it, with a reason; reactivating (only from `suspended`; an onboarding request under review is approved, never reactivated) returns each subscription to its previous state. `offboarded` is final: it closes the entity's subscriptions on both sides, retires its versions and revokes its memberships (M2-11).
 
 ### 4.2 Publishing an API version
 
@@ -148,7 +148,7 @@ published → deprecated → retired
    Both run in the background when the version is submitted for review, and their results go with the review. The operator only approves if they passed; the provider can rerun them after fixing their service. From the contract test, only the codes of the failed checks and the HTTP status are stored, per operation, never a body.
 3. `platform_reviewer` reviews the service sheet, the classification and minimization. If `classification ∈ {sensitive}` and `features.approval.regulatorForSensitive`, it also goes through `regulator`. The regulator approves it (it is published) or sends it back to the provider with a reason (`changes_requested`). Nobody who has already taken part in the version, or who belongs to the provider entity, can decide.
 4. On publication: the route is created in the gateway in "closed" mode (without subscriptions nobody gets in) and the API appears in the catalog.
-5. A new major version coexists with the previous one. `deprecated` shows a notice and the retirement date; `retired` removes the route and revokes the subscriptions (with configurable advance notice, 90 days by default).
+5. A new major version coexists with the previous one. `deprecated` shows a notice and the retirement date; `retired` removes the route, revokes the subscriptions and rejects the pending requests, those waiting for information included (with configurable advance notice, 90 days by default).
 
 Changes to a published version: only compatible changes are allowed (descriptions, SLA, new optional operations). An incompatible change requires a new major version. The lint compares against the published version and blocks incompatibilities.
 
@@ -177,11 +177,11 @@ pending_provider → info_requested → pending_provider (question from the stew
 3. If the API is `sensitive` and policy requires it, it also goes through `regulator`.
 4. `approved → active` happens when the reconcilers confirm that the gateway already has the policy data. The portal shows "activating" in the meantime. Target: under 60 seconds.
 5. Suspending or revoking (by the provider, the operator or the regulator) is reflected in the gateway in under 60 seconds.
-6. Renewal: 30 days before `validUntil` the consumer is notified; renewal is a new, prefilled request.
+6. Renewal: 30 days before `validUntil` the consumer is notified; renewal is a new, prefilled request. It lives next to the active subscription it renews and may be decided after that one expires (a renewal asked for in time must not be lost to a slow decision; it then starts at the decision); it can not be granted if the original was suspended or revoked, and suspending or revoking the original closes it. Only one request per application, version and purpose can be waiting for a decision at a time, renewal or not.
 
 **Rules**
 - An application has at most one active subscription per API version and purpose.
-- Sandbox (M4-08): subscriptions of sandbox applications are approved automatically if `features.sandbox.autoApprove`, and they only point to the test upstream. A sandbox application can only request access to versions that declare a sandbox, and it calls `/sandbox{basePath}`. The gateway never lets it reach the real service, nor lets a production application reach the sandbox (`environment_mismatch`). The automatic approval is decided by the system and recorded in the audit log.
+- Sandbox (M4-08): subscriptions of sandbox applications are approved automatically if `features.sandbox.autoApprove`, and they only point to the test upstream. Nobody reviews that approval, so the granted rate limit is capped at the version's default, and only the first `features.sandbox.autoApproveMaxRenewals` renewals in a chain (default 3) are approved automatically: after that the provider decides. A sandbox application can only request access to versions that declare a sandbox, and it calls `/sandbox{basePath}`. The gateway never lets it reach the real service, nor lets a production application reach the sandbox (`environment_mismatch`). The automatic approval is decided by the system and recorded in the audit log.
 - Separation of duties: the requester cannot approve, even if they hold both roles in different entities. This does not apply to revoking or suspending: those actions only remove access, and a data steward must be able to cut off access for one of their own applications that has been compromised.
 
 ### 4.5 Calling an API (what the portal makes possible)
@@ -224,7 +224,7 @@ enrollment_issued → enrolled → online ⇄ offline
 - **Minimization:** the reviewer sees the `exposedFields` and must confirm that they match the allowed purposes. The catalog shows which personal data each API exposes.
 - **Classification:** `public` (open data), `internal` (non-personal, internal use), `personal` (personal data), `sensitive` (special categories: health, etc.). The classification determines additional approvals, maximum validity and whether `X-DEN-End-User` is required.
 - **Maximum subscription validity** per classification, configurable (by default: public 24 months, internal 24 months, personal 12 months, sensitive 6 months).
-- **Nothing is deleted** in the domain: entities, APIs and subscriptions change state. The only physical deletion is of attached documents by legal order, and it is recorded in the audit log.
+- **Nothing is deleted** in the domain: entities, APIs and subscriptions change state. The only physical deletion is of attached documents by legal order, and it is recorded in the audit log. A replaced designation or agreement is not deleted (it may already have been read, and its hash is evidence): replacing is capped at 5 times per document.
 
 ## 6. Screens
 
@@ -295,7 +295,7 @@ purposes:
 features:
   publicCatalog: false
   mtls: { required: true }
-  sandbox: { autoApprove: true }
+  sandbox: { autoApprove: true, autoApproveMaxRenewals: 3 }
   approval: { regulatorForSensitive: true }
   lint: { noIdInQuery: true }
   upstreams: [node, xroad]   # ADR-0029: direct is opt-in
