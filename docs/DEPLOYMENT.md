@@ -261,7 +261,7 @@ It also serves the data subject API that the citizen app consumes.
 
 **Role in the deployment.** It is the interface for people. On one side, the developer portal: catalog, interactive documentation, applications and access requests. On the other, the consoles for each role: publisher, data steward, entity administrator, operator, regulator and audit. It signs in with Keycloak (`den-portal`) and calls the API with the user's token, stored in Auth.js's encrypted cookie. It has no database of its own, and authorization is always decided by the API.
 
-- Image: `apps/web/Dockerfile`. It is built with placeholder secrets; the real ones arrive at runtime.
+- Image: `apps/web/Dockerfile`. It is built with placeholder secrets; the real ones arrive at runtime. `/files/entity-check.sh` (P-05) is made from `scripts/entity-check.sh` when the image is built, and the image carries a copy of it: a change to the script needs a rebuild.
 - Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `DEN_PORTAL_WEB_CLIENT_ID`, `DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_API_URL` (internal, `http://api:4000`), `DEN_WEB_URL`, `DEN_GATEWAY_PUBLIC_URL`, optionally `DEN_AUTH_REFRESH_BEFORE_SECONDS` and `DEN_SESSION_IDLE_SECONDS` (the realm's `ssoSessionIdleTimeout`, 1800 by default: the web warns two minutes before the session ends from inactivity and offers to continue, WCAG 2.2.1; if you change one, change the other). In the pilot, `AUTH_TRUST_HOST=true` (it is behind the proxy).
 - It runs with `next start` on 3000.
 - **Security headers (M3-09).** The web sets the nonce-based CSP, HSTS and the other headers itself (`ARCHITECTURE.md §12`). The proxy in front must not remove or replace them; nor must it add another `Content-Security-Policy`, because the browser would apply both.

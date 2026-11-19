@@ -26,6 +26,9 @@ RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
 WORKDIR /repo
 COPY pnpm-workspace.yaml ./
 COPY config ./config
+# /files/entity-check.sh (P-05) is made at build time from this file; the copy lets the route
+# read it at run time too, should Next.js ever render it again.
+COPY scripts/entity-check.sh ./scripts/entity-check.sh
 COPY --from=build /out ./apps/web
 ENV NODE_ENV=production
 USER node

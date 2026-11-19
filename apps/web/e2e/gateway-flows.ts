@@ -118,8 +118,9 @@ export async function issueCertificate(page: Page, clientId: string): Promise<vo
   const { csr, keyPem } = await makeCsr(clientId);
   await section.getByLabel(/^Solicitud de certificado \(CSR\)/).fill(csr);
   await section.getByRole('button', { name: 'Solicitar certificado' }).click();
-  const issued = section.getByRole('status');
-  await expect(issued).toContainText('El certificado está listo');
+  // The section has other live regions (the copy buttons of the CSR commands, P-05).
+  const issued = section.getByRole('status').filter({ hasText: 'El certificado está listo' });
+  await expect(issued).toBeVisible();
   const downloading = page.waitForEvent('download');
   await issued.getByRole('link', { name: 'Descargar' }).click();
   const chain = await readFile((await (await downloading).path()) ?? '', 'utf8');

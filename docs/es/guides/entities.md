@@ -135,7 +135,7 @@ Antes de empezar, el operador da a las entidades los dos nombres de la plataform
 
 ### 4.1 Verificar la red desde el servidor de la entidad
 
-Desde el servidor que hará las consultas (o el del nodo), con el script `scripts/entity-check.sh` del repositorio, que el operador entrega en la jornada:
+Desde el servidor que hará las consultas (o el del nodo), con el script `scripts/entity-check.sh` del repositorio, que el operador entrega en la jornada y el portal sirve en `https://<portal>/files/entity-check.sh` (la ficha de cada aplicación lo enlaza):
 
 ```bash
 chmod +x entity-check.sh

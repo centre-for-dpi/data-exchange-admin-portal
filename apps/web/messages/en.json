@@ -481,6 +481,23 @@
       "optional": "For now the certificate is optional on this network. Once mTLS is required, the gateway will only accept calls with a valid certificate issued by the network.",
       "howTo": "1. On your application's server, generate the private key and the certificate signing request (CSR). The private key never leaves that server:",
       "paste": "2. Paste the content of the .csr file here. The portal has it signed by the network's certificate authority.",
+      "shells": "Shell on the application's server",
+      "shell": {
+        "posix": "Linux or macOS",
+        "gitBash": "Windows: Git Bash",
+        "powershell": "Windows: PowerShell"
+      },
+      "shellNote": {
+        "posix": "In bash or zsh. With umask 077 the key is readable only by you (permissions 600).",
+        "gitBash": "MSYS_NO_PATHCONV=1 stops Git Bash from turning /CN=… into a Windows path, which OpenSSL rejects. icacls leaves the key readable only by you.",
+        "powershell": "Uses the OpenSSL on the PATH or the one that comes with Git for Windows. The key file is created first, readable only by you, and OpenSSL then writes the key into it."
+      },
+      "commands": "Commands for {shell}",
+      "check": "Before pasting the CSR, the last line must show <code>subject=CN={clientId}</code> (OpenSSL 3.0 writes it with spaces, CN = …) and nothing else. An existing key is never overwritten, and if OpenSSL fails no half-made key is left behind.",
+      "keyExists": "{file} already exists: it is not overwritten.",
+      "opensslMissing": "OpenSSL was not found: install Git for Windows or add openssl to the PATH.",
+      "script": "Or download <link>entity-check.sh</link>, which does the same in bash (also in Git Bash) and says what went wrong, and run it on that server. Its messages are in Spanish.",
+      "scriptCommand": "Command for entity-check.sh",
       "csr": "Certificate signing request (CSR)",
       "csrHint": "In PEM format: it starts with -----BEGIN CERTIFICATE REQUEST-----. It must name this application only (CN = its client ID).",
       "submit": "Request certificate",

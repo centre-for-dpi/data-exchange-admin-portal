@@ -127,7 +127,12 @@ cmd_csr() {
     rm -f "$id.key" "$id.csr"
     fail "OpenSSL no pudo crear la solicitud (ver el mensaje anterior); no quedó ninguna llave a medias."
   fi
-  if [[ $(openssl req -in "$id.csr" -noout -subject 2>/dev/null) != "subject=CN=$id" ]]; then
+  # OpenSSL 3.0 (Debian 12, Ubuntu 22.04 and 24.04) writes "subject=CN = <id>", later versions
+  # "subject=CN=<id>" and LibreSSL "subject=/CN=<id>": compared without spaces or that slash.
+  local subject
+  subject=$(openssl req -in "$id.csr" -noout -subject 2>/dev/null) || subject=
+  subject=${subject// /}
+  if [[ ${subject/#subject=\//subject=} != "subject=CN=$id" ]]; then
     rm -f "$id.key" "$id.csr"
     fail "La solicitud no nombra a $id; no quedó ninguna llave a medias."
   fi

@@ -135,7 +135,7 @@ Before starting, the operator gives the entities the platform's two names: the *
 
 ### 4.1 Check the network from the entity's server
 
-From the server that will send the requests (or the node's server), using the repository's `scripts/entity-check.sh` script, which the operator hands out on the day:
+From the server that will send the requests (or the node's server), using the repository's `scripts/entity-check.sh` script, which the operator hands out on the day and the portal serves at `https://<portal>/files/entity-check.sh` (each application's page links it):
 
 ```bash
 chmod +x entity-check.sh

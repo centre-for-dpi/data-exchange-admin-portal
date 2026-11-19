@@ -15,10 +15,35 @@ function csr(id, { pathFirst } = {}) {
   return { ...result, dir };
 }
 
+// OpenSSL 3.0 (Ubuntu 24.04, the CI runner) writes "subject=CN = <id>", later ones no spaces.
 const subjectOf = (file) =>
   spawnSync('openssl', ['req', '-in', file, '-noout', '-subject'], {
     encoding: 'utf8',
-  }).stdout.trim();
+  })
+    .stdout.trim()
+    .replaceAll(' ', '');
+
+/** A stand-in openssl that answers -subject as OpenSSL 3.0 does and passes the rest on. */
+function openssl30() {
+  const real = spawnSync('bash', ['-c', 'command -v openssl'], { encoding: 'utf8' }).stdout.trim();
+  const dir = mkdtempSync(join(tmpdir(), 'den-openssl30-'));
+  const bin = join(dir, 'openssl');
+  writeFileSync(
+    bin,
+    [
+      '#!/usr/bin/env bash',
+      'if [[ " $* " == *" -subject "* ]]; then',
+      `  out=$('${real}' "$@") || exit`,
+      '  printf \'%s\\n\' "${out/subject=CN=/subject=CN = }"',
+      '  exit',
+      'fi',
+      `exec '${real}' "$@"`,
+      '',
+    ].join('\n'),
+  );
+  chmodSync(bin, 0o755);
+  return dir;
+}
 
 describe('entity-check.sh csr', () => {
   const id = 'den-app-01a1efe4-c982-7e65-8855-7ea59c07bb55';
@@ -31,6 +56,14 @@ describe('entity-check.sh csr', () => {
     if (process.platform !== 'win32') {
       expect(statSync(join(r.dir, `${id}.key`)).mode & 0o777).toBe(0o600);
     }
+  });
+
+  it('accepts the subject as OpenSSL 3.0 writes it (Debian 12, Ubuntu 22.04 and 24.04)', () => {
+    const r = csr(id, { pathFirst: openssl30() });
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/Solicitud de certificado/);
+    expect(readFileSync(join(r.dir, `${id}.key`), 'utf8')).toMatch(/BEGIN PRIVATE KEY/);
+    expect(subjectOf(join(r.dir, `${id}.csr`))).toBe(`subject=CN=${id}`);
   });
 
   it('leaves no half-made key behind and says why when OpenSSL fails', () => {

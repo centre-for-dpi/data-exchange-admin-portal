@@ -156,7 +156,7 @@ Changes to a published version: only compatible changes are allowed (description
 
 1. `app_developer` creates an application in their entity (sandbox or production).
 2. The portal creates a confidential client in Keycloak (`client_credentials`) and shows the secret only once.
-3. If `features.mtls.required`, the developer generates a CSR (the portal offers instructions and a command) and uploads it; the portal signs it through step-ca with the `client_id` in the CN/SAN. Certificates last 90 days by default, with a notice 15 days before expiry.
+3. If `features.mtls.required`, the developer generates the key and a CSR on the application's own server and uploads the CSR; the portal shows the commands for Linux/macOS, Git Bash and PowerShell (P-05: the key readable only by its owner, never overwritten, and a check of the subject before pasting) and offers `entity-check.sh` for download. It never offers to make the key in the browser, where it would land on someone's laptop. The portal signs the CSR through step-ca with the `client_id` in the CN/SAN. Certificates last 90 days by default, with a notice 15 days before expiry.
 4. Rotation: a second credential can be created before revoking the first (rotation window). When the secret is rotated or a new certificate is requested, the previous one becomes `rotating` and keeps working for `lifecycle.credentialRotationDays` (7 by default); after that it becomes `expired`. Revoking cuts the credential off immediately. The current secret is not revoked: it is rotated first. One rotation at a time per credential type.
 5. An application without approved subscriptions can obtain a token, but the gateway rejects all its calls.
 

@@ -421,7 +421,7 @@ details.faq[open] summary { color: var(--gov); }
     <section id="verificar">
       <div class="part">On the day</div>
       <h2><span class="num">6</span>Check the network from the entity's server</h2>
-      <p>The operator hands out the platform's two names, the <b>portal</b>'s and the <b>gateway</b>'s, and the <code>entity-check.sh</code> script. It only needs <code>bash</code>, <code>curl</code> and <code>openssl</code>. Run it on the server that will send the requests, or on the node's server.</p>
+      <p>The operator hands out the platform's two names, the <b>portal</b>'s and the <b>gateway</b>'s, and the <code>entity-check.sh</code> script, which the portal also serves at <code>https://&lt;portal&gt;/files/entity-check.sh</code> (each application's page links it). It only needs <code>bash</code>, <code>curl</code> and <code>openssl</code>. Run it on the server that will send the requests, or on the node's server.</p>
       <div class="code"><button class="copy" type="button">Copy</button><pre><code>chmod +x entity-check.sh
 ./entity-check.sh check &lt;portal&gt; &lt;gateway&gt;</code></pre></div>
       <p>It checks DNS, outbound HTTPS to the portal and to the gateway, and that the gateway's certificate verifies against the network's root. It saves the root to <code>./den-network-ca.pem</code>.</p>

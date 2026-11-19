@@ -6,6 +6,7 @@ import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { CertificateRequestForm } from '../../../../components/apps/certificate-form';
+import { CsrCommands } from '../../../../components/apps/csr-commands';
 import {
   RevokeCredentialForm,
   RotateSecretForm,
@@ -16,6 +17,7 @@ import { Button } from '../../../../components/ui/button';
 import { Notice } from '../../../../components/ui/notice';
 import { Card, Page, PageHeader, Section } from '../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../lib/api';
+import { csrCommands, csrScriptCommand } from '../../../../lib/csr-commands';
 import { getViewer } from '../../../../lib/viewer';
 
 interface PageProps {
@@ -64,11 +66,12 @@ export default async function ApplicationPage({ params }: PageProps) {
   const revocable = (c: (typeof app.credentials)[number]) =>
     app.canWrite &&
     (c.status === 'rotating' || (c.status === 'active' && c.kind === 'mtls_certificate'));
-  const csrCommand = [
-    'openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \\',
-    `  -keyout ${app.clientId}.key -out ${app.clientId}.csr \\`,
-    `  -subj "/CN=${app.clientId}"`,
-  ].join('\n');
+  // The key and CSR are made on the application's server, never in the browser (P-05).
+  const csr = csrCommands({
+    clientId: app.clientId,
+    keyExists: t('certificates.keyExists', { file: `${app.clientId}.key` }),
+    opensslMissing: t('certificates.opensslMissing'),
+  });
   const gateway = process.env.DEN_GATEWAY_PUBLIC_URL ?? 'http://localhost:9080';
   // The guide's programs (M5-08); with mTLS (M3-10) both calls present the application's
   // certificate and trust the gateway through the network CA.
@@ -233,12 +236,11 @@ export default async function ApplicationPage({ params }: PageProps) {
               ) : null}
               <div className="space-y-3">
                 <p className="text-sm">{t('certificates.howTo')}</p>
-                <pre
-                  className="overflow-x-auto rounded-2xl bg-surface-inverse p-5 text-sm leading-relaxed text-[#f6f8fa]"
-                  tabIndex={0}
-                >
-                  <code>{csrCommand}</code>
-                </pre>
+                <CsrCommands
+                  commands={csr}
+                  clientId={app.clientId}
+                  scriptCommand={csrScriptCommand(app.clientId)}
+                />
                 <p className="text-sm">{t('certificates.paste')}</p>
               </div>
               <CertificateRequestForm applicationId={app.id} downloadBase={downloadBase} />

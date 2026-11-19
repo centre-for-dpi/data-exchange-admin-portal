@@ -481,6 +481,23 @@
       "optional": "Por ahora el certificado es opcional en esta red. Cuando se exija mTLS, el gateway solo aceptará llamadas con un certificado vigente emitido por la red.",
       "howTo": "1. En el servidor de tu aplicación, genera la clave privada y la solicitud de certificado (CSR). La clave privada nunca sale de ese servidor:",
       "paste": "2. Pega aquí el contenido del archivo .csr. El portal lo hace firmar por la autoridad de certificación de la red.",
+      "shells": "Intérprete de comandos del servidor de la aplicación",
+      "shell": {
+        "posix": "Linux o macOS",
+        "gitBash": "Windows: Git Bash",
+        "powershell": "Windows: PowerShell"
+      },
+      "shellNote": {
+        "posix": "En bash o zsh. Con umask 077 solo tú puedes leer la clave (permisos 600).",
+        "gitBash": "MSYS_NO_PATHCONV=1 evita que Git Bash convierta /CN=… en una ruta de Windows, que OpenSSL rechaza. icacls deja la clave legible solo para ti.",
+        "powershell": "Usa el OpenSSL del PATH o el que trae Git para Windows. Primero crea el archivo de la clave, legible solo para ti, y luego OpenSSL escribe la clave en él."
+      },
+      "commands": "Comandos para {shell}",
+      "check": "Antes de pegar la solicitud, la última línea debe mostrar <code>subject=CN={clientId}</code> (OpenSSL 3.0 lo escribe con espacios, CN = …) y nada más. Una clave existente nunca se sobrescribe, y si OpenSSL falla no queda ninguna clave a medias.",
+      "keyExists": "{file} ya existe: no se sobrescribe.",
+      "opensslMissing": "No se encontró OpenSSL: instala Git para Windows o agrega openssl al PATH.",
+      "script": "O descarga <link>entity-check.sh</link>, que hace lo mismo en bash (también en Git Bash) y dice qué falló, y ejecútalo en ese servidor.",
+      "scriptCommand": "Comando para entity-check.sh",
       "csr": "Solicitud de certificado (CSR)",
       "csrHint": "En formato PEM: empieza por -----BEGIN CERTIFICATE REQUEST-----. Debe nombrar solo a esta aplicación (CN = su client ID).",
       "submit": "Solicitar certificado",

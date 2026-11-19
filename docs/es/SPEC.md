@@ -156,7 +156,7 @@ Cambios en una versión publicada: solo se permiten cambios compatibles (descrip
 
 1. `app_developer` crea una aplicación en su entidad (sandbox o producción).
 2. El portal crea un cliente confidencial en Keycloak (`client_credentials`), muestra el secreto una sola vez.
-3. Si `features.mtls.required`, el desarrollador genera un CSR (el portal ofrece instrucciones y un comando) y lo sube; el portal lo firma vía step-ca con el `client_id` en el CN/SAN. Certificados de 90 días por defecto, con aviso a los 15 días.
+3. Si `features.mtls.required`, el desarrollador genera la clave y un CSR en el propio servidor de la aplicación y sube el CSR; el portal muestra los comandos para Linux/macOS, Git Bash y PowerShell (P-05: la clave legible solo por su dueño, nunca sobrescrita, y una comprobación del sujeto antes de pegarlo) y ofrece `entity-check.sh` para descargar. Nunca ofrece crear la clave en el navegador, donde quedaría en el portátil de alguien. El portal firma el CSR vía step-ca con el `client_id` en el CN/SAN. Certificados de 90 días por defecto, con aviso a los 15 días.
 4. Rotación: se puede crear una segunda credencial antes de revocar la primera (ventana de rotación). Al rotar el secreto o pedir un certificado nuevo, el anterior queda `rotating` y sigue funcionando `lifecycle.credentialRotationDays` (7 por defecto); después pasa a `expired`. Revocar corta la credencial de inmediato. El secreto actual no se revoca: primero se rota. Una rotación a la vez por tipo de credencial.
 5. Una aplicación sin suscripciones aprobadas puede obtener token pero el gateway rechaza todas sus llamadas.
 

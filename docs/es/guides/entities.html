@@ -421,7 +421,7 @@ details.faq[open] summary { color: var(--gov); }
     <section id="verificar">
       <div class="part">Durante la jornada</div>
       <h2><span class="num">6</span>Verificar la red desde el servidor de la entidad</h2>
-      <p>El operador entrega los dos nombres de la plataforma, el del <b>portal</b> y el del <b>gateway</b>, y el script <code>entity-check.sh</code>. Solo necesita <code>bash</code>, <code>curl</code> y <code>openssl</code>. Se ejecuta en el servidor que hará las consultas, o en el del nodo.</p>
+      <p>El operador entrega los dos nombres de la plataforma, el del <b>portal</b> y el del <b>gateway</b>, y el script <code>entity-check.sh</code>, que el portal también sirve en <code>https://&lt;portal&gt;/files/entity-check.sh</code> (la ficha de cada aplicación lo enlaza). Solo necesita <code>bash</code>, <code>curl</code> y <code>openssl</code>. Se ejecuta en el servidor que hará las consultas, o en el del nodo.</p>
       <div class="code"><button class="copy" type="button">Copiar</button><pre><code>chmod +x entity-check.sh
 ./entity-check.sh check &lt;portal&gt; &lt;gateway&gt;</code></pre></div>
       <p>Comprueba el DNS, la salida HTTPS al portal y al gateway, y que el certificado del gateway verifica contra la raíz de la red. Deja la raíz en <code>./den-network-ca.pem</code>.</p>

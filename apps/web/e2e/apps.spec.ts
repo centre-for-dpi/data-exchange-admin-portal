@@ -88,8 +88,42 @@ test.describe('applications and OAuth2 credentials', () => {
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 
     const section = page.getByRole('region', { name: 'Certificado de cliente (mTLS)' });
-    await expect(section.locator('pre').getByText(`-subj "/CN=${clientId}"`)).toBeVisible();
+    // The commands per shell (P-05), with this application's client ID; arrows move the tabs.
+    const posixTab = section.getByRole('tab', { name: 'Linux o macOS' });
+    await expect(posixTab).toHaveAttribute('aria-selected', 'true');
+    await expect(section.getByTestId('csr-posix')).toContainText(`id=${clientId}`);
+    await expect(section.getByTestId('csr-posix')).toContainText('-subj "/CN=$id"');
+    await expect(section.getByTestId('csr-posix')).toContainText('umask 077');
+    await expect(section.getByTestId('csr-posix')).not.toContainText('MSYS_NO_PATHCONV');
     await expectNoAccessibilityViolations(page);
+    await posixTab.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(section.getByRole('tab', { name: 'Windows: Git Bash' })).toBeFocused();
+    await expect(section.getByTestId('csr-gitBash')).toContainText('MSYS_NO_PATHCONV=1 openssl');
+    await expect(section.getByTestId('csr-posix')).toBeHidden();
+    await page.keyboard.press('End');
+    await expect(section.getByRole('tab', { name: 'Windows: PowerShell' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(section.getByTestId('csr-powershell')).toContainText(`$id = '${clientId}'`);
+    await expect(section.getByTestId('csr-powershell')).toContainText(
+      `throw '${clientId}.key ya existe: no se sobrescribe.'`,
+    );
+    await expect(section.getByText(`subject=CN=${clientId}`)).toBeVisible();
+    await expect(section.getByTestId('csr-script')).toHaveText(
+      `bash entity-check.sh csr ${clientId}`,
+    );
+    await expectNoAccessibilityViolations(page);
+
+    // entity-check.sh, offered next to them, is the repository's script.
+    const scriptDownload = page.waitForEvent('download');
+    await section.getByRole('link', { name: 'entity-check.sh' }).click();
+    const script = await scriptDownload;
+    expect(script.suggestedFilename()).toBe('entity-check.sh');
+    expect(await readFile((await script.path()) ?? '')).toEqual(
+      await readFile(new URL('../../../scripts/entity-check.sh', import.meta.url)),
+    );
 
     // A CSR for another application is refused before the CA, with a translated message.
     const csrField = section.getByLabel(/^Solicitud de certificado \(CSR\)/);
@@ -101,8 +135,8 @@ test.describe('applications and OAuth2 credentials', () => {
     const { csr, keyPem } = await makeCsr(clientId);
     await csrField.fill(csr);
     await section.getByRole('button', { name: 'Solicitar certificado' }).click();
-    const issued = section.getByRole('status');
-    await expect(issued).toContainText('El certificado está listo');
+    const issued = section.getByRole('status').filter({ hasText: 'El certificado está listo' });
+    await expect(issued).toBeVisible();
 
     const downloading = page.waitForEvent('download');
     await issued.getByRole('link', { name: 'Descargar' }).click();
@@ -125,6 +159,18 @@ test.describe('applications and OAuth2 credentials', () => {
       section.getByText(/Puedes pedir un certificado nuevo para renovarlo/),
     ).toBeVisible();
     await expect(section.getByRole('button', { name: 'Solicitar certificado' })).toBeVisible();
+    await expectNoAccessibilityViolations(page);
+
+    // In English, the commands say it in English too (P-05).
+    await page.goto(new URL(page.url()).pathname.replace(/^\/my-apps\//, '/en/my-apps/'));
+    const english = page.getByRole('region', { name: 'Client certificate (mTLS)' });
+    await english.getByRole('tab', { name: 'Windows: PowerShell' }).click();
+    await expect(english.getByTestId('csr-powershell')).toContainText(
+      `throw '${clientId}.key already exists: it is not overwritten.'`,
+    );
+    await expect(
+      english.getByRole('tablist', { name: "Shell on the application's server" }),
+    ).toBeVisible();
     await expectNoAccessibilityViolations(page);
   });
 
