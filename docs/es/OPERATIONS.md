@@ -55,10 +55,11 @@ Compose respeta este orden con `depends_on` y health checks: `api` espera a `pos
 | `fluent-bit-transparency` | Escucha en 5170; envía al colector del API con reintentos | Nada | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/health` |
 | `opensearch` / `fluent-bit` | Índices `den-access-YYYY.MM` al llegar el primer log | En el host, `vm.max_map_count` (DEPLOYMENT §2) | `dc ps opensearch fluent-bit` (healthy) |
 | `mailpit` | — | Guardar el usuario de `MAILPIT_UI_AUTH` | Abrir `$DEN_PUBLIC_URL/mail` |
-| `api` | Migraciones (`prisma migrate deploy`), seed idempotente (`DEN_ALLOW_SEED=true`), arranque de los trabajos en segundo plano y **reconciliación completa inmediata** de APISIX y Keycloak | Revisar el log del primer arranque | `dc logs api` muestra `Portal API listening on 4000 (country <código>)`; `curl -fsS $DEN_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
+| `migrate` | Aplica las migraciones pendientes (`prisma migrate deploy`) como dueño del esquema y termina: el único contenedor con `DATABASE_MIGRATION_URL` (A-2) | Nada | `dc ps -a migrate` muestra `exited (0)`; `dc logs migrate` |
+| `api` | Seed idempotente (`DEN_ALLOW_SEED=true`), arranque de los trabajos en segundo plano y **reconciliación completa inmediata** de APISIX y Keycloak | Revisar el log del primer arranque | `dc logs api` muestra `Portal API listening on 4000 (country <código>)`; `curl -fsS $DEN_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
 | `web` | — | Nada | Abrir `$DEN_PUBLIC_URL` e iniciar sesión |
 | `citizen-app` | — | Nada | Abrir `$DEN_PUBLIC_URL/citizen-app` |
-| Proxy inverso | — | Configurar las rutas de DEPLOYMENT §5.2 **sin** `/api/v1/internal` ni `/api/v1/opa` | `curl -i $DEN_PUBLIC_URL/api/v1/opa/bundle.tar.gz` **no** debe llegar al API (404 del proxy o de la web) |
+| Proxy inverso | — | Configurar las rutas de DEPLOYMENT §5.2 **sin** `/api/v1/internal` ni `/api/v1/opa`, y con la administración de Keycloak cerrada (`DEN_KEYCLOAK_ADMIN_ALLOW`, B-28) | `curl -i $DEN_PUBLIC_URL/api/v1/opa/bundle.tar.gz` y `curl -i -X POST $DEN_PUBLIC_URL/api/v1/internal/subject-access` responden exactamente **404** (el de la web: un 401 quiere decir que llegó al API); `curl -i $DEN_PUBLIC_URL/auth/admin/` responde 403. `install.sh status` comprueba las tres cosas (M-26) |
 
 Estado general de un vistazo: `dc ps` (todos `running`, y `healthy` los que tienen health check; `tsa-init` en `exited (0)`).
 
@@ -90,7 +91,7 @@ Estado general de un vistazo: `dc ps` (todos `running`, y `healthy` los que tien
 | Entidades | El solicitante se registra y pide el alta de su entidad; un `platform_reviewer` o `platform_admin` la aprueba (`entity_review.decide`) y el solicitante queda como `entity_admin`. El `platform_admin` también puede crearlas desde la consola (`entity_admin.create`) y suspenderlas, reactivarlas o darlas de baja (`entity_admin.decide`) | Inmediato |
 | Personas de una entidad | El `entity_admin` invita por correo y asigna roles (ADR-0018) | Inmediato; los roles se leen en cada petición |
 | Roles de plataforma | El seed se los da a los usuarios de demo (`infra/keycloak/README.md`). Las personas del operador reciben los suyos desde la línea de comandos del servidor, después de registrarse y entrar una vez: `sudo ./install.sh platform-role grant <correo> <rol>` en el piloto, `node dist/admin/platform-roles-cli.js grant <correo> <rol>` en el contenedor del API en los demás despliegues (`revoke`, `list`). Queda auditado (`platform_role.granted`, `platform_role.revoked`); el último `platform_admin` no se puede quitar | De inmediato; el segundo factor se pide en el siguiente ingreso de la persona |
-| Usuarios de demo (piloto) | `sudo ./install.sh demo-users disable [--reason "..."]`, `node dist/admin/demo-users-cli.js disable` en el contenedor del API en los demás despliegues (`list` muestra su estado). Cada usuario de demo del archivo del realm queda desactivado en Keycloak (con sus sesiones cerradas) y en el portal, y pierde sus roles de plataforma; queda auditado (`user.disabled`, `platform_role.revoked`). Se niega mientras no haya un `platform_admin` activo que no sea usuario de demo, y no cambia nada si Keycloak no responde. Necesita `KEYCLOAK_ADMIN_USER` y `KEYCLOAK_ADMIN_PASSWORD` en el contenedor del API (el `.env` del piloto los tiene). Ningún comando lo deshace | De inmediato; la semilla los deja desactivados en cada arranque |
+| Usuarios de demo (piloto) | `sudo ./install.sh demo-users disable [--reason "..."]`, `node dist/admin/demo-users-cli.js disable` en el contenedor del API en los demás despliegues (`list` muestra su estado). Cada usuario de demo del archivo del realm queda desactivado en Keycloak (con sus sesiones cerradas) y en el portal, y pierde sus roles de plataforma; queda auditado (`user.disabled`, `platform_role.revoked`). Se niega mientras no haya un `platform_admin` activo que no sea usuario de demo, y no cambia nada si Keycloak no responde. Necesita `KEYCLOAK_ADMIN_USER` y `KEYCLOAK_ADMIN_PASSWORD`, que el contenedor del API no tiene (A-2): `install.sh` se los pasa solo a este comando, desde `.env`; en otros despliegues, `docker compose exec -e KEYCLOAK_ADMIN_USER -e KEYCLOAK_ADMIN_PASSWORD api …` con las dos en tu shell. Ningún comando lo deshace | De inmediato; la semilla los deja desactivados en cada arranque |
 | Autorregistro | Realm `den-portal`: `registrationAllowed` y `verifyEmail`; el enlace de verificación dura 60 minutos (`actionTokenGeneratedByUserLifespan`, P-08) | Ya activo en realms nuevos; en uno existente, §5.3 |
 
 > **Advertencia.** El piloto siempre carga el seed de demo, con entidades ficticias y usuarios de demo que conservan sus roles de plataforma. Dar cuentas y roles propios a las personas del operador con el comando anterior no los quita: `demo-users disable` sí, cuando ya los tienen. Aun así, un piloto es un entorno de demostración, no de producción (`DEPLOYMENT.md §8`). Después, el ensayo de la demo (§2.2) ya no corre en esa instalación.
@@ -196,7 +197,7 @@ Los logs no contienen cuerpos, rutas reales ni query strings, y no deben contene
 
 | Componente | Impacto mientras está caído | Al volver |
 | :-- | :-- | :-- |
-| `api` | No hay portal; el gateway sigue con la última configuración; los registros de transparencia esperan en el búfer de Fluent Bit | Migraciones, reconciliación completa, vacía el outbox |
+| `api` | No hay portal; el gateway sigue con la última configuración; los registros de transparencia esperan en el búfer de Fluent Bit | Migraciones (`migrate`, antes), reconciliación completa (vuelve a escribir cada objeto con llave privada, B-31), vacía el outbox |
 | `web` | No hay portal; el API sigue | — |
 | `keycloak` | No se puede iniciar sesión ni emitir tokens de aplicación. La validación de los tokens vigentes (5 min) depende de la caché de JWKS de APISIX (sin probar, M6-04) | — |
 | `apisix` | Sin tráfico | Lee la configuración de etcd |
@@ -291,7 +292,7 @@ node scripts/keycloak-portal-mfa.mjs              # flujo, mapa acr y política 
 node scripts/keycloak-portal-mfa.mjs --demo-otp   # además, los códigos de los usuarios de demo
 ```
 
-- `--demo-otp` es solo para desarrollo y el piloto. Reimporta desde el JSON, con el mismo id, cada usuario semilla con rol crítico que aún no tenga código: vuelve a poner la contraseña de `DEN_DEMO_USER_PASSWORD` y el código de `DEN_DEMO_TOTP_SECRET`. Se salta un usuario de demo desactivado en Keycloak (`demo-users disable`), para no volver a activarlo.
+- `--demo-otp` es solo para desarrollo y el piloto. Reimporta desde el JSON, con el mismo id, cada usuario semilla con rol crítico que aún no tenga código: vuelve a poner la contraseña de `DEN_DEMO_CRITICAL_PASSWORD` (`DEN_DEMO_USER_PASSWORD` si está vacía) y el código de `DEN_DEMO_TOTP_SECRET`. `--demo-critical-password` pone `DEN_DEMO_CRITICAL_PASSWORD` a esos mismos usuarios si existen y están activos (M-29; `install.sh realms` lo corre una vez, cuando agrega la variable). Con `DEN_KEYCLOAK_SMTP_HOST` definida, el script también aplica el servidor SMTP del realm (M-28). Se salta un usuario de demo desactivado en Keycloak (`demo-users disable`), para no volver a activarlo.
 - **Enlace de verificación (P-08).** El mismo script fija cuánto duran los enlaces de verificación del correo y de restablecimiento de contraseña (`actionTokenGeneratedByUserLifespan`, 60 minutos; Keycloak trae 5).
 - Comprobación: en la consola de Keycloak, realm `den-portal` → Authentication, `den-browser` está ligado al navegador. `pnpm demo:otp` imprime el código vigente de los usuarios de demo y la clave para una app autenticadora.
 - **Aviso de credencial.** Keycloak le escribe al dueño de la cuenta cuando se pone o se quita una contraseña o un segundo factor, y guarda esos eventos 90 días (realm `den-portal` → Events). Si alguien dice que no enroló el segundo factor que recibió en el aviso, trátalo como un incidente: deshabilita la cuenta en Keycloak, borra la credencial OTP y restablece la contraseña antes de volver a habilitarla.
@@ -356,10 +357,12 @@ Las bases `den` y `keycloak` se respaldan con pgBackRest en el piloto y con Barm
 
 **La clave `PGBACKREST_REPO1_CIPHER_PASS` se guarda fuera del servidor**, con la copia del `.env`. Sin ella no se puede restaurar ningún respaldo.
 
-**El repositorio vive en el mismo servidor.** No protege de la pérdida del disco ni de la máquina. `sudo ./install.sh backup` copia todo a `backups/<fecha>/`, para llevarlo fuera del servidor:
+**El repositorio vive en el mismo servidor.** No protege de la pérdida del disco ni de la máquina. `sudo ./install.sh backup` copia todo salvo `.env` a `backups/<fecha>/`, para llevarlo fuera del servidor, y conserva los `DEN_BACKUP_KEEP` más recientes (5 por omisión):
 - un respaldo completo de pgBackRest y el repositorio entero (`pgbackrest-repo.tgz`, ya cifrado);
 - los volcados lógicos `den.dump` y `keycloak.dump`, que sirven para restaurar en otra versión de PostgreSQL o en otra plataforma (del piloto a Kubernetes);
-- los volúmenes y el `.env` (tabla de abajo).
+- los volúmenes (tabla de abajo).
+
+**`.env` no va ahí (M-30).** Tiene la clave del repositorio (`PGBACKREST_REPO1_CIPHER_PASS`), la contraseña de la CA y todos los demás secretos: un repositorio cifrado junto a su clave no protege nada. Guarda `.env` fuera del servidor, en otro lugar que los respaldos (un gestor de contraseñas o la bóveda del operador).
 
 Hazlo antes de cada actualización y con regularidad.
 
@@ -380,9 +383,13 @@ Lo escrito después del instante elegido se pierde. Después de restaurar:
 - revisa la cadena de auditoría (Consola → Auditoría → "Verificar integridad");
 - revisa que nada quede fuera de sincronía con el gateway (§4.2). Los reconciliadores llevan APISIX, OPA y Keycloak al estado de la base restaurada.
 
-**Si se perdió el servidor:** instala el portal en otro (`INSTALL.md`) con el `.env` guardado. Antes del primer arranque, restaura el volumen `pgbackrest-repo` desde `pgbackrest-repo.tgz` y los demás volúmenes desde sus `.tgz`. Luego ejecuta `sudo ./install.sh restore`.
+**Si se perdió el servidor** (`sudo ./install.sh restore-volumes <carpeta>`, M-30):
+1. En el servidor nuevo, con el DNS apuntando a él: clona el repositorio en la misma versión y pon el `.env` guardado en su raíz (permisos 600). No corras antes `sudo ./install.sh`: su arranque inicializaría una base vacía.
+2. Copia la carpeta del respaldo (`backups/<fecha>/`, con `pgbackrest-repo.tgz`) al servidor.
+3. `sudo ./install.sh restore-volumes <carpeta>`. Revisa el servidor y que no corra nada de esta instalación, crea imágenes, redes y volúmenes sin arrancar nada (`docker compose create`), llena `pgbackrest-repo`, `step-ca-data`, `tsa-data`, `api-documents` y `citizen-app-data` desde sus `.tgz`, restaura la base en el volumen de datos vacío desde el repositorio (el último estado archivado) y solo entonces arranca todo y toma un respaldo completo en la nueva línea de tiempo.
+4. Revisa la cadena de auditoría y el gateway (§4.2), como después de cualquier restauración.
 
-**La prueba del procedimiento:** `pnpm restore:test`, también en CI. Usa la misma imagen y los mismos comandos, en contenedores aparte. Prueba la pérdida del volumen de datos, la recuperación a un instante, un respaldo después de restaurar y que el repositorio no se lee sin su clave.
+**La prueba del procedimiento:** `pnpm restore:test`, también en CI. Usa la misma imagen y los mismos comandos, en contenedores aparte. Prueba la pérdida del volumen de datos, la pérdida del servidor (el repositorio desde su archivo, desempacado en volúmenes nuevos y restaurado antes de que arranque PostgreSQL: los pasos de `restore-volumes`), la recuperación a un instante, un respaldo después de restaurar y que el repositorio no se lee sin su clave.
 
 **Otros datos** que `install.sh backup` guarda aparte:
 
@@ -391,7 +398,7 @@ Lo escrito después del instante elegido se pierde. Después de restaurar:
 | Volumen `step-ca-data` | Claves de la CA: sin él, todos los certificados quedan huérfanos | `docker run --rm -v den_step-ca-data:/v -v "$PWD":/b alpine tar xzf /b/step-ca-data.tgz -C /v`, con el servicio detenido |
 | Volumen `tsa-data` | Cadena y clave de la TSA de desarrollo (los sellos ya emitidos se verifican con la cadena) | Igual, con `den_tsa-data` |
 | Volumen `api-documents` | Documentos subidos (designaciones, acuerdos) | Igual, con `den_api-documents` |
-| `.env` | Claves sin las que los datos no se pueden verificar, seudonimizar igual ni restaurar | Copia cifrada fuera de la máquina |
+| `.env` (no va en `backups/`) | Claves sin las que los datos no se pueden verificar, seudonimizar igual ni restaurar | Copia cifrada fuera de la máquina, aparte de los respaldos |
 
 No hace falta respaldar `etcd-data` (se reconstruye desde PostgreSQL), OPA (guarda solo una copia del bundle) ni `opensearch-data` (analítica, se puede perder). `transparency-buffer` solo tiene lo que aún no llegó al API.
 

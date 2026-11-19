@@ -55,10 +55,11 @@ Compose follows this order with `depends_on` and health checks: `api` waits for 
 | `fluent-bit-transparency` | Listens on 5170; sends to the API collector with retries | Nothing | `dc exec api wget -qO- http://fluent-bit-transparency:2020/api/v1/health` |
 | `opensearch` / `fluent-bit` | `den-access-YYYY.MM` indexes when the first log arrives | On the host, `vm.max_map_count` (DEPLOYMENT §2) | `dc ps opensearch fluent-bit` (healthy) |
 | `mailpit` | — | Save the `MAILPIT_UI_AUTH` user | Open `$DEN_PUBLIC_URL/mail` |
-| `api` | Migrations (`prisma migrate deploy`), idempotent seed (`DEN_ALLOW_SEED=true`), start of the background jobs and an **immediate full reconciliation** of APISIX and Keycloak | Review the log of the first start | `dc logs api` shows `Portal API listening on 4000 (country <code>)`; `curl -fsS $DEN_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
+| `migrate` | Applies pending migrations (`prisma migrate deploy`) as the schema owner and ends: the only container with `DATABASE_MIGRATION_URL` (A-2) | Nothing | `dc ps -a migrate` shows `exited (0)`; `dc logs migrate` |
+| `api` | Idempotent seed (`DEN_ALLOW_SEED=true`), start of the background jobs and an **immediate full reconciliation** of APISIX and Keycloak | Review the log of the first start | `dc logs api` shows `Portal API listening on 4000 (country <code>)`; `curl -fsS $DEN_PUBLIC_URL/api/v1/health` → `{"status":"ok"}` |
 | `web` | — | Nothing | Open `$DEN_PUBLIC_URL` and sign in |
 | `citizen-app` | — | Nothing | Open `$DEN_PUBLIC_URL/citizen-app` |
-| Reverse proxy | — | Configure the routes from DEPLOYMENT §5.2 **without** `/api/v1/internal` or `/api/v1/opa` | `curl -i $DEN_PUBLIC_URL/api/v1/opa/bundle.tar.gz` must **not** reach the API (404 from the proxy or the web) |
+| Reverse proxy | — | Configure the routes from DEPLOYMENT §5.2 **without** `/api/v1/internal` or `/api/v1/opa`, and with Keycloak's administration closed (`DEN_KEYCLOAK_ADMIN_ALLOW`, B-28) | `curl -i $DEN_PUBLIC_URL/api/v1/opa/bundle.tar.gz` and `curl -i -X POST $DEN_PUBLIC_URL/api/v1/internal/subject-access` answer exactly **404** (the web's: a 401 means the API got it); `curl -i $DEN_PUBLIC_URL/auth/admin/` answers 403. `install.sh status` checks all three (M-26) |
 
 Overall status at a glance: `dc ps` (all `running`, and `healthy` those that have a health check; `tsa-init` in `exited (0)`).
 
@@ -90,7 +91,7 @@ Overall status at a glance: `dc ps` (all `running`, and `healthy` those that hav
 | Entities | The requester registers and requests onboarding for their entity; a `platform_reviewer` or `platform_admin` approves it (`entity_review.decide`) and the requester becomes `entity_admin`. The `platform_admin` can also create them from the console (`entity_admin.create`) and suspend, reactivate or offboard them (`entity_admin.decide`) | Immediately |
 | People in an entity | The `entity_admin` invites them by email and assigns roles (ADR-0018) | Immediately; roles are read on every request |
 | Platform roles | The seed gives them to the demo users (`infra/keycloak/README.md`). The operator's own people get theirs from the server's command line, after they register and sign in once: `sudo ./install.sh platform-role grant <email> <role>` in the pilot, `node dist/admin/platform-roles-cli.js grant <email> <role>` in the API container elsewhere (`revoke`, `list`). Audited (`platform_role.granted`, `platform_role.revoked`); the last `platform_admin` cannot be revoked | Immediately; the second factor is asked at the person's next sign-in |
-| Demo users (pilot) | `sudo ./install.sh demo-users disable [--reason "..."]`, `node dist/admin/demo-users-cli.js disable` in the API container elsewhere (`list` shows their state). Each demo user of the realm file is disabled in Keycloak (sessions ended) and in the portal, and loses its platform roles; audited (`user.disabled`, `platform_role.revoked`). It refuses while no active `platform_admin` other than the demo users exists, and changes nothing if Keycloak does not answer. It needs `KEYCLOAK_ADMIN_USER` and `KEYCLOAK_ADMIN_PASSWORD` in the API container (the pilot's `.env` has them). No command undoes it | Immediately; the seed leaves them disabled on every start |
+| Demo users (pilot) | `sudo ./install.sh demo-users disable [--reason "..."]`, `node dist/admin/demo-users-cli.js disable` in the API container elsewhere (`list` shows their state). Each demo user of the realm file is disabled in Keycloak (sessions ended) and in the portal, and loses its platform roles; audited (`user.disabled`, `platform_role.revoked`). It refuses while no active `platform_admin` other than the demo users exists, and changes nothing if Keycloak does not answer. It needs `KEYCLOAK_ADMIN_USER` and `KEYCLOAK_ADMIN_PASSWORD`, which the API container does not hold (A-2): `install.sh` passes them to this command only, from `.env`; elsewhere, `docker compose exec -e KEYCLOAK_ADMIN_USER -e KEYCLOAK_ADMIN_PASSWORD api …` with both in your shell. No command undoes it | Immediately; the seed leaves them disabled on every start |
 | Self-registration | Realm `den-portal`: `registrationAllowed` and `verifyEmail`; the verification link lasts 60 minutes (`actionTokenGeneratedByUserLifespan`, P-08) | Already active on new realms; on an existing one, §5.3 |
 
 > **Warning.** The pilot always loads the demo seed, with fictitious entities and demo users that keep their platform roles. Giving the operator's people their own accounts and roles with the command above does not remove them: `demo-users disable` does, once they have them. Even then a pilot is a demonstration environment, not a production one (`DEPLOYMENT.md §8`). After it, the demo rehearsal (§2.2) no longer runs on that installation.
@@ -196,7 +197,7 @@ Logs do not contain bodies, real paths or query strings, and must not contain th
 
 | Component | Impact while it is down | When it comes back |
 | :-- | :-- | :-- |
-| `api` | No portal; the gateway keeps the last configuration; transparency records wait in the Fluent Bit buffer | Migrations, full reconciliation, drains the outbox |
+| `api` | No portal; the gateway keeps the last configuration; transparency records wait in the Fluent Bit buffer | Migrations (`migrate`, first), full reconciliation (every object with a private key is written again, B-31), drains the outbox |
 | `web` | No portal; the API keeps running | — |
 | `keycloak` | Nobody can sign in and no application tokens can be issued. Validating current tokens (5 min) depends on APISIX's JWKS cache (untested, M6-04) | — |
 | `apisix` | No traffic | Reads the configuration from etcd |
@@ -291,7 +292,7 @@ node scripts/keycloak-portal-mfa.mjs              # flow, acr map and OTP policy
 node scripts/keycloak-portal-mfa.mjs --demo-otp   # also the demo users' codes
 ```
 
-- `--demo-otp` is for development and the pilot only. It reimports from the JSON, with the same id, each seed user with a critical role that does not yet have a code: it sets the password from `DEN_DEMO_USER_PASSWORD` and the code from `DEN_DEMO_TOTP_SECRET` again. A demo user disabled in Keycloak (`demo-users disable`) is skipped, so it is not enabled again.
+- `--demo-otp` is for development and the pilot only. It reimports from the JSON, with the same id, each seed user with a critical role that does not yet have a code: it sets the password from `DEN_DEMO_CRITICAL_PASSWORD` (`DEN_DEMO_USER_PASSWORD` when empty) and the code from `DEN_DEMO_TOTP_SECRET` again. `--demo-critical-password` sets `DEN_DEMO_CRITICAL_PASSWORD` on those same users when they exist and are enabled (M-29; `install.sh realms` runs it once, when it adds the variable). With `DEN_KEYCLOAK_SMTP_HOST` set, the script also applies the realm's SMTP server (M-28). A demo user disabled in Keycloak (`demo-users disable`) is skipped, so it is not enabled again.
 - **Verification link (P-08).** The same script sets how long the email verification and password reset links last (`actionTokenGeneratedByUserLifespan`, 60 minutes; Keycloak's default is 5).
 - Check: in the Keycloak console, realm `den-portal` → Authentication, `den-browser` is bound to the browser flow. `pnpm demo:otp` prints the current code for the demo users and the key for an authenticator app.
 - **Credential notice.** Keycloak writes to the account owner when a password or a second factor is set or removed, and keeps those events for 90 days (realm `den-portal` → Events). If someone says they did not enroll the second factor mentioned in the notice, treat it as an incident: disable the account in Keycloak, delete the OTP credential and reset the password before enabling it again.
@@ -356,10 +357,12 @@ The `den` and `keycloak` databases are backed up with pgBackRest on the pilot an
 
 **The `PGBACKREST_REPO1_CIPHER_PASS` key is kept off the server**, with the copy of `.env`. Without it, no backup can be restored.
 
-**The repository lives on the same server.** It does not protect against losing the disk or the machine. `sudo ./install.sh backup` copies everything to `backups/<date>/`, so it can be taken off the server:
+**The repository lives on the same server.** It does not protect against losing the disk or the machine. `sudo ./install.sh backup` copies everything but `.env` to `backups/<date>/`, so it can be taken off the server, and keeps the newest `DEN_BACKUP_KEEP` (5 by default) of them:
 - a full pgBackRest backup and the entire repository (`pgbackrest-repo.tgz`, already encrypted);
 - the logical dumps `den.dump` and `keycloak.dump`, which can be used to restore on another PostgreSQL version or another platform (from the pilot to Kubernetes);
-- the volumes and `.env` (table below).
+- the volumes (table below).
+
+**`.env` is not in it (M-30).** It holds the repository's key (`PGBACKREST_REPO1_CIPHER_PASS`), the CA's password and every other secret: an encrypted repository next to its key protects nothing. Keep `.env` off the server, in another place than the backups (a password manager or the operator's vault).
 
 Do it before every update and on a regular basis.
 
@@ -380,9 +383,13 @@ Whatever was written after the chosen instant is lost. After restoring:
 - check the audit chain (Console → Audit → "Verify integrity");
 - check that nothing is out of sync with the gateway (§4.2). The reconcilers bring APISIX, OPA and Keycloak to the state of the restored database.
 
-**If the server was lost:** install the portal on another one (`INSTALL.md`) with the saved `.env`. Before the first start, restore the `pgbackrest-repo` volume from `pgbackrest-repo.tgz` and the other volumes from their `.tgz` files. Then run `sudo ./install.sh restore`.
+**If the server was lost** (`sudo ./install.sh restore-volumes <dir>`, M-30):
+1. On the new server, with DNS pointing at it: clone the repository at the same version and put the saved `.env` at its root (mode 600). Do not run `sudo ./install.sh` first: its start would initialise an empty database.
+2. Copy the backup directory (`backups/<date>/`, with `pgbackrest-repo.tgz`) to the server.
+3. `sudo ./install.sh restore-volumes <dir>`. It checks the server and that nothing of this installation runs, creates images, networks and volumes without starting anything (`docker compose create`), fills `pgbackrest-repo`, `step-ca-data`, `tsa-data`, `api-documents` and `citizen-app-data` from their `.tgz`, restores the database into the empty data volume from the repository (the latest archived state), and only then starts everything and takes a full backup on the new timeline.
+4. Check the audit chain and the gateway (§4.2), as after any restore.
 
-**Testing the procedure:** `pnpm restore:test`, also in CI. It uses the same image and the same commands, in separate containers. It tests losing the data volume, point-in-time recovery, a backup after restoring, and that the repository cannot be read without its key.
+**Testing the procedure:** `pnpm restore:test`, also in CI. It uses the same image and the same commands, in separate containers. It tests losing the data volume, losing the server (the repository from its archive, unpacked into new volumes, then restored before PostgreSQL starts: the steps of `restore-volumes`), point-in-time recovery, a backup after restoring, and that the repository cannot be read without its key.
 
 **Other data** that `install.sh backup` saves separately:
 
@@ -391,7 +398,7 @@ Whatever was written after the chosen instant is lost. After restoring:
 | `step-ca-data` volume | The CA's keys: without it, every certificate is orphaned | `docker run --rm -v den_step-ca-data:/v -v "$PWD":/b alpine tar xzf /b/step-ca-data.tgz -C /v`, with the service stopped |
 | `tsa-data` volume | Chain and key of the development TSA (timestamps already issued are verified with the chain) | Same, with `den_tsa-data` |
 | `api-documents` volume | Uploaded documents (designations, agreements) | Same, with `den_api-documents` |
-| `.env` | Keys without which the data cannot be verified, pseudonymized the same way or restored | Encrypted copy off the machine |
+| `.env` (not in `backups/`) | Keys without which the data cannot be verified, pseudonymized the same way or restored | Encrypted copy off the machine, apart from the backups |
 
 There is no need to back up `etcd-data` (it is rebuilt from PostgreSQL), OPA (it only keeps a copy of the bundle) or `opensearch-data` (analytics, can be lost). `transparency-buffer` only holds what has not yet reached the API.
 

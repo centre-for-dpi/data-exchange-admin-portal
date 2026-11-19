@@ -96,7 +96,7 @@ Lo que hay en APISIX, OPA y en los clientes de Keycloak se calcula desde aquí, 
 - **Scripts de inicialización** (`infra/postgres/init`, solo con el volumen vacío):
   - `01-keycloak.sh`: rol `KEYCLOAK_DB_USER` y base `keycloak`.
   - `02-app-role.sh`: rol `den_app` (sin DDL) con la contraseña `DEN_APP_DB_PASSWORD`, base `den_test` y privilegios por defecto para que `den_app` use todo lo que cree el dueño.
-- **Dos roles del portal:** el dueño del esquema (`POSTGRES_USER`, `den`) solo corre migraciones (`DATABASE_MIGRATION_URL`); el API corre como `den_app` (`DATABASE_URL`). Las tablas de auditoría y de transparencia son de solo inserción incluso para el dueño (triggers, `ARCHITECTURE.md §7` y §13).
+- **Dos roles del portal:** el dueño del esquema (`POSTGRES_USER`, `den`) solo corre migraciones (`DATABASE_MIGRATION_URL`): en el piloto, el servicio de un solo uso `migrate`, el único contenedor con esa URL (A-2); en Kubernetes, el contenedor de inicio del API. El API corre como `den_app` (`DATABASE_URL`). Las tablas de auditoría y de transparencia son de solo inserción incluso para el dueño (triggers, `ARCHITECTURE.md §7` y §13).
 - **Migraciones:** Prisma (`apps/api/prisma/migrations`), con `DATABASE_MIGRATION_URL` (`apps/api/prisma.config.ts`). El esquema de la cola pg-boss también es una migración: el API arranca pg-boss sin permisos de DDL (`migrate: false`).
 - Las contraseñas de `.env` solo se usan **la primera vez**. Cambiarlas en `.env` con el volumen ya creado no cambia los roles: hay que hacer `ALTER ROLE ... PASSWORD` y actualizar `.env` a la vez.
 
@@ -121,7 +121,10 @@ Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen toke
   - Sin el flujo, Keycloak no puede dar `acr=mfa`, y esos roles reciben 403 `mfa_required` en todo el portal.
   - Los usuarios semilla con rol crítico traen el código de `DEN_DEMO_TOTP_SECRET`. En producción no hay usuarios semilla: cada persona enrola su app la primera vez.
 - **Enlace de verificación (P-08).** Los enlaces de verificación del correo y de restablecimiento de contraseña de `den-portal` duran 60 minutos (`actionTokenGeneratedByUserLifespan: 3600`; Keycloak trae 5). En un Keycloak que ya importó el realm lo aplica `node scripts/keycloak-portal-mfa.mjs`; en el piloto, `sudo ./install.sh realms`, que corre `update`.
-- **Usuarios de demo en un piloto (P-08).** La semilla los carga en cada arranque del API (`DEN_ALLOW_SEED=true`). Cuando la gente del operador tiene sus roles, `node dist/admin/demo-users-cli.js disable` en el contenedor del API (`sudo ./install.sh demo-users disable`) los desactiva en Keycloak y en el portal; desde entonces la semilla los deja desactivados. Usa `KEYCLOAK_URL` y el administrador de `master` (`OPERATIONS.md §2.3`).
+- **Usuarios de demo en un piloto (P-08).** La semilla los carga en cada arranque del API (`DEN_ALLOW_SEED=true`). Cuando la gente del operador tiene sus roles, `node dist/admin/demo-users-cli.js disable` en el contenedor del API (`sudo ./install.sh demo-users disable`) los desactiva en Keycloak y en el portal; desde entonces la semilla los deja desactivados. Usa `DEN_KEYCLOAK_ADMIN_URL` y el administrador de `master`, que el contenedor del API no tiene: `install.sh` se los pasa solo a ese comando (`OPERATIONS.md §2.3`).
+- **Contraseñas de demo (M-29).** Los usuarios con rol crítico (`ana.operadora`, `pablo.plataforma`, `marta.regulador`, `sofia.auditora`, `lucia.datos`) tienen `DEN_DEMO_CRITICAL_PASSWORD`, aleatoria en el piloto; los demás comparten `DEN_DEMO_USER_PASSWORD`, que se puede entregar en un taller. En desarrollo ambas son `den-demo-password`. Con solo la contraseña de una cuenta que ya tiene su segundo factor nadie puede inscribir otro: Keycloak pide antes el código actual (comprobado en Keycloak 26.8, consola de la cuenta incluida). Una cuenta que aún no lo tiene, como la de una persona a la que se acaba de dar un rol de plataforma, debe inscribirlo en su siguiente ingreso que lo pida: quien tenga la contraseña lo hace, y al dueño le llega un correo (M3-08). Que cada persona inscriba su autenticador (consola de la cuenta, "Inicio de sesión") antes de recibir el rol.
+- **Correo saliente (M-28).** El servidor SMTP del realm sale de `DEN_KEYCLOAK_SMTP_HOST`, `_PORT`, `_FROM`, `_FROM_NAME`, `_AUTH`, `_USER`, `_PASSWORD`, `_STARTTLS` y `_SSL` (Mailpit si faltan). En un realm ya importado, `sudo ./install.sh realms` (`node scripts/keycloak-portal-mfa.mjs`) los aplica, solo si `DEN_KEYCLOAK_SMTP_HOST` está definida.
+- **Administración (B-28).** El proxy del piloto responde 403 en `/auth/admin` y `/auth/realms/master` salvo desde `DEN_KEYCLOAK_ADMIN_ALLOW` (§5.2). El API llama a la Admin API dentro de la red (`DEN_KEYCLOAK_ADMIN_URL`, `http://keycloak:8080/auth`).
 - **Certificado de cliente de las aplicaciones (M3-10, ADR-0022).** Arranca con el proveedor x509 `nginx` y `trust-proxy-verification` (`--spi-x509cert-lookup--…`, en el compose): lee de `SSL_CLIENT_CERT` el certificado que APISIX ya verificó en la ruta de token del gateway. Por eso ninguna otra vía hacia Keycloak debe dejar pasar esa cabecera ni `ssl-client-verify` (§5.2).
 - Detalle de los tres realms y los usuarios semilla: `infra/keycloak/README.md`.
 
@@ -187,7 +190,8 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 - En cada arranque, `infra/step-ca/configure.sh` ajusta el provisioner `den-portal` (plantilla `app.tpl`, solo autenticación de cliente, 90 días por defecto, 397 como máximo). También crea, si no existe, el provisioner `den-gateway-tls` con la contraseña de la CA (plantilla `gateway.tpl`, solo autenticación de servidor, 90 días) y el provisioner `den-nodes` de los nodos del kit (plantilla `node.tpl`, autenticación de servidor y de cliente, 90 días, M4-02). Luego inicia la CA. Es idempotente: una CA existente recibe un provisioner nuevo al reiniciar el contenedor.
 - El portal genera las claves de los certificados del gateway y las guarda selladas con `DEN_SECRETS_KEY` (tabla `gateway_certificate`). Los renueva en el último tercio de su vida, en la pasada completa del reconciliador de APISIX.
 - El estado (raíz, intermedia, claves, `secrets/password`) vive en `step-ca-data`. **Perder ese volumen invalida todos los certificados emitidos.**
-- El API firma los CSR con los provisioners (`DEN_STEP_CA_URL`, `DEN_STEP_CA_PROVISIONER`, `DEN_STEP_CA_GATEWAY_PROVISIONER`, `DEN_STEP_CA_PROVISIONER_PASSWORD` = `STEP_CA_PASSWORD` para los dos) y verifica el TLS de la CA con `DEN_STEP_CA_ROOT_FILE` o `DEN_STEP_CA_ROOT_FINGERPRINT`. Con `NODE_ENV=production` (imágenes del piloto) una de las dos es **obligatoria**; sin ninguna, solo en desarrollo, confía en la raíz que sirve la CA.
+- **Cada provisioner tiene su propia contraseña (B-16):** `DEN_STEP_CA_PROVISIONER_PASSWORD` (`den-portal`), `DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD` y `DEN_STEP_CA_NODE_PROVISIONER_PASSWORD` (las dos toman la primera si faltan). `configure.sh` da a un provisioner un par de llaves nuevo, cifrado con su contraseña, cuando esa contraseña cambia (`secrets/<nombre>.password.sha256` registra cuál tiene la llave). Las llaves propias de la CA siguen bajo `STEP_CA_PASSWORD`, que solo recibe step-ca. Desarrollo deja las tres vacías o iguales a la de la CA.
+- El API firma los CSR con los provisioners (`DEN_STEP_CA_URL`, `DEN_STEP_CA_PROVISIONER`, `DEN_STEP_CA_GATEWAY_PROVISIONER`, `DEN_STEP_CA_NODE_PROVISIONER` y sus contraseñas; nunca `STEP_CA_PASSWORD`; vuelve a leer la llave de un provisioner cuando step-ca la rechaza) y verifica el TLS de la CA con `DEN_STEP_CA_ROOT_FILE` o `DEN_STEP_CA_ROOT_FINGERPRINT`. Con `NODE_ENV=production` (imágenes del piloto) una de las dos es **obligatoria**; sin ninguna, solo en desarrollo, confía en la raíz que sirve la CA.
 
 ### 3.7 Registro de transparencia: Fluent Bit + TSA
 
@@ -227,7 +231,7 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 
 **Función de `prometheus` en el despliegue.** Recoge las métricas de APISIX, del API (`GET /metrics` con `DEN_METRICS_TOKEN`) y de OPA, y evalúa las alertas de `ARCHITECTURE.md §9`. También da al API la disponibilidad del gateway, que es uno de los indicadores de la red. Sin él no hay alertas y ese indicador queda "sin datos"; el tráfico no se afecta.
 
-**Función de `alertmanager` en el despliegue.** Agrupa las alertas y las manda por correo al operador. En desarrollo y en el piloto llegan a Mailpit (`operaciones@den.example`). En producción se monta un `alertmanager.yml` propio con el SMTP y la dirección del operador.
+**Función de `alertmanager` en el despliegue.** Agrupa las alertas y las manda por correo al operador. En desarrollo llegan a Mailpit (`operaciones@den.example`). `infra/alertmanager/entrypoint.sh` toma los del operador de `.env` (M-28): `DEN_ALERT_EMAIL_TO` (quién las recibe), `DEN_ALERT_SMTP_SMARTHOST` (`host:puerto`), `DEN_ALERT_SMTP_FROM`, `DEN_ALERT_SMTP_REQUIRE_TLS` (`true` con un servidor real) y, con autenticación, `DEN_ALERT_SMTP_USER` y `DEN_ALERT_SMTP_PASSWORD`. Sin ellas, Mailpit.
 
 **Función de `grafana` en el despliegue.** Muestra el tablero del operador (`DEN · Operador`), aprovisionado desde `infra/grafana`, sin edición en la interfaz: los cambios van por el repositorio. Su usuario es `admin`, con `GRAFANA_ADMIN_PASSWORD`. En el piloto queda detrás del proxy en `/grafana` (`GRAFANA_ROOT_URL`, `GRAFANA_SERVE_FROM_SUB_PATH=true`).
 
@@ -240,7 +244,7 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 
 - Recibe todo el correo de desarrollo y del piloto (SMTP 1025): el del API (`DEN_SMTP_URL`), el de Keycloak (verificación y recuperación) y el de la app ciudadana.
 - En el piloto se sirve en `/mail` (`MP_WEBROOT`) detrás de usuario y contraseña (`MP_UI_AUTH=${MAILPIT_UI_AUTH}`): Keycloak envía allí los enlaces de recuperación de contraseña, así que una bandeja abierta permitiría tomar cualquier cuenta.
-- En producción se reemplaza por el SMTP real del operador (`DEN_SMTP_URL`, `DEN_MAIL_FROM`).
+- El servidor real del operador lo reemplaza por configuración (M-28): `DEN_SMTP_URL` y `DEN_MAIL_FROM` para el API (`smtp://mailpit:1025` en el piloto mientras `.env` no diga otra cosa; `smtps://usuario:contraseña@host:465` para uno real), `DEN_KEYCLOAK_SMTP_*` para Keycloak (§3.3), `DEN_ALERT_*` para Alertmanager (§3.8.1). La app ciudadana, utilería de demo, sigue en Mailpit (`CITIZEN_APP_SMTP_HOST`, sin autenticación).
 
 ### 3.9.1 Antivirus: ClamAV (perfil `antivirus`, M6-08)
 
@@ -263,7 +267,8 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 Además sirve la API del titular que consume la app ciudadana.
 
 - Imagen: `apps/api/Dockerfile`, construida desde la raíz del repo (`COPY . .`). **La configuración del país (`config/country/*.yaml`) queda dentro de la imagen**: un cambio en el YAML exige reconstruir.
-- Al arrancar: `prisma migrate deploy` (migraciones como dueño) → el seed (`dist/seed/main.js`) si `DEN_ALLOW_SEED=true` → `node dist/main.js` en `API_PORT` (4000). Si la configuración del país es inválida o falta `DEN_COUNTRY`, termina con código 1.
+- Al arrancar: el seed (`dist/seed/main.js`) si `DEN_ALLOW_SEED=true` → `node dist/main.js` en `API_PORT` (4000), como `den_app`. Las migraciones corren antes, como dueño del esquema, en su propio contenedor (`migrate` en el piloto, el contenedor de inicio en Kubernetes: `node_modules/.bin/prisma migrate deploy` con `DATABASE_MIGRATION_URL`, A-2). Termina con código 1 si la configuración del país es inválida o falta `DEN_COUNTRY` y, con `NODE_ENV=production`, si uno de sus secretos aún tiene el valor de `.env.example` (M-25; la imagen trae ese archivo para comparar).
+- **Solo sus propias variables (A-2).** En el piloto recibe la lista de `api:` en `docker-compose.deploy.yml`, no todo `.env`: ni la contraseña del dueño del esquema, ni el administrador `master` de Keycloak, ni la contraseña de la CA, ni la llave de los respaldos, ni los secretos de la web.
 - Corre como usuario `node`. Documentos en `/var/lib/den/documents` (`DEN_DOCUMENTS_DIR`, volumen `api-documents`); allí quedan también los paquetes del kit que el operador sirve desde el portal (P-03), hasta `DEN_KIT_BUNDLE_MAX_BYTES` cada uno (128 MiB por defecto).
 - **Trabajos en segundo plano en el mismo proceso** (`OPERATIONS.md §3`). `DEN_WORKER=off` arranca el API sin ellos (pruebas, réplicas de solo lectura).
 - Expone `/api/v1/*`. Rutas que **nunca** van al ingreso público: `/api/v1/internal/*` (colector de transparencia) y `/api/v1/opa/*` (bundle y estado de OPA).
@@ -273,7 +278,9 @@ Además sirve la API del titular que consume la app ciudadana.
 **Función en el despliegue.** Es la interfaz de las personas. Por un lado, el portal de desarrolladores: catálogo, documentación interactiva, aplicaciones y solicitudes de acceso. Por otro, las consolas de cada rol: publicador, responsable de datos, administrador de entidad, operador, regulador y auditoría. Inicia sesión con Keycloak (`den-portal`) y llama al API con el token del usuario, guardado en la cookie cifrada de Auth.js. No tiene base de datos propia, y la autorización la decide siempre el API.
 
 - Imagen: `apps/web/Dockerfile`. Se compila con secretos de relleno; los reales llegan en tiempo de ejecución. `/files/entity-check.sh` (P-05) se genera desde `scripts/entity-check.sh` al compilar la imagen, que además lleva una copia: un cambio en el script requiere recompilarla.
-- Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `DEN_PORTAL_WEB_CLIENT_ID`, `DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_API_URL` (interno, `http://api:4000`), `DEN_WEB_URL`, `DEN_GATEWAY_PUBLIC_URL`, opcional `DEN_AUTH_REFRESH_BEFORE_SECONDS` y `DEN_SESSION_IDLE_SECONDS` (el `ssoSessionIdleTimeout` del realm, 1800 por omisión: la web avisa dos minutos antes de que la sesión termine por inactividad y ofrece seguir, WCAG 2.2.1; si se cambia uno, se cambia el otro). En el piloto, `AUTH_TRUST_HOST=true` (está detrás del proxy).
+- Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `DEN_PORTAL_WEB_CLIENT_ID`, `DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_API_URL` (interno, `http://api:4000`), `DEN_WEB_URL`, `DEN_GATEWAY_PUBLIC_URL`, opcional `DEN_AUTH_REFRESH_BEFORE_SECONDS` y `DEN_SESSION_IDLE_SECONDS` (el `ssoSessionIdleTimeout` del realm, 1800 por omisión: la web avisa dos minutos antes de que la sesión termine por inactividad y ofrece seguir, WCAG 2.2.1; si se cambia uno, se cambia el otro). En el piloto, `AUTH_TRUST_HOST=true` (está detrás del proxy) y nada más de `.env` (A-2).
+- Desplegada (`next start` en una dirección que no es de loopback) no arranca mientras `AUTH_SECRET` o `DEN_PORTAL_WEB_CLIENT_SECRET` tenga el valor de `.env.example` (M-25).
+- **La dirección del visitante (M-27).** En cada llamada al API reenvía la última entrada del `X-Forwarded-For` que puso el proxy, y solo para una petición que trae `X-DEN-Proxy-Token` igual a `DEN_WEB_PROXY_TOKEN`: Next.js no le dice a la web quién es su par directo, así que el proxy prueba el salto con esa cabecera, que pone en todo lo que manda a la web, sobrescribiendo lo que haya enviado un cliente (§5.2). Una petición que llegó a la web por otro camino, o una web sin el token (desarrollo), no reenvía nada, y el API ve la dirección de la propia web. El API cree la cabecera porque `web` está en `DEN_TRUST_PROXY` (§4.1).
 - Corre con `next start` en 3000.
 - **Cabeceras de seguridad (M3-09).** La web pone ella misma la CSP con nonce, HSTS y el resto de las cabeceras (`ARCHITECTURE.md §12`). El proxy de delante no debe quitarlas ni reemplazarlas; tampoco debe agregar otra `Content-Security-Policy`, porque el navegador aplicaría las dos.
   - HSTS va siempre, con `includeSubDomains`: publica la web en un nombre cuyos subdominios también se sirvan por HTTPS.
@@ -315,7 +322,9 @@ Muestra lo que debe implementar una app ciudadana real; no es un producto.
 
 ## 4. Variables de entorno
 
-La referencia completa, comentada, es `.env.example`. Todos los servicios leen el mismo `.env` de la raíz (Compose con `--env-file .env`; en el piloto también `env_file` para `api`, `web` y `citizen-app`).
+La referencia completa, comentada, es `.env.example`. Compose lee el `.env` de la raíz (`--env-file .env`) y le da a cada servicio solo las variables de su lista (A-2): `api`, `web` y `citizen-app` del piloto tienen las suyas en `docker-compose.deploy.yml`.
+
+**Los valores de ejemplo se rechazan (M-25).** En producción el API, la web y la app ciudadana no arrancan mientras uno de sus secretos tenga el valor de `.env.example` (público en el repositorio), e `install.sh` rechaza un `.env` con cualquiera de esos secretos. `make-deploy-env.mjs` los genera todos.
 
 ### 4.1 Secretos que no se pueden cambiar a la ligera
 
@@ -327,7 +336,8 @@ La referencia completa, comentada, es `.env.example`. Todos los servicios leen e
 | `DEN_SECRETS_KEY` (32 bytes base64). Se rota con `DEN_SECRETS_KEYS_PREVIOUS` y `secrets:reseal` (`OPERATIONS.md §5.6`), nunca reemplazándola sin más | Si se reemplaza sin rotar, no se pueden abrir los secretos de cliente sellados que el reconciliador de Keycloak aún no aplicó, ni las claves de los certificados del gateway (`gateway_certificate`): el reconciliador de APISIX falla hasta que se emitan certificados nuevos |
 | `POSTGRES_PASSWORD`, `DEN_APP_DB_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Solo se aplican al crear el volumen (§3.2) |
 | `DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_GATEWAY_PROVISIONER_SECRET`, `DEN_CITIZEN_APP_CLIENT_SECRET` | Solo se aplican al importar el realm (§3.3) |
-| `STEP_CA_PASSWORD` | Cifra las claves de la CA y de los provisioners `den-portal` y `den-gateway-tls` ya creadas |
+| `STEP_CA_PASSWORD` | Cifra las claves de la CA ya creadas (raíz e intermedia) |
+| `DEN_STEP_CA_PROVISIONER_PASSWORD`, `DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD`, `DEN_STEP_CA_NODE_PROVISIONER_PASSWORD` | En el siguiente arranque de step-ca, ese provisioner recibe un par de llaves nuevo bajo la contraseña nueva (B-16): reinicia step-ca y después el API |
 | `AUTH_SECRET` | Cierra todas las sesiones de la web |
 | `DEN_APISIX_KEYRING` (16 caracteres) | APISIX no puede leer las claves privadas que cifró con el anterior (TLS del gateway, aserciones). Para rotarlo, se agrega el nuevo **primero** en `data_encryption.keyring` dejando el anterior detrás, hasta que el reconciliador reescriba esos objetos |
 
@@ -335,10 +345,12 @@ Si falta `DEN_SUBJECT_REF_KEY` o `DEN_END_USER_HASH_SALT`, o son cortas, o (con 
 
 Seguridad del API (M6-01):
 - `DEN_TRUST_PROXY`: quién puede fijar `X-Forwarded-For`, la dirección del llamante en los límites y en los eventos de seguridad.
-  - La dirección del proxy o su red, separadas por comas (`172.30.0.2`). En el piloto es la dirección de Traefik en la red `edge`: `docker inspect -f '{{(index .NetworkSettings.Networks "lab-router_default").IPAddress}}' <contenedor-de-traefik>`. Si Traefik cambia de dirección al reiniciarse, se fija con `ipv4_address` en su Compose.
+  - Nombres de host, que el API resuelve en la red de Compose cada 30 s, así un contenedor recreado con otra dirección conserva la confianza (M-27). El piloto escribe `edge,web` con el proxy incluido, o `<contenedor-de-traefik>,web` con uno que ya estaba en el servidor: el proxy, y la web, que reenvía la dirección del visitante. Sin `web`, todos los visitantes de la web comparten la cuota de su dirección y la auditoría registra la dirección de la web.
+  - La dirección del proxy o su red, separadas por comas (`172.30.0.2`), para un proxy fuera del DNS de Docker: `docker inspect -f '{{(index .NetworkSettings.Networks "<red>").IPAddress}}' <contenedor-de-traefik>`; si cambia de dirección al reiniciarse, se fija con `ipv4_address` en su Compose.
   - La red completa solo si en ella no hay más contenedores que el proxy y el portal: cualquier otro podría elegir con qué dirección se registra y se limita.
   - Un número confía en ese número de saltos, venga de donde venga: solo donde nada más que el proxy alcanza el API.
-  - Vacío (lo que genera `make-deploy-env.mjs` si no se le pasa): nadie. Los llamantes sin sesión comparten entonces la cuota de la dirección del proxy.
+  - Vacío (lo que genera `make-deploy-env.mjs` si no se le pasa; después `install.sh` lo llena): nadie. Los llamantes sin sesión comparten entonces la cuota de la dirección del proxy.
+  - El `ip` de la auditoría (SPEC §3) es `request.ip` para personas y aplicaciones, nunca para los trabajos en segundo plano.
 - `DEN_LOG_FORMAT`: `text` (por omisión) o `json`, un objeto por línea para un colector de logs (el chart de Helm fija `json`). Las líneas van enmascaradas en los dos formatos (`ARCHITECTURE.md §8`).
 - `DEN_RATE_LIMIT_PER_MINUTE` (600 por usuario verificado, o por dirección sin un token válido) y `DEN_RATE_LIMIT_STRICT_PER_MINUTE` (30 en subidas, versiones nuevas, solicitudes de alta, invitaciones y enrolamiento de nodos).
 
@@ -402,7 +414,13 @@ Otras variables del gateway (M3): `DEN_GATEWAY_NODES` (cuántos nodos de APISIX 
 | `DEN_NODE_CONTROL_TOKEN` | valor de desarrollo | aleatorio |
 | `DEN_WG_HUB_PRIVATE_KEY`, `DEN_WG_HUB_PUBLIC_KEY` | par de desarrollo | par aleatorio |
 | `DEN_WG_HUB_ENDPOINT` | `wg-hub:51820` | `<nombre del gateway>:51820` |
-| `MAILPIT_UI_AUTH`, `TRAEFIK_NETWORK`, `DEN_PUBLIC_URL` | — | solo piloto |
+| `DEN_DEMO_CRITICAL_PASSWORD` | vacía (`DEN_DEMO_USER_PASSWORD`) | aleatoria (M-29) |
+| `DEN_STEP_CA_PROVISIONER_PASSWORD` y las del gateway y los nodos | la de `STEP_CA_PASSWORD` | aleatorias, una cada una (B-16) |
+| `DEN_SMTP_URL` | `smtp://127.0.0.1:1025` | `smtp://mailpit:1025`, o el servidor del operador (M-28) |
+| `DEN_KEYCLOAK_ADMIN_URL` | vacía (`KEYCLOAK_URL`) | `http://keycloak:8080/auth` (B-28) |
+| `DEN_TRUST_PROXY` | vacío | `edge,web`, o el contenedor del proxy y `web` (M-27) |
+| `DEN_WEB_PROXY_TOKEN` | vacío (la web no reenvía ninguna dirección) | aleatorio; en la ruta del proxy hacia la web (M-27) |
+| `MAILPIT_UI_AUTH`, `TRAEFIK_NETWORK` (`den-edge` salvo `--traefik-network`), `DEN_KEYCLOAK_ADMIN_ALLOW`, `DEN_BACKUP_KEEP`, `DEN_PUBLIC_URL` | — | solo piloto |
 
 El API usa `KEYCLOAK_URL` para validar los tokens y para el Admin API de `den-gateway`: en el piloto llega a Keycloak por la URL pública, a través del proxy.
 
@@ -417,8 +435,10 @@ La forma recomendada de instalar el piloto es `sudo ./install.sh` ([`INSTALL.md`
 ### 5.1 Qué hace el override `docker-compose.deploy.yml`
 
 - Quita todos los puertos publicados (`ports: !reset []`) y pone `restart: unless-stopped`.
-- Agrega `api`, `web` y `citizen-app` como contenedores. El API aplica migraciones y el seed al arrancar (`DEN_ALLOW_SEED=true`) y envía correo a `smtp://mailpit:1025`.
-- Une al proxy, por la red externa `${TRAEFIK_NETWORK}` (por defecto `lab-router_default`), solo los servicios que se publican, con alias fijos: `den-portal-web`, `den-portal-api`, `den-keycloak`, `den-apisix`, `den-mailpit`, `den-citizen-app`, `den-tsa`.
+- Agrega `migrate`, `api`, `web` y `citizen-app` como contenedores. `migrate` aplica las migraciones como dueño del esquema y termina; el API, como `den_app`, carga el seed al arrancar (`DEN_ALLOW_SEED=true`) y envía correo a `DEN_SMTP_URL` (`smtp://mailpit:1025` por omisión).
+- Cada uno recibe solo sus propias variables (`environment:`, A-2); todo secreto es obligatorio (`${VAR:?}`), también las contraseñas y la clave de código de los usuarios de demo en Keycloak (M-25).
+- Límites de memoria en los servicios pesados (`mem_limit`, B-31): Keycloak, PostgreSQL y OpenSearch 2 GB, ClamAV 3 GB, el API 1,5 GB, APISIX, la web y Prometheus 1 GB. Las imágenes de terceros van fijadas por etiqueta y digest en el archivo base.
+- Une al proxy, por la red externa `${TRAEFIK_NETWORK}` (obligatoria: `den-edge` con el proxy de `install.sh`), solo los servicios que se publican, con alias fijos: `den-portal-web`, `den-portal-api`, `den-keycloak`, `den-apisix`, `den-mailpit`, `den-citizen-app`, `den-tsa`.
 - Keycloak con `start_period` de 300 s: en una máquina compartida tarda minutos en arrancar.
 
 ### 5.2 Rutas del proxy inverso (un solo nombre público)
@@ -461,6 +481,30 @@ http:
 ```
 
 Traefik da más prioridad a la regla más larga, así que `/api/v1`, `/auth`, etc. ganan sobre `/`.
+
+**La administración de Keycloak (B-28).** `/auth/admin` (la consola y la Admin API) y `/auth/realms/master` (donde entran sus administradores) responden 403 salvo desde las direcciones de `DEN_KEYCLOAK_ADMIN_ALLOW` (direcciones o redes CIDR separadas por comas; vacío: nadie). El portal nunca las necesita por el proxy: el API y los scripts llegan a Keycloak dentro de la red. Con tu propio Traefik, agrega esto, con tus direcciones:
+
+```yaml
+http:
+  middlewares:
+    den-keycloak-admin: { ipAllowList: { sourceRange: ['203.0.113.10/32'] } }
+  routers:
+    den-auth-admin: { rule: 'Host(`portal.example.org`) && (PathPrefix(`/auth/admin`) || PathPrefix(`/auth/realms/master`))', service: den-keycloak, middlewares: [den-keycloak-admin, den-no-client-cert-headers], tls: { certResolver: le } }
+```
+
+Detrás de un balanceador o una CDN, `ipAllowList` necesita `ipStrategy` para leer la dirección del cliente de su `X-Forwarded-For`.
+
+**El token del proxy para la web (M-27).** La ruta hacia la web (`/`) debe poner `X-DEN-Proxy-Token` igual a `DEN_WEB_PROXY_TOKEN`; sin él la web no pasa la dirección del visitante, y todos los visitantes de la web comparten un límite de peticiones y una dirección en la auditoría. `install.sh` lo escribe en las rutas que genera (`den-web-from-proxy`, un archivo que solo lee root). A mano:
+
+```yaml
+http:
+  middlewares:
+    den-web-from-proxy: { headers: { customRequestHeaders: { X-DEN-Proxy-Token: '<DEN_WEB_PROXY_TOKEN>' } } }
+  routers:
+    den-web: { rule: 'Host(`portal.example.org`)', service: den-web, middlewares: [den-web-from-proxy], tls: { certResolver: le } }
+```
+
+Guarda ese archivo tan en secreto como `.env`. Si tu Traefik no corre como root, dale a su usuario permiso de lectura.
 
 **El espejo del kit (P-03)** no necesita una ruta propia: `/kit/<versión>/<archivo>` es una ruta de páginas de la web (`/`), que lo transmite desde el API, y también lo es la subida del operador (`/files/kit-releases/<versión>/bundle`). El proxy debe aceptar cuerpos de petición tan grandes como el paquete (decenas de MB): Traefik no tiene límite por defecto; otro proxy (`client_max_body_size` de nginx) debe permitir `DEN_KIT_BUNDLE_MAX_BYTES`.
 
@@ -516,7 +560,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
   --env-file .env --profile observability up -d --build [api web citizen-app]
 ```
 
-- Las migraciones se aplican solas al arrancar el API.
+- Las migraciones las aplica el servicio `migrate` antes de que arranque el API (A-2).
 - Revisa en las notas de la historia (`BACKLOG.md`) si la versión pide pasos manuales: cambios de realm de Keycloak (no se reimportan, §3.3), variables nuevas en `.env` (`make-deploy-env.mjs` no edita un `.env` existente) o volúmenes nuevos.
 - **Al pasar a M3 (M3-01 a M3-04)**, sobre un piloto anterior:
   1. Agregar a `.env`: `DEN_STEP_CA_URL=https://step-ca:9000`, `DEN_STEP_CA_PROVISIONER_PASSWORD` (= `STEP_CA_PASSWORD`), `DEN_STEP_CA_ROOT_FILE=/var/lib/den/step-ca/root_ca.crt` y, si cambian sus valores por defecto, `DEN_GATEWAY_TLS_HOSTS` y `DEN_GATEWAY_CLIENT_NAME`.
@@ -535,6 +579,14 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 - **P-06 (carpeta de documentos)**, sobre cualquier despliegue anterior: `.env` traía `DEN_DOCUMENTS_DIR=data/documents` y toda subida fallaba. El overlay de despliegue fija ahora `/var/lib/den/documents` para el API e `install.sh update` corrige `.env`; con `docker compose` a mano, cambiar la línea en `.env` y recrear el API. No se guardó nada, así que no hay nada que mover.
 - **R-10 (el cambio de nombre de la app ciudadana, commit `9de1423`)**, sobre un piloto instalado antes: `sudo ./install.sh update` pasa los nombres viejos del `.env` (§4): `DEN_CARPETA_CLIENT_SECRET` a `DEN_CITIZEN_APP_CLIENT_SECRET` (mismo valor), `DEN_CARPETA_URL` a `DEN_CITIZEN_APP_URL` (la ruta `/carpeta` pasa a `/citizen-app`), y el client id `carpeta-ciudadana` a `citizen-app` en `DEN_CITIZEN_CLIENTS` y `DEN_CITIZEN_APPS` (con la nueva dirección de Compose del webhook). Las líneas viejas se quedan en `.env`, sin uso. Luego su paso `realms` corre `scripts/keycloak-citizen-app.mjs`: en el realm `den-citizens` existente crea `citizen-app` desde `infra/keycloak/den-citizens-realm.json` (secreto de `DEN_CITIZEN_APP_CLIENT_SECRET`, URIs de redirección de `DEN_CITIZEN_APP_URL`, PKCE y scopes por defecto) y borra `carpeta-ciudadana`. Es idempotente; los ciudadanos con sesión en la app vuelven a entrar. Si la actualización la corre el `install.sh` anterior, Compose se detiene y pide `DEN_CITIZEN_APP_CLIENT_SECRET`: basta correr otra vez `sudo ./install.sh update`. Con `docker compose` a secas, renombra las variables a mano y corre `node scripts/keycloak-citizen-app.mjs` con `KEYCLOAK_URL` y el administrador de `master`. Los avisos del volumen anterior `carpeta-data` no se mueven (§4).
 - **R-02 (credenciales en el plano de control del gateway, ADR-0031)**, sobre cualquier piloto anterior: `sudo ./install.sh update` agrega a `.env` `DEN_OPA_DECISION_TOKEN`, `DEN_OPA_ADMIN_TOKEN`, `ETCD_ROOT_PASSWORD` y `APISIX_ETCD_PASSWORD`. Si la actualización la corre el `install.sh` anterior, Compose se detiene y pide una de ellas: basta correr otra vez `sudo ./install.sh update` (o `sudo ./install.sh start`). En el `up`, `etcd-init` activa la autenticación de etcd (los datos se quedan) y se recrean OPA, APISIX, los Fluent Bit y OpenSearch (banderas y redes nuevas). Hasta que el API nuevo reescribe las rutas con el token de decisión (su pasada completa al arrancar), el gateway responde 503. Con `docker compose` a secas, agrega las cuatro variables a mano (32 caracteres al azar cada una, p. ej. `openssl rand -hex 32`).
+- **R-04 (secretos y endurecimiento del despliegue, ADR-0034)**, sobre cualquier piloto anterior: `sudo ./install.sh update` lo hace todo; si la actualización la corre el `install.sh` anterior, Compose se detiene y pide una de las variables nuevas: corre otra vez `sudo ./install.sh update`. Qué cambia:
+  - **Un servicio `migrate`** aplica las migraciones como dueño del esquema antes del API, que ahora corre solo como `den_app` y recibe solo las variables que lee; también `web` y `citizen-app` (ya no hay `env_file`). Una variable que agregaste a mano en `.env` para uno de ellos debe estar en su lista `environment:` de `docker-compose.deploy.yml` (la prueba `tests/infra/src/deploy-overlay.test.ts` lista lo que lee cada uno).
+  - **Nuevo en `.env`**, lo agrega `install.sh`: `DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD` y `DEN_STEP_CA_NODE_PROVISIONER_PASSWORD`, una `DEN_STEP_CA_PROVISIONER_PASSWORD` nueva si era la de la CA (B-16: en su siguiente arranque step-ca da a cada provisioner un par de llaves nuevo bajo su propia contraseña; los certificados ya emitidos siguen valiendo); `DEN_DEMO_CRITICAL_PASSWORD` (M-29: `realms` la pone a los cinco usuarios de demo con rol crítico, `sudo ./install.sh credentials` la muestra); `DEN_KEYCLOAK_ADMIN_URL=http://keycloak:8080/auth`; `DEN_WEB_PROXY_TOKEN` (M-27: el proxy lo agrega a lo que manda a la web; con tu propio Traefik, agrega al router `den-web` el middleware `den-web-from-proxy` de §5.2); `DEN_TRUST_PROXY` recibe `web` y, si estaba vacío, el proxy (`edge`, o el contenedor de Traefik que encuentre en `TRAEFIK_NETWORK`; en un servidor donde no lo encuentra, escribe su nombre o dirección antes de `,web`); `DEN_SMTP_URL` pasa del valor de desarrollo a `smtp://mailpit:1025`.
+  - **Las rutas del proxy** (`install.sh` reescribe las del incluido): `/auth/admin` y `/auth/realms/master` responden 403 salvo desde `DEN_KEYCLOAK_ADMIN_ALLOW` (vacío: nadie). Con tu propio Traefik, agrega a su archivo el middleware `den-keycloak-admin` y el router `den-auth-admin` de `infra/edge/den.yml.template` (§5.2).
+  - **La llave de fábrica de APISIX** sale del keyring: hasta que el API nuevo arranca y reescribe los objetos SSL y la llave de la aserción (segundos), un nombre TLS cuya llave estaba cifrada con ella no responde.
+  - **Respaldos:** `install.sh backup` ya no copia `.env` y conserva los cinco últimos; borra el archivo `env` de los `backups/*/` anteriores cuando `.env` tenga una copia fuera del servidor.
+  - **Requisitos:** Docker Engine 26 o posterior (el instalador lo comprueba). Las imágenes van fijadas por digest: el primer `up` las descarga de nuevo.
+  - Con `docker compose` a secas: agrega a mano las variables de arriba (32 caracteres al azar, p. ej. `openssl rand -hex 32`; `DEN_TRUST_PROXY` como en §4.1), fija `TRAEFIK_NETWORK` (ya no tiene valor por omisión) y corre `node scripts/keycloak-portal-mfa.mjs --demo-critical-password` cuando Keycloak esté arriba.
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
 ## 6. Desarrollo local

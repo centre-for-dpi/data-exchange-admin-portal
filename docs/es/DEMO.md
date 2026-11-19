@@ -6,7 +6,7 @@ Duración: 15 minutos. Todo corre en local con `pnpm infra:up && pnpm dev`. Todo
 
 **Ensayo automático:** `pnpm demo` ejecuta los 10 pasos contra el stack local con los mismos personajes. Cada uno inicia sesión en Keycloak como lo haría en la web. El script narra cada paso y termina con código 1 si algo no se comporta como dice este guion. Para poder repetirse, usa una API propia por corrida (`/salud/afiliacion-<corrida>/v1`). El recorrido completo por la UI está en `apps/web/e2e/demo.spec.ts`.
 
-## Personajes (usuarios semilla en Keycloak, contraseña `den-demo-password` solo en desarrollo, o la de `DEN_DEMO_USER_PASSWORD`)
+## Personajes (usuarios semilla en Keycloak, contraseña `den-demo-password` solo en desarrollo, o la de `DEN_DEMO_USER_PASSWORD`; en un piloto, los que tienen segundo factor tienen la suya, `DEN_DEMO_CRITICAL_PASSWORD`)
 
 | Usuario | Entidad | Rol |
 | :-- | :-- | :-- |

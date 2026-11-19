@@ -482,7 +482,7 @@ The kit is specified in another repository; this contract is the boundary. In de
   - Cookies: the Auth.js ones are `HttpOnly`, `SameSite=Lax`, host-only and, over HTTPS, `Secure` with a `__Secure-` or `__Host-` prefix. The portal's own cookies (active entity, session step-up) follow the same rules. CSRF through Auth.js and server actions (`Origin` check).
 - **API (M6-01).**
   - Rate limit before reading the body: per verified user (a forged token is not a quota of its own) or per address, and a strict quota on expensive routes and on node enrollment. Only the control routes of the platform services, each with its own credential, are exempt, and they are recognized by route template. The proxy adds a per-address limit.
-  - `X-Forwarded-For` is only trusted from the proxy's address (`DEN_TRUST_PROXY`).
+  - `X-Forwarded-For` is only trusted from the proxy and the web, by address or by host name (`DEN_TRUST_PROXY`); the web forwards the visitor's address, which the audit log records (M-27).
   - Uploads verify the token before receiving the file.
   - Maximum body size, zod validation on all inputs and problem+json without internal stack traces.
   - Each field error carries `key` and `params` in addition to the English `message`, and the web app shows it in the user's language (ADR-0025, M6-02). `params` never carries what the user typed.

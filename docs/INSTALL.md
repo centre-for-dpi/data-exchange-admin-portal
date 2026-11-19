@@ -39,7 +39,7 @@ Where the numbers come from (measured on the demo pilot, November 2026):
 
 No other service may be on 80 or 443. If the server already runs Traefik, the installer can join it (§3, step 4).
 
-**Before Tuesday:**
+**Before installing:**
 
 - [ ] VPS created, with `root` or `sudo` access over SSH.
 - [ ] Both DNS records created and propagated: `getent hosts <name>` must return the server's IP.
@@ -48,10 +48,10 @@ No other service may be on 80 or 443. If the server already runs Traefik, the in
 
 ### 1.3 Software
 
-The installer checks everything, and if Docker is missing it offers to install it with the official script (`get.docker.com`).
+The installer checks everything. If Docker is missing it can download Docker's official script (`get.docker.com`), show its SHA-256 and run it only after you confirm, never piped into a shell; with `DEN_DOCKER_SCRIPT_SHA256` set to a checksum you got elsewhere, it checks it (B-30). Docker's own packages for your distribution (https://docs.docker.com/engine/install/) are the alternative.
 
-- Docker Engine with the Compose plugin ≥ 2.26.
-- `git`, `curl`, and `openssl` for the checks.
+- Docker Engine ≥ 26 with the Compose plugin ≥ 2.26.
+- `git`, `curl` and `openssl`: the installer stops if one is missing.
 - Node.js is **not** needed on the server: the helper scripts run in a `node` container.
 
 ## 2. Installation
@@ -72,19 +72,21 @@ The script asks its questions one at a time, shows a summary and asks for confir
 | 3 | **Portal name** | Just the name, without `https://` (e.g. `portal.den.example`) |
 | 3 | **Gateway name** | Defaults to `gw.<portal>`. It must differ from the portal |
 | 4 | **Inbound proxy** | `1` Bundled (recommended): the installer puts Traefik on 80/443. `2` I already have Traefik: it joins its Docker network and writes the routes of the portal and the gateway for it (file provider). It asks for the HTTPS entryPoint (`websecure`), the certResolver for the portal's certificate (`-`: your Traefik already has it) and Traefik's dynamic folder on this server (`-`: it only writes `infra/edge/den-external.yml`, for you to copy) |
+| 4 | **Addresses for Keycloak's administration** | Enter: none. `/auth/admin` and the `master` realm are not published (B-28) except for the addresses or CIDR networks you give, such as the operator's office; `DEN_KEYCLOAK_ADMIN_ALLOW` in `.env`, then `sudo ./install.sh update` |
 | 4 | **Portal certificate** | `1` Let's Encrypt (contact email optional; port 80 must be reachable). `2` Your own: paths to the certificate (full chain) and to the private key, in PEM. It must come from a recognized public CA: the API and the web also call the portal by its name and verify the certificate |
 | 5 | **Observability** (OpenSearch, Prometheus, Alertmanager, Grafana) | Yes, if the server has 16 GB: it provides the usage indicators, email alerts and the operator dashboard at `/grafana`. You can do without it: it does not affect traffic, audit or transparency |
 | 5 | **Document antivirus** (ClamAV) | Yes, if the server has 8 GB: it scans every uploaded document before storing it. Adds ~1.2 GB of RAM and downloads its signatures from the internet |
-| 6 | **Password for the demo users** | Enter generates a random one. Choose one if you are going to share it at the bootcamp |
+| 6 | **Password for the demo users** | Enter generates a random one. Choose one if you are going to share it at a workshop: `$` and `#` are fine, quotes and backslashes are not. The demo users with a critical role (platform, operator, regulator, auditor, data steward) always get another one, random (`credentials` shows it, M-29) |
 
 Then, with no more questions:
 
 - **Step 7.** Writes `.env` (mode 600) with all the secrets generated at random: database passwords, signing keys, the pseudonym key, the WireGuard hub key and the internal tokens.
 - **Step 8.** Creates the Docker network, sets `vm.max_map_count` for OpenSearch and, if it detects `ufw` or `firewalld`, offers to open the ports.
 - **Step 9.** Builds and starts everything, and waits until every service is healthy.
-- **Step 10.** Checks five things:
+- **Step 10.** Checks:
   - that the API responds;
-  - that the OPA bundle is **not** exposed to the public;
+  - that the OPA bundle and the transparency collector are **not** exposed to the public: exactly 404, any other answer is reported (M-26);
+  - that Keycloak's administration answers 403 (B-28);
   - that Keycloak responds;
   - that OPA already has a policy;
   - that the gateway presents the network certificate.
@@ -97,7 +99,7 @@ Then, with no more questions:
 | :-- | :-- | :-- |
 | `https://<portal>` | Portal: catalog, consoles for the operator, the regulator and the entities | People |
 | `https://<portal>/api/v1` | Portal API | The web, integrations |
-| `https://<portal>/auth` | Keycloak: sign-in, second factor, admin console at `/auth/admin/` | People, operator |
+| `https://<portal>/auth` | Keycloak: sign-in, second factor; the admin console at `/auth/admin/` only from `DEN_KEYCLOAK_ADMIN_ALLOW` | People, operator |
 | `https://<gateway>` | **Gateway**: traffic between entities with mTLS, tokens at `/oauth/token`, control channel for the nodes | Entity systems |
 | `<gateway>:51820/udp` | WireGuard hub: tunnels from the kit nodes | Nodes |
 | `https://<portal>/mail` | Test mailbox (Mailpit): all the pilot's email arrives here, behind a user and password | Operator |
@@ -130,11 +132,12 @@ The pilot **always** loads the seed: three fictitious entities (the operator, a 
 | Command | What it does |
 | :-- | :-- |
 | `sudo ./install.sh status` | Container status and the step 10 checks |
-| `sudo ./install.sh credentials` | Demo users, Keycloak administrator, test mailbox user and Grafana user |
+| `sudo ./install.sh credentials` | Demo users (the shared password and the critical roles' own), Keycloak administrator, test mailbox user and Grafana user |
 | `sudo ./install.sh otp` | Current second-factor code for the demo users with a critical role |
 | `sudo ./install.sh logs [service]` | Logs (e.g. `logs api`) |
-| `sudo ./install.sh backup` | Full pgBackRest backup and a copy in `backups/<date>/`: dumps of `den` and `keycloak`, the backup repository (encrypted), the CA, TSA, documents and citizen app volumes, and `.env`. Daily backups already run on their own (`OPERATIONS.md §6`) |
+| `sudo ./install.sh backup` | Full pgBackRest backup and a copy in `backups/<date>/`: dumps of `den` and `keycloak`, the backup repository (encrypted), the CA, TSA, documents and citizen app volumes; not `.env`, which you keep apart (M-30). It keeps the newest `DEN_BACKUP_KEEP` (5). Daily backups already run on their own (`OPERATIONS.md §6`) |
 | `sudo ./install.sh restore [instant]` | Restores the database to the last archived state, or to the given instant (`"2026-11-20 14:30:00-05"`). Stops and starts everything |
+| `sudo ./install.sh restore-volumes <dir>` | The server was lost: on a new server with the saved `.env`, recreates every volume from a backup directory and starts (`OPERATIONS.md §6.1`) |
 | `sudo ./install.sh update` | Backup, `git pull --ff-only`, rebuild, restart and the realm settings in Keycloak (`realms`) |
 | `sudo ./install.sh realms` | Applies the settings of `infra/keycloak/*-realm.json` to the realms Keycloak already imported: login flow, policies, the 60-minute verification link. Idempotent (`OPERATIONS.md §5.3`) |
 | `sudo ./install.sh demo-users list` / `disable` | The demo users' state; `disable` stops them signing in and revokes their platform roles, audited, once the operator's people have theirs (§6) |

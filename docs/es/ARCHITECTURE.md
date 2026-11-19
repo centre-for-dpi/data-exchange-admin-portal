@@ -482,7 +482,7 @@ El kit se especifica en otro repositorio; este contrato es la frontera. En desar
   - Cookies: las de Auth.js son `HttpOnly`, `SameSite=Lax`, de un solo host y, sobre HTTPS, `Secure` con prefijo `__Secure-` o `__Host-`. Las propias del portal (entidad activa, escalado de sesión) siguen las mismas reglas. CSRF por Auth.js y por las server actions (comprobación de `Origin`).
 - **API (M6-01).**
   - Límite de peticiones antes de leer el cuerpo: por usuario verificado (un token inventado no es una cuota propia) o por dirección, y una cuota estricta en las rutas costosas y en el enrolamiento de nodos. Solo las rutas de control de los servicios de la plataforma, cada una con su credencial, quedan fuera, y se reconocen por plantilla de ruta. El proxy suma un límite por dirección.
-  - `X-Forwarded-For` solo se cree a la dirección del proxy (`DEN_TRUST_PROXY`).
+  - `X-Forwarded-For` solo se cree al proxy y a la web, por dirección o por nombre de host (`DEN_TRUST_PROXY`); la web reenvía la dirección del visitante, que la auditoría registra (M-27).
   - Las subidas verifican el token antes de recibir el archivo.
   - Tamaño máximo de cuerpo, validación zod en todas las entradas y problem+json sin trazas internas.
   - Cada error de campo lleva `key` y `params` además del `message` en inglés, y la web lo muestra en el idioma del usuario (ADR-0025, M6-02). `params` nunca lleva lo que escribió el usuario.
