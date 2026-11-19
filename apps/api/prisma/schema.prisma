@@ -847,7 +847,7 @@ enum SubjectSource {
 
 /// Transparency register (ADR-0015, MT-03): one row per call that reached a provider on an
 /// operation with a data subject. The subject is only the keyed pseudonym OPA computed; never
-/// the document number, the path or any content. Insert-only: den_app may not update or delete,
+/// the document number, the path, any content or free text the consumer chose (X-Request-Id, M-16). Insert-only: den_app may not update or delete,
 /// a trigger refuses it to everyone, and only purge_subject_access_records() removes rows past
 /// retention. Ids are snapshots, without foreign keys: the record is evidence and must outlive
 /// later changes to what it points to.
@@ -859,8 +859,6 @@ model SubjectAccessRecord {
   gatewayNode      String        @map("gateway_node")
   /// nginx $request_id: random, chosen by the gateway; with the node, the idempotency key.
   gatewayRequestId String        @map("gateway_request_id")
-  /// X-Request-Id for correlation with the consumer and the provider (the client may set it).
-  requestId        String?       @map("request_id")
   /// HMAC-SHA-256(subject key, country|type|number), hex.
   subjectRef       String        @map("subject_ref")
   subjectSource    SubjectSource @map("subject_source")

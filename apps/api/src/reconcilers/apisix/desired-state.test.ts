@@ -496,8 +496,10 @@ describe('transparency register (ADR-0015, MT-03)', () => {
     expect(variables).not.toMatch(/body_subject|data_subject/);
     // The official only as their keyed hash, never X-DEN-End-User in clear.
     expect(Object.values(TRANSPARENCY_LOG_FORMAT)).not.toContain('$http_x_den_end_user');
-    // The idempotency key is nginx's own id, not the client-chosen X-Request-Id.
+    // The idempotency key is nginx's own id; the client-chosen X-Request-Id is not carried at all
+    // (A-4, M-16): free text next to the pseudonym.
     expect(TRANSPARENCY_LOG_FORMAT.gateway_request_id).toBe('$request_id');
+    expect(variables).not.toContain('$http_x_request_id');
     // The analytics log stays without the data subject.
     expect(JSON.stringify(plugins['http-logger'])).not.toContain('subject');
   });

@@ -61,7 +61,7 @@ The entity can keep it as proof that the network authorized that request. To acc
 4. that `req.body_sha256` is the SHA-256 of the bytes received, whatever their content type (the hash of nothing, if no body arrived). This applies to POST, PUT and PATCH, to any request that carried a body (a GET or a DELETE too), and whenever the assertion includes it. The service has to hash the body exactly as it arrived, before parsing it;
 5. that its `jti` has not been seen before while the assertion is valid, so that a captured assertion cannot be replayed. Remembering each `jti` until its `exp` is enough.
 
-The token carries no identification numbers: the number goes in the path, and the assertion only carries its hash. It can be archived without any personal data in clear text. `jti` is the request's identifier in the gateway (`X-Request-Id`), the same one used in the data subject's transparency log.
+The token carries no identification numbers: the number goes in the path, and the assertion only carries its hash. It can be archived without any personal data in clear text. `jti` is the request's identifier in the gateway (nginx's `$request_id`, not the consumer's `X-Request-Id`), the same one used in the data subject's transparency log.
 
 Node.js, with no libraries:
 

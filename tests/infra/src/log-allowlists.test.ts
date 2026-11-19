@@ -58,5 +58,7 @@ describe('Fluent Bit allowlists, second privacy barrier (ARCHITECTURE.md §8, M3
     expect(keys).toContain('end_user_hash');
     expect(keys).toContain('subject_ref');
     for (const key of FORBIDDEN) expect(keys, key).not.toContain(key);
+    // The consumer's X-Request-Id is free text: never next to the pseudonym (M-16).
+    expect(keys).not.toContain('request_id');
   });
 });

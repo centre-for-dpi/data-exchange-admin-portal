@@ -21,13 +21,15 @@ const optional = <T extends z.ZodType>(schema: T) =>
 
 /**
  * One record of the transparency pipeline (TRANSPARENCY_LOG_FORMAT in the APISIX reconciler):
- * metadata only, the data subject as OPA's keyed pseudonym.
+ * metadata only, the data subject as OPA's keyed pseudonym. Every field is one the gateway sets.
+ * Anything else is stripped, not rejected: a gateway still on an older log format sends the
+ * consumer's X-Request-Id (request_id), which is neither evidence nor stored (A-4, M-16), so it
+ * can never make the record of an authorized call invalid.
  */
 export const gatewayRecordSchema = z.object({
   ts: z.coerce.number<string | number>().positive(),
   gateway_node: z.string().trim().min(1).max(255),
   gateway_request_id: z.string().regex(/^[0-9a-f]{32}$/),
-  request_id: optional(z.string().max(200)),
   route_id: z.string().max(100),
   operation: z.string().trim().min(1).max(200),
   subscription_id: z.uuid(),
@@ -142,7 +144,6 @@ export class SubjectAccessService implements OnApplicationBootstrap, OnApplicati
         occurredAt: new Date(Math.round(record.ts * 1000)),
         gatewayNode: record.gateway_node,
         gatewayRequestId: record.gateway_request_id,
-        requestId: record.request_id ?? null,
         subjectRef: record.subject_ref,
         subjectSource: source,
         providerEntityId: version.api.entityId,

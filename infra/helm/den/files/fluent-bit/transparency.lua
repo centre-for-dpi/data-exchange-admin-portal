@@ -4,11 +4,14 @@
 --
 -- APISIX tcp-logger sends a batch as one JSON array, which the tcp input wraps as {"msg": [...]};
 -- this filter splits it back into one record per call.
+--
+-- X-Request-Id (request_id) is not kept (A-4, M-16): the consumer writes it, so it is free text
+-- that proves nothing and could carry the number the pseudonym stands for. A gateway still on the
+-- old log format sends it; it is dropped here, whatever its length, and the record goes on.
 local ALLOWED = {
   ts = true,
   gateway_node = true,
   gateway_request_id = true,
-  request_id = true,
   route_id = true,
   operation = true,
   subscription_id = true,
@@ -21,8 +24,23 @@ local ALLOWED = {
   upstream_status = true,
 }
 
+-- Longest value kept: every allowed field is set by the gateway (ids, hashes, codes, statuses)
+-- and is far shorter. A longer one is dropped alone, so the record keeps its size bounded and
+-- the collector judges the rest; it never takes the other records of the batch with it.
+local MAX_LENGTH = 255
+
 local function present(value)
   return type(value) == "string" and value ~= "" and value ~= "-"
+end
+
+local function bounded(value)
+  if type(value) == "number" then
+    return value
+  end
+  if type(value) == "string" and #value <= MAX_LENGTH then
+    return value
+  end
+  return nil
 end
 
 -- Only calls OPA let through to the provider (an upstream answered or was tried) and that carry
@@ -38,7 +56,7 @@ local function keep(entry)
   local filtered = {}
   for key, value in pairs(entry) do
     if ALLOWED[key] then
-      filtered[key] = value
+      filtered[key] = bounded(value)
     end
   end
   return filtered

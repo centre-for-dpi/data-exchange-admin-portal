@@ -198,7 +198,6 @@ describe('transparency register collector (MT-03)', () => {
         subjectSource: 'path',
         subjectRef: byPath.subject_ref,
         gatewayRequestId: byPath.gateway_request_id,
-        requestId: byPath.request_id,
         providerEntityId: salud,
         apiId,
         apiVersionId: versionId,
@@ -216,6 +215,8 @@ describe('transparency register collector (MT-03)', () => {
         subjectSource: 'body',
         endUserHash: null,
       });
+      // The consumer's X-Request-Id is not kept next to the pseudonym (M-16).
+      expect(JSON.stringify(rows)).not.toContain(byPath.request_id);
     });
 
     it('ignores retries of the same call', async () => {
@@ -232,6 +233,12 @@ describe('transparency register collector (MT-03)', () => {
       expect(
         (await ingest([record({ request_id: shared }), record({ request_id: shared })])).json(),
       ).toMatchObject({ accepted: 2 });
+    });
+
+    it('registers the call whatever X-Request-Id the consumer sent (A-4)', async () => {
+      // A gateway still on the old log format carries it; it is ignored, never a reason to drop.
+      const long = record({ request_id: 'a'.repeat(4096) });
+      expect((await ingest([long])).json()).toEqual({ accepted: 1, duplicates: 0, dropped: {} });
     });
 
     it('drops records that do not match an authorized call, and keeps the rest of the batch', async () => {

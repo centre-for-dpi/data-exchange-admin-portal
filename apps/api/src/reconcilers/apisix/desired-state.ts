@@ -211,13 +211,14 @@ const ACCESS_LOG_FORMAT = {
  * cannot reach the pipeline. A record only counts when the call reached the provider
  * ($upstream_status, set by nginx, never by the client) and carries the reference OPA returned
  * (the gateway removes a client-sent one before OPA). $request_id is nginx's random id, which a
- * client cannot choose (unlike X-Request-Id): it is the record's idempotency key.
+ * client cannot choose: it is the record's idempotency key. X-Request-Id is not carried (M-16):
+ * the consumer writes it, so it is free text that proves nothing and could hold the very number
+ * the pseudonym stands for; nor could an oversized one take the record or its batch down (A-4).
  */
 export const TRANSPARENCY_LOG_FORMAT = {
   ts: '$msec',
   gateway_node: '$hostname',
   gateway_request_id: '$request_id',
-  request_id: '$http_x_request_id',
   route_id: '$route_id',
   operation: '$http_x_den_operation',
   subscription_id: '$http_x_den_subscription',

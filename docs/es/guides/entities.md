@@ -61,7 +61,7 @@ La entidad puede guardarla como prueba de que la red autorizó esa consulta. Par
 4. que, en POST, PUT y PATCH, en cualquier petición que haya traído cuerpo (también un GET o un DELETE) y siempre que la aserción lo traiga, `req.body_sha256` es el SHA-256 de los bytes recibidos, sea cual sea su tipo de contenido (el de nada, si no llegó cuerpo). El servicio tiene que hashear el cuerpo tal como llegó, antes de interpretarlo;
 5. que su `jti` no se vio antes mientras la aserción vale: así una aserción capturada no se puede repetir. Basta con recordar los `jti` hasta su `exp`.
 
-El token no lleva números de identificación: el número va en la ruta, y la aserción solo lleva su hash. Se puede archivar sin datos personales en claro. `jti` es el identificador de la petición en el gateway (`X-Request-Id`), el mismo del registro de transparencia del titular.
+El token no lleva números de identificación: el número va en la ruta, y la aserción solo lleva su hash. Se puede archivar sin datos personales en claro. `jti` es el identificador de la petición en el gateway (el `$request_id` de nginx, no el `X-Request-Id` del consumidor), el mismo del registro de transparencia del titular.
 
 Node.js, sin librerías:
 

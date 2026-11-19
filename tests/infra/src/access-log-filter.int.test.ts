@@ -144,6 +144,29 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
     expect(long).not.toHaveProperty('request_id');
   });
 
+  it('drops a value the consumer wrote with six digits or more in a row (M-16)', () => {
+    const uuid = '10324567-8901-4abc-8def-123456789012';
+    const [denied, generated, short] = filter([
+      // A denied call: the purpose is whatever the consumer declared.
+      call({
+        request_id: 'CC-1032456789',
+        purpose: 'cc1032456789',
+        status: '403',
+        upstream_latency_ms: '',
+        deny_reason: 'purpose_not_allowed',
+      }),
+      // The form the gateway generates (request-id plugin): its hex digits often run that long.
+      call({ request_id: uuid }),
+      call({ request_id: 'demo-12345', purpose: 'law_1581' }),
+    ]);
+    expect(JSON.stringify(denied)).not.toContain('1032456789');
+    expect(denied).not.toHaveProperty('request_id');
+    expect(denied).not.toHaveProperty('purpose');
+    expect(denied).toMatchObject({ status: 403, deny_reason: 'purpose_not_allowed' });
+    expect(generated).toMatchObject({ request_id: uuid });
+    expect(short).toMatchObject({ request_id: 'demo-12345', purpose: 'law_1581' });
+  });
+
   it('names the consumer of a denied call from the deny response, never on an allowed one', () => {
     const app = 'den-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b';
     const [denied, allowed] = filter([
@@ -185,6 +208,55 @@ describe('access-log filter in Fluent Bit (ARCHITECTURE.md §8, M5-01)', () => {
     expect(out).toMatchObject({ status: 403, upstream_latency_ms: 10 });
     expect(out).not.toHaveProperty('deny_reason');
     expect(out).not.toHaveProperty('consumer_app');
+  });
+});
+
+describe('transparency filter in Fluent Bit (transparency.lua, MT-03)', () => {
+  const subjectRef = '96954dc22b760bf38d4d7922b0938cc626cc98be90f356e7220d4878a2d4bedd';
+  /** A transparency record as APISIX's tcp-logger sends it, plus what must never pass. */
+  const consulted = (overrides: Record = {}): Record => ({
+    ts: '1794000000.123',
+    gateway_node: 'apisix-1',
+    gateway_request_id: 'dd4242b0e03c4fce6d98679e89ae89fd',
+    route_id: 'den-route-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
+    operation: 'getAfiliado',
+    subscription_id: '01a1e1bb-e6e8-72d0-8fd0-9ae31776f31d',
+    consumer_entity: 'programas-sociales',
+    consumer_app: 'den-app-01a1e1bb-a2ca-73cb-9746-621ebe76f18b',
+    purpose: 'eligibility_check',
+    end_user_hash: subjectRef,
+    subject_ref: subjectRef,
+    status: '200',
+    upstream_status: '200',
+    uri: '/salud/afiliados/1000000001',
+    ...overrides,
+  });
+  const transparency = (records: Record[]) => filter(records, 'transparency.lua', 'transparency');
+
+  it("never keeps the consumer's X-Request-Id, whatever its length (A-4, M-16)", () => {
+    const outs = transparency([
+      // A gateway still on the old log format sends it.
+      consulted({ request_id: 'CC-1000000001' }),
+      consulted({ request_id: 'a'.repeat(8000) }),
+    ]);
+    expect(outs).toHaveLength(2);
+    for (const out of outs) {
+      expect(out).not.toHaveProperty('request_id');
+      expect(out).not.toHaveProperty('uri');
+      expect(out).toMatchObject({ subject_ref: subjectRef, upstream_status: '200' });
+    }
+    expect(JSON.stringify(outs)).not.toContain('1000000001');
+  });
+
+  it('drops an oversized value alone, and the calls without a pseudonym or an upstream', () => {
+    const outs = transparency([
+      consulted({ purpose: 'p'.repeat(300) }),
+      consulted({ subject_ref: '' }),
+      consulted({ upstream_status: '-' }),
+    ]);
+    expect(outs).toHaveLength(1);
+    expect(outs[0]).not.toHaveProperty('purpose');
+    expect(outs[0]).toMatchObject({ operation: 'getAfiliado', gateway_node: 'apisix-1' });
   });
 });
 

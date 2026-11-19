@@ -45,6 +45,13 @@ local FORMAT = {
 
 local MAX_LENGTH = 128
 
+-- Values the consumer writes (M-16): one with a run of six digits or more could be an
+-- identification number ("CC-1032456789" as a trace id, "cc1032456789" as a purpose), the same
+-- rule as gateway-errors.lua, and is dropped. The one exception is a request id in the form the
+-- gateway itself generates (request-id plugin, a UUID), whose hex digits often run that long.
+local CONSUMER_WRITTEN = { request_id = true, purpose = true }
+local UUID = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
+
 local function present(value)
   return type(value) == "string" and value ~= "" and value ~= "-"
 end
@@ -53,10 +60,15 @@ local function text(key, value)
   if not present(value) or #value > MAX_LENGTH then
     return nil
   end
-  if string.match(value, FORMAT[key]) then
-    return value
+  if not string.match(value, FORMAT[key]) then
+    return nil
   end
-  return nil
+  if CONSUMER_WRITTEN[key] and string.find(value, "%d%d%d%d%d%d") then
+    if key ~= "request_id" or not string.match(value, UUID) then
+      return nil
+    end
+  end
+  return value
 end
 
 local function integer(value)
