@@ -192,7 +192,35 @@ sudo /opt/den-node/install.sh service
 
    At the end the installer says how the API answers (`GET /afiliacion/afiliados/<key>`), what goes in the portal (node and service path), and the OpenAPI's path and fingerprint.
 
-4. **Review the columns before publishing.** The resource brings **every** column of the view that can be published. In `/opt/den-node/config/services/afiliacion.yaml`, remove from `columns` those not to be shared and, if you changed anything, validate, regenerate the OpenAPI and restart:
+4. **Review the service file before publishing.** The installer writes the service's configuration in `/opt/den-node/config/services/afiliacion.yaml` (no need to write it by hand, but do review it). It looks like this:
+
+   ```yaml
+   name: afiliacion                     # the service
+   path: /afiliacion                    # "Service path on the node" in the portal
+   type: instant
+   database:
+     engine: postgres                   # sqlserver | postgres | mysql | oracle
+     host: db.internal.entity
+     port: 5432
+     name: entity                       # in Oracle, the service name
+     user: den_reader
+     passwordFile: /run/secrets/afiliacion_db_password   # the password never goes in this file
+     tls: require                       # disable | require | verify
+   resources:
+     - name: afiliados                  # in the URL: /afiliacion/afiliados/<key>
+       entity: Afiliados                # name in the OpenAPI
+       source: salud.v_afiliados        # the view
+       key:
+         column: numero_documento       # the column the key is looked up in
+       dataSubject: { documentType: CC } # the key identifies a person
+       columns:                         # what goes out in the answer
+         - { name: numero_documento }
+         - { name: regimen }
+         - { name: eps }
+         - { name: estado }
+   ```
+
+   The resource brings **every** column of the view that can be published: **a column not in `columns` does not go out**, even if it is in the view. Remove those not to be shared. All the fields (`as` to change how a column is published, `key.pattern` for keys in another format, `many`, `maxConnections`, `queryTimeout`) are in `INSTANT-APIS.md` §4–6. If you changed anything, validate, regenerate the OpenAPI and restart:
 
    ```bash
    cd /opt/den-node

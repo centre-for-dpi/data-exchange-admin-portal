@@ -503,7 +503,31 @@ GRANT SELECT ON salud.v_afiliados TO den_reader;</code></pre></div>
 <tr><td>Resource name / entity name in the OpenAPI</td><td class="wrap"><code>-</code> for the ones it proposes (the view's, without <code>v_</code>)</td></tr>
 </tbody></table></div>
 <p>At the end the installer says how the API answers (<code>GET /afiliacion/afiliados/&lt;key&gt;</code>), what goes in the portal (node and service path), and the OpenAPI's path and fingerprint.</p></div></span></li>
-<li><span><b>Review the columns before publishing.</b> The resource brings <b>every</b> column of the view that can be published. In <code>/opt/den-node/config/services/afiliacion.yaml</code>, remove from <code>columns</code> those not to be shared and, if you changed anything, validate, regenerate the OpenAPI and restart:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>cd /opt/den-node
+<li><span><b>Review the service file before publishing.</b> The installer writes the service's configuration in <code>/opt/den-node/config/services/afiliacion.yaml</code> (no need to write it by hand, but do review it). It looks like this:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>name: afiliacion                     # the service
+path: /afiliacion                    # "Service path on the node" in the portal
+type: instant
+database:
+  engine: postgres                   # sqlserver | postgres | mysql | oracle
+  host: db.internal.entity
+  port: 5432
+  name: entity                       # in Oracle, the service name
+  user: den_reader
+  passwordFile: /run/secrets/afiliacion_db_password   # the password never goes in this file
+  tls: require                       # disable | require | verify
+resources:
+  - name: afiliados                  # in the URL: /afiliacion/afiliados/&lt;key&gt;
+    entity: Afiliados                # name in the OpenAPI
+    source: salud.v_afiliados        # the view
+    key:
+      column: numero_documento       # the column the key is looked up in
+    dataSubject: { documentType: CC } # the key identifies a person
+    columns:                         # what goes out in the answer
+      - { name: numero_documento }
+      - { name: regimen }
+      - { name: eps }
+      - { name: estado }</code></pre></div>
+<p>The resource brings <b>every</b> column of the view that can be published: **a column not in <code>columns</code> does not go out**, even if it is in the view. Remove those not to be shared. All the fields (<code>as</code> to change how a column is published, <code>key.pattern</code> for keys in another format, <code>many</code>, <code>maxConnections</code>, <code>queryTimeout</code>) are in <code>INSTANT-APIS.md</code> §4–6. If you changed anything, validate, regenerate the OpenAPI and restart:</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code>cd /opt/den-node
 sudo docker compose exec den-node /den-node validate
 sudo docker compose exec den-node /den-node openapi afiliacion | sudo tee config/services/afiliacion.openapi.json &gt;/dev/null
 sudo docker compose restart den-node</code></pre></div></div></span></li>

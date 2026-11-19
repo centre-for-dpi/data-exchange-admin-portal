@@ -192,7 +192,35 @@ sudo /opt/den-node/install.sh service
 
    Al terminar, el instalador dice cómo responde la API (`GET /afiliacion/afiliados/<clave>`), lo que va en el portal (nodo y ruta del servicio) y la ruta y la huella del OpenAPI.
 
-4. **Revisa las columnas antes de publicar.** El recurso trae **todas** las columnas de la vista que se pueden publicar. En `/opt/den-node/config/services/afiliacion.yaml`, quita de `columns` las que no se van a compartir y, si cambiaste algo, valida, regenera el OpenAPI y reinicia:
+4. **Revisa el archivo del servicio antes de publicar.** El instalador escribe la configuración del servicio en `/opt/den-node/config/services/afiliacion.yaml` (no hace falta escribirla a mano, pero sí revisarla). Se ve así:
+
+   ```yaml
+   name: afiliacion                     # el servicio
+   path: /afiliacion                    # "Ruta del servicio en el nodo" en el portal
+   type: instant
+   database:
+     engine: postgres                   # sqlserver | postgres | mysql | oracle
+     host: bd.interna.entidad
+     port: 5432
+     name: entidad                      # en Oracle, el nombre del servicio
+     user: den_reader
+     passwordFile: /run/secrets/afiliacion_db_password   # la contraseña nunca va en este archivo
+     tls: require                       # disable | require | verify
+   resources:
+     - name: afiliados                  # en la URL: /afiliacion/afiliados/<clave>
+       entity: Afiliados                # nombre en el OpenAPI
+       source: salud.v_afiliados        # la vista
+       key:
+         column: numero_documento       # la columna que se busca con la clave
+       dataSubject: { documentType: CC } # la clave identifica a una persona
+       columns:                         # lo que sale en la respuesta
+         - { name: numero_documento }
+         - { name: regimen }
+         - { name: eps }
+         - { name: estado }
+   ```
+
+   El recurso trae **todas** las columnas de la vista que se pueden publicar: **una columna que no está en `columns` no sale**, aunque esté en la vista. Quita las que no se van a compartir. Todos los campos (`as` para cambiar cómo se publica una columna, `key.pattern` para claves con otro formato, `many`, `maxConnections`, `queryTimeout`) están en `INSTANT-APIS.md` §4–6. Si cambiaste algo, valida, regenera el OpenAPI y reinicia:
 
    ```bash
    cd /opt/den-node

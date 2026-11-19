@@ -503,7 +503,31 @@ GRANT SELECT ON salud.v_afiliados TO den_reader;</code></pre></div>
 <tr><td>Nombre del recurso / de la entidad en el OpenAPI</td><td class="wrap"><code>-</code> para los que propone (el de la vista sin <code>v_</code>)</td></tr>
 </tbody></table></div>
 <p>Al terminar, el instalador dice cómo responde la API (<code>GET /afiliacion/afiliados/&lt;clave&gt;</code>), lo que va en el portal (nodo y ruta del servicio) y la ruta y la huella del OpenAPI.</p></div></span></li>
-<li><span><b>Revisa las columnas antes de publicar.</b> El recurso trae <b>todas</b> las columnas de la vista que se pueden publicar. En <code>/opt/den-node/config/services/afiliacion.yaml</code>, quita de <code>columns</code> las que no se van a compartir y, si cambiaste algo, valida, regenera el OpenAPI y reinicia:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>cd /opt/den-node
+<li><span><b>Revisa el archivo del servicio antes de publicar.</b> El instalador escribe la configuración del servicio en <code>/opt/den-node/config/services/afiliacion.yaml</code> (no hace falta escribirla a mano, pero sí revisarla). Se ve así:<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>name: afiliacion                     # el servicio
+path: /afiliacion                    # "Ruta del servicio en el nodo" en el portal
+type: instant
+database:
+  engine: postgres                   # sqlserver | postgres | mysql | oracle
+  host: bd.interna.entidad
+  port: 5432
+  name: entidad                      # en Oracle, el nombre del servicio
+  user: den_reader
+  passwordFile: /run/secrets/afiliacion_db_password   # la contraseña nunca va en este archivo
+  tls: require                       # disable | require | verify
+resources:
+  - name: afiliados                  # en la URL: /afiliacion/afiliados/&lt;clave&gt;
+    entity: Afiliados                # nombre en el OpenAPI
+    source: salud.v_afiliados        # la vista
+    key:
+      column: numero_documento       # la columna que se busca con la clave
+    dataSubject: { documentType: CC } # la clave identifica a una persona
+    columns:                         # lo que sale en la respuesta
+      - { name: numero_documento }
+      - { name: regimen }
+      - { name: eps }
+      - { name: estado }</code></pre></div>
+<p>El recurso trae <b>todas</b> las columnas de la vista que se pueden publicar: **una columna que no está en <code>columns</code> no sale**, aunque esté en la vista. Quita las que no se van a compartir. Todos los campos (<code>as</code> para cambiar cómo se publica una columna, <code>key.pattern</code> para claves con otro formato, <code>many</code>, <code>maxConnections</code>, <code>queryTimeout</code>) están en <code>INSTANT-APIS.md</code> §4–6. Si cambiaste algo, valida, regenera el OpenAPI y reinicia:</p>
+<div class="code"><button class="copy" type="button">Copiar</button><pre><code>cd /opt/den-node
 sudo docker compose exec den-node /den-node validate
 sudo docker compose exec den-node /den-node openapi afiliacion | sudo tee config/services/afiliacion.openapi.json &gt;/dev/null
 sudo docker compose restart den-node</code></pre></div></div></span></li>
