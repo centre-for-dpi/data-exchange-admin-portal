@@ -53,7 +53,8 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `postgres` | `den/postgres` (`postgres:18.6-alpine` con pgBackRest, `infra/postgres`) | 5432 | `POSTGRES_PORT` 5432 | `pg-data`; en el piloto también `pgbackrest-repo` y `pg-socket` | base | `pg_isready` |
 | `pgbackrest` | `den/postgres` | — (sin red) | — | `pg-data`, `pgbackrest-repo`, `pg-socket` | solo piloto (M6-06) | ninguno |
 | `keycloak` | `quay.io/keycloak/keycloak:26.8.0` | 8080 (HTTP), 9000 (gestión) | `KEYCLOAK_PORT` 8080 | — (usa `postgres`) | base | `GET /health/ready` en 9000 |
-| `etcd` | `quay.io/coreos/etcd:v3.6.16` | 2379 | no se publica | `etcd-data` | base | `etcdctl endpoint health` |
+| `etcd` | `quay.io/coreos/etcd:v3.6.16` | 2379 | no se publica | `etcd-data` | base | `etcdctl endpoint health` como `healthcheck` |
+| `etcd-init` | `den/etcd-init:local` (`infra/etcd`: etcdctl sobre la imagen de step-ca) | — | — | — | base, una vez antes de APISIX | sale con 0 |
 | `apisix` | `apache/apisix:3.19.0-debian` | 9080 (HTTP), 9443 (HTTPS), 9180 (admin), 7085 (estado), 9091 (métricas) | 9080, 9443, 9180 | — (estado en etcd) | base | `GET /status/ready` en 7085 |
 | `opa` | `openpolicyagent/opa:1.21.4-static` | 8181 | `OPA_PORT` 8181 | `opa-data` (último bundle, M6-04) | base | `GET /health` |
 | `step-ca` | `smallstep/step-ca:0.30.2` | 9000 | `STEP_CA_PORT` 9000 | `step-ca-data` | base | `step ca health` |
@@ -140,6 +141,7 @@ Si Keycloak cae, nadie puede iniciar sesión y las aplicaciones no obtienen toke
 También termina el TLS del gateway en 9443 con su certificado de servidor y, cuando `features.mtls.required` está activo, exige ahí el certificado de cliente de la aplicación (M3-02). Hacia los proveedores con mTLS presenta el certificado de cliente del gateway de esa entidad (M3-03). No guarda cuerpos de petición ni de respuesta. En el piloto se publica en `/gw`.
 
 - etcd guarda la configuración de APISIX (prefijo `/apisix`). Un solo nodo, HTTP sin TLS, no se publica.
+- **etcd pide credenciales (B-15, ADR-0031).** `etcd-init` corre `infra/etcd/init.sh` antes de APISIX en cada arranque. Es idempotente: en un etcd sin autenticación crea `apisix` (su rol solo lee y escribe `/apisix`; `APISIX_ETCD_PASSWORD`), `root` (`ETCD_ROOT_PASSWORD`) y `healthcheck` (sin rol, contraseña pública `healthcheck`, para el chequeo de salud del contenedor), y activa la autenticación sin tocar los datos. En los arranques siguientes vuelve a poner la contraseña de APISIX que dice `.env` si APISIX ya no puede entrar con ella. APISIX entra como `apisix` (`deployment.etcd.user`/`password` en `config.yaml`). La contraseña de root no se puede cambiar una vez puesta (`OPERATIONS.md §5.6`).
 - APISIX en modo `traditional` con `config_provider: etcd` (`infra/apisix/config.yaml`, montado de solo lectura). La clave del Admin API llega por `APISIX_ADMIN_KEY`.
 - El Admin API (9180) acepta solo direcciones privadas (`127.0.0.0/24`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) y exige la clave. Nunca se expone al público.
 - Plugins propios en `infra/apisix/plugins` (montados en `/usr/local/apisix/den`): `den-data-subject` (ADR-0017) `den-client-cert` (M3-02: pasa a OPA la huella RFC 8705 del certificado de cliente verificado), `den-rate-limited` (M3-05: el 429 del límite por suscripción en problem+json) y `den-header-guard` (M3-07: borra toda cabecera `X-DEN-*` del cliente salvo la finalidad y el funcionario). La lista de plugins de `config.yaml` es explícita: un plugin nuevo exige reiniciar APISIX.
@@ -168,6 +170,7 @@ Además calcula el hash del funcionario y el seudónimo del titular, y devuelve 
   - El bundle lleva la clave del seudónimo y la sal del funcionario: el volumen es solo de OPA (modo 700) y se respalda o se destruye como un secreto.
   - Borrar el volumen no daña nada mientras el portal responda: OPA descarga el bundle en la siguiente consulta.
 - Los *decision logs* están desactivados a propósito (la entrada lleva cabeceras con datos en claro).
+- **Su API pide un token (B-15, ADR-0031).** OPA corre con `--authentication=token --authorization=basic` y `infra/opa/authz.rego`, montado desde el repo fuera del bundle. `/health` y `/metrics` siguen abiertos. El gateway solo puede consultar reglas `.../decision`, con `DEN_OPA_DECISION_TOKEN` en el parámetro de query `den_token`: el plugin opa de APISIX no envía cabeceras propias, así que el reconciliador escribe `den/authz/decision?den_token=…` en cada ruta (OPA registra la ruta sin la query). Todo lo demás (datos, políticas, `/v1/config`) pide `DEN_OPA_ADMIN_TOKEN` como `Authorization: Bearer`. Una ruta sin el token recibe 503 (falla cerrado). El chart de Helm no usa el token: OPA escucha solo en el loopback del pod.
 - `OPA_PORTAL_URL`: en desarrollo `http://host.docker.internal:4000/api/v1/opa` (el API corre en el host); en el piloto `http://api:4000/api/v1/opa`.
 
 ### 3.6 step-ca
@@ -194,6 +197,7 @@ También firma los de los nodos del kit al enrolarse y al renovarse (M4-02). Sol
 
 **Función de `tsa` en el despliegue.** Es la autoridad de sellado de tiempo (RFC 3161), independiente de la clave del operador. Sella dos cosas: los puntos de control del registro de transparencia y el anclaje diario de la bitácora de auditoría. Con el sello cualquiera puede probar que esos datos existían en ese momento y que no se reescribieron después (ADR-0016). Su cadena pública permite que terceros (la app ciudadana, `den-verify-receipt`) verifiquen los sellos sin confiar en el portal.
 
+- **Solo APISIX alcanza las entradas de Fluent Bit (B-17, ADR-0031).** En Fluent Bit 5.1.5 no tienen autenticación, así que los tres Fluent Bit están en la red `logs` con APISIX y en ninguna otra salvo la que usa cada uno para entregar: `analytics` (con OpenSearch) y, en el piloto, `collector` (con el API).
 - `fluent-bit-transparency` (`infra/fluent-bit/transparency.yaml`): entrada TCP 5170 en JSON, filtro Lua `transparency.lua`, salida HTTP a `${DEN_TRANSPARENCY_COLLECTOR_HOST}:${DEN_TRANSPARENCY_COLLECTOR_PORT}/api/v1/internal/subject-access` con `Bearer ${DEN_TRANSPARENCY_INGEST_TOKEN}`. Búfer en disco (`transparency-buffer`, hasta 1 GB) y reintentos sin límite: si el API cae, los registros esperan.
 - `tsa-init` crea una sola vez la cadena de la TSA de desarrollo en `tsa-data` (`infra/tsa/init.sh`). `tsa` es sigstore timestamp-server con esa clave. En producción se usa la TSA acreditada del país (`DEN_TSA_URL`).
 - La cadena de la TSA es pública: `GET /api/v1/timestamp/certchain`.
@@ -331,7 +335,7 @@ Seguridad del API (M6-01):
 - `DEN_LOG_FORMAT`: `text` (por omisión) o `json`, un objeto por línea para un colector de logs (el chart de Helm fija `json`). Las líneas van enmascaradas en los dos formatos (`ARCHITECTURE.md §8`).
 - `DEN_RATE_LIMIT_PER_MINUTE` (600 por usuario verificado, o por dirección sin un token válido) y `DEN_RATE_LIMIT_STRICT_PER_MINUTE` (30 en subidas, versiones nuevas, solicitudes de alta, invitaciones y enrolamiento de nodos).
 
-**Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí) y `providers` son los upstreams y el runner de contrato. En el piloto APISIX no está en `default`. El API no está en `providers`: comparte con el runner de contrato la red `runner`, solo de ellos dos. Ver `ARCHITECTURE.md §12`.
+**Redes de Compose (M6-01).** `default` es la plataforma, `gateway` es el control del gateway (etcd y OPA solo ahí, ambos con credenciales desde B-15), `providers` son los upstreams y el runner de contrato, y `logs` une a APISIX con sus Fluent Bit (B-17), que llegan a OpenSearch por `analytics` y, en el piloto, al API por `collector`. En el piloto APISIX no está en `default`. El API no está en `providers`: comparte con el runner de contrato la red `runner`, solo de ellos dos. Ver `ARCHITECTURE.md §12`.
 
 **Desplegar M6-04 sobre un piloto existente.** `up -d` crea el volumen `opa-data`, corre `opa-init` y recrea OPA: durante unos segundos no hay OPA y el gateway niega (falla cerrado).
 
@@ -342,6 +346,8 @@ Seguridad del API (M6-01):
 2. Recrear todo con `up -d`: cambian las redes.
 3. Aplicar al realm `den-portal` ya importado la política de contraseñas, las URIs exactas y los eventos (con `kcadm`, como en §3.3), y las URIs exactas al realm `den-citizens`.
 4. Si el Traefik es propio, agregar los límites `den-rate-api` y `den-rate-auth` de `infra/edge/den.yml.template`.
+
+Plano de control del gateway (B-15, ADR-0031): `DEN_OPA_DECISION_TOKEN` (el token del gateway para las decisiones de OPA; el API lo escribe en las rutas y OPA lo verifica) y `DEN_OPA_ADMIN_TOKEN` (el resto del API de OPA), de 32 caracteres o más; `APISIX_ETCD_PASSWORD` (el usuario de APISIX en etcd) y `ETCD_ROOT_PASSWORD` (el root de etcd, para `etcd-init` y el operador). `make-deploy-env.mjs` los genera e `install.sh` los agrega a un `.env` anterior.
 
 Analítica (M5): `DEN_OPENSEARCH_URL` (OpenSearch como lo alcanza el API) y opcional `DEN_OPENSEARCH_AUTH`.
 
@@ -518,6 +524,7 @@ docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 - **Al pasar a M6-06 (respaldos con pgBackRest)**, sobre un piloto anterior: agregar a `.env` `PGBACKREST_REPO1_CIPHER_PASS` (32 caracteres al azar) y guardar una copia fuera del servidor. `install.sh` lo hace solo si falta, al instalar o actualizar. Si la actualización la corre el `install.sh` anterior, Compose se detiene pidiendo la variable: basta volver a ejecutar `sudo ./install.sh update`. Al arrancar, PostgreSQL se reinicia con el archivado activo y `pgbackrest` toma el primer respaldo completo.
 - **P-08 (enlace de verificación y usuarios de demo)**, sobre cualquier piloto anterior: `sudo ./install.sh update` aplica el enlace de 60 minutos al realm existente (`install.sh realms`; con `docker compose` a mano, `node scripts/keycloak-portal-mfa.mjs`, `OPERATIONS.md §5.3`). Los usuarios de demo siguen como están hasta que el operador corre `sudo ./install.sh demo-users disable` (`OPERATIONS.md §2.3`).
 - **P-06 (carpeta de documentos)**, sobre cualquier despliegue anterior: `.env` traía `DEN_DOCUMENTS_DIR=data/documents` y toda subida fallaba. El overlay de despliegue fija ahora `/var/lib/den/documents` para el API e `install.sh update` corrige `.env`; con `docker compose` a mano, cambiar la línea en `.env` y recrear el API. No se guardó nada, así que no hay nada que mover.
+- **R-02 (credenciales en el plano de control del gateway, ADR-0031)**, sobre cualquier piloto anterior: `sudo ./install.sh update` agrega a `.env` `DEN_OPA_DECISION_TOKEN`, `DEN_OPA_ADMIN_TOKEN`, `ETCD_ROOT_PASSWORD` y `APISIX_ETCD_PASSWORD`. Si la actualización la corre el `install.sh` anterior, Compose se detiene y pide una de ellas: basta correr otra vez `sudo ./install.sh update` (o `sudo ./install.sh start`). En el `up`, `etcd-init` activa la autenticación de etcd (los datos se quedan) y se recrean OPA, APISIX, los Fluent Bit y OpenSearch (banderas y redes nuevas). Hasta que el API nuevo reescribe las rutas con el token de decisión (su pasada completa al arrancar), el gateway responde 503. Con `docker compose` a secas, agrega las cuatro variables a mano (32 caracteres al azar cada una, p. ej. `openssl rand -hex 32`).
 - Un cambio en `infra/apisix/config.yaml`, `infra/opa/config.yaml`, `infra/fluent-bit/*` o `infra/step-ca/*` se monta desde el repo: basta reiniciar ese servicio (`up -d <servicio>` o `restart <servicio>`).
 
 ## 6. Desarrollo local

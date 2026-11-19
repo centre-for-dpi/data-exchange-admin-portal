@@ -8,6 +8,22 @@ const port = (name: string, fallback: number): number => Number(env(name, String
 const gatewayUrl = (): string => `http://localhost:${port('APISIX_HTTP_PORT', 9080)}`;
 const adminUrl = (): string => `http://localhost:${port('APISIX_ADMIN_PORT', 9180)}/apisix/admin`;
 const opaUrl = (): string => `http://localhost:${port('OPA_PORT', 8181)}`;
+/** OPA's API as the operator (B-15): only decisions go without the admin token. */
+const asOpaAdmin = (path: string, init: RequestInit = {}): Promise<Response> =>
+  fetch(`${opaUrl()}${path}`, {
+    ...init,
+    headers: { authorization: `Bearer ${env('DEN_OPA_ADMIN_TOKEN')}`, ...init.headers },
+  });
+/** etcdctl in the etcd container, as `user` (B-15: anonymous calls fail). */
+const etcdctl = (user: string | undefined, ...args: string[]) =>
+  spawnSync(
+    'docker',
+    ['exec', 'den-etcd-1', 'etcdctl', ...(user ? [`--user=${user}`] : []), ...args],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, MSYS_NO_PATHCONV: '1' },
+    },
+  );
 
 const asAdmin = (path: string, init: RequestInit = {}): Promise<Response> =>
   fetch(`${adminUrl()}${path}`, {
@@ -106,17 +122,11 @@ describe('APISIX (M0-04)', () => {
     });
     expect([200, 201]).toContain(put.status);
     try {
-      const stored = spawnSync(
-        'docker',
-        [
-          'exec',
-          'den-etcd-1',
-          'etcdctl',
-          'get',
-          '/apisix/plugin_metadata/den-assertion',
-          '--print-value-only',
-        ],
-        { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } },
+      const stored = etcdctl(
+        `root:${env('ETCD_ROOT_PASSWORD')}`,
+        'get',
+        '/apisix/plugin_metadata/den-assertion',
+        '--print-value-only',
       ).stdout;
       const value = (JSON.parse(stored) as { private_key: string }).private_key;
       expect(value).not.toContain('BEGIN');
@@ -231,7 +241,7 @@ describe('mock providers on the host (M0-04)', () => {
 
 describe('OPA (M0-04)', () => {
   it('is configured to pull the den bundle from the portal API, without decision logs', async () => {
-    const res = await fetch(`${opaUrl()}/v1/config`);
+    const res = await asOpaAdmin('/v1/config');
     const { result } = (await res.json()) as {
       result: {
         services: Record<string, { url: string; credentials?: unknown }>;
@@ -246,12 +256,80 @@ describe('OPA (M0-04)', () => {
   });
 
   it('denies by default while no bundle is loaded', async () => {
-    const res = await fetch(`${opaUrl()}/v1/data/den/authz/allow`, {
+    const res = await asOpaAdmin('/v1/data/den/authz/allow', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ input: {} }),
     });
     const body = (await res.json()) as { result?: unknown };
     expect(body.result === undefined || body.result === false).toBe(true);
+  });
+});
+
+/**
+ * The gateway's control plane requires credentials (B-15, ADR-0031): a container on the gateway's
+ * network that is not APISIX cannot read the pseudonym key in OPA's data, replace a policy, or
+ * read and write the gateway's configuration in etcd.
+ */
+describe('credentials on the gateway control plane (B-15)', () => {
+  it("OPA's API: decisions with the gateway's token, everything else with the admin token", async () => {
+    const decision = env('DEN_OPA_DECISION_TOKEN');
+    const call = (path: string, init: RequestInit = {}) =>
+      fetch(`${opaUrl()}${path}`, init).then((r) => r.status);
+    const post = { method: 'POST', body: JSON.stringify({ input: {} }) };
+    // No token: nothing but health and metrics, which carry no data.
+    expect(await call('/v1/data/config')).toBe(401);
+    expect(await call('/v1/data/den/authz/decision', post)).toBe(401);
+    expect(await call('/v1/policies')).toBe(401);
+    expect(await call('/health')).toBe(200);
+    expect(await call('/metrics')).toBe(200);
+    // The gateway's token: decisions only, in the query (the opa plugin sends no header).
+    expect(await call(`/v1/data/den/authz/decision?den_token=${decision}`, post)).toBe(200);
+    expect(await call(`/v1/data/config?den_token=${decision}`, post)).toBe(401);
+    expect(await call(`/v1/data/den/authz?den_token=${decision}`, post)).toBe(401);
+    expect(
+      await call('/v1/data/den/authz/decision', {
+        ...post,
+        headers: { authorization: `Bearer ${decision}` },
+      }),
+    ).toBe(401);
+    expect(await call(`/v1/data/den/authz/decision?den_token=${decision}x`, post)).toBe(401);
+    // The admin token: the whole API.
+    expect((await asOpaAdmin('/v1/policies')).status).toBe(200);
+  });
+
+  it('etcd: APISIX reads and writes its prefix only; anonymous calls and the health user get nothing', () => {
+    const key = '/apisix/plugin_metadata/den-header-guard';
+    expect(etcdctl(undefined, 'get', key).status).not.toBe(0);
+    const apisix = `apisix:${env('APISIX_ETCD_PASSWORD')}`;
+    expect(etcdctl(apisix, 'get', '/apisix', '--prefix', '--keys-only', '--limit=1').status).toBe(
+      0,
+    );
+    expect(etcdctl(apisix, 'get', '/other').stderr).toMatch(/permission denied/);
+    expect(etcdctl('healthcheck:healthcheck', 'get', key).stderr).toMatch(/permission denied/);
+    expect(etcdctl('healthcheck:healthcheck', 'endpoint', 'health').status).toBe(0);
+    expect(etcdctl(`root:${env('ETCD_ROOT_PASSWORD')}`, 'auth', 'status').stdout).toMatch(
+      /Authentication Status: true/,
+    );
+  });
+});
+
+/** Whether `from` (a container with bash) opens a TCP connection to host:port. */
+const reaches = (from: string, target: string): boolean =>
+  spawnSync(
+    'docker',
+    ['exec', from, 'bash', '-c', `timeout 3 bash -c 'exec 3<>/dev/tcp/${target}' 2>/dev/null`],
+    { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' } },
+  ).status === 0;
+
+/**
+ * The Fluent Bit inputs have no authentication (B-17, ADR-0031): only APISIX reaches them. A
+ * container on the gateway's control network or the platform's, Keycloak here, cannot send records.
+ */
+describe('only the gateway reaches the Fluent Bit inputs (B-17)', () => {
+  it.each(['fluent-bit:9880', 'fluent-bit-transparency:5170'])('%s', (target) => {
+    const path = target.replace(':', '/');
+    expect(reaches('den-apisix-1', path)).toBe(true);
+    expect(reaches('den-keycloak-1', path)).toBe(false);
   });
 });

@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { HttpApisixAdmin } from './apisix-admin.js';
-import { desiredGateway, type GatewaySettings, parseDevNodes } from './desired-state.js';
+import { opaAdminFetch, opaDecisionToken } from '../../../test/opa.js';
+import { desiredGateway, type GatewaySettings, opaPolicy, parseDevNodes } from './desired-state.js';
 
 const GATEWAY = `http://127.0.0.1:${process.env.APISIX_HTTP_PORT ?? 9080}`;
 const OPA = `http://localhost:${process.env.OPA_PORT ?? 8181}`;
@@ -69,6 +70,9 @@ headers := {"X-DEN-Subscription": grant.subscription, "X-DEN-Rate-Limit": format
 headers := {"Content-Type": "application/problem+json", "X-DEN-Deny-Reason": "no_subscription"} if not allow
 
 status_code := 403
+
+# What the opa plugin queries: OPA lets the gateway's token read only rules named decision (B-15).
+decision := {"allow": allow, "headers": headers, "status_code": status_code}
 `;
   const grants: Record<string, { subscription: string; limit: number }> = {
     a: { subscription: `sub-a-${run}`, limit: 2 },
@@ -76,7 +80,7 @@ status_code := 403
     c: { subscription: `sub-c-${run}`, limit: 3 },
   };
   const putGrants = async () => {
-    const res = await fetch(`${OPA}/v1/data/${POLICY}`, {
+    const res = await opaAdminFetch(`${OPA}/v1/data/${POLICY}`, {
       method: 'PUT',
       body: JSON.stringify({ grants }),
     });
@@ -102,7 +106,10 @@ status_code := 403
   };
 
   beforeAll(async () => {
-    const res = await fetch(`${OPA}/v1/policies/${POLICY}`, { method: 'PUT', body: policy });
+    const res = await opaAdminFetch(`${OPA}/v1/policies/${POLICY}`, {
+      method: 'PUT',
+      body: policy,
+    });
     expect(res.status, await res.text()).toBe(200);
     await putGrants();
     await admin.put('routes', ROUTE, {
@@ -113,7 +120,7 @@ status_code := 403
         'proxy-rewrite': { uri: '/health' },
         opa: {
           host: 'http://opa:8181',
-          policy: POLICY,
+          policy: opaPolicy(`${POLICY}/decision`, opaDecisionToken()),
           send_headers_upstream: ['X-DEN-Subscription', 'X-DEN-Rate-Limit'],
         },
         'limit-count': plugins['limit-count'],
@@ -141,8 +148,8 @@ status_code := 403
 
   afterAll(async () => {
     for (const id of [ROUTE, PROXIED_ROUTE, PROVIDER_ROUTE]) await admin.delete('routes', id);
-    await fetch(`${OPA}/v1/policies/${POLICY}`, { method: 'DELETE' });
-    await fetch(`${OPA}/v1/data/${POLICY}`, { method: 'DELETE' });
+    await opaAdminFetch(`${OPA}/v1/policies/${POLICY}`, { method: 'DELETE' });
+    await opaAdminFetch(`${OPA}/v1/data/${POLICY}`, { method: 'DELETE' });
   });
 
   it('applies each subscription its own limit, with the quota headers', async () => {

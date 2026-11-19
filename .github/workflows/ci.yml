@@ -90,6 +90,8 @@ jobs:
         with:
           version: 1.21.4
       - run: opa check --strict packages/policy
+      # OPA's own API authorization (B-15, ADR-0031), outside the bundle.
+      - run: opa check --strict infra/opa/authz.rego
       - run: opa test --verbose packages/policy
       # ARCHITECTURE.md §4.2: policy coverage of at least 90 %.
       - run: opa test --coverage --threshold 90 --format=json packages/policy > /dev/null

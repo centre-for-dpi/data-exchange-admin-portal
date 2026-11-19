@@ -94,6 +94,11 @@ const set = {
   DEN_CITIZEN_APP_CLIENT_SECRET: secret(),
   APISIX_ADMIN_KEY: secret(),
   OPA_BUNDLE_TOKEN: secret(),
+  // OPA's API and etcd require credentials on the gateway's network (B-15, ADR-0031).
+  DEN_OPA_DECISION_TOKEN: secret(32),
+  DEN_OPA_ADMIN_TOKEN: secret(32),
+  ETCD_ROOT_PASSWORD: secret(),
+  APISIX_ETCD_PASSWORD: secret(),
   DEN_END_USER_HASH_SALT: secret(32),
   DEN_SUBJECT_REF_KEY: secret(32),
   DEN_TRANSPARENCY_INGEST_TOKEN: secret(),

@@ -38,6 +38,12 @@ export interface GatewaySettings {
   audience: string;
   /** Local OPA next to the gateway. */
   opaUrl: string;
+  /**
+   * The gateway's token for OPA's decisions (DEN_OPA_DECISION_TOKEN, B-15): OPA's API refuses
+   * every call without one (infra/opa/authz.rego). Unset where OPA's API is reachable only by
+   * APISIX (the Helm chart: loopback in the gateway's pod).
+   */
+  opaToken?: string;
   /** Fluent Bit HTTP input for access logs (ARCHITECTURE.md §8). */
   accessLogUrl: string;
   /** Fluent Bit TCP input of the transparency register (ADR-0015, ARCHITECTURE.md §13). */
@@ -558,7 +564,7 @@ export function desiredGateway(
       opa: {
         host: settings.opaUrl,
         // Only what the plugin reads (M6-03): see decision in packages/policy/den/authz.rego.
-        policy: 'den/authz/decision',
+        policy: opaPolicy('den/authz/decision', settings.opaToken),
         with_route: true,
         // Kept connections to the local OPA per worker (M6-03). With the default of 5, every call
         // beyond them opened and closed its own: at 500 req/s, thousands in TIME_WAIT and connects
@@ -849,6 +855,14 @@ export interface DevNode {
   hostPort: string;
   tls: boolean;
 }
+
+/**
+ * The opa plugin's `policy`, with the gateway's token where OPA requires one (B-15, ADR-0031). The
+ * plugin calls `{host}/v1/data/{policy}` and sends no header of its own, so the token travels in
+ * the den_token query parameter, which infra/opa/authz.rego checks and OPA does not log.
+ */
+export const opaPolicy = (path: string, token?: string): string =>
+  token ? `${path}?den_token=${encodeURIComponent(token)}` : path;
 
 /** Connections each APISIX worker keeps open to the local OPA (opa plugin, M6-03). */
 export const OPA_KEEPALIVE_POOL = 64;

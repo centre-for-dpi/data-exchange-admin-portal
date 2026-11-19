@@ -5,9 +5,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { readPolicies } from '../opa/policy-files.js';
 import { HttpApisixAdmin } from '../reconcilers/apisix/apisix-admin.js';
+import { opaAdminFetch, opaDecisionToken } from '../../test/opa.js';
 import {
   desiredGateway,
   type GatewaySettings,
+  opaPolicy,
   parseDevNodes,
 } from '../reconcilers/apisix/desired-state.js';
 import { AccessLogIndexReconciler } from './access-log-index.js';
@@ -95,13 +97,13 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
       const renamed = source
         .replace(/^package den\.authz/m, `package ${PACKAGE}.authz`)
         .replace(/data\.(routes|clients|config)\b/g, `data.${PACKAGE}.$1`);
-      const res = await fetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
+      const res = await opaAdminFetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
         method: 'PUT',
         body: renamed,
       });
       expect(res.status, await res.text()).toBe(200);
     }
-    const put = await fetch(`${OPA}/v1/data/${PACKAGE}`, {
+    const put = await opaAdminFetch(`${OPA}/v1/data/${PACKAGE}`, {
       method: 'PUT',
       body: JSON.stringify({
         routes: {
@@ -176,7 +178,11 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
     const plugins = { ...(route.plugins as Record<string, Record<string, unknown>>) };
     delete plugins['openid-connect'];
     expect(plugins).toHaveProperty('http-logger');
-    plugins.opa = { ...plugins.opa, policy: `${PACKAGE}/authz` };
+    // The renamed policy's decision, with the gateway's token like a real route (B-15).
+    plugins.opa = {
+      ...plugins.opa,
+      policy: opaPolicy(`${PACKAGE}/authz/decision`, opaDecisionToken()),
+    };
     await admin.put('routes', ROUTE, {
       uri: `${BASE}/*`,
       methods: ['GET'],
@@ -195,11 +201,11 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
   afterAll(async () => {
     await admin.delete('routes', ROUTE);
     for (const { path } of readPolicies()) {
-      await fetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
+      await opaAdminFetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
         method: 'DELETE',
       });
     }
-    await fetch(`${OPA}/v1/data/${PACKAGE}`, { method: 'DELETE' });
+    await opaAdminFetch(`${OPA}/v1/data/${PACKAGE}`, { method: 'DELETE' });
     provider.close();
     await prisma.$disconnect();
   });

@@ -457,11 +457,12 @@ The kit is specified in another repository; this contract is the boundary. In de
 
 - OWASP ASVS 5.0 level 2 review, with its fixes and open items: `docs/security/ASVS-L2.md` (M6-01).
 - **Networks (M6-01).**
-  - `gateway`: the gateway's control plane. APISIX, etcd and OPA, plus the platform components that use them (Keycloak, the Fluent Bits, Prometheus and, in the pilot, the API).
+  - `gateway`: the gateway's control plane. APISIX, etcd and OPA, plus the platform components that use them (Keycloak, Prometheus and, in the pilot, the API).
+  - `logs`: APISIX and its three Fluent Bits, whose inputs have no authentication (B-17, ADR-0031): no other container can send them records. The analytics Fluent Bit reaches OpenSearch on `analytics`; in the pilot the transparency one reaches the API on `collector`.
   - `providers`: the gateway's upstreams (test providers, node hub) and the contract runner.
   - `runner` (pilot): the API and the contract runner. The API is not on `providers`, so no upstream can reach it without going through the proxy.
   - `default`: the platform (database, CA, OpenSearch, mail, portal).
-  - etcd and OPA have no authentication of their own in the pilot, which is why they are only on `gateway`: neither the upstreams nor the runner can reach them. The gateway cannot reach the database, the CA, OpenSearch or the mail server. The test is `tests/infra/src/networks.int.test.ts`.
+  - etcd and OPA are only on `gateway`: neither the upstreams nor the runner can reach them. In Compose both also require credentials (B-15, ADR-0031): OPA's API a token (the gateway's, in the query, only for decisions; the admin token for everything else; `infra/opa/authz.rego`), etcd a user (APISIX's reads and writes only `/apisix`; `etcd-init` turns authentication on). In the Helm chart OPA listens on the pod's loopback and etcd requires mTLS. The gateway cannot reach the database, the CA, OpenSearch or the mail server. The test is `tests/infra/src/networks.int.test.ts`.
 - APISIX Admin API on the internal network only, with an admin key. In production, also etcd mTLS and OPA authentication (M6-05).
 - **Private keys in etcd** (gateway TLS, S-6 assertions). They are encrypted with the deployment's own `data_encryption.keyring` (`DEN_APISIX_KEYRING`), never with APISIX's factory default, which is public.
 - **APISIX plugins.** APISIX only loads the ones the portal's routes use: a route that asks for another one, such as the serverless functions, is rejected.

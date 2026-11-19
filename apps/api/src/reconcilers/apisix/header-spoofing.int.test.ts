@@ -4,7 +4,8 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readPolicies } from '../../opa/policy-files.js';
 import { HttpApisixAdmin } from './apisix-admin.js';
-import { desiredGateway, type GatewaySettings, parseDevNodes } from './desired-state.js';
+import { opaAdminFetch, opaDecisionToken } from '../../../test/opa.js';
+import { desiredGateway, type GatewaySettings, opaPolicy, parseDevNodes } from './desired-state.js';
 
 const GATEWAY = `http://127.0.0.1:${process.env.APISIX_HTTP_PORT ?? 9080}`;
 const OPA = `http://localhost:${process.env.OPA_PORT ?? 8181}`;
@@ -87,7 +88,7 @@ describe('a consumer cannot forge the X-DEN-* headers the provider receives (M3-
       const renamed = source
         .replace(/^package den\.authz/m, `package ${PACKAGE}.authz`)
         .replace(/data\.(routes|clients|config)\b/g, `data.${PACKAGE}.$1`);
-      const res = await fetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
+      const res = await opaAdminFetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
         method: 'PUT',
         body: renamed,
       });
@@ -144,7 +145,7 @@ describe('a consumer cannot forge the X-DEN-* headers the provider receives (M3-
         gatewayNodes: 1,
       },
     };
-    const put = await fetch(`${OPA}/v1/data/${PACKAGE}`, {
+    const put = await opaAdminFetch(`${OPA}/v1/data/${PACKAGE}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -170,7 +171,11 @@ describe('a consumer cannot forge the X-DEN-* headers the provider receives (M3-
     delete plugins['openid-connect'];
     delete plugins['http-logger'];
     delete plugins['tcp-logger'];
-    plugins.opa = { ...plugins.opa, policy: `${PACKAGE}/authz` };
+    // The renamed policy's decision, with the gateway's token like a real route (B-15).
+    plugins.opa = {
+      ...plugins.opa,
+      policy: opaPolicy(`${PACKAGE}/authz/decision`, opaDecisionToken()),
+    };
     await admin.put('routes', ROUTE, {
       uri: `${BASE}/*`,
       methods: ['GET'],
@@ -189,11 +194,11 @@ describe('a consumer cannot forge the X-DEN-* headers the provider receives (M3-
   afterAll(async () => {
     await admin.delete('routes', ROUTE);
     for (const { path } of readPolicies()) {
-      await fetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
+      await opaAdminFetch(`${OPA}/v1/policies/${PACKAGE}-${path.replace(/\W/g, '-')}`, {
         method: 'DELETE',
       });
     }
-    await fetch(`${OPA}/v1/data/${PACKAGE}`, { method: 'DELETE' });
+    await opaAdminFetch(`${OPA}/v1/data/${PACKAGE}`, { method: 'DELETE' });
     provider.close();
   });
 

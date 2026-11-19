@@ -46,6 +46,7 @@ import { WireguardReconciler } from './wireguard/wireguard.reconciler.js';
         keycloakDiscoveryUrl: `${process.env.DEN_GATEWAY_KEYCLOAK_URL ?? 'http://keycloak:8080'}/realms/den-gateway/.well-known/openid-configuration`,
         audience: 'den-gateway',
         opaUrl: process.env.DEN_GATEWAY_OPA_URL ?? 'http://opa:8181',
+        opaToken: process.env.DEN_OPA_DECISION_TOKEN || undefined,
         accessLogUrl: process.env.DEN_GATEWAY_ACCESS_LOG_URL ?? 'http://fluent-bit:9880/',
         transparencyLog: parseHostPort(
           process.env.DEN_GATEWAY_TRANSPARENCY_LOG ?? 'fluent-bit-transparency:5170',

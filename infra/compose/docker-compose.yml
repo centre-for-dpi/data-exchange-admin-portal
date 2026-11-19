@@ -98,18 +98,46 @@ services:
       - --initial-cluster=etcd0=http://etcd:2380
     volumes:
       - etcd-data:/etcd-data
-    # Not published: only APISIX talks to etcd.
+    # Not published: only APISIX talks to etcd, as its own user (etcd-init, B-15).
     healthcheck:
       <<: *healthcheck-defaults
-      test: ['CMD', 'etcdctl', '--endpoints=http://127.0.0.1:2379', 'endpoint', 'health']
+      # Anonymous calls fail once authentication is on: the health check logs in as `healthcheck`,
+      # a user with no role and a public password (infra/etcd/init.sh).
+      test:
+        [
+          'CMD',
+          'etcdctl',
+          '--endpoints=http://127.0.0.1:2379',
+          '--user=healthcheck:healthcheck',
+          'endpoint',
+          'health',
+        ]
+
+  # Authentication of etcd (B-15, ADR-0031), before APISIX on every start: APISIX's user, which
+  # reads and writes only /apisix, root, and authentication on (infra/etcd/init.sh, idempotent).
+  etcd-init:
+    build: ../etcd
+    image: den/etcd-init:local
+    networks: [gateway]
+    entrypoint: ['sh', '/init/init.sh']
+    environment:
+      ETCD_ROOT_PASSWORD: ${ETCD_ROOT_PASSWORD:?set ETCD_ROOT_PASSWORD in .env}
+      APISIX_ETCD_PASSWORD: ${APISIX_ETCD_PASSWORD:?set APISIX_ETCD_PASSWORD in .env}
+    volumes:
+      - ../etcd/init.sh:/init/init.sh:ro
+    depends_on:
+      etcd:
+        condition: service_healthy
 
   apisix:
     image: apache/apisix:3.19.0-debian
-    networks: [gateway, providers]
+    networks: [gateway, providers, logs]
     environment:
       # The deployment's own key for the private keys APISIX keeps in etcd (M6-01).
       DEN_APISIX_KEYRING: ${DEN_APISIX_KEYRING:?set DEN_APISIX_KEYRING in .env (16 characters)}
       APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?set APISIX_ADMIN_KEY in .env}
+      # Its user in etcd (etcd-init, B-15).
+      APISIX_ETCD_PASSWORD: ${APISIX_ETCD_PASSWORD:?set APISIX_ETCD_PASSWORD in .env}
     volumes:
       - ../apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ../apisix/plugins:/usr/local/apisix/den:ro
@@ -124,6 +152,8 @@ services:
     depends_on:
       etcd:
         condition: service_healthy
+      etcd-init:
+        condition: service_completed_successfully
       # Its error log goes there (config.yaml): nginx must resolve the name to start.
       fluent-bit-errors:
         condition: service_healthy
@@ -160,11 +190,19 @@ services:
       - --addr=0.0.0.0:8181
       - --log-format=json
       - --config-file=/config/config.yaml
+      # Its API needs a token (B-15, ADR-0031): the gateway's for decisions, the admin one for the
+      # rest; authz.rego says which. /health and /metrics stay open.
+      - --authentication=token
+      - --authorization=basic
+      - /config/authz.rego
     environment:
       OPA_PORTAL_URL: ${OPA_PORTAL_URL:-http://host.docker.internal:4000/api/v1/opa}
       OPA_BUNDLE_TOKEN: ${OPA_BUNDLE_TOKEN:?set OPA_BUNDLE_TOKEN in .env}
+      DEN_OPA_DECISION_TOKEN: ${DEN_OPA_DECISION_TOKEN:?set DEN_OPA_DECISION_TOKEN in .env}
+      DEN_OPA_ADMIN_TOKEN: ${DEN_OPA_ADMIN_TOKEN:?set DEN_OPA_ADMIN_TOKEN in .env}
     volumes:
       - ../opa/config.yaml:/config/config.yaml:ro
+      - ../opa/authz.rego:/config/authz.rego:ro
       # The last bundle, for a restart while the portal is down (M6-04).
       - opa-data:/var/lib/opa
     extra_hosts:
@@ -215,7 +253,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:3.9.0
-    networks: [default]
+    networks: [default, analytics]
     profiles: [observability]
     environment:
       discovery.type: single-node
@@ -246,7 +284,9 @@ services:
 
   fluent-bit:
     image: fluent/fluent-bit:5.1.5-debug
-    networks: [default, gateway]
+    # Its input has no authentication (B-17): only APISIX reaches it, on `logs`; it reaches
+    # OpenSearch alone on `analytics`.
+    networks: [logs, analytics]
     profiles: [observability]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/fluent-bit.yaml']
     volumes:
@@ -336,7 +376,9 @@ services:
   # would not see the calls. Buffers on disk and retries while the collector is unreachable.
   fluent-bit-transparency:
     image: fluent/fluent-bit:5.1.5-debug
-    networks: [default, gateway]
+    # Its input has no authentication (B-17): only APISIX reaches it, on `logs`. The collector is
+    # the API on the host here; in the pilot, the API on `collector` (docker-compose.deploy.yml).
+    networks: [logs]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/transparency.yaml']
     environment:
       FLUENT_BIT_HTTP_PORT: '2020'
@@ -359,7 +401,8 @@ services:
   # gateway-errors.yaml). Base profile: APISIX needs it to start.
   fluent-bit-errors:
     image: fluent/fluent-bit:5.1.5-debug
-    networks: [gateway]
+    # Only APISIX sends to it (B-17).
+    networks: [logs]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/gateway-errors.yaml']
     environment:
       FLUENT_BIT_HTTP_PORT: '2020'
@@ -538,13 +581,19 @@ services:
         condition: service_healthy
 
 # Network segmentation (M6-01). `default` is the platform (database, identity, CA, analytics,
-# the portal). `gateway` is the gateway's control plane: etcd and OPA have no authentication of
-# their own, so only the gateway and the platform's components reach them. `providers` are the
-# gateway's upstreams (mock providers, the node hub) and the contract runner: none of them reaches
-# etcd, OPA or the database, and the gateway reaches nothing of the platform but what it needs.
+# the portal). `gateway` is the gateway's control plane: etcd and OPA, which also require
+# credentials (B-15, ADR-0031); only the gateway and the platform's components reach them.
+# `providers` are the gateway's upstreams (mock providers, the node hub) and the contract runner:
+# none of them reaches etcd, OPA or the database, and the gateway reaches nothing of the platform
+# but what it needs.
+# `logs` joins APISIX to its three Fluent Bits, whose inputs have no authentication (B-17,
+# ADR-0031): no other container can send them records. `analytics` is the analytics Fluent Bit's
+# way to OpenSearch.
 networks:
   gateway:
   providers:
+  logs:
+  analytics:
 
 volumes:
   pg-data:

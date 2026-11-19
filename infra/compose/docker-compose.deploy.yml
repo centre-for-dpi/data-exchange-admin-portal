@@ -97,6 +97,7 @@ services:
     networks: !override
       gateway: {}
       providers: {}
+      logs: {}
       edge:
         aliases: [den-apisix]
 
@@ -117,6 +118,8 @@ services:
 
   fluent-bit-transparency:
     restart: unless-stopped
+    # The collector is the API, on a network of the two of them (B-17).
+    networks: [logs, collector]
 
   fluent-bit-errors:
     restart: unless-stopped
@@ -230,6 +233,8 @@ services:
       default: {}
       gateway: {}
       runner: {}
+      # fluent-bit-transparency's way to the collector (B-17): nothing else is on it.
+      collector: {}
       edge:
         aliases: [den-portal-api]
 
@@ -284,6 +289,8 @@ volumes:
 networks:
   # The API and the contract runner only (the runner's results come back to the API).
   runner:
+  # The API and fluent-bit-transparency only (B-17).
+  collector:
   edge:
     name: ${TRAEFIK_NETWORK:-lab-router_default}
     external: true

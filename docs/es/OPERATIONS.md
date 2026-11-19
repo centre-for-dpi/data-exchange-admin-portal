@@ -26,7 +26,7 @@ dc exec api wget -qO- http://opa:8181/health
 
 ```
 postgres ──▶ keycloak ─────────────┐
-etcd ──────▶ apisix ───────────────┤
+etcd ──▶ etcd-init ──▶ apisix ─────┤
 step-ca ───────────────────────────┼──▶ api ──▶ web
 tsa-init ──▶ tsa ──────────────────┘      └───▶ citizen-app
 opa ················ descarga el bundle de api (reintenta solo)
@@ -47,7 +47,7 @@ Compose respeta este orden con `depends_on` y health checks: `api` espera a `pos
 | :-- | :-- | :-- | :-- |
 | `postgres` | Con el volumen vacío: roles `den_app` y `keycloak`, bases `keycloak` y `den_test` (`infra/postgres/init`) | Nada. Las contraseñas de `.env` se fijan aquí y solo aquí | `dc exec postgres pg_isready` |
 | `keycloak` | Importa los realms `den-portal`, `den-gateway` y `den-citizens` si no existen, con los secretos de `.env` | Nada en un despliegue nuevo. En uno existente, aplicar los cambios de realm que pida la versión (§5.3), entre ellos la política de rotación de secretos de M3-04 y el segundo factor de M3-08 | `curl -fsS $DEN_PUBLIC_URL/auth/realms/den-portal/.well-known/openid-configuration` |
-| `etcd` | — | Nada | `dc ps etcd` (healthy) |
+| `etcd` / `etcd-init` | `etcd-init`, antes de APISIX en cada arranque: el usuario de APISIX (solo `/apisix`), root y la autenticación activa (B-15) | Nada | `dc ps etcd` (healthy); `dc logs etcd-init` termina en `ready` |
 | `apisix` | Lee `infra/apisix/config.yaml`; sin rutas ni objetos SSL hasta que el API reconcilie | **Nada a mano**: rutas, upstreams y objetos SSL los crea el API | `dc ps apisix` (healthy); §2.2 |
 | `step-ca` | Primera vez: crea la CA y el provisioner `den-portal`. Siempre: `configure.sh` fija plantillas y duraciones, y crea `den-gateway-tls` si falta | Guardar la huella de la raíz si otro sistema la necesita (§5.4) | `dc exec step-ca step ca health --ca-url=https://localhost:9000 --root=/home/step/certs/root_ca.crt` |
 | `tsa-init` / `tsa` | `tsa-init` crea una vez la cadena de la TSA; `tsa` firma sellos | Nada | `curl -fsS $DEN_PUBLIC_URL/tsa/api/v1/timestamp/certchain` devuelve PEM |
@@ -323,6 +323,10 @@ La rotación y la revocación de los secretos y certificados de las aplicaciones
 | Certificados del gateway (servidor y clientes hacia proveedores) | Los renueva solo el reconciliador de APISIX; para forzarlo, reiniciar el API tras borrar la fila de `gateway_certificate` correspondiente |
 | `DEN_SECRETS_KEY` (sella los secretos de cliente pendientes y las claves privadas del gateway) | 1. Generar la nueva (32 bytes base64), ponerla en `DEN_SECRETS_KEY` y pasar la anterior a `DEN_SECRETS_KEYS_PREVIOUS`. 2. Recrear el API (`dc up -d api`): lo nuevo se sella con la nueva y lo anterior se sigue abriendo. 3. Resellar: `dc exec api node dist/secrets/main.js` (en desarrollo, `pnpm --filter @den/api secrets:reseal`). Es idempotente y deja `secrets.resealed` en la bitácora. 4. Vaciar `DEN_SECRETS_KEYS_PREVIOUS` y recrear el API. Si el resellado encuentra un valor que ninguna clave abre, se detiene sin cambiar nada más: falta una clave anterior |
 | Clave de firma de la aserción del gateway (M6-10) | La rota sola el portal cada `lifecycle.assertionKeyRotationDays` (90 días); la anterior sigue en el JWKS. Para rotarla ya: `POST /api/v1/admin/gateway-signing-keys/rotate` como `platform_admin`; con `"compromised": true` la anterior sale del JWKS (`RUNBOOK.md §2.2`) |
+| `DEN_OPA_DECISION_TOKEN` | Cambiar en `.env` y recrear a la vez `opa` y `api`: la pasada completa del API reescribe las rutas con el nuevo; mientras tanto el gateway responde 503 |
+| `DEN_OPA_ADMIN_TOKEN` | Cambiar en `.env` y recrear `opa` |
+| `APISIX_ETCD_PASSWORD` | Cambiar en `.env` y correr `dc up -d`: `etcd-init` la pone en etcd y APISIX se recrea con ella |
+| `ETCD_ROOT_PASSWORD` (credenciales de etcd) | No se cambia por `.env` una vez activa la autenticación: `etcd-init` se detiene con un mensaje y APISIX no arranca. Cámbiala primero en etcd, como root: `dc exec etcd etcdctl --user="root:<anterior>" user passwd root` (pide la nueva), y luego en `.env`. Si se perdió la anterior: `dc stop apisix etcd`, `docker volume rm den_etcd-data`, `dc up -d`; etcd arranca vacío, `etcd-init` vuelve a poner los usuarios y el reconciliador del API reescribe todo el gateway desde PostgreSQL (`§5.2`) |
 | `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | **No se rotan**: rompen el vínculo con los registros anteriores (`DEPLOYMENT.md §4.1`) |
 | CA intermedia | `RUNBOOK.md §3` |
 
@@ -399,6 +403,8 @@ El chart `den` archiva el WAL y toma un respaldo base diario de las dos bases (`
 
 | Síntoma | Causa probable | Qué hacer |
 | :-- | :-- | :-- |
+| El gateway responde `503` a toda llamada | OPA rechaza al gateway (401): las rutas aún no llevan `DEN_OPA_DECISION_TOKEN`, u OPA y el API tienen valores distintos | El mismo valor para `opa` y `api` en `.env`; recrear los dos; la pasada completa del API reescribe las rutas (`§5.2`). `dc logs opa` muestra `resp_status: 401` en `/v1/data/den/authz/decision` |
+| `apisix` no arranca; `etcd-init` salió con error | etcd no responde, o `ETCD_ROOT_PASSWORD` no es la contraseña de root de etcd | `dc logs etcd-init`; §5.6, `ETCD_ROOT_PASSWORD` |
 | El gateway responde `403` a todo, incluso con suscripción | OPA sin bundle: el API no puede construirlo (falta, es corta o es el valor de ejemplo `DEN_SUBJECT_REF_KEY` o `DEN_END_USER_HASH_SALT`) o OPA no alcanza `OPA_PORTAL_URL` | `dc logs opa`, `dc logs api`; revisar esas variables y `OPA_BUNDLE_TOKEN` |
 | Suscripción "Aprobada (activándose)" que no pasa a "Activa" | OPA no descargó ni reportó la revisión nueva | `health?bundles` de OPA; SQL 1 con `system = 'opa'` |
 | API publicada que no aparece en el gateway (`404`) | Error del reconciliador de APISIX | SQL 1 con `system = 'apisix'`; `dc logs api`; revisar `APISIX_ADMIN_URL` y `APISIX_ADMIN_KEY` |

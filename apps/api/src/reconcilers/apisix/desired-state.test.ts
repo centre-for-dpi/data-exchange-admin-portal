@@ -198,6 +198,15 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     }
   });
 
+  it("asks OPA with the gateway's token where OPA requires one (B-15)", () => {
+    const withToken = desiredGateway(version(), { ...settings, opaToken: 'tok/en+=' }).route
+      .plugins as Plugins;
+    // The plugin calls {host}/v1/data/{policy} and sends no header of its own.
+    expect(withToken.opa?.policy).toBe('den/authz/decision?den_token=tok%2Fen%2B%3D');
+    const without = desiredGateway(version(), settings).route.plugins as Plugins;
+    expect(without.opa?.policy).toBe('den/authz/decision');
+  });
+
   it("removes the consumer's credentials before the upstream (M-11)", () => {
     const plugins = desiredGateway(version(), settings).route.plugins as Plugins;
     // openid-connect (bearer_only) validates the token and leaves it in place; OPA reads it and

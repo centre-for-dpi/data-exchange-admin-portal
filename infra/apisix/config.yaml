@@ -50,6 +50,9 @@ deployment:
       - http://etcd:2379
     prefix: /apisix
     timeout: 30
+    # APISIX's own user, which reads and writes only /apisix (infra/etcd/init.sh, B-15).
+    user: apisix
+    password: ${{APISIX_ETCD_PASSWORD}}
 
 nginx_config:
   # Rule 2 (CLAUDE.md, ARCHITECTURE.md §8): nginx's access log writes the request line and the

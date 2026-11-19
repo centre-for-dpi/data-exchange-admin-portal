@@ -95,6 +95,16 @@ ensure_env_additions() {
     chmod 600 "$ENV_FILE"
     warn "Nueva clave de cifrado de los respaldos (PGBACKREST_REPO1_CIPHER_PASS) en .env: guarda una copia fuera del servidor. Sin ella no se puede restaurar ningún respaldo."
   fi
+  # Credentials of OPA's API and etcd (B-15, ADR-0031), new in this version: generated once. etcd-init
+  # turns etcd's authentication on with them on the next start; the data in etcd stays.
+  local key
+  for key in DEN_OPA_DECISION_TOKEN DEN_OPA_ADMIN_TOKEN ETCD_ROOT_PASSWORD APISIX_ETCD_PASSWORD; do
+    if [[ -z $(env_get "$key") ]]; then
+      env_set "$key" "$(head -c 32 /dev/urandom | base64 | tr -d '\n/+=')"
+      chmod 600 "$ENV_FILE"
+      info "Nueva credencial interna en .env: $key."
+    fi
+  done
   # Earlier .env files carried the development value (data/documents), which the API cannot write.
   if [[ $(env_get DEN_DOCUMENTS_DIR) != /var/lib/den/documents ]]; then
     env_set DEN_DOCUMENTS_DIR /var/lib/den/documents
@@ -670,6 +680,13 @@ cmd_update() {
   require_install; load_env_settings
   cmd_backup
   git pull --ff-only
+  # Bash already read this file: the rest runs with the installer just pulled, whose
+  # ensure_env_additions knows the variables (and new secrets) the new version needs.
+  exec bash "$ROOT/install.sh" update-apply
+}
+
+cmd_update_apply() {
+  require_install; load_env_settings
   ensure_env_additions
   write_edge
   dc up -d --build --wait --wait-timeout 1800
@@ -709,12 +726,13 @@ case ${1:-install} in
   backup) cmd_backup ;;
   restore) shift; cmd_restore "${1:-}" ;;
   update) cmd_update ;;
+  update-apply) cmd_update_apply ;;
   images) shift; cmd_images "${1:-}" ;;
   platform-role) shift; cmd_platform_role "$@" ;;
   demo-users) shift; cmd_demo_users "$@" ;;
   realms) cmd_realms ;;
   stop) require_install; dc stop ;;
-  start) require_install; dc up -d --wait --wait-timeout 900 ;;
+  start) require_install; ensure_env_additions; dc up -d --wait --wait-timeout 900 ;;
   -h | --help | help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) fail "Comando desconocido: $1 (ver ./install.sh help)" ;;
 esac

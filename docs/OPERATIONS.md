@@ -26,7 +26,7 @@ dc exec api wget -qO- http://opa:8181/health
 
 ```
 postgres ──▶ keycloak ─────────────┐
-etcd ──────▶ apisix ───────────────┤
+etcd ──▶ etcd-init ──▶ apisix ─────┤
 step-ca ───────────────────────────┼──▶ api ──▶ web
 tsa-init ──▶ tsa ──────────────────┘      └───▶ citizen-app
 opa ················ downloads the bundle from api (retries on its own)
@@ -47,7 +47,7 @@ Compose follows this order with `depends_on` and health checks: `api` waits for 
 | :-- | :-- | :-- | :-- |
 | `postgres` | With an empty volume: roles `den_app` and `keycloak`, databases `keycloak` and `den_test` (`infra/postgres/init`) | Nothing. The passwords in `.env` are set here and only here | `dc exec postgres pg_isready` |
 | `keycloak` | Imports the realms `den-portal`, `den-gateway` and `den-citizens` if they do not exist, with the secrets from `.env` | Nothing on a new deployment. On an existing one, apply the realm changes the version calls for (§5.3), among them the secret rotation policy of M3-04 and the second factor of M3-08 | `curl -fsS $DEN_PUBLIC_URL/auth/realms/den-portal/.well-known/openid-configuration` |
-| `etcd` | — | Nothing | `dc ps etcd` (healthy) |
+| `etcd` / `etcd-init` | `etcd-init`, before APISIX on every start: APISIX's user (only `/apisix`), root and authentication on (B-15) | Nothing | `dc ps etcd` (healthy); `dc logs etcd-init` ends in `ready` |
 | `apisix` | Reads `infra/apisix/config.yaml`; no routes or SSL objects until the API reconciles | **Nothing by hand**: routes, upstreams and SSL objects are created by the API | `dc ps apisix` (healthy); §2.2 |
 | `step-ca` | First time: creates the CA and the `den-portal` provisioner. Always: `configure.sh` sets templates and durations, and creates `den-gateway-tls` if it is missing | Save the root fingerprint if another system needs it (§5.4) | `dc exec step-ca step ca health --ca-url=https://localhost:9000 --root=/home/step/certs/root_ca.crt` |
 | `tsa-init` / `tsa` | `tsa-init` creates the TSA chain once; `tsa` signs timestamps | Nothing | `curl -fsS $DEN_PUBLIC_URL/tsa/api/v1/timestamp/certchain` returns PEM |
@@ -323,6 +323,10 @@ Rotating and revoking the applications' secrets and certificates is done by thei
 | Gateway certificates (server, and clients towards providers) | The APISIX reconciler renews them on its own; to force it, restart the API after deleting the matching `gateway_certificate` row |
 | `DEN_SECRETS_KEY` (seals pending client secrets and the gateway's private keys) | 1. Generate the new one (32 bytes base64), put it in `DEN_SECRETS_KEY` and move the old one to `DEN_SECRETS_KEYS_PREVIOUS`. 2. Recreate the API (`dc up -d api`): new values are sealed with the new key and old ones can still be opened. 3. Reseal: `dc exec api node dist/secrets/main.js` (in development, `pnpm --filter @den/api secrets:reseal`). It is idempotent and leaves `secrets.resealed` in the audit log. 4. Empty `DEN_SECRETS_KEYS_PREVIOUS` and recreate the API. If the reseal finds a value that no key opens, it stops without changing anything else: a previous key is missing |
 | Gateway assertion signing key (M6-10) | The portal rotates it on its own every `lifecycle.assertionKeyRotationDays` (90 days); the previous one stays in the JWKS. To rotate it now: `POST /api/v1/admin/gateway-signing-keys/rotate` as `platform_admin`; with `"compromised": true` the previous one is removed from the JWKS (`RUNBOOK.md §2.2`) |
+| `DEN_OPA_DECISION_TOKEN` | Change it in `.env` and recreate `opa` and `api` together: the API's full pass rewrites the routes with the new one; until then the gateway answers 503 |
+| `DEN_OPA_ADMIN_TOKEN` | Change it in `.env` and recreate `opa` |
+| `APISIX_ETCD_PASSWORD` | Change it in `.env` and run `dc up -d`: `etcd-init` sets it in etcd and APISIX is recreated with it |
+| `ETCD_ROOT_PASSWORD` (etcd credentials) | It cannot change through `.env` once authentication is on: `etcd-init` stops with a message and APISIX does not start. Change it in etcd first, as root: `dc exec etcd etcdctl --user="root:<old>" user passwd root` (it asks for the new one), then in `.env`. If the old one is lost: `dc stop apisix etcd`, `docker volume rm den_etcd-data`, `dc up -d`; etcd starts empty, `etcd-init` sets the users again and the API's reconciler rewrites the whole gateway from PostgreSQL (`§5.2`) |
 | `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | **Not rotated**: they break the link with earlier records (`DEPLOYMENT.md §4.1`) |
 | Intermediate CA | `RUNBOOK.md §3` |
 
@@ -399,6 +403,8 @@ The `den` chart archives the WAL and takes a daily base backup of both databases
 
 | Symptom | Probable cause | What to do |
 | :-- | :-- | :-- |
+| The gateway responds `503` to every call | OPA refuses the gateway (401): the routes do not carry `DEN_OPA_DECISION_TOKEN` yet, or OPA and the API have different values | Same value for `opa` and `api` in `.env`; recreate both; the API's full pass rewrites the routes (`§5.2`). `dc logs opa` shows `resp_status: 401` on `/v1/data/den/authz/decision` |
+| `apisix` does not start; `etcd-init` exited with an error | etcd does not answer, or `ETCD_ROOT_PASSWORD` is not etcd's root password | `dc logs etcd-init`; §5.6, `ETCD_ROOT_PASSWORD` |
 | The gateway responds `403` to everything, even with a subscription | OPA without a bundle: the API cannot build it (`DEN_SUBJECT_REF_KEY` or `DEN_END_USER_HASH_SALT` is missing, too short or the example value) or OPA cannot reach `OPA_PORTAL_URL` | `dc logs opa`, `dc logs api`; check those variables and `OPA_BUNDLE_TOKEN` |
 | Subscription "Approved (activating)" that does not become "Active" | OPA did not download or report the new revision | OPA's `health?bundles`; SQL 1 with `system = 'opa'` |
 | Published API that does not appear on the gateway (`404`) | APISIX reconciler error | SQL 1 with `system = 'apisix'`; `dc logs api`; check `APISIX_ADMIN_URL` and `APISIX_ADMIN_KEY` |

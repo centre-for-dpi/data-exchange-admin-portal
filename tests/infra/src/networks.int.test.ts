@@ -40,10 +40,11 @@ const networksOf = (compose: Compose, service: string) =>
   Object.keys(compose.services[service]?.networks ?? {}).sort();
 
 /**
- * Network segmentation (M6-01): the gateway's control plane (etcd and OPA, without
- * authentication of their own) is reachable only from the gateway and the platform; the
- * upstreams and the contract runner reach neither it nor the platform; and the gateway reaches
- * nothing of the platform's internals (database, CA, analytics store, mail).
+ * Network segmentation (M6-01): the gateway's control plane (etcd and OPA, which also require
+ * credentials since B-15) is reachable only from the gateway and the platform; the upstreams and
+ * the contract runner reach neither it nor the platform; the gateway reaches nothing of the
+ * platform's internals (database, CA, analytics store, mail); and only the gateway reaches the
+ * Fluent Bit inputs, which have no authentication (B-17).
  */
 describe('network segmentation of the stack (M6-01)', () => {
   const deployEnv = {
@@ -59,7 +60,29 @@ describe('network segmentation of the stack (M6-01)', () => {
   for (const [name, compose] of stacks) {
     it(`${name}: etcd and OPA only on the gateway's control network`, () => {
       expect(networksOf(compose, 'etcd')).toEqual(['gateway']);
+      expect(networksOf(compose, 'etcd-init')).toEqual(['gateway']);
       expect(networksOf(compose, 'opa')).toEqual(['gateway']);
+    });
+
+    it(`${name}: only the gateway reaches the Fluent Bit inputs (B-17)`, () => {
+      const on = (network: string) =>
+        Object.keys(compose.services)
+          .filter((s) => networksOf(compose, s).includes(network))
+          .sort();
+      expect(on('logs')).toEqual([
+        'apisix',
+        'fluent-bit',
+        'fluent-bit-errors',
+        'fluent-bit-transparency',
+      ]);
+      expect(on('analytics')).toEqual(['fluent-bit', 'opensearch']);
+      expect(networksOf(compose, 'fluent-bit')).toEqual(['analytics', 'logs']);
+      expect(networksOf(compose, 'fluent-bit-errors')).toEqual(['logs']);
+      // The collector: the API on the host in development, on a network of the two in the pilot.
+      expect(networksOf(compose, 'fluent-bit-transparency')).toEqual(
+        name === 'pilot' ? ['collector', 'logs'] : ['logs'],
+      );
+      if (name === 'pilot') expect(on('collector')).toEqual(['api', 'fluent-bit-transparency']);
     });
 
     it(`${name}: the gateway is not on the platform network`, () => {
@@ -84,7 +107,7 @@ describe('network segmentation of the stack (M6-01)', () => {
 
   it('pilot: no upstream reaches the API without the proxy', () => {
     const [, pilot] = stacks[1];
-    expect(networksOf(pilot, 'api')).toEqual(['default', 'edge', 'gateway', 'runner']);
+    expect(networksOf(pilot, 'api')).toEqual(['collector', 'default', 'edge', 'gateway', 'runner']);
     const onRunner = Object.keys(pilot.services).filter((s) =>
       networksOf(pilot, s).includes('runner'),
     );
