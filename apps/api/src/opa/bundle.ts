@@ -151,6 +151,11 @@ export interface BundleData {
     country: string;
     /** Person document types of the country; the first one is the default. */
     documentTypes: string[];
+    /**
+     * Canonical form of each type's number (identifiers.personNumberFormat, ADR-0030): the policy
+     * denies a data subject whose number is written any other way (data_subject_invalid).
+     */
+    documentNumberFormats: Record<string, string>;
     /** features.mtls.required: every call needs a client certificate and a bound token. */
     mtlsRequired: boolean;
     /**

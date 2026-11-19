@@ -24,6 +24,19 @@ identifiers:
   # permiso especial de permanencia, permiso por protección temporal, pasaporte.
   person: [CC, CE, TI, PEP, PPT, PA]
   organization: [NIT]
+  # Canonical form of each person document number (ADR-0030): the gateway accepts a data subject
+  # only when its number is written exactly like this, so the gateway, the provider and the citizen
+  # read the same person. Numeric documents: digits only, no leading zeros, dots or spaces
+  # (1000000001, never 1.000.000.001 or 01000000001). The passport: upper-case letters and digits.
+  # Any type also has to be 3 to 20 of A-Z and 0-9. To confirm with the issuing registries before
+  # production: a registry whose numbers keep significant leading zeros needs another pattern.
+  personNumberFormat:
+    CC: '^[1-9][0-9]{2,9}$'
+    CE: '^[1-9][0-9]{2,9}$'
+    TI: '^[1-9][0-9]{2,10}$'
+    PEP: '^[1-9][0-9]{2,14}$'
+    PPT: '^[1-9][0-9]{2,9}$'
+    PA: '^[A-Z0-9]{3,20}$'
 
 sectors:
   - code: identidad

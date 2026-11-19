@@ -8,10 +8,11 @@
 --
 -- A client cannot assert the subject: any X-DEN-Body-Subject it sends is removed first. The gateway
 -- and the provider must read the same person, so the plugin gives no subject (OPA then denies) when
--- the body is not declared as JSON, repeats a member name (I-JSON, RFC 7493) or the value has a
--- colon. The body
--- is never stored or logged (golden rule 2). Runs in the rewrite phase after openid-connect
--- (2599), so unauthenticated calls are rejected before any body is read, and before
+-- the body is not declared as JSON, repeats a member name (I-JSON, RFC 7493), even only in letter
+-- case (M-12: a case-insensitive provider reads numeroIdentificacion and NumeroIdentificacion as
+-- one member), or the value has a colon. OPA then requires the canonical form of the number
+-- (ADR-0030). The body is never stored or logged (golden rule 2). Runs in the rewrite phase after
+-- openid-connect (2599), so unauthenticated calls are rejected before any body is read, and before
 -- proxy-rewrite (1008) and opa (access phase).
 --
 local core = require("apisix.core")
@@ -96,8 +97,10 @@ local function is_json(content_type)
         and ngx.re.find(content_type, [[^\s*application/([a-z0-9.+-]*\+)?json\s*(;|$)]], "joi") ~= nil
 end
 
--- True when some object in a (valid) JSON text repeats a member name. Parsers disagree on which
--- value wins, so the gateway and the provider could read different people.
+-- True when some object in a (valid) JSON text repeats a member name, compared without letter case
+-- (ASCII: string.lower). Parsers disagree on which value wins, and case-insensitive ones (.NET,
+-- Jackson with ACCEPT_CASE_INSENSITIVE_PROPERTIES) take names that differ only in case as the same
+-- member, so the gateway and the provider could read different people.
 local function has_duplicate_names(body)
     local stack = {}
     local i = 1
@@ -134,7 +137,11 @@ local function has_duplicate_names(body)
             end
             if top and top.object and top.expect_name then
                 local name = cjson.decode(body:sub(at, j))
-                if name == nil or top.names[name] then
+                if type(name) ~= "string" then
+                    return true
+                end
+                name = name:lower()
+                if top.names[name] then
                     return true
                 end
                 top.names[name] = true

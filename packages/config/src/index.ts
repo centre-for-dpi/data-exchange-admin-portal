@@ -10,8 +10,10 @@ export {
   resolveCountryCode,
   type LoadOptions,
 } from './load.js';
+export { documentNumberFormats, isCanonicalDocumentNumber } from './document-numbers.js';
 export {
   DEFAULT_UPSTREAMS,
+  DOCUMENT_NUMBER_SHAPE,
   UI_LOCALES,
   UPSTREAM_TYPES,
   countryConfigSchema,

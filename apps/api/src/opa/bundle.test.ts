@@ -27,6 +27,7 @@ const data = (salt = 'salt-for-tests-0001'): BundleData => ({
     subjectRefKey: 'subject-key-for-tests-0000000000000001',
     country: 'XX',
     documentTypes: ['ID', 'PP'],
+    documentNumberFormats: { ID: '^[1-9][0-9]{2,19}$', PP: '^[A-Z0-9]{3,20}$' },
     mtlsRequired: false,
     gatewayNodes: 1,
   },

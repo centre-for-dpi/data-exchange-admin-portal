@@ -16,15 +16,16 @@ export function subjectRef(input: {
     .digest('hex');
 }
 
-/** As OPA: no spaces, dots or hyphens, upper case. */
+/**
+ * The number in the citizen's token, as the identity provider may format it, without spaces, dots
+ * or hyphens and in upper case. The gateway never normalizes: it denies any spelling but the
+ * canonical one (ADR-0030), which the result must then be (isCanonicalDocumentNumber).
+ */
 export const normalizeDocumentNumber = (value: string): string =>
   value
     .trim()
     .replace(/[\s.-]/g, '')
     .toUpperCase();
-
-/** Numbers OPA accepts after normalization. */
-export const DOCUMENT_NUMBER = /^[A-Z0-9]{3,20}$/;
 
 /** The key OPA's bundle carries; at least 32 characters, as the bundle requires. */
 export function subjectRefKey(): string {

@@ -213,6 +213,15 @@ describe('OPA bundle and activation (M1-09)', () => {
         subjectRefKey: process.env.DEN_SUBJECT_REF_KEY,
         country: 'CO',
         documentTypes: ['CC', 'CE', 'TI', 'PEP', 'PPT', 'PA'],
+        // The canonical form of each number, from co.yaml (ADR-0030).
+        documentNumberFormats: {
+          CC: '^[1-9][0-9]{2,9}$',
+          CE: '^[1-9][0-9]{2,9}$',
+          TI: '^[1-9][0-9]{2,10}$',
+          PEP: '^[1-9][0-9]{2,14}$',
+          PPT: '^[1-9][0-9]{2,9}$',
+          PA: '^[A-Z0-9]{3,20}$',
+        },
         mtlsRequired: true,
         gatewayNodes: 1,
       });

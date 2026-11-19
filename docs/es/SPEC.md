@@ -214,9 +214,10 @@ enrollment_issued → enrolled → online ⇄ offline
 ### 4.7 Transparencia para el titular (ADR-0015, ADR-0016)
 
 1. Al publicar una versión de una API `personal` o `sensitive`, cada operación declara dónde está el titular (`x-den-data-subject`) o que no tiene titular (`none`).
-2. En cada llamada autorizada, el gateway calcula un seudónimo del titular y registra la consulta: entidad y aplicación que consultaron, entidad proveedora, API y datos expuestos, operación, finalidad, funcionario (hash), fecha y resultado. Nunca registra el contenido ni el número de documento.
-3. Las consultas se agrupan en lotes sellados (firma del operador y sello de tiempo de una TSA independiente). Cada consulta tiene un comprobante que cualquiera puede verificar.
-4. El ciudadano ve sus consultas en la app ciudadana del país. El portal solo responde a esa app con el token del ciudadano, y le avisa de consultas nuevas si el ciudadano lo pidió.
+2. El número de documento viaja en la forma canónica de su tipo, que define la configuración del país (`identifiers.personNumberFormat`: por ejemplo, dígitos sin ceros a la izquierda ni puntos). El gateway niega cualquier otra escritura (`data_subject_invalid`), así que la persona que registra es la que busca el proveedor, y el proveedor debe buscarla por ese valor exacto (ADR-0030).
+3. En cada llamada autorizada, el gateway calcula un seudónimo del titular y registra la consulta: entidad y aplicación que consultaron, entidad proveedora, API y datos expuestos, operación, finalidad, funcionario (hash), fecha y resultado. Nunca registra el contenido ni el número de documento.
+4. Las consultas se agrupan en lotes sellados (firma del operador y sello de tiempo de una TSA independiente). Cada consulta tiene un comprobante que cualquiera puede verificar.
+5. El ciudadano ve sus consultas en la app ciudadana del país. El portal solo responde a esa app con el token del ciudadano, y le avisa de consultas nuevas si el ciudadano lo pidió.
 
 ## 5. Reglas de negocio transversales
 
@@ -285,6 +286,7 @@ legal:
 identifiers:
   person: [CC, CE, TI, PEP, PPT, PA]
   organization: [NIT]
+  personNumberFormat: { CC: '^[1-9][0-9]{2,9}$', PA: '^[A-Z0-9]{3,20}$' }  # forma canónica de cada número (ADR-0030)
 sectors: [identidad, vulnerabilidad, vivienda, salud, trabajo, educacion, movilidad]
 purposes:
   - { code: eligibility_check, name: "Verificación de requisitos de un trámite" }

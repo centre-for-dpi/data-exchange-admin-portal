@@ -177,43 +177,52 @@ declares_subject if {
 	not operation.subject
 }
 
-# Document numbers are compared without spaces, dots or hyphens, in upper case.
-normalized(value) := upper(replace(replace(replace(trim_space(value), " ", ""), ".", ""), "-", ""))
-
 default_document_type := object.get(operation.subject, "documentType", data.config.documentTypes[0])
 
 path_match := regex.find_all_string_submatch_n(operation.subject.regex, input.request.path, 1)[0] if {
 	operation.subject.in == "path"
 }
 
-subject_type := upper(path_match[operation.subject.typeGroup]) if {
+subject_type := path_match[operation.subject.typeGroup] if {
 	operation.subject.typeGroup
 } else := default_document_type if {
 	operation.subject.in == "path"
 }
 
-subject_number := normalized(path_match[operation.subject.numberGroup])
+subject_number := path_match[operation.subject.numberGroup]
 
 # Body subjects: the gateway plugin den-data-subject read them from the JSON body (ADR-0017) and
 # passes "TYPE:NUMBER", or just "NUMBER" with the operation's (or the country's) type. Any value
 # the client sent in that header was removed before; the consumer cannot assert the subject.
 header_parts := split(header("x-den-body-subject"), ":") if operation.subject.in == "body"
 
-subject_type := upper(trim_space(header_parts[0])) if count(header_parts) == 2
+subject_type := header_parts[0] if count(header_parts) == 2
 
 subject_type := default_document_type if count(header_parts) == 1
 
-subject_number := normalized(header_parts[1]) if count(header_parts) == 2
+subject_number := header_parts[1] if count(header_parts) == 2
 
-subject_number := normalized(header_parts[0]) if count(header_parts) == 1
+subject_number := header_parts[0] if count(header_parts) == 1
+
+# The canonical form (ADR-0030, M-12): the type exactly as the country names it, and the number
+# exactly as its type writes it (data.config.documentNumberFormats, from the country's
+# identifiers.personNumberFormat), and always 3 to 20 of A-Z and 0-9. Nothing is normalized: a
+# number in another spelling (leading zeros, dots, spaces, lower case) is denied, because the
+# provider could read it as the same person while the reference, and the citizen, would not.
+number_shape := `^[A-Z0-9]{3,20}$`
+
+number_format := object.get(object.get(data.config, "documentNumberFormats", {}), subject_type, number_shape)
+
+subject_canonical if {
+	subject_type in data.config.documentTypes
+	regex.match(number_shape, subject_number)
+	regex.match(number_format, subject_number)
+}
 
 subject_ref := crypto.hmac.sha256(
 	concat("|", [data.config.country, subject_type, subject_number]),
 	data.config.subjectRefKey,
-) if {
-	subject_type in data.config.documentTypes
-	regex.match(`^[A-Z0-9]{3,20}$`, subject_number)
-}
+) if subject_canonical
 
 # Sandbox (M4-08): sandbox applications only reach sandbox routes (synthetic data), and
 # production applications never do. The subscription already names one route; this makes the
@@ -259,6 +268,9 @@ deny_reason := "no_subscription" if {
 } else := "end_user_invalid" if {
 	end_user_invalid
 } else := "data_subject_required" if {
+	declares_subject
+	not subject_number
+} else := "data_subject_invalid" if {
 	declares_subject
 	not subject_ref
 }
@@ -348,6 +360,7 @@ details := {
 	"end_user_required": "This API requires X-DEN-End-User with the official making the request.",
 	"end_user_invalid": "X-DEN-End-User must identify the official: 1 to 128 visible ASCII characters, no spaces.",
 	"data_subject_required": "The request does not say whose data it asks for, in the path or in the body as the API documents.",
+	"data_subject_invalid": "The data subject's document type is not one of the country's, or its number is not written in the canonical form of its type: no leading zeros, separators or spaces, letters in upper case.",
 	"client_certificate_required": "Call the gateway over TLS with the application's client certificate.",
 	"token_not_bound": "Get the access token with the client certificate: it must be bound to it (cnf x5t#S256).",
 	"certificate_mismatch": "The access token is bound to another certificate than the one presented.",

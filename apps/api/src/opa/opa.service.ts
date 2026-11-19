@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { getCountryConfig } from '@den/config';
+import { documentNumberFormats, getCountryConfig } from '@den/config';
 import { USABLE_CREDENTIAL_STATUSES } from '../domain/credential/state-machine.js';
 import { listOperations } from '../apis/lint/openapi-lint.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -191,6 +191,7 @@ export class OpaService implements OnApplicationBootstrap {
           subjectRefKey,
           country: country.country.code,
           documentTypes: [...country.identifiers.person],
+          documentNumberFormats: documentNumberFormats(country),
           mtlsRequired: country.features.mtls.required,
           gatewayNodes: this.gatewayNodes(),
         },

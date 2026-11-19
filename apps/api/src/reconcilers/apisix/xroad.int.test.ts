@@ -114,6 +114,7 @@ describe('X-Road upstream through the operator Security Server (M4-05)', () => {
         subjectRefKey: 'm4-05-subject-ref-key-0123456789abcdef',
         country: 'CO',
         documentTypes: ['CC'],
+        documentNumberFormats: { CC: '^[1-9][0-9]{2,9}$' },
         mtlsRequired: false,
         gatewayNodes: 1,
       },

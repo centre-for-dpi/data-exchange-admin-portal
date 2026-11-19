@@ -139,6 +139,7 @@ describe('a consumer cannot forge the X-DEN-* headers the provider receives (M3-
         subjectRefKey: SUBJECT_KEY,
         country: 'CO',
         documentTypes: ['CC'],
+        documentNumberFormats: { CC: '^[1-9][0-9]{2,9}$' },
         mtlsRequired: false,
         gatewayNodes: 1,
       },

@@ -214,9 +214,10 @@ enrollment_issued → enrolled → online ⇄ offline
 ### 4.7 Transparency for the data subject (ADR-0015, ADR-0016)
 
 1. When a version of a `personal` or `sensitive` API is published, each operation declares where the data subject is (`x-den-data-subject`) or that it has no data subject (`none`).
-2. On each authorized call, the gateway computes a pseudonym for the data subject and records the query: the entity and application that queried, the provider entity, the API and the exposed data, the operation, the purpose, the official (hash), the date and the result. It never records the content or the document number.
-3. Queries are grouped into sealed batches (operator signature and a timestamp from an independent TSA). Each query has a receipt that anyone can verify.
-4. Citizens see their queries in the country's citizen app. The portal only answers that app with the citizen's token, and alerts the citizen about new queries if the citizen asked for it.
+2. The document number travels in the canonical form of its type, which the country configuration defines (`identifiers.personNumberFormat`: for example, digits without leading zeros or dots). The gateway denies any other spelling (`data_subject_invalid`), so the person it records is the person the provider looks up, and the provider must look the person up by that exact value (ADR-0030).
+3. On each authorized call, the gateway computes a pseudonym for the data subject and records the query: the entity and application that queried, the provider entity, the API and the exposed data, the operation, the purpose, the official (hash), the date and the result. It never records the content or the document number.
+4. Queries are grouped into sealed batches (operator signature and a timestamp from an independent TSA). Each query has a receipt that anyone can verify.
+5. Citizens see their queries in the country's citizen app. The portal only answers that app with the citizen's token, and alerts the citizen about new queries if the citizen asked for it.
 
 ## 5. Cross-cutting business rules
 
@@ -285,6 +286,7 @@ legal:
 identifiers:
   person: [CC, CE, TI, PEP, PPT, PA]
   organization: [NIT]
+  personNumberFormat: { CC: '^[1-9][0-9]{2,9}$', PA: '^[A-Z0-9]{3,20}$' }  # canonical form of each number (ADR-0030)
 sectors: [identidad, vulnerabilidad, vivienda, salud, trabajo, educacion, movilidad]
 purposes:
   - { code: eligibility_check, name: "Verificación de requisitos de un trámite" }

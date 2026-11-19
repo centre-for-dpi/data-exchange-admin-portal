@@ -1511,6 +1511,7 @@
       "end_user_required": "Falta X-DEN-End-User (el funcionario)",
       "end_user_invalid": "X-DEN-End-User no válido",
       "data_subject_required": "Falta el titular de los datos",
+      "data_subject_invalid": "Documento del titular fuera de su forma canónica",
       "rate_limited": "Límite de peticiones por minuto superado"
     },
     "consumed": {

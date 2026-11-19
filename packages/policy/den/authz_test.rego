@@ -58,6 +58,8 @@ bundle := {
 		"subjectRefKey": "subject-key-for-tests-0000000000000001",
 		"country": "CO",
 		"documentTypes": ["CC", "CE", "TI"],
+		# TI has no format of its own: only the shape every number keeps to (ADR-0030).
+		"documentNumberFormats": {"CC": "^[1-9][0-9]{2,9}$", "CE": "^[1-9][0-9]{2,9}$"},
 		"mtlsRequired": false,
 		"gatewayNodes": 1,
 	},
@@ -339,25 +341,60 @@ test_the_reference_matches_the_portal_vector if {
 	h["X-DEN-Subject-Ref"] == "0d0deea2958985c2da0174f52dfb3bd1a9a88d0115ce41a4a3d1166e889b9062"
 }
 
-test_the_same_person_gets_the_same_reference_and_another_a_different_one if {
-	formatted := headers_for(get_path("/salud/afiliacion/v1/afiliados/1.000.000.001"), bundle)
-	formatted["X-DEN-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+test_another_person_gets_another_reference if {
+	one := headers_for(get_path("/salud/afiliacion/v1/afiliados/1000000001"), bundle)
 	other := headers_for(get_path("/salud/afiliacion/v1/afiliados/1000000002"), bundle)
-	other["X-DEN-Subject-Ref"] != formatted["X-DEN-Subject-Ref"]
+	other["X-DEN-Subject-Ref"] != one["X-DEN-Subject-Ref"]
+}
+
+# M-12: one person, one spelling. A provider that reads the number as an integer, strips separators
+# or ignores case would answer with the same person's data, while any other spelling would give
+# another reference and the citizen, whose reference comes from the canonical number, would never
+# see the consultation. Every other spelling is denied, so the provider only ever gets the
+# canonical one.
+test_another_spelling_of_the_number_is_denied if {
+	every number in ["0001000000001", "01000000001", "1.000.000.001", "1000000-001", "1000000001%20"] {
+		denied(get_path(concat("/", ["/salud/afiliacion/v1/afiliados", number])), bundle, "data_subject_invalid")
+	}
+}
+
+test_a_denied_spelling_never_carries_a_reference if {
+	h := headers_for(get_path("/salud/afiliacion/v1/afiliados/0001000000001"), bundle)
+	not h["X-DEN-Subject-Ref"]
+	h["X-DEN-Deny-Reason"] == "data_subject_invalid"
 }
 
 test_the_document_type_may_come_from_the_path if {
-	h := headers_for(get_path("/salud/afiliacion/v1/personas/ce/123456"), all_operations)
+	h := headers_for(get_path("/salud/afiliacion/v1/personas/CE/123456"), all_operations)
 	h["X-DEN-Subject-Ref"] == subject_ref_of("CE", "123456")
 }
 
+test_the_document_type_is_written_as_the_country_names_it if {
+	denied(get_path("/salud/afiliacion/v1/personas/ce/123456"), all_operations, "data_subject_invalid")
+}
+
 test_an_unknown_document_type_is_denied if {
-	denied(get_path("/salud/afiliacion/v1/personas/xx/123456"), all_operations, "data_subject_required")
+	denied(get_path("/salud/afiliacion/v1/personas/xx/123456"), all_operations, "data_subject_invalid")
 }
 
 test_a_malformed_number_is_denied if {
-	denied(get_path("/salud/afiliacion/v1/afiliados/12"), bundle, "data_subject_required")
-	denied(get_path("/salud/afiliacion/v1/afiliados/1000%2F0001"), bundle, "data_subject_required")
+	denied(get_path("/salud/afiliacion/v1/afiliados/12"), bundle, "data_subject_invalid")
+	denied(get_path("/salud/afiliacion/v1/afiliados/1000%2F0001"), bundle, "data_subject_invalid")
+}
+
+test_a_type_without_a_format_keeps_to_the_shape if {
+	h := headers_for(get_path("/salud/afiliacion/v1/personas/TI/0012345"), all_operations)
+	h["X-DEN-Subject-Ref"] == subject_ref_of("TI", "0012345")
+	denied(get_path("/salud/afiliacion/v1/personas/TI/ab12345"), all_operations, "data_subject_invalid")
+}
+
+test_without_formats_in_the_bundle_every_type_keeps_to_the_shape if {
+	h := authz.headers with input as get_path("/salud/afiliacion/v1/afiliados/01000000001")
+		with data.routes as bundle.routes
+		with data.clients as bundle.clients
+		with data.config as object.remove(bundle.config, ["documentNumberFormats"])
+		with time.now_ns as june_2026
+	h["X-DEN-Subject-Ref"] == subject_ref_of("CC", "01000000001")
 }
 
 test_the_body_subject_read_by_the_gateway_becomes_a_reference if {
@@ -368,15 +405,21 @@ test_the_body_subject_read_by_the_gateway_becomes_a_reference if {
 }
 
 test_a_bare_number_uses_the_operation_document_type if {
-	h := headers_for(post_verification({"x-den-body-subject": " 1000000001 "}), all_operations)
+	h := headers_for(post_verification({"x-den-body-subject": "1000000001"}), all_operations)
 	h["X-DEN-Subject-Ref"] == subject_ref_of("CC", "1000000001")
+}
+
+test_a_body_subject_in_another_spelling_is_denied if {
+	every value in [" 1000000001 ", "01000000001", "CC:1.000.000.001", "cc:1000000001", " CC:1000000001"] {
+		denied(post_verification({"x-den-body-subject": value}), all_operations, "data_subject_invalid")
+	}
 }
 
 test_an_operation_with_a_body_subject_requires_it if {
 	denied(post_verification({}), all_operations, "data_subject_required")
 	denied(post_verification({"x-den-body-subject": ["CC:1000000001", "CC:1000000002"]}), all_operations, "data_subject_required")
 	denied(post_verification({"x-den-body-subject": "CC:1000:0001"}), all_operations, "data_subject_required")
-	denied(post_verification({"x-den-body-subject": "XX:1000000001"}), all_operations, "data_subject_required")
+	denied(post_verification({"x-den-body-subject": "XX:1000000001"}), all_operations, "data_subject_invalid")
 }
 
 test_operations_without_a_subject_carry_no_reference if {

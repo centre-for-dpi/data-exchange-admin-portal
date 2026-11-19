@@ -6,6 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import {
   CountryConfigError,
+  DOCUMENT_NUMBER_SHAPE,
+  documentNumberFormats,
+  isCanonicalDocumentNumber,
   loadCountryConfig,
   localize,
   parseCountryConfigFile,
@@ -216,6 +219,48 @@ describe('validation', () => {
       expectInvalid(set('features.upstreams', ['node', 'ftp']), /features\.upstreams\.1/);
       expectInvalid(set('features.upstreams', ['node', 'node']), /duplicate upstream type "node"/);
       expectInvalid(set('features.upstreams', 'node'), /features\.upstreams/);
+    });
+  });
+
+  describe('identifiers.personNumberFormat (ADR-0030)', () => {
+    it('gives every person type a canonical form, the shape where the country sets none', () => {
+      const loaded = parseCountryConfigFile(
+        writeConfig(set('identifiers.personNumberFormat', { CC: '^[1-9][0-9]{2,9}$' })),
+      );
+      const formats = documentNumberFormats(loaded);
+      expect(formats.CC).toBe('^[1-9][0-9]{2,9}$');
+      expect(formats.PA).toBe(DOCUMENT_NUMBER_SHAPE);
+      expect(Object.keys(formats)).toEqual(loaded.identifiers.person);
+      const without = parseCountryConfigFile(
+        writeConfig(set('identifiers.personNumberFormat', undefined)),
+      );
+      expect(without.identifiers.personNumberFormat).toEqual({});
+    });
+
+    it('accepts one spelling per person: no padding, separators or lower case', () => {
+      const co = loadCountryConfig({ code: 'co', configDir: repoConfigDir });
+      expect(isCanonicalDocumentNumber(co, 'CC', '1000000001')).toBe(true);
+      for (const number of ['01000000001', '1.000.000.001', '1000000001 ', '12', 'abc123']) {
+        expect(isCanonicalDocumentNumber(co, 'CC', number), number).toBe(false);
+      }
+      expect(isCanonicalDocumentNumber(co, 'PA', 'AB123456')).toBe(true);
+      expect(isCanonicalDocumentNumber(co, 'PA', 'ab123456')).toBe(false);
+      expect(isCanonicalDocumentNumber(co, 'XX', '1000000001')).toBe(false);
+      // The shape applies to every type, whatever its own pattern allows.
+      const lax = parseCountryConfigFile(
+        writeConfig(set('identifiers.personNumberFormat', { PA: '^.+$' })),
+      );
+      expect(isCanonicalDocumentNumber(lax, 'PA', 'AB-123')).toBe(false);
+    });
+
+    it('rejects an unknown type and patterns OPA and JavaScript would read apart', () => {
+      expectInvalid(
+        set('identifiers.personNumberFormat', { XX: '^[0-9]+$' }),
+        /"XX" is not one of identifiers\.person/,
+      );
+      for (const pattern of ['[0-9]+', '^[0-9]+', '^(?=1)[0-9]+$', '^([0-9])\\1$', '^[0-9+$']) {
+        expectInvalid(set('identifiers.personNumberFormat', { CC: pattern }), /personNumberFormat/);
+      }
     });
   });
 

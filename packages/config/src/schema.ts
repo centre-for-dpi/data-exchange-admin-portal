@@ -71,6 +71,44 @@ const uniqueBy =
 const months = z.number().int().min(1).max(120);
 
 /**
+ * Every data subject's document number, whatever its type (packages/policy/den/authz.rego): 3 to
+ * 20 upper-case letters and digits, no separators or spaces.
+ */
+export const DOCUMENT_NUMBER_SHAPE = '^[A-Z0-9]{3,20}$';
+
+/**
+ * A pattern OPA (Go's RE2) and JavaScript read alike: anchored with ^ and $, and without
+ * lookaround, backreferences, named groups, Unicode classes or inline flags, which one of them
+ * does not support or reads differently.
+ */
+const isPortablePattern = (pattern: string): boolean => {
+  if (!pattern.startsWith('^') || !pattern.endsWith('$') || pattern.endsWith('\\$')) return false;
+  if (/\(\?|\\[1-9kpP]/.test(pattern)) return false;
+  try {
+    new RegExp(pattern);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Canonical form of the number of each person document type (ADR-0030, M-12): the gateway accepts a
+ * data subject only when its number matches the pattern exactly, as written, so the gateway, the
+ * provider and the citizen read one person in one spelling. A type without one only has to keep to
+ * DOCUMENT_NUMBER_SHAPE, which applies to every type as well.
+ */
+const personNumberFormatSchema = z.record(
+  nonEmpty.max(32),
+  z
+    .string()
+    .refine(
+      isPortablePattern,
+      'must be a regular expression anchored with ^ and $, without lookaround, backreferences, named groups, \\p classes or inline flags',
+    ),
+);
+
+/**
  * How a provider's service reaches the gateway (SPEC.md §3.1): through the entity's kit node, a
  * service in X-Road, or an HTTPS API called without a node. Same values as `upstream.type` in
  * packages/contracts.
@@ -99,11 +137,24 @@ export const countryConfigSchema = z.strictObject({
     dataProtectionLaw: nonEmpty,
     dataProtectionAuthority: nonEmpty,
   }),
-  identifiers: z.strictObject({
-    // At most 32 characters: the length the citizens' realm accepts for document_type.
-    person: z.array(nonEmpty.max(32)).min(1),
-    organization: z.array(nonEmpty.max(32)).min(1),
-  }),
+  identifiers: z
+    .strictObject({
+      // At most 32 characters: the length the citizens' realm accepts for document_type.
+      person: z.array(nonEmpty.max(32)).min(1),
+      organization: z.array(nonEmpty.max(32)).min(1),
+      personNumberFormat: personNumberFormatSchema.default({}),
+    })
+    .superRefine((ids, ctx) => {
+      for (const type of Object.keys(ids.personNumberFormat)) {
+        if (!ids.person.includes(type)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `"${type}" is not one of identifiers.person`,
+            path: ['personNumberFormat', type],
+          });
+        }
+      }
+    }),
   sectors: z
     .array(catalogEntrySchema)
     .min(1)

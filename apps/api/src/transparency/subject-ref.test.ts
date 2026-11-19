@@ -14,7 +14,7 @@ describe('subject reference', () => {
     ).toBe('0d0deea2958985c2da0174f52dfb3bd1a9a88d0115ce41a4a3d1166e889b9062');
   });
 
-  it('normalizes like the gateway', () => {
+  it("drops the identity provider's separators and letter case", () => {
     expect(normalizeDocumentNumber('ab 12.34-5')).toBe('AB12345');
   });
 });

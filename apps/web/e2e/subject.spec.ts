@@ -130,6 +130,26 @@ test.describe('data subject pseudonym at the gateway (MT-02)', () => {
       expect(res.status).toBe(403);
       expect(res.headers.get('x-den-deny-reason')).toBe('data_subject_required');
     }
+    // M-12: names that differ only in letter case count as repeated (a case-insensitive provider
+    // reads them as one member), and the number must be in its canonical form (ADR-0030): a
+    // provider that ignores leading zeros or dots would answer for 1000000001 under another
+    // reference. Denied before the provider, so none of them is registered.
+    const sameNameOtherCase = await call('/verificaciones', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"numeroIdentificacion":"1000000001","NumeroIdentificacion":"1000000002"}',
+    });
+    expect(sameNameOtherCase.res.status).toBe(403);
+    expect(sameNameOtherCase.res.headers.get('x-den-deny-reason')).toBe('data_subject_required');
+    for (const spelled of [
+      call('/01000000001'),
+      call('/1.000.000.001'),
+      verify({ numeroIdentificacion: ' 1000000001' }),
+    ]) {
+      const { res } = await spelled;
+      expect(res.status).toBe(403);
+      expect(res.headers.get('x-den-deny-reason')).toBe('data_subject_invalid');
+    }
     // A JSON media type with parameters still counts as JSON, and the same name in different
     // objects is no repetition: the gateway lets it through (the strict mock provider then
     // rejects the extra member with 400, which is its call, not the gateway's).

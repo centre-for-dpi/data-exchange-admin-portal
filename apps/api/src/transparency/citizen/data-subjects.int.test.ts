@@ -193,6 +193,8 @@ describe('citizen API: who consulted my data (MT-05)', () => {
         citizens.token(valentina.sub, { documentNumber: valentina.number, expiresIn: '-1m' }),
         citizens.token(valentina.sub, { documentNumber: null }),
         citizens.token(valentina.sub, { documentNumber: '12' }),
+        // Not the canonical form of a CC (ADR-0030): the gateway never records it.
+        citizens.token(valentina.sub, { documentNumber: `0${valentina.number}` }),
         citizens.token(valentina.sub, { documentNumber: valentina.number, documentType: 'NIT' }),
       ];
       for (const token of await Promise.all(bad)) {

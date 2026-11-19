@@ -1511,6 +1511,7 @@
       "end_user_required": "X-DEN-End-User (the official) missing",
       "end_user_invalid": "X-DEN-End-User not valid",
       "data_subject_required": "Data subject missing",
+      "data_subject_invalid": "Data subject's document not in its canonical form",
       "rate_limited": "Requests-per-minute limit exceeded"
     },
     "consumed": {

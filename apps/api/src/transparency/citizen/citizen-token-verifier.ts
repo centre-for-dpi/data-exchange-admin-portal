@@ -1,11 +1,6 @@
-import { getCountryConfig } from '@den/config';
+import { getCountryConfig, isCanonicalDocumentNumber } from '@den/config';
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
-import {
-  DOCUMENT_NUMBER,
-  normalizeDocumentNumber,
-  subjectRef,
-  subjectRefKey,
-} from '../subject-ref.js';
+import { normalizeDocumentNumber, subjectRef, subjectRefKey } from '../subject-ref.js';
 
 export const CITIZEN_TOKEN_VERIFIER = Symbol('CITIZEN_TOKEN_VERIFIER');
 
@@ -50,7 +45,8 @@ export const citizenTokenOptions = (): CitizenTokenOptions => ({
  * Verifies access tokens of the national digital identity (in development, the Keycloak realm
  * den-citizens): RS256 signature against the issuer's JWKS, issuer, audience, expiry, and an
  * authorized citizen app as azp. The document claims become the citizen's pseudonym with the
- * same key and normalization as the gateway; the number itself is not kept or returned.
+ * same key as the gateway: the number without separators, in upper case, and in the canonical form
+ * of its type, the only one the gateway records (ADR-0030). It is not kept or returned.
  */
 export function createCitizenTokenVerifier(options: CitizenTokenOptions): CitizenTokenVerifier {
   const keys =
@@ -88,7 +84,10 @@ export function createCitizenTokenVerifier(options: CitizenTokenOptions): Citize
       const rawNumber = payload[options.documentNumberClaim];
       const documentNumber =
         typeof rawNumber === 'string' ? normalizeDocumentNumber(rawNumber) : '';
-      if (!DOCUMENT_NUMBER.test(documentNumber)) throw new Error('no valid document number');
+      // The gateway records only canonical numbers (ADR-0030): any other would never match.
+      if (!isCanonicalDocumentNumber(country, documentType, documentNumber)) {
+        throw new Error('no valid document number');
+      }
 
       return {
         sub: payload.sub,
