@@ -8,6 +8,7 @@ import {
   xroadServicePath,
   xroadServicePathSchema,
 } from '@den/contracts';
+import { pathSpecificity } from '../../opa/bundle.js';
 import type { ApisixObject } from './apisix-admin.js';
 
 /** Deterministic ids (ARCHITECTURE.md §4): reconciling needs no extra state. */
@@ -621,12 +622,19 @@ export function desiredGateway(
       ...(v.bodySubjects.length > 0
         ? {
             'den-data-subject': {
-              operations: v.bodySubjects.map((s) => ({
-                method: s.method.toUpperCase(),
-                uri: s.pathRegex,
-                pointer: s.pointer,
-                ...(s.typePointer ? { type_pointer: s.typePointer } : {}),
-              })),
+              // The plugin takes the first operation that matches: most specific first, as the
+              // policy resolves them (M-13), so both read the subject of the same operation.
+              operations: [...v.bodySubjects]
+                .sort((a, b) => {
+                  const [x, y] = [pathSpecificity(a.pathRegex), pathSpecificity(b.pathRegex)];
+                  return x < y ? 1 : x > y ? -1 : 0;
+                })
+                .map((s) => ({
+                  method: s.method.toUpperCase(),
+                  uri: s.pathRegex,
+                  pointer: s.pointer,
+                  ...(s.typePointer ? { type_pointer: s.typePointer } : {}),
+                })),
             },
           }
         : {}),

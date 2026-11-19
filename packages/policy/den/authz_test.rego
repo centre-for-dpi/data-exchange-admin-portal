@@ -226,6 +226,66 @@ test_path_regex_is_anchored if {
 	denied(request({"request": {"path": "/salud/afiliacion/v1/afiliados/1/extra"}}), bundle, "operation_not_allowed")
 }
 
+# A route whose GET operations are `paths` (operation id -> pathRegex), all granted, internal data.
+with_get_operations(paths) := object.union(bundle, {
+	"routes": {route_id: {
+		"apiVersionId": "v1",
+		"classification": "internal",
+		"operations": [{"id": id, "method": "GET", "pathRegex": regex, "subject": {"in": "none"}} |
+			some id, regex in paths
+		],
+	}},
+	"clients": {"den-app-a": {"subscriptions": [object.union(
+		bundle.clients["den-app-a"].subscriptions[0],
+		{"operations": [id | some id, _ in paths]},
+	)]}},
+})
+
+operation_for(path, b) := headers_for(get_path(path), b)["X-DEN-Operation"]
+
+# M-13: GET /afiliados/{id} and GET /afiliados/buscar are valid OpenAPI; both match the literal
+# path, and the literal one wins instead of an eval_conflict_error (5xx on every call).
+literal_and_parameter := with_get_operations({
+	"getAfiliado": "^/salud/afiliacion/v1/afiliados/[^/]+$",
+	"buscarAfiliados": "^/salud/afiliacion/v1/afiliados/buscar$",
+})
+
+test_a_literal_path_next_to_a_parameter_wins if {
+	operation_for("/salud/afiliacion/v1/afiliados/buscar", literal_and_parameter) == "buscarAfiliados"
+}
+
+test_the_parameter_path_next_to_a_literal_still_works if {
+	operation_for("/salud/afiliacion/v1/afiliados/1000000001", literal_and_parameter) == "getAfiliado"
+}
+
+test_a_partly_literal_segment_beats_a_whole_parameter if {
+	b := with_get_operations({
+		"getArchivo": "^/salud/afiliacion/v1/archivos/[^/]+$",
+		"getArchivoJson": "^/salud/afiliacion/v1/archivos/[^/]+\\.json$",
+		"getIndice": "^/salud/afiliacion/v1/archivos/indice\\.json$",
+	})
+	operation_for("/salud/afiliacion/v1/archivos/a.json", b) == "getArchivoJson"
+	operation_for("/salud/afiliacion/v1/archivos/a.xml", b) == "getArchivo"
+	operation_for("/salud/afiliacion/v1/archivos/indice.json", b) == "getIndice"
+}
+
+test_segments_compare_from_the_left if {
+	b := with_get_operations({
+		"porTipo": "^/salud/afiliacion/v1/[^/]+/resumen$",
+		"afiliadoPorId": "^/salud/afiliacion/v1/afiliados/[^/]+$",
+	})
+	operation_for("/salud/afiliacion/v1/afiliados/resumen", b) == "afiliadoPorId"
+	operation_for("/salud/afiliacion/v1/hogares/resumen", b) == "porTipo"
+}
+
+test_two_equally_specific_matches_fail_closed if {
+	b := with_get_operations({
+		"porNombre": "^/salud/afiliacion/v1/afiliados/[^/]+$",
+		"porCodigo": "^/salud/afiliacion/v1/afiliados/[^/]+$",
+	})
+	denied(get_path("/salud/afiliacion/v1/afiliados/1000000001"), b, "operation_not_allowed")
+}
+
 # --- Rule 4: subscription, operation, purpose, validity -------------------------------------
 
 test_denies_a_client_without_subscription_to_the_route if {

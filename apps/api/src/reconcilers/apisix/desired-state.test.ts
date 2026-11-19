@@ -85,6 +85,28 @@ describe('data subject read from the body (ADR-0017)', () => {
   });
 });
 
+describe('body subjects next to each other (M-13)', () => {
+  it('lists the most specific operation first, as the policy resolves them', () => {
+    const plugins = desiredGateway(
+      version({
+        bodySubjects: [
+          { method: 'POST', pathRegex: '^/salud/afiliacion/v1/afiliados/[^/]+$', pointer: '/a' },
+          {
+            method: 'POST',
+            pathRegex: '^/salud/afiliacion/v1/afiliados/verificaciones$',
+            pointer: '/b',
+          },
+        ],
+      }),
+      settings,
+    ).route.plugins as Plugins;
+    // den-data-subject takes the first match: /afiliados/verificaciones must come first.
+    expect(
+      (plugins['den-data-subject']?.operations as Array<{ pointer: string }>).map((o) => o.pointer),
+    ).toEqual(['/b', '/a']);
+  });
+});
+
 type Plugins = Record<string, Record<string, unknown>>;
 
 describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {

@@ -1,6 +1,13 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { type BundleData, buildBundle, bundleSubject, pathRegex, tarGz } from './bundle.js';
+import {
+  type BundleData,
+  buildBundle,
+  bundleSubject,
+  pathRegex,
+  pathSpecificity,
+  tarGz,
+} from './bundle.js';
 import { untar } from '../../test/untar.js';
 import { readPolicies } from './policy-files.js';
 
@@ -86,6 +93,16 @@ describe('pathRegex (operations on the full public path, SPIKE S-1)', () => {
     expect(re.test('/salud/aXb/v1/x+y/1000.json')).toBe(false);
     expect(re.test('/salud/a.b/v1/x+y/1000Xjson')).toBe(false);
     expect(re.test('/salud/a.b/v1/x+y/a/b.json')).toBe(false);
+  });
+});
+
+describe("pathSpecificity (the policy's precedence, M-13)", () => {
+  it('ranks each segment: literal, partly a parameter, a parameter', () => {
+    expect(pathSpecificity(pathRegex('/s/a/v1', '/afiliados/buscar'))).toBe('222222');
+    expect(pathSpecificity(pathRegex('/s/a/v1', '/afiliados/{id}.json'))).toBe('222221');
+    expect(pathSpecificity(pathRegex('/s/a/v1', '/afiliados/{id}'))).toBe('222220');
+    // Escaped braces in a literal are not a parameter.
+    expect(pathSpecificity(pathRegex('/s/a/v1', '/x{}'))).toBe('22222');
   });
 });
 

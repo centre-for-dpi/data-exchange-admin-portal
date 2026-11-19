@@ -141,7 +141,7 @@ published → deprecated → retired
 
 1. `api_publisher` creates the API and the version: uploads OpenAPI 3.x, chooses the upstream among the types the country accepts (§3.1), fills in the exposed fields, legal basis, allowed purposes and SLA.
 2. Automatic validations when submitting for review (blocking):
-   - OpenAPI lint with the DEN ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), descriptions in Spanish.
+   - OpenAPI lint with the DEN ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), no two paths that can match the same request with neither more specific (a literal path next to a parameterised one is fine: the literal wins, `ARCHITECTURE.md §4.2`), descriptions in Spanish.
    - Connectivity: the portal asks the node/URL for a `healthcheck` through the gateway in test mode (GET to the service root; it passes with any response that is not a 5xx).
    - Contract test (Schemathesis) against the sandbox, with a time limit. The sandbox is the test service with synthetic data that the version declares; without a sandbox, the test is skipped and does not block.
 

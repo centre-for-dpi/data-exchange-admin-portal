@@ -259,6 +259,73 @@ ${subject
   });
 });
 
+describe('paths a request could match twice (M-13)', () => {
+  /** A document with one operation per (path, method); path parameters are declared. */
+  const withPaths = (paths: Array<[path: string, method?: string]>) =>
+    [
+      'openapi: 3.1.0',
+      'info: { title: Test, version: 1.0.0 }',
+      'paths:',
+      ...paths.flatMap(([path, method = 'get'], i) => [
+        `  ${path}:`,
+        `    ${method}:`,
+        `      operationId: op${i}`,
+        ...([...path.matchAll(/\{([^/{}]+)\}/g)].length > 0
+          ? [
+              '      parameters:',
+              ...[...path.matchAll(/\{([^/{}]+)\}/g)].map(
+                (m) =>
+                  `        - { name: ${m[1]}, in: path, required: true, schema: { type: string } }`,
+              ),
+            ]
+          : []),
+        "      responses: { '200': { description: ok } }",
+      ]),
+    ].join('\n');
+  const ambiguous = async (paths: Array<[string, string?]>) =>
+    (await lintOpenApi(withPaths(paths), { noIdInQuery: false })).report.issues.filter(
+      (i) => i.code === 'den-ambiguous-paths',
+    );
+
+  it('accepts a literal path next to a parameterised one: the literal wins at the gateway', async () => {
+    const { report } = await lintOpenApi(
+      withPaths([['/afiliados/{afiliadoId}'], ['/afiliados/buscar']]),
+      { noIdInQuery: false },
+    );
+    expect(report.issues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(await ambiguous([['/archivos/{nombre}'], ['/archivos/{nombre}.json']])).toEqual([]);
+  });
+
+  it('rejects overlapping paths where neither is more specific', async () => {
+    const issues = await ambiguous([['/a/{x}/c'], ['/{y}/b/c']]);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ severity: 'error', path: ['paths', '/{y}/b/c'] });
+    expect(issues[0]?.message).toContain('/a/{x}/c');
+    expect(await ambiguous([['/f/{a}.json'], ['/f/x{b}']])).toHaveLength(1);
+  });
+
+  it('accepts what cannot meet: other methods, other literals, other lengths', async () => {
+    expect(
+      await ambiguous([
+        ['/a/{x}', 'get'],
+        ['/{y}/b', 'post'],
+      ]),
+    ).toEqual([]);
+    expect(await ambiguous([['/a/{x}/c'], ['/{y}/b/d']])).toEqual([]);
+    expect(await ambiguous([['/f/{a}.json'], ['/f/{b}.xml']])).toEqual([]);
+    expect(await ambiguous([['/a/{x}'], ['/{y}/b/c']])).toEqual([]);
+  });
+
+  it('leaves equivalent templates to Spectral (path-params)', async () => {
+    const { report } = await lintOpenApi(withPaths([['/a/{x}'], ['/a/{y}']]), {
+      noIdInQuery: false,
+    });
+    expect(report.valid).toBe(false);
+    expect(report.issues.map((i) => i.code)).toContain('path-params');
+    expect(report.issues.map((i) => i.code)).not.toContain('den-ambiguous-paths');
+  });
+});
+
 describe('identifier-like parameter names', () => {
   it.each([
     'id',

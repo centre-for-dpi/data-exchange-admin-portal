@@ -47,11 +47,38 @@ purpose := header("x-den-purpose")
 end_user := header("x-den-end-user")
 
 # Rule 3: the operation is found by method and by pathRegex on the full public path.
-operation := op if {
+matching_operations contains op if {
 	some op in route.operations
 	op.method == input.request.method
 	regex.match(op.pathRegex, input.request.path)
 }
+
+# A literal path next to a parameterised one (/afiliados/buscar and /afiliados/{id}) matches both:
+# the most specific wins (M-13). Segments compare from the left: a literal one beats one that is
+# partly a parameter ({id}.json), which beats a whole parameter (OpenAPI: concrete paths before
+# templated ones). Two matches equally specific are ambiguous and match nothing (fail closed); the
+# portal's lint rejects such overlaps when a version is registered.
+operation := op if {
+	some op in matching_operations
+	specificity(op) == most_specific
+	count({o | some o in matching_operations; specificity(o) == most_specific}) == 1
+}
+
+most_specific := max({specificity(op) | some op in matching_operations})
+
+# One digit per segment: 2 literal, 1 partly a parameter, 0 a parameter. pathRegex comes from the
+# portal (apps/api/src/opa/bundle.ts, pathRegex): a parameter is `[^/]+` and literal text is
+# escaped, so `[^/]+` marks only parameters and `{}` (the placeholder) cannot come from a literal.
+# Every match of one path has as many segments as the path, so the strings compare digit by digit.
+specificity(op) := concat("", [segment_rank(segment) |
+	some segment in split(trim_suffix(trim_prefix(replace(op.pathRegex, "[^/]+", "{}"), "^"), "$"), "/")
+])
+
+segment_rank(segment) := "0" if {
+	segment == "{}"
+} else := "1" if {
+	contains(segment, "{}")
+} else := "2"
 
 now := time.now_ns()
 

@@ -141,7 +141,7 @@ published → deprecated → retired
 
 1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige el upstream entre los tipos que acepta el país (§3.1), completa campos expuestos, base legal, finalidades permitidas, SLA.
 2. Validaciones automáticas al enviar a revisión (bloqueantes):
-   - Lint del OpenAPI con el conjunto de reglas DEN (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), descripciones en español.
+   - Lint del OpenAPI con el conjunto de reglas DEN (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), sin dos rutas que puedan coincidir con la misma petición sin que una sea más específica (una ruta literal junto a una con parámetro sí se acepta: gana la literal, `ARCHITECTURE.md §4.2`), descripciones en español.
    - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba (GET a la raíz del servicio; pasa con cualquier respuesta que no sea 5xx).
    - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo. El sandbox es el servicio de pruebas con datos sintéticos que la versión declara; sin sandbox, la prueba se omite y no bloquea.
 

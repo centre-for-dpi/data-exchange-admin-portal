@@ -315,6 +315,88 @@ function dataSubjectIssues(
 }
 
 /**
+ * One segment of a path template, as the gateway ranks it (M-13): 2 literal, 1 partly a parameter
+ * ({id}.json), 0 a whole parameter. `prefix` and `suffix` are the literal text around the
+ * parameters (the whole text for a literal segment).
+ */
+interface TemplateSegment {
+  rank: 0 | 1 | 2;
+  text: string;
+  prefix: string;
+  suffix: string;
+  pattern: RegExp;
+}
+
+function templateSegments(path: string): TemplateSegment[] {
+  return path.split('/').map((text) => {
+    const parts = text.split(/\{[^/{}]+\}/);
+    const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    return {
+      rank: parts.length === 1 ? 2 : /^\{[^/{}]+\}$/.test(text) ? 0 : 1,
+      text,
+      prefix: parts[0] ?? '',
+      suffix: parts.at(-1) ?? '',
+      pattern: new RegExp(`^${escaped.join('[^/]+')}$`),
+    };
+  });
+}
+
+/** Whether some request segment could match both (conservative when both have parameters). */
+function segmentsOverlap(a: TemplateSegment, b: TemplateSegment): boolean {
+  if (a.rank === 2 && b.rank === 2) return a.text === b.text;
+  if (a.rank === 2) return b.pattern.test(a.text);
+  if (b.rank === 2) return a.pattern.test(b.text);
+  // Both with parameters: disjoint only if their literal ends cannot agree (.json and .xml).
+  const prefixes = a.prefix.startsWith(b.prefix) || b.prefix.startsWith(a.prefix);
+  const suffixes = a.suffix.endsWith(b.suffix) || b.suffix.endsWith(a.suffix);
+  return prefixes && suffixes;
+}
+
+/** a is at least as specific as b in every segment and more in one: every router picks a. */
+const dominates = (a: TemplateSegment[], b: TemplateSegment[]): boolean =>
+  a.every((s, i) => s.rank >= (b[i]?.rank ?? 0)) && a.some((s, i) => s.rank > (b[i]?.rank ?? 0));
+
+/**
+ * Paths a request could match under one method with neither more specific (M-13). The gateway
+ * gives a literal segment precedence over a parameter (packages/policy/den/authz.rego,
+ * operation), so /afiliados/buscar next to /afiliados/{id} is fine. /a/{x} next to /{y}/b is not:
+ * routers disagree on /a/b, and the gateway could authorize and record one operation while the
+ * provider runs the other. Equivalent templates (/a/{x} and /a/{y}) are Spectral's path-params.
+ */
+function ambiguousPathIssues(
+  spec: Record<string, unknown>,
+  lineOf: (path: string[]) => number,
+): LintIssue[] {
+  const paths = Object.entries((spec.paths ?? {}) as Record<string, Record<string, unknown>>).map(
+    ([path, item]) => ({
+      path,
+      segments: templateSegments(path),
+      shape: path.replace(/\{[^/{}]+\}/g, '{}'),
+      methods: HTTP_METHODS.filter((m) => item && typeof item === 'object' && m in item),
+    }),
+  );
+  const issues: LintIssue[] = [];
+  for (const [i, a] of paths.entries()) {
+    for (const b of paths.slice(i + 1)) {
+      if (a.segments.length !== b.segments.length || a.shape === b.shape) continue;
+      const methods = a.methods.filter((m) => b.methods.includes(m));
+      if (methods.length === 0) continue;
+      if (!a.segments.every((s, k) => b.segments[k] && segmentsOverlap(s, b.segments[k]))) continue;
+      if (dominates(a.segments, b.segments) || dominates(b.segments, a.segments)) continue;
+      const at = ['paths', b.path];
+      issues.push({
+        code: 'den-ambiguous-paths',
+        message: `Paths ${a.path} and ${b.path} can match the same ${methods.map((m) => m.toUpperCase()).join('/')} request and neither is more specific: make one literal wherever the other has a parameter, or separate them`,
+        severity: 'error',
+        path: at,
+        line: lineOf(at),
+      });
+    }
+  }
+  return issues;
+}
+
+/**
  * Gatekeeper in front of Spectral, whose YAML parser expands aliases without limit. Fails closed:
  * the document reaches Spectral only if the bounded parser read it without any error, with at
  * most MAX_YAML_ALIASES alias expansions and within MAX_PARSED_JSON_BYTES. Any other outcome
@@ -429,12 +511,11 @@ export async function lintOpenApi(source: string, options: LintOptions): Promise
         });
       }
     }
-    issues.push(
-      ...dataSubjectIssues(spec, options, (path) => {
-        const range = document.getRangeForJsonPath(path, true);
-        return range ? range.start.line + 1 : 1;
-      }),
-    );
+    const lineOf = (path: string[]) => {
+      const range = document.getRangeForJsonPath(path, true);
+      return range ? range.start.line + 1 : 1;
+    };
+    issues.push(...dataSubjectIssues(spec, options, lineOf), ...ambiguousPathIssues(spec, lineOf));
   }
 
   issues.sort((a, b) => (a.line ?? 0) - (b.line ?? 0));

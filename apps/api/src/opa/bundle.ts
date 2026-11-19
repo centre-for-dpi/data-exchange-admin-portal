@@ -24,6 +24,21 @@ export function pathRegex(basePath: string, openapiPath: string): string {
 }
 
 /**
+ * The policy's precedence of an operation (packages/policy/den/authz.rego, specificity; M-13): one
+ * digit per segment of its pathRegex, 2 literal, 1 partly a parameter, 0 a parameter. Of the
+ * operations that match one path, the one with the greatest string is the one the gateway uses.
+ */
+export function pathSpecificity(regex: string): string {
+  return regex
+    .replaceAll('[^/]+', '{}')
+    .replace(/^\^/, '')
+    .replace(/\$$/, '')
+    .split('/')
+    .map((segment) => (segment === '{}' ? '0' : segment.includes('{}') ? '1' : '2'))
+    .join('');
+}
+
+/**
  * How OPA finds the data subject of an operation (ADR-0015):
  * - path: `regex` is the operation's path regex with capture groups around the subject's number
  *   (and, if any, its document type); the group numbers say which is which.
