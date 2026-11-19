@@ -55,7 +55,12 @@ describe('complete audit (M2-09)', () => {
 
   /** A few events of a made-up area, unique to this run. */
   async function probe() {
-    const area = `probe_${randomUUID().slice(0, 8).replace(/-/g, '')}`.replace(/[0-9]/g, 'x');
+    // Letters only (an action's area has no digits), all 16 hex symbols kept distinct: a digit
+    // turned into a fixed letter made areas collide across runs in a database that keeps its events.
+    const area = `probe_${randomUUID()
+      .slice(0, 12)
+      .replace(/-/g, '')
+      .replace(/[0-9]/g, (d) => String.fromCharCode(103 + Number(d)))}`;
     const targetId = randomUUID();
     await prisma.$transaction(async (tx) => {
       await audit.record(tx, {
@@ -206,6 +211,55 @@ describe('complete audit (M2-09)', () => {
       }
     });
 
+    it('verification checks the RFC 3161 token of each anchor and rejects future dates (B-02)', async () => {
+      await app.get(AuditAnchorService).anchorDue(later());
+      const real = await prisma.auditAnchor.findFirstOrThrow({ orderBy: { day: 'desc' } });
+      const ok = chainCheckSchema.parse((await get('/audit/verify', 'sofia.auditora')).json());
+      expect(ok.anchors.timestampsChecked).toBe(true);
+      expect(ok.anchors.problems).toEqual([]);
+      // An anchor of an existing event, dated ahead, with a token that stamps nothing.
+      const day = '2999-12-30';
+      await owner.query('ALTER TABLE audit_anchor DISABLE TRIGGER USER');
+      try {
+        await owner.query(
+          `INSERT INTO audit_anchor (day, last_seq, last_hash, tsa_token, tsa_gen_time) VALUES ($1, $2, $3, $4, now() + interval '3 days')`,
+          [day, real.lastSeq.toString(), real.lastHash, Buffer.from('not a token')],
+        );
+        const check = chainCheckSchema.parse((await get('/audit/verify', 'sofia.auditora')).json());
+        expect(check.valid).toBe(false);
+        expect(check.anchors.problems).toEqual(
+          expect.arrayContaining([
+            { day, reason: 'timestamp_invalid' },
+            { day, reason: 'future_dated' },
+          ]),
+        );
+        // A token that is not the anchor's: the real one, stored under another anchor's hash.
+        await owner.query('DELETE FROM audit_anchor WHERE day = $1', [day]);
+        await owner.query(
+          `INSERT INTO audit_anchor (day, last_seq, last_hash, tsa_token, tsa_gen_time) VALUES ($1, $2, $3, $4, $5)`,
+          [day, real.lastSeq.toString(), real.lastHash, real.tsaToken, new Date(0)],
+        );
+        const swapped = chainCheckSchema.parse(
+          (await get('/audit/verify', 'sofia.auditora')).json(),
+        );
+        // The genTime kept beside the token is not the token's.
+        expect(swapped.anchors.problems).toContainEqual({ day, reason: 'timestamp_invalid' });
+      } finally {
+        await owner.query('DELETE FROM audit_anchor WHERE day = $1', [day]);
+        await owner.query('ALTER TABLE audit_anchor ENABLE TRIGGER USER');
+      }
+    });
+
+    it('the anchor e-mail carries the time-stamp token (B-02)', async () => {
+      await app.get(AuditAnchorService).anchorDue(later());
+      const latest = await prisma.auditAnchor.findFirstOrThrow({ orderBy: { day: 'desc' } });
+      sent.length = 0;
+      await app.get(AuditAnchorService).email({ day: latest.day });
+      const attachment = sent[0]?.attachments?.[0];
+      expect(attachment?.filename).toBe(`anchor-${latest.day}.tsr`);
+      expect(Buffer.compare(attachment?.content ?? Buffer.alloc(0), latest.tsaToken)).toBe(0);
+    });
+
     it('anchors cannot be changed or deleted, not even by the schema owner', async () => {
       await app.get(AuditAnchorService).anchorDue(later());
       const latest = await prisma.auditAnchor.findFirstOrThrow({ orderBy: { day: 'desc' } });
@@ -225,13 +279,15 @@ describe('complete audit (M2-09)', () => {
   });
 
   it('the audit trail cannot be changed or deleted by the schema owner either', async () => {
-    const seq = await prisma.$transaction((tx) =>
+    const targetId = randomUUID();
+    await prisma.$transaction((tx) =>
       audit.record(tx, {
         actor: { type: 'system', id: 'test' },
         action: 'probe.owner',
-        target: { type: 'probe', id: randomUUID() },
+        target: { type: 'probe', id: targetId },
       }),
     );
+    const { seq } = await prisma.auditEvent.findFirstOrThrow({ where: { targetId } });
     await expect(
       owner.query('UPDATE audit_event SET action = $1 WHERE seq = $2', [
         'probe.tampered',

@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
 import { OPA_SYNC_TARGET } from '../opa/opa.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { anchorOverdueSeconds } from '../audit/anchor-lag.js';
 import { PGBOSS_SCHEMA } from '../queue/queue.service.js';
 
 /**
@@ -161,6 +162,17 @@ export class MetricsService {
           FROM transparency_checkpoint c
           WHERE NOT EXISTS (SELECT 1 FROM transparency_timestamp t WHERE t.checkpoint_seq = c.seq)`;
         unstamped.set(Math.max(0, row?.age ?? 0));
+      }),
+    });
+
+    // The audit chain's daily anchor (B-02): a day that ended and is not anchored means the
+    // chain's tail is not protected against being cut (or the TSA, or the anchoring, is down).
+    const anchorOverdue = new Gauge({
+      name: 'den_audit_anchor_overdue_seconds',
+      help: 'Seconds a finished day of the audit trail has waited for its daily anchor; 0 when none waits.',
+      registers,
+      collect: safely('den_audit_anchor_overdue_seconds', async () => {
+        anchorOverdue.set(await anchorOverdueSeconds(this.prisma));
       }),
     });
 

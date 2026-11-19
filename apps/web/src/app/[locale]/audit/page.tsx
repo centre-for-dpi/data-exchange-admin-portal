@@ -103,10 +103,12 @@ export default async function AuditPage({ params, searchParams }: PageProps) {
           <p className="font-semibold">
             {check.valid
               ? t('verify.valid', { verified: check.verified })
-              : t('verify.invalid', {
-                  seq: check.brokenAt?.seq ?? '',
-                  reason: check.brokenAt ? t(`verify.reasons.${check.brokenAt.reason}`) : '',
-                })}
+              : check.brokenAt
+                ? t('verify.invalid', {
+                    seq: check.brokenAt.seq,
+                    reason: t(`verify.reasons.${check.brokenAt.reason}`),
+                  })
+                : t('verify.invalidAnchors')}
           </p>
           {check.lastSeq && check.lastHash ? (
             <p className="font-mono text-xs break-all">
@@ -117,12 +119,14 @@ export default async function AuditPage({ params, searchParams }: PageProps) {
           <p>
             {check.anchors.problems.length > 0
               ? t('verify.anchorsBroken', {
-                  days: check.anchors.problems.map((p) => p.day).join(', '),
+                  days: [...new Set(check.anchors.problems.map((p) => p.day))].join(', '),
                 })
-              : t('verify.anchors', {
-                  count: check.anchors.checked,
-                  day: check.anchors.lastDay ?? '-',
-                })}
+              : check.anchors.checked > 0 && !check.anchors.timestampsChecked
+                ? t('verify.anchorsUnchecked')
+                : t('verify.anchors', {
+                    count: check.anchors.checked,
+                    day: check.anchors.lastDay ?? '-',
+                  })}
           </p>
           <p>
             {t('verify.checkedAt', {

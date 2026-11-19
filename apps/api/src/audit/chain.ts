@@ -49,6 +49,15 @@ export function eventHash(prevHash: string | null, event: ChainedFields): string
     .digest('hex');
 }
 
+/**
+ * How far an event's time may differ from its neighbour's and from the verifier's clock. Events
+ * are stamped by the API after it takes the chain lock, so on one clock the chain's time never
+ * goes back; with several API instances their clocks (NTP, normally well under a second) and the
+ * database's differ a little. A minute covers that without leaving room to backdate an event
+ * across the daily anchor (ARCHITECTURE.md §7). The audit_event trigger uses the same figure.
+ */
+export const CHAIN_CLOCK_SKEW_MS = 60_000;
+
 export interface ChainCheck {
   valid: boolean;
   /** Events covered by the chain and verified. */
@@ -64,17 +73,27 @@ export interface ChainCheck {
   /** First event where verification failed, and why. */
   brokenAt?: {
     seq: string;
-    reason: 'gap' | 'prev_hash_mismatch' | 'hash_mismatch' | 'missing_hash';
+    reason:
+      | 'gap'
+      | 'prev_hash_mismatch'
+      | 'hash_mismatch'
+      | 'missing_hash'
+      | 'invalid_seq'
+      | 'time_regression'
+      | 'future_dated';
   };
 }
 
 /**
  * Incremental verifier: feed events in seq order (in batches) and read the result at the end.
  * Detects a modified event (hash), a removed or reordered one (prev_hash or gap in seq) and an
- * event inserted without going through the chain (missing hash after the chain started).
+ * event inserted without going through the chain (missing hash after the chain started, or a
+ * position at or below zero), and an event whose time goes back along seq or is in the future
+ * (B-01). It does not prove who wrote the chain: see ARCHITECTURE.md §7.
  */
 export class ChainVerifier {
-  private previous: { seq: bigint; hash: string } | undefined;
+  private previous: { seq: bigint; hash: string; occurredAt: Date } | undefined;
+  private lastUnchained: bigint | undefined;
   private result: ChainCheck = {
     valid: true,
     verified: 0,
@@ -83,6 +102,8 @@ export class ChainVerifier {
     lastSeq: null,
     lastHash: null,
   };
+
+  constructor(private readonly now: () => Date = () => new Date()) {}
 
   get done(): boolean {
     return !this.result.valid;
@@ -94,9 +115,16 @@ export class ChainVerifier {
       this.result.valid = false;
       this.result.brokenAt = { seq: event.seq.toString(), reason };
     };
+    // seq is a serial starting at 1: a row at or below zero was inserted by hand, below the
+    // genesis, where a hashless event would otherwise pass as "written before the chain".
+    if (event.seq <= 0n) return fail('invalid_seq');
     if (!this.previous) {
       // Before the chain starts, events have no hash at all.
       if (!event.hash) {
+        if (this.lastUnchained !== undefined && event.seq <= this.lastUnchained) {
+          return fail('invalid_seq');
+        }
+        this.lastUnchained = event.seq;
         this.result.unchained += 1;
         return;
       }
@@ -111,7 +139,12 @@ export class ChainVerifier {
       if (event.prevHash !== this.previous.hash) return fail('prev_hash_mismatch');
     }
     if (eventHash(event.prevHash, event) !== event.hash) return fail('hash_mismatch');
-    this.previous = { seq: event.seq, hash: event.hash };
+    const time = event.occurredAt.getTime();
+    if (this.previous && time < this.previous.occurredAt.getTime() - CHAIN_CLOCK_SKEW_MS) {
+      return fail('time_regression');
+    }
+    if (time > this.now().getTime() + CHAIN_CLOCK_SKEW_MS) return fail('future_dated');
+    this.previous = { seq: event.seq, hash: event.hash, occurredAt: event.occurredAt };
     this.result.verified += 1;
     this.result.lastSeq = event.seq.toString();
     this.result.lastHash = event.hash;

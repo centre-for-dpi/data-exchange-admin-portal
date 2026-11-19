@@ -6,6 +6,7 @@ export interface MailMessage {
   to: string;
   subject: string;
   text: string;
+  attachments?: Array<{ filename: string; content: Buffer; contentType: string }>;
 }
 
 /** Sends e-mail. Replaced by an in-memory fake in tests. */

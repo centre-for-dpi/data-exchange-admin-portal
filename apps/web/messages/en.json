@@ -693,10 +693,15 @@
         "gap": "an event is missing (gap in the sequence)",
         "prev_hash_mismatch": "it does not link to the previous event",
         "hash_mismatch": "its content was modified",
-        "missing_hash": "it was inserted outside the chain"
+        "missing_hash": "it was inserted outside the chain",
+        "invalid_seq": "its position is not valid (at or below zero, or out of order)",
+        "time_regression": "its time goes back along the chain",
+        "future_dated": "it is dated in the future"
       },
       "anchors": "{count, plural, =0 {No daily anchors yet.} one {One daily anchor verified; the last, {day}.} other {# daily anchors verified; the last, {day}.}}",
-      "anchorsBroken": "Anchors without their event in the trail: {days}. The end of the chain was deleted or changed."
+      "anchorsBroken": "Anchors that do not check out: {days}. The end of the chain was deleted or changed, or an anchor's time-stamp is not valid or is dated in the future.",
+      "anchorsUnchecked": "The time-stamps of the daily anchors could not be checked: the time-stamping authority's roots are not available.",
+      "invalidAnchors": "Verification failed: see the anchors."
     },
     "recent": "Recent events",
     "older": "Older events",

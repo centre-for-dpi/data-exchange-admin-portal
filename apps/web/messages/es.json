@@ -693,10 +693,15 @@
         "gap": "falta un evento (hueco en la secuencia)",
         "prev_hash_mismatch": "no enlaza con el evento anterior",
         "hash_mismatch": "su contenido fue modificado",
-        "missing_hash": "se insertó fuera de la cadena"
+        "missing_hash": "se insertó fuera de la cadena",
+        "invalid_seq": "su posición no es válida (menor o igual a cero, o fuera de orden)",
+        "time_regression": "su hora retrocede a lo largo de la cadena",
+        "future_dated": "tiene fecha futura"
       },
       "anchors": "{count, plural, =0 {Aún no hay anclajes diarios.} one {Un anclaje diario verificado; el último, {day}.} other {# anclajes diarios verificados; el último, {day}.}}",
-      "anchorsBroken": "Anclajes sin su evento en la bitácora: {days}. Se borró o cambió el final de la cadena."
+      "anchorsBroken": "Anclajes que no cuadran: {days}. Se borró o cambió el final de la cadena, o el sello de tiempo de un anclaje no es válido o tiene fecha futura.",
+      "anchorsUnchecked": "No se pudieron verificar los sellos de tiempo de los anclajes diarios: no están disponibles las raíces de la autoridad de sellado.",
+      "invalidAnchors": "La verificación falló: revise los anclajes."
     },
     "recent": "Eventos recientes",
     "older": "Eventos anteriores",

@@ -33,10 +33,13 @@ export function firstDayToAnchor(
   return after > nextEventDay ? after : nextEventDay;
 }
 
+/** A TSA stamp dated further ahead than this is rejected: its clock (or the stamp) is wrong. */
+export const ANCHOR_STAMP_SKEW_MS = 5 * 60_000;
+
 const jobSchema = z.object({ day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 
 const TEXT = {
-  es: (day: string, seq: string, hash: string, stamped: string) => ({
+  es: (day: string, seq: string, hash: string, stamped: string, file: string) => ({
     subject: `Anclaje diario de la bitácora: ${day}`,
     text: [
       `Último evento del ${day} en la bitácora de auditoría de la red:`,
@@ -45,10 +48,12 @@ const TEXT = {
       `  Hash: ${hash}`,
       `  Sellado por la autoridad de sellado de tiempo: ${stamped}`,
       '',
+      `Adjunto, el sello RFC 3161 (${file}) sobre los bytes UTF-8 del hash. Verif�quelo con su propia copia de la ra�z de la autoridad: openssl ts -verify -in ${file} -token_in -data <archivo con el hash, sin salto de l�nea> -CAfile <ra�z.pem>`,
+      '',
       'Guarde este correo: si algún día la bitácora no contiene ese evento con ese hash, fue alterada.',
     ].join('\n'),
   }),
-  en: (day: string, seq: string, hash: string, stamped: string) => ({
+  en: (day: string, seq: string, hash: string, stamped: string, file: string) => ({
     subject: `Daily anchor of the audit trail: ${day}`,
     text: [
       `Last event of ${day} in the network's audit trail:`,
@@ -56,6 +61,8 @@ const TEXT = {
       `  Position (seq): ${seq}`,
       `  Hash: ${hash}`,
       `  Time-stamped by the time-stamping authority at: ${stamped}`,
+      '',
+      `Attached, the RFC 3161 time-stamp (${file}) over the UTF-8 bytes of the hash. Verify it with your own copy of the authority's root: openssl ts -verify -in ${file} -token_in -data <file with the hash, no newline> -CAfile <root.pem>`,
       '',
       'Keep this e-mail: if the trail ever lacks that event with that hash, it was tampered with.',
     ].join('\n'),
@@ -137,6 +144,13 @@ export class AuditAnchorService implements OnApplicationBootstrap, OnApplication
     if (!event?.hash || (after !== undefined && event.seq <= after)) return false;
     // Stamp before the transaction: the TSA is a network call.
     const stamp = await this.tsa.stamp(Buffer.from(event.hash, 'utf8'));
+    // A stamp from the future would be stored as proof and `/audit/verify` would flag it forever;
+    // better to anchor nothing and have the overdue alert fire (B-02).
+    if (stamp.genTime.getTime() > Date.now() + ANCHOR_STAMP_SKEW_MS) {
+      throw new Error(
+        `The TSA stamped the anchor of ${day} in the future (${stamp.genTime.toISOString()}): not stored`,
+      );
+    }
     return this.prisma.$transaction(async (tx) => {
       const lock = await tx.$queryRaw<Array<{ locked: boolean }>>`
         SELECT pg_try_advisory_xact_lock(${ANCHOR_LOCK}) AS locked`;
@@ -183,12 +197,23 @@ export class AuditAnchorService implements OnApplicationBootstrap, OnApplication
       timeStyle: 'long',
       timeZone: config.country.timezone,
     }).format(anchor.tsaGenTime);
+    const file = `anchor-${day}.tsr`;
     const message = TEXT[mailLocale(config.country.locale)](
       day,
       anchor.lastSeq.toString(),
       anchor.lastHash,
       stamped,
+      file,
     );
-    for (const { email } of regulators) await this.mail.send({ to: email, ...message });
+    const attachments = [
+      {
+        filename: file,
+        content: Buffer.from(anchor.tsaToken),
+        contentType: 'application/pkcs7-mime',
+      },
+    ];
+    for (const { email } of regulators) {
+      await this.mail.send({ to: email, ...message, attachments });
+    }
   }
 }

@@ -10,6 +10,11 @@ import type {
 import { NotFoundError } from '../common/errors.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TsaClient } from '../transparency/evidence/tsa.client.js';
+import { verifyTimestampToken } from '@den/transparency-verifier';
+import { getCountryConfig } from '@den/config';
+import { localDay, nextDay } from '../common/local-day.js';
+import { ANCHOR_STAMP_SKEW_MS } from './audit-anchor.service.js';
 import { ChainVerifier } from './chain.js';
 
 type EventRow = Prisma.AuditEventGetPayload<object>;
@@ -29,7 +34,10 @@ const text = (value: unknown, key: string): string | null => {
  */
 @Injectable()
 export class AuditQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tsa: TsaClient,
+  ) {}
 
   /** Walks the whole chain in seq order, in batches. */
   async verify(): Promise<ChainCheckResult> {
@@ -49,7 +57,11 @@ export class AuditQueryService {
     const anchors = await this.verifyAnchors();
     return {
       ...chain,
-      valid: chain.valid && anchors.problems.length === 0,
+      // Anchors whose time-stamp could not be checked (no TSA roots) do not make the check valid.
+      valid:
+        chain.valid &&
+        anchors.problems.length === 0 &&
+        (anchors.checked === 0 || anchors.timestampsChecked),
       anchors,
       checkedAt: new Date().toISOString(),
     };
@@ -62,8 +74,11 @@ export class AuditQueryService {
   private async verifyAnchors(): Promise<ChainCheckResult['anchors']> {
     const anchors = await this.prisma.auditAnchor.findMany({
       orderBy: { day: 'asc' },
-      select: { day: true, lastSeq: true, lastHash: true },
+      select: { day: true, lastSeq: true, lastHash: true, tsaToken: true, tsaGenTime: true },
     });
+    const roots = await (anchors.length > 0 ? this.tsa.certificates() : Promise.resolve([])).catch(
+      () => null,
+    );
     const events = new Map(
       (
         await this.prisma.auditEvent.findMany({
@@ -73,13 +88,51 @@ export class AuditQueryService {
       ).map((e) => [e.seq, e.hash]),
     );
     const problems: ChainCheckResult['anchors']['problems'] = [];
+    const now = Date.now();
+    // Tomorrow's date is tolerated: the daily anchoring is exercised with a clock a day or two
+    // ahead (the integration suite does), and the days of a country's time zone and the
+    // database's differ at the edges. What stops anchoring for good is a day well ahead.
+    const tomorrow = nextDay(localDay(new Date(now), getCountryConfig().country.timezone));
     for (const anchor of anchors) {
       const hash = events.get(anchor.lastSeq);
       if (hash === undefined) problems.push({ day: anchor.day, reason: 'event_missing' });
       else if (hash !== anchor.lastHash)
         problems.push({ day: anchor.day, reason: 'hash_mismatch' });
+      // An anchor dated beyond tomorrow, or stamped in the future, would stop the anchoring (a day
+      // is never anchored before the one of the latest anchor) and cannot be an honest stamp.
+      if (anchor.day > tomorrow || anchor.tsaGenTime.getTime() > now + ANCHOR_STAMP_SKEW_MS) {
+        problems.push({ day: anchor.day, reason: 'future_dated' });
+      }
+      if (roots && roots.length > 0 && !(await this.stampHolds(anchor, roots))) {
+        problems.push({ day: anchor.day, reason: 'timestamp_invalid' });
+      }
     }
-    return { checked: anchors.length, lastDay: anchors.at(-1)?.day ?? null, problems };
+    return {
+      checked: anchors.length,
+      lastDay: anchors.at(-1)?.day ?? null,
+      timestampsChecked: roots !== null,
+      problems,
+    };
+  }
+
+  /**
+   * The stored RFC 3161 token is a valid stamp, by a trusted TSA, over the anchor's hash, and says
+   * the time that was stored with it (B-02).
+   */
+  private async stampHolds(
+    anchor: { lastHash: string; tsaToken: Uint8Array; tsaGenTime: Date },
+    roots: string[],
+  ): Promise<boolean> {
+    try {
+      const stamp = await verifyTimestampToken(
+        new Uint8Array(anchor.tsaToken),
+        new TextEncoder().encode(anchor.lastHash),
+        roots,
+      );
+      return stamp.genTime.getTime() === anchor.tsaGenTime.getTime();
+    } catch {
+      return false;
+    }
   }
 
   /** The WHERE of the network trail for a set of filters (list and export). */

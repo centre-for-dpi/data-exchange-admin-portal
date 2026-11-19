@@ -93,7 +93,15 @@ export const chainCheckSchema = z.object({
   brokenAt: z
     .object({
       seq: z.string(),
-      reason: z.enum(['gap', 'prev_hash_mismatch', 'hash_mismatch', 'missing_hash']),
+      reason: z.enum([
+        'gap',
+        'prev_hash_mismatch',
+        'hash_mismatch',
+        'missing_hash',
+        'invalid_seq',
+        'time_regression',
+        'future_dated',
+      ]),
     })
     .optional(),
   /**
@@ -103,8 +111,16 @@ export const chainCheckSchema = z.object({
   anchors: z.object({
     checked: z.number().int(),
     lastDay: z.string().nullable(),
+    /**
+     * Whether the RFC 3161 token of each anchor was verified against the pinned TSA roots (B-02).
+     * False when the roots were unavailable: the check is then not valid, it is incomplete.
+     */
+    timestampsChecked: z.boolean(),
     problems: z.array(
-      z.object({ day: z.string(), reason: z.enum(['event_missing', 'hash_mismatch']) }),
+      z.object({
+        day: z.string(),
+        reason: z.enum(['event_missing', 'hash_mismatch', 'timestamp_invalid', 'future_dated']),
+      }),
     ),
   }),
   checkedAt: z.iso.datetime(),
