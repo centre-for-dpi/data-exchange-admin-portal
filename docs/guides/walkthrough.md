@@ -32,7 +32,7 @@ One person can hold several roles in their entity (in this example's consumer, o
 
 - **An authenticator app** on a phone (Google Authenticator, Microsoft Authenticator or any TOTP app). Critical roles need it: the platform roles and the data steward.
 - **Password:** at least 12 characters, different from the username and the email, not one of the last 5.
-- **The verification email expires after 5 minutes.** Have the mailbox open before registering and click the link as soon as it arrives. On a test network the portal's emails go to the test mailbox (`/mail`), not to the internet: made-up addresses work there.
+- **The verification link lasts 60 minutes** (5 before P-08; `sudo ./install.sh update` applies it to an existing installation). Have the mailbox open before registering. On a test network the portal's emails go to the test mailbox (`/mail`), not to the internet: made-up addresses work there.
 - **Use one private window per person** when playing several roles from the same computer, so sessions do not mix.
 
 ## 1. The operator's team
@@ -50,6 +50,14 @@ No screen grants the platform roles yet (`platform_admin`, `platform_reviewer`, 
 
    Roles: `platform_admin` (technical team: everything operational), `platform_reviewer` (reviews and approves onboarding and APIs), `regulator` (oversees and approves what is sensitive), `auditor` (reads the audit log). The change is recorded in the audit log with its reason. To take it away: `revoke`. The command never leaves the network without a `platform_admin`. If your installation does not have the command, update the portal to a version that includes it.
 3. **The person signs in again.** Keycloak shows a **QR code**: they scan it with the authenticator app and type the 6-digit code. From then on they see the **Operator console**.
+4. **Once the operator's own team has its roles**, whoever runs the server disables the demo accounts the pilot ships with (they hold platform roles and the demo password):
+
+   ```bash
+   sudo ./install.sh demo-users list
+   sudo ./install.sh demo-users disable --reason "Operator team has its roles"
+   ```
+
+   The installer cannot undo it, and the rehearsal with the demo personas stops working. It refuses while there is no active `platform_admin` of the operator's own.
 
 ## 2. The provider entity requests its onboarding
 
@@ -104,6 +112,8 @@ The node is the secure channel between the network's gateway and the entity: it 
 ### 5.2 Install the node (the entity's infrastructure)
 
 Server: Ubuntu Server 22.04 or 24.04, amd64 or arm64, with outbound **UDP 51820** (the tunnel) and **TCP 443** (the portal), and the time synchronized.
+
+The commands for the current version, with its checksum and the portal's address filled in, are in **My entity → Kit nodes → Kit to install** (and on the portal's public page `/kit`). If the server cannot reach GitHub, that same section offers the copy the portal serves, when the operator has uploaded it. For version 0.2.0:
 
 ```bash
 curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
@@ -169,7 +179,7 @@ To finish: `sudo /opt/den-node/install.sh doctor`. Everything ✔; the only acce
 | :-- | :-- |
 | Version | `1.0` |
 | OpenAPI file | The same one configured on the node |
-| Where does the service live? | **Node of the instant-APIs kit**, also for an own API: the option says "node" because the gateway reaches it through the node's tunnel |
+| Service type | If the country only allows the node (the pilot, without an X-Road Security Server), the form does not ask: it says the service comes in through the entity's node. If it also allows X-Road, choose **Node of the entity (own API or instant API)** |
 | Kit node / Service path on the node | The node from 5.1 · `/afiliacion` |
 | Test service (sandbox) | None, or one with synthetic data |
 | Allowed purposes | The country's catalog, for example *Eligibility check for a procedure* |
@@ -277,10 +287,10 @@ curl -sS --cacert network-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 
 | Symptom | Cause | What to do |
 | :-- | :-- | :-- |
-| The verification link expired | It lasts 5 minutes | Sign in with that account: the verification screen offers to send it again. Or use "Forgot password?" |
+| The verification link expired | It lasts 60 minutes (5 on installations not yet updated) | Sign in with that account: the verification screen offers to send it again. Or use "Forgot password?" |
 | "Email already exists" when registering | The account was created; only the verification is missing | The same: sign in and resend the verification |
 | Invitations is empty | The email is not identical to the request's, or not verified | Register the account with the exact email |
-| "We could not complete the operation" uploading the onboarding document | (Operator) the API cannot write to its documents folder | In the portal's `.env`, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, and recreate the API container (`docker compose ... up -d --no-build --no-deps api`) |
+| "We could not complete the operation" uploading the onboarding document | (Operator, installations before P-06) the API cannot write to its documents folder | `sudo ./install.sh update` fixes it. By hand: in the portal's `.env`, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, and recreate the API container (`docker compose ... up -d --no-build --no-deps api`) |
 | A platform role does not show | The person never signed in | Have them sign in once and run `platform-role grant` again |
 | **Approve** is disabled, or "The version was not approved" | The automatic validations have not passed (still running, or failed) | The version sheet says what each failure means and what to try; fix it and **Run validations again** |
 | Validation with **504** (timeout) | The gateway does not reach the node through the tunnel | On the node: `sudo /opt/den-node/install.sh status` (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: `sudo /opt/den-node/install.sh stop` and `start` |
@@ -295,10 +305,10 @@ curl -sS --cacert network-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 Found in the rehearsal and recorded in the portal's backlog (section P):
 
 - **P-01** ✔ Platform roles from the server's command line (a console screen is still missing).
-- **P-02** A warning when the node serves a contract other than the published one.
-- **P-03** The kit bundle, its checksum and the commands on the portal's nodes page.
-- **P-04** Offering only the service types the country allows (the node and X-Road), with clear names.
+- **P-02** ✔ A warning when the node serves a contract other than the published one.
+- **P-03** ✔ The kit bundle, its checksum and the commands on the portal's nodes page.
+- **P-04** ✔ Offering only the service types the country allows (the node and X-Road), with clear names.
 - **P-05** The application page showing a CSR command that works on Linux, Git Bash and PowerShell (or pointing to `entity-check.sh`).
-- **P-06** The deployment's `.env` sends documents to a folder the API cannot write (the workaround is in the table above).
+- **P-06** ✔ The deployment's `.env` sent documents to a folder the API cannot write.
 - **P-07** ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.
-- **P-08** Disabling the pilot's demo accounts and making the verification link last longer.
+- **P-08** ✔ Disabling the pilot's demo accounts and making the verification link last longer.

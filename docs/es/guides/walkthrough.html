@@ -382,7 +382,7 @@ details.faq[open] summary { color: var(--gov); }
 <ul class="ticks">
 <li><b>Una app autenticadora</b> en el celular (Google Authenticator, Microsoft Authenticator u otra TOTP). La piden los roles críticos: los de plataforma y el responsable de datos.</li>
 <li><b>Contraseña:</b> al menos 12 caracteres, distinta del usuario y del correo, sin repetir las últimas 5.</li>
-<li><b>El correo de verificación vence a los 5 minutos.</b> Ten el correo abierto antes de registrarte y pulsa el enlace en cuanto llegue. En una red de prueba, los correos del portal llegan al buzón de pruebas (<code>/mail</code>), no a internet: ahí puedes usar direcciones inventadas.</li>
+<li><b>El enlace del correo de verificación dura 60 minutos</b> (antes de P-08 eran 5; <code>sudo ./install.sh update</code> lo aplica a una instalación existente). Ten el correo abierto antes de registrarte. En una red de prueba, los correos del portal llegan al buzón de pruebas (<code>/mail</code>), no a internet: ahí puedes usar direcciones inventadas.</li>
 <li><b>Usa una ventana privada por persona</b> si haces varios papeles desde el mismo equipo, para no mezclar sesiones.</li>
 </ul>
     </section>
@@ -397,6 +397,9 @@ sudo ./install.sh platform-role grant &lt;correo&gt; platform_admin --reason "Eq
 sudo ./install.sh platform-role list</code></pre></div>
 <p>Roles: <code>platform_admin</code> (equipo técnico: todo lo operativo), <code>platform_reviewer</code> (revisa y aprueba altas y APIs), <code>regulator</code> (supervisa y aprueba lo sensible), <code>auditor</code> (consulta la bitácora). El cambio queda en la bitácora de auditoría con el motivo. Para quitarlo: <code>revoke</code>. El comando no deja la red sin ningún <code>platform_admin</code>. Si tu instalación no tiene el comando, actualiza el portal a una versión que lo incluya.</p></div></span></li>
 <li><span><b>La persona vuelve a entrar.</b> Keycloak le muestra un <b>código QR</b>: lo escanea con la app autenticadora y escribe el código de 6 dígitos. Desde ahí ve la <b>Consola del operador</b>.</span></li>
+<li><span><b>Cuando el equipo propio ya tiene sus roles</b>, quien administra el servidor desactiva las cuentas de demostración que trae el piloto (tienen roles de plataforma y la contraseña de demostración):<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>sudo ./install.sh demo-users list
+sudo ./install.sh demo-users disable --reason "Equipo del operador con sus roles"</code></pre></div>
+<p>No se puede deshacer desde el instalador, y el ensayo con las personas de demostración deja de funcionar. Se niega si no queda un <code>platform_admin</code> propio activo.</p></div></span></li>
 </ol>
     </section>
 
@@ -449,6 +452,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <p><b>Mi entidad → Nodos del kit → Registrar un nodo:</b> un nombre único en la entidad (por ejemplo <code>nodo-principal</code>) <b>→ Registrar y emitir token</b>. <b>Copia el token en ese momento:</b> se muestra una sola vez, sirve para un solo nodo y vence a las 72 horas. Entrégalo a quien instala.</p>
 <h3>5.2 Instalar el nodo (infraestructura de la entidad)</h3>
 <p>Servidor: Ubuntu Server 22.04 o 24.04, amd64 o arm64, con salida a internet por <b>UDP 51820</b> (el túnel) y <b>TCP 443</b> (el portal), y la hora sincronizada.</p>
+<p>Los comandos de la versión vigente, con su huella y la dirección del portal ya puestas, están en <b>Mi entidad → Nodos del kit → Kit para instalar</b> (y en la página pública <code>/kit</code> del portal). Si el servidor no llega a GitHub, esa misma sección ofrece la copia que sirve el portal, cuando el operador la sube. Para la versión 0.2.0:</p>
 <div class="code"><button class="copy" type="button">Copiar</button><pre><code>curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
 curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz.sha256
 sha256sum -c den-node-kit-0.2.0.tar.gz.sha256      # debe decir: OK
@@ -494,7 +498,7 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <div class="tablewrap"><table class="t"><thead><tr><th>Campo</th><th>Ejemplo</th></tr></thead><tbody>
 <tr><td>Versión</td><td class="wrap"><code>1.0</code></td></tr>
 <tr><td>Archivo OpenAPI</td><td class="wrap">El mismo que se configuró en el nodo</td></tr>
-<tr><td>¿Dónde vive el servicio?</td><td class="wrap"><b>Nodo del kit de APIs instantáneas</b>, también para una API propia: la opción dice "nodo" porque el gateway llega por el túnel del nodo</td></tr>
+<tr><td>Tipo de servicio</td><td class="wrap">Si el país solo admite el nodo (el piloto, sin Security Server de X-Road), el formulario no lo pregunta: dice que el servicio llega por el nodo de la entidad. Si también admite X-Road, elige <b>Nodo de la entidad (API propia o API instantánea)</b></td></tr>
 <tr><td>Nodo del kit / Ruta del servicio en el nodo</td><td class="wrap">El nodo de 5.1 · <code>/afiliacion</code></td></tr>
 <tr><td>Servicio de pruebas (sandbox)</td><td class="wrap">Sin sandbox, o uno con datos sintéticos</td></tr>
 <tr><td>Finalidades permitidas</td><td class="wrap">Las del catálogo del país, por ejemplo <i>Verificación de requisitos de un trámite</i></td></tr>
@@ -576,10 +580,10 @@ curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt
     <section id="si-algo-falla">
       <h2>Si algo falla</h2>
 <div class="tablewrap"><table class="t"><thead><tr><th>Síntoma</th><th>Causa</th><th>Qué hacer</th></tr></thead><tbody>
-<tr><td>Venció el enlace de verificación</td><td class="wrap">Dura 5 minutos</td><td class="wrap">Inicia sesión con esa cuenta: la pantalla de verificación ofrece reenviarlo. O usa "¿Olvidaste tu contraseña?"</td></tr>
+<tr><td>Venció el enlace de verificación</td><td class="wrap">Dura 60 minutos (5 en instalaciones sin actualizar)</td><td class="wrap">Inicia sesión con esa cuenta: la pantalla de verificación ofrece reenviarlo. O usa "¿Olvidaste tu contraseña?"</td></tr>
 <tr><td>"El correo ya existe" al registrarse</td><td class="wrap">La cuenta se creó; solo falta verificarla</td><td class="wrap">Lo mismo: inicia sesión y reenvía la verificación</td></tr>
 <tr><td>Invitaciones vacía</td><td class="wrap">El correo no es idéntico al de la solicitud, o no está verificado</td><td class="wrap">Registra la cuenta con el correo exacto</td></tr>
-<tr><td>"No pudimos completar la operación" al subir el documento del alta</td><td class="wrap">(Operador) el API no puede escribir en su carpeta de documentos</td><td class="wrap">En el <code>.env</code> del portal, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, y recrea el contenedor del API (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
+<tr><td>"No pudimos completar la operación" al subir el documento del alta</td><td class="wrap">(Operador, instalaciones anteriores a P-06) el API no puede escribir en su carpeta de documentos</td><td class="wrap"><code>sudo ./install.sh update</code> lo corrige. A mano: en el <code>.env</code> del portal, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, y recrea el contenedor del API (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
 <tr><td>No aparece un rol de plataforma</td><td class="wrap">La persona no ha entrado nunca al portal</td><td class="wrap">Que entre una vez y repetir <code>platform-role grant</code></td></tr>
 <tr><td><b>Aprobar</b> está deshabilitado, o "La versión no se aprobó"</td><td class="wrap">Las validaciones automáticas no han pasado (siguen en curso o fallaron)</td><td class="wrap">La ficha de la versión dice qué significa cada falla y qué intentar; corrige y <b>Repetir validaciones</b></td></tr>
 <tr><td>Validación con <b>504</b> (tiempo agotado)</td><td class="wrap">El gateway no llega al nodo por el túnel</td><td class="wrap">En el nodo: <code>sudo /opt/den-node/install.sh status</code> (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: <code>sudo /opt/den-node/install.sh stop</code> y <code>start</code></td></tr>
@@ -596,13 +600,13 @@ curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt
 <p>Encontrado en el ensayo y anotado en el backlog del portal (sección P):</p>
 <ul class="ticks">
 <li><b>P-01</b> ✔ Roles de plataforma desde el comando del servidor (falta una pantalla en la consola).</li>
-<li><b>P-02</b> Aviso cuando el nodo sirve un contrato distinto del publicado.</li>
-<li><b>P-03</b> El paquete del kit, su huella y los comandos en la pantalla de nodos del portal.</li>
-<li><b>P-04</b> Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.</li>
+<li><b>P-02</b> ✔ Aviso cuando el nodo sirve un contrato distinto del publicado.</li>
+<li><b>P-03</b> ✔ El paquete del kit, su huella y los comandos en la pantalla de nodos del portal.</li>
+<li><b>P-04</b> ✔ Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.</li>
 <li><b>P-05</b> Que la pantalla de la aplicación muestre un comando de CSR que funcione en Linux, Git Bash y PowerShell (o remita a <code>entity-check.sh</code>).</li>
-<li><b>P-06</b> El <code>.env</code> del despliegue manda los documentos a una carpeta donde el API no puede escribir (el arreglo provisional está en la tabla de problemas).</li>
+<li><b>P-06</b> ✔ El <code>.env</code> del despliegue mandaba los documentos a una carpeta donde el API no puede escribir.</li>
 <li><b>P-07</b> ✔ Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.</li>
-<li><b>P-08</b> Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.</li>
+<li><b>P-08</b> ✔ Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.</li>
 </ul>
     </section>
 

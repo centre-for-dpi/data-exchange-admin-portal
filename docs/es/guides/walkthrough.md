@@ -32,7 +32,7 @@ Una misma persona puede tener varios papeles en su entidad (en la consumidora de
 
 - **Una app autenticadora** en el celular (Google Authenticator, Microsoft Authenticator u otra TOTP). La piden los roles críticos: los de plataforma y el responsable de datos.
 - **Contraseña:** al menos 12 caracteres, distinta del usuario y del correo, sin repetir las últimas 5.
-- **El correo de verificación vence a los 5 minutos.** Ten el correo abierto antes de registrarte y pulsa el enlace en cuanto llegue. En una red de prueba, los correos del portal llegan al buzón de pruebas (`/mail`), no a internet: ahí puedes usar direcciones inventadas.
+- **El enlace del correo de verificación dura 60 minutos** (antes de P-08 eran 5; `sudo ./install.sh update` lo aplica a una instalación existente). Ten el correo abierto antes de registrarte. En una red de prueba, los correos del portal llegan al buzón de pruebas (`/mail`), no a internet: ahí puedes usar direcciones inventadas.
 - **Usa una ventana privada por persona** si haces varios papeles desde el mismo equipo, para no mezclar sesiones.
 
 ## 1. El equipo del operador
@@ -50,6 +50,14 @@ Ninguna pantalla da todavía los roles de plataforma (`platform_admin`, `platfor
 
    Roles: `platform_admin` (equipo técnico: todo lo operativo), `platform_reviewer` (revisa y aprueba altas y APIs), `regulator` (supervisa y aprueba lo sensible), `auditor` (consulta la bitácora). El cambio queda en la bitácora de auditoría con el motivo. Para quitarlo: `revoke`. El comando no deja la red sin ningún `platform_admin`. Si tu instalación no tiene el comando, actualiza el portal a una versión que lo incluya.
 3. **La persona vuelve a entrar.** Keycloak le muestra un **código QR**: lo escanea con la app autenticadora y escribe el código de 6 dígitos. Desde ahí ve la **Consola del operador**.
+4. **Cuando el equipo propio ya tiene sus roles**, quien administra el servidor desactiva las cuentas de demostración que trae el piloto (tienen roles de plataforma y la contraseña de demostración):
+
+   ```bash
+   sudo ./install.sh demo-users list
+   sudo ./install.sh demo-users disable --reason "Equipo del operador con sus roles"
+   ```
+
+   No se puede deshacer desde el instalador, y el ensayo con las personas de demostración deja de funcionar. Se niega si no queda un `platform_admin` propio activo.
 
 ## 2. La entidad proveedora pide su alta
 
@@ -104,6 +112,8 @@ El nodo es el canal seguro entre el gateway de la red y la entidad: abre un tún
 ### 5.2 Instalar el nodo (infraestructura de la entidad)
 
 Servidor: Ubuntu Server 22.04 o 24.04, amd64 o arm64, con salida a internet por **UDP 51820** (el túnel) y **TCP 443** (el portal), y la hora sincronizada.
+
+Los comandos de la versión vigente, con su huella y la dirección del portal ya puestas, están en **Mi entidad → Nodos del kit → Kit para instalar** (y en la página pública `/kit` del portal). Si el servidor no llega a GitHub, esa misma sección ofrece la copia que sirve el portal, cuando el operador la sube. Para la versión 0.2.0:
 
 ```bash
 curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
@@ -169,7 +179,7 @@ Para terminar: `sudo /opt/den-node/install.sh doctor`. Todo en ✔; el único av
 | :-- | :-- |
 | Versión | `1.0` |
 | Archivo OpenAPI | El mismo que se configuró en el nodo |
-| ¿Dónde vive el servicio? | **Nodo del kit de APIs instantáneas**, también para una API propia: la opción dice "nodo" porque el gateway llega por el túnel del nodo |
+| Tipo de servicio | Si el país solo admite el nodo (el piloto, sin Security Server de X-Road), el formulario no lo pregunta: dice que el servicio llega por el nodo de la entidad. Si también admite X-Road, elige **Nodo de la entidad (API propia o API instantánea)** |
 | Nodo del kit / Ruta del servicio en el nodo | El nodo de 5.1 · `/afiliacion` |
 | Servicio de pruebas (sandbox) | Sin sandbox, o uno con datos sintéticos |
 | Finalidades permitidas | Las del catálogo del país, por ejemplo *Verificación de requisitos de un trámite* |
@@ -276,10 +286,10 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 
 | Síntoma | Causa | Qué hacer |
 | :-- | :-- | :-- |
-| Venció el enlace de verificación | Dura 5 minutos | Inicia sesión con esa cuenta: la pantalla de verificación ofrece reenviarlo. O usa "¿Olvidaste tu contraseña?" |
+| Venció el enlace de verificación | Dura 60 minutos (5 en instalaciones sin actualizar) | Inicia sesión con esa cuenta: la pantalla de verificación ofrece reenviarlo. O usa "¿Olvidaste tu contraseña?" |
 | "El correo ya existe" al registrarse | La cuenta se creó; solo falta verificarla | Lo mismo: inicia sesión y reenvía la verificación |
 | Invitaciones vacía | El correo no es idéntico al de la solicitud, o no está verificado | Registra la cuenta con el correo exacto |
-| "No pudimos completar la operación" al subir el documento del alta | (Operador) el API no puede escribir en su carpeta de documentos | En el `.env` del portal, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, y recrea el contenedor del API (`docker compose ... up -d --no-build --no-deps api`) |
+| "No pudimos completar la operación" al subir el documento del alta | (Operador, instalaciones anteriores a P-06) el API no puede escribir en su carpeta de documentos | `sudo ./install.sh update` lo corrige. A mano: en el `.env` del portal, `DEN_DOCUMENTS_DIR=/var/lib/den/documents`, y recrea el contenedor del API (`docker compose ... up -d --no-build --no-deps api`) |
 | No aparece un rol de plataforma | La persona no ha entrado nunca al portal | Que entre una vez y repetir `platform-role grant` |
 | **Aprobar** está deshabilitado, o "La versión no se aprobó" | Las validaciones automáticas no han pasado (siguen en curso o fallaron) | La ficha de la versión dice qué significa cada falla y qué intentar; corrige y **Repetir validaciones** |
 | Validación con **504** (tiempo agotado) | El gateway no llega al nodo por el túnel | En el nodo: `sudo /opt/den-node/install.sh status` (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: `sudo /opt/den-node/install.sh stop` y `start` |
@@ -294,10 +304,10 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 Encontrado en el ensayo y anotado en el backlog del portal (sección P):
 
 - **P-01** ✔ Roles de plataforma desde el comando del servidor (falta una pantalla en la consola).
-- **P-02** Aviso cuando el nodo sirve un contrato distinto del publicado.
-- **P-03** El paquete del kit, su huella y los comandos en la pantalla de nodos del portal.
-- **P-04** Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.
+- **P-02** ✔ Aviso cuando el nodo sirve un contrato distinto del publicado.
+- **P-03** ✔ El paquete del kit, su huella y los comandos en la pantalla de nodos del portal.
+- **P-04** ✔ Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.
 - **P-05** Que la pantalla de la aplicación muestre un comando de CSR que funcione en Linux, Git Bash y PowerShell (o remita a `entity-check.sh`).
-- **P-06** El `.env` del despliegue manda los documentos a una carpeta donde el API no puede escribir (el arreglo provisional está en la tabla de problemas).
+- **P-06** ✔ El `.env` del despliegue mandaba los documentos a una carpeta donde el API no puede escribir.
 - **P-07** ✔ Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.
-- **P-08** Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.
+- **P-08** ✔ Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.

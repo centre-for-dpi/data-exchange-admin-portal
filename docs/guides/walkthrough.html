@@ -382,7 +382,7 @@ details.faq[open] summary { color: var(--gov); }
 <ul class="ticks">
 <li><b>An authenticator app</b> on a phone (Google Authenticator, Microsoft Authenticator or any TOTP app). Critical roles need it: the platform roles and the data steward.</li>
 <li><b>Password:</b> at least 12 characters, different from the username and the email, not one of the last 5.</li>
-<li><b>The verification email expires after 5 minutes.</b> Have the mailbox open before registering and click the link as soon as it arrives. On a test network the portal's emails go to the test mailbox (<code>/mail</code>), not to the internet: made-up addresses work there.</li>
+<li><b>The verification link lasts 60 minutes</b> (5 before P-08; <code>sudo ./install.sh update</code> applies it to an existing installation). Have the mailbox open before registering. On a test network the portal's emails go to the test mailbox (<code>/mail</code>), not to the internet: made-up addresses work there.</li>
 <li><b>Use one private window per person</b> when playing several roles from the same computer, so sessions do not mix.</li>
 </ul>
     </section>
@@ -397,6 +397,9 @@ sudo ./install.sh platform-role grant &lt;email&gt; platform_admin --reason "Tec
 sudo ./install.sh platform-role list</code></pre></div>
 <p>Roles: <code>platform_admin</code> (technical team: everything operational), <code>platform_reviewer</code> (reviews and approves onboarding and APIs), <code>regulator</code> (oversees and approves what is sensitive), <code>auditor</code> (reads the audit log). The change is recorded in the audit log with its reason. To take it away: <code>revoke</code>. The command never leaves the network without a <code>platform_admin</code>. If your installation does not have the command, update the portal to a version that includes it.</p></div></span></li>
 <li><span><b>The person signs in again.</b> Keycloak shows a <b>QR code</b>: they scan it with the authenticator app and type the 6-digit code. From then on they see the <b>Operator console</b>.</span></li>
+<li><span><b>Once the operator's own team has its roles</b>, whoever runs the server disables the demo accounts the pilot ships with (they hold platform roles and the demo password):<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo ./install.sh demo-users list
+sudo ./install.sh demo-users disable --reason "Operator team has its roles"</code></pre></div>
+<p>The installer cannot undo it, and the rehearsal with the demo personas stops working. It refuses while there is no active <code>platform_admin</code> of the operator's own.</p></div></span></li>
 </ol>
     </section>
 
@@ -449,6 +452,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <p><b>My entity → Kit nodes → Register a node:</b> a name unique in the entity (for example <code>main-node</code>) <b>→ Register and issue token</b>. <b>Copy the token right away:</b> it is shown once, works for one node and expires after 72 hours. Hand it to whoever installs.</p>
 <h3>5.2 Install the node (the entity's infrastructure)</h3>
 <p>Server: Ubuntu Server 22.04 or 24.04, amd64 or arm64, with outbound <b>UDP 51820</b> (the tunnel) and <b>TCP 443</b> (the portal), and the time synchronized.</p>
+<p>The commands for the current version, with its checksum and the portal's address filled in, are in <b>My entity → Kit nodes → Kit to install</b> (and on the portal's public page <code>/kit</code>). If the server cannot reach GitHub, that same section offers the copy the portal serves, when the operator has uploaded it. For version 0.2.0:</p>
 <div class="code"><button class="copy" type="button">Copy</button><pre><code>curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
 curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz.sha256
 sha256sum -c den-node-kit-0.2.0.tar.gz.sha256      # must say: OK
@@ -494,7 +498,7 @@ sudo ./install.sh                                  # sudo DEN_LANG=es ./install.
 <div class="tablewrap"><table class="t"><thead><tr><th>Field</th><th>Example</th></tr></thead><tbody>
 <tr><td>Version</td><td class="wrap"><code>1.0</code></td></tr>
 <tr><td>OpenAPI file</td><td class="wrap">The same one configured on the node</td></tr>
-<tr><td>Where does the service live?</td><td class="wrap"><b>Node of the instant-APIs kit</b>, also for an own API: the option says "node" because the gateway reaches it through the node's tunnel</td></tr>
+<tr><td>Service type</td><td class="wrap">If the country only allows the node (the pilot, without an X-Road Security Server), the form does not ask: it says the service comes in through the entity's node. If it also allows X-Road, choose <b>Node of the entity (own API or instant API)</b></td></tr>
 <tr><td>Kit node / Service path on the node</td><td class="wrap">The node from 5.1 · <code>/afiliacion</code></td></tr>
 <tr><td>Test service (sandbox)</td><td class="wrap">None, or one with synthetic data</td></tr>
 <tr><td>Allowed purposes</td><td class="wrap">The country's catalog, for example <i>Eligibility check for a procedure</i></td></tr>
@@ -577,10 +581,10 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
     <section id="when-something-fails">
       <h2>When something fails</h2>
 <div class="tablewrap"><table class="t"><thead><tr><th>Symptom</th><th>Cause</th><th>What to do</th></tr></thead><tbody>
-<tr><td>The verification link expired</td><td class="wrap">It lasts 5 minutes</td><td class="wrap">Sign in with that account: the verification screen offers to send it again. Or use "Forgot password?"</td></tr>
+<tr><td>The verification link expired</td><td class="wrap">It lasts 60 minutes (5 on installations not yet updated)</td><td class="wrap">Sign in with that account: the verification screen offers to send it again. Or use "Forgot password?"</td></tr>
 <tr><td>"Email already exists" when registering</td><td class="wrap">The account was created; only the verification is missing</td><td class="wrap">The same: sign in and resend the verification</td></tr>
 <tr><td>Invitations is empty</td><td class="wrap">The email is not identical to the request's, or not verified</td><td class="wrap">Register the account with the exact email</td></tr>
-<tr><td>"We could not complete the operation" uploading the onboarding document</td><td class="wrap">(Operator) the API cannot write to its documents folder</td><td class="wrap">In the portal's <code>.env</code>, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, and recreate the API container (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
+<tr><td>"We could not complete the operation" uploading the onboarding document</td><td class="wrap">(Operator, installations before P-06) the API cannot write to its documents folder</td><td class="wrap"><code>sudo ./install.sh update</code> fixes it. By hand: in the portal's <code>.env</code>, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, and recreate the API container (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
 <tr><td>A platform role does not show</td><td class="wrap">The person never signed in</td><td class="wrap">Have them sign in once and run <code>platform-role grant</code> again</td></tr>
 <tr><td><b>Approve</b> is disabled, or "The version was not approved"</td><td class="wrap">The automatic validations have not passed (still running, or failed)</td><td class="wrap">The version sheet says what each failure means and what to try; fix it and <b>Run validations again</b></td></tr>
 <tr><td>Validation with <b>504</b> (timeout)</td><td class="wrap">The gateway does not reach the node through the tunnel</td><td class="wrap">On the node: <code>sudo /opt/den-node/install.sh status</code> (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: <code>sudo /opt/den-node/install.sh stop</code> and <code>start</code></td></tr>
@@ -597,13 +601,13 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <p>Found in the rehearsal and recorded in the portal's backlog (section P):</p>
 <ul class="ticks">
 <li><b>P-01</b> ✔ Platform roles from the server's command line (a console screen is still missing).</li>
-<li><b>P-02</b> A warning when the node serves a contract other than the published one.</li>
-<li><b>P-03</b> The kit bundle, its checksum and the commands on the portal's nodes page.</li>
-<li><b>P-04</b> Offering only the service types the country allows (the node and X-Road), with clear names.</li>
+<li><b>P-02</b> ✔ A warning when the node serves a contract other than the published one.</li>
+<li><b>P-03</b> ✔ The kit bundle, its checksum and the commands on the portal's nodes page.</li>
+<li><b>P-04</b> ✔ Offering only the service types the country allows (the node and X-Road), with clear names.</li>
 <li><b>P-05</b> The application page showing a CSR command that works on Linux, Git Bash and PowerShell (or pointing to <code>entity-check.sh</code>).</li>
-<li><b>P-06</b> The deployment's <code>.env</code> sends documents to a folder the API cannot write (the workaround is in the table above).</li>
+<li><b>P-06</b> ✔ The deployment's <code>.env</code> sent documents to a folder the API cannot write.</li>
 <li><b>P-07</b> ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.</li>
-<li><b>P-08</b> Disabling the pilot's demo accounts and making the verification link last longer.</li>
+<li><b>P-08</b> ✔ Disabling the pilot's demo accounts and making the verification link last longer.</li>
 </ul>
     </section>
 
