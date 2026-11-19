@@ -8,7 +8,7 @@ import {
   gatewayFetch,
   gatewayToken,
 } from './gateway-flows';
-import { expectNoAccessibilityViolations } from './helpers';
+import { enrollOneTimeCode, expectNoAccessibilityViolations } from './helpers';
 import { newPerson, registerAccount, waitForMail } from './onboarding';
 
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\ntrailer << >>\n%%EOF\n');
@@ -79,6 +79,9 @@ test.describe('M2 governance end to end', () => {
     await member.goto('/invitations');
     await member.getByRole('button', { name: `Aceptar la invitación de ${shortName}` }).click();
     await member.waitForURL((url) => !url.pathname.includes('/invitations'));
+    // entity_admin needs a second factor (ADR-0035): the portal sends the new administrator to
+    // Keycloak, which sets one up for the new account.
+    await enrollOneTimeCode(member, admin.password);
 
     // 3. salud publishes an API; the new entity creates an application and asks for access,
     //    attaching the signed agreement.

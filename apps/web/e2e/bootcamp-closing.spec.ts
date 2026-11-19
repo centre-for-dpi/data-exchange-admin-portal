@@ -15,7 +15,7 @@ import {
   issueCertificate,
   untilCertificateKnown,
 } from './gateway-flows';
-import { expectNoAccessibilityViolations } from './helpers';
+import { enrollOneTimeCode, expectNoAccessibilityViolations } from './helpers';
 import { mockNodeLogs, startMockNode, stopMockNode } from './mock-node';
 import { newPerson, registerAccount } from './onboarding';
 
@@ -60,6 +60,8 @@ test.describe('bootcamp simulation (M4 closing, M4-08)', () => {
     await page.goto('/invitations');
     await page.getByRole('button', { name: /^Aceptar la invitación/ }).click();
     await page.waitForURL((url) => !url.pathname.includes('/invitations'));
+    // entity_admin needs a second factor (ADR-0035): a new account sets one up in Keycloak.
+    await enrollOneTimeCode(page, admin.password);
     await page.goto('/my-entity');
     await page.getByText(`Gestionar a ${adminName}`).click();
     await page
