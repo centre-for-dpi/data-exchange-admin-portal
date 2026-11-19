@@ -13,7 +13,11 @@ import type { Principal } from '../auth/principal.service.js';
 import { NotFoundError } from '../common/errors.js';
 import { MAIL_TRANSPORT, type MailTransport } from '../mail/mail.service.js';
 import { mailLocale } from '../mail/messages.js';
-import { NOTIFICATION_FOOTER, NOTIFICATION_TEXTS } from '../mail/notification-messages.js';
+import {
+  NOTIFICATION_FOOTER,
+  NOTIFICATION_SUBJECTS,
+  NOTIFICATION_TEXTS,
+} from '../mail/notification-messages.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { QueueService } from '../queue/queue.service.js';
 import { resolveNotification } from './notification-rules.js';
@@ -103,7 +107,7 @@ export class NotificationsService implements OnApplicationBootstrap {
       const title = NOTIFICATION_TEXTS[locale][kind](params, day(params.date));
       await this.mail.send({
         to: row.user.email,
-        subject: title,
+        subject: NOTIFICATION_SUBJECTS[locale][kind],
         text: [
           title,
           '',

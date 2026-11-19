@@ -173,7 +173,9 @@ describe('notifications (M2-08)', () => {
     ).toBe(0);
     const mails = mailsTo('lucia.datos').filter((m) => m.text.includes(`/requests/${id}`));
     expect(mails).toHaveLength(1);
-    expect(mails[0]?.subject).toContain('pide acceso');
+    // Fixed subject (B-10): what third parties typed goes in the body only.
+    expect(mails[0]?.subject).toBe('Nueva solicitud de acceso');
+    expect(mails[0]?.text).toContain('pide acceso');
   });
 
   it('lists, counts and marks notifications as read, only one’s own', async () => {
@@ -238,7 +240,7 @@ describe('notifications (M2-08)', () => {
     });
     await dispatch(id, 'subscription.suspended');
     const suspended = mailsTo('carlos.dev').filter((m) => m.text.includes(id));
-    expect(suspended.some((m) => m.subject.includes('Se suspendió'))).toBe(true);
+    expect(suspended.some((m) => m.subject === 'Acceso suspendido')).toBe(true);
     expect(
       await prisma.auditEvent.count({
         where: { action: 'notification_preference.updated', targetId: await userId('carlos.dev') },

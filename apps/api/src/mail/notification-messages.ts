@@ -90,6 +90,59 @@ export const NOTIFICATION_TEXTS: Record<MailLocale, Record<NotificationKind, Tex
   },
 };
 
+/**
+ * The e-mail subject of each kind (B-10): fixed text. The sentence of NOTIFICATION_TEXTS carries
+ * names and values that third parties typed (entity, API, application, comments), and an official
+ * sender must not put them in a subject line, where they are the first thing a person reads. The
+ * sentence stays in the body.
+ */
+export const NOTIFICATION_SUBJECTS: Record<MailLocale, Record<NotificationKind, string>> = {
+  es: {
+    invitation_received: 'Te invitaron a una entidad',
+    entity_request_decided: 'Respuesta a una solicitud de alta de entidad',
+    entity_status_changed: 'Cambio de estado de una entidad en la red',
+    api_review_requested: 'Una API espera tu revisión',
+    api_changes_requested: 'Se pidieron cambios en una API',
+    api_published: 'Una API fue publicada',
+    api_deprecated: 'Una API quedó obsoleta',
+    regulator_approval_needed: 'Algo espera la aprobación del regulador',
+    access_requested: 'Nueva solicitud de acceso',
+    access_request_answered: 'Respuesta sobre una solicitud de acceso',
+    access_info_requested: 'Preguntan sobre tu solicitud de acceso',
+    access_approved: 'Solicitud de acceso aprobada',
+    access_rejected: 'Solicitud de acceso rechazada',
+    access_expiring: 'Un acceso está por vencer',
+    access_suspended: 'Acceso suspendido',
+    access_revoked: 'Acceso revocado',
+    certificate_expiring: 'Un certificado de cliente está por vencer',
+    certificate_revoked: 'Un certificado de cliente fue revocado',
+    node_offline: 'Un nodo no envía heartbeat',
+    api_contract_differs: 'Un nodo sirve un contrato distinto del publicado',
+  },
+  en: {
+    invitation_received: 'You were invited to an entity',
+    entity_request_decided: 'Answer to an entity onboarding request',
+    entity_status_changed: 'An entity changed status on the network',
+    api_review_requested: 'An API is waiting for your review',
+    api_changes_requested: 'Changes were requested on an API',
+    api_published: 'An API was published',
+    api_deprecated: 'An API was deprecated',
+    regulator_approval_needed: 'Something is waiting for the regulator',
+    access_requested: 'New access request',
+    access_request_answered: 'Answer about an access request',
+    access_info_requested: 'A question about your access request',
+    access_approved: 'Access request approved',
+    access_rejected: 'Access request rejected',
+    access_expiring: 'An access is about to expire',
+    access_suspended: 'Access suspended',
+    access_revoked: 'Access revoked',
+    certificate_expiring: 'A client certificate is about to expire',
+    certificate_revoked: 'A client certificate was revoked',
+    node_offline: 'A node is not sending heartbeats',
+    api_contract_differs: 'A node serves a contract different from the published one',
+  },
+};
+
 export const NOTIFICATION_FOOTER: Record<MailLocale, (prefs: string) => string> = {
   es: (prefs) => `Puedes elegir qué avisos recibes por correo: ${prefs}`,
   en: (prefs) => `You can choose which notices you get by e-mail: ${prefs}`,
