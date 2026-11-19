@@ -31,6 +31,8 @@
     "db:seed": "pnpm --filter @den/api db:seed",
     "demo": "node scripts/demo.mjs",
     "demo:otp": "node scripts/totp.mjs",
+    "docs:manual": "node scripts/user-manual-capture.mjs",
+    "docs:manual:html": "node scripts/user-manual-html.mjs",
     "traffic:simulate": "pnpm --filter @den/api traffic:simulate",
     "load:seed": "pnpm --filter @den/api load:seed",
     "load:test": "node scripts/load-test.mjs",

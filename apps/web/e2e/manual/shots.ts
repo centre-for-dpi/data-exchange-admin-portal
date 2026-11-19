@@ -56,12 +56,25 @@ export async function shot(
   page: Page,
   language: Lang,
   id: string,
-  opts: { hotspots?: Locator[]; blur?: Locator[]; region?: Locator; pad?: number } = {},
+  opts: {
+    hotspots?: Locator[];
+    blur?: Locator[];
+    /** What to show: one element, or several (the box that holds them all). */
+    region?: Locator | Locator[];
+    pad?: number;
+    /** Keeps only the top of a long region (in pixels). */
+    maxHeight?: number;
+  } = {},
 ): Promise<ShotEntry> {
-  const pad = opts.pad ?? 16;
-  const region = opts.region ?? page.locator('main').first();
-  await region.scrollIntoViewIfNeeded();
-  await page.evaluate(() => document.fonts.ready);
+  // The page's main area has its own margins: no extra margin, or the header's edge shows.
+  const pad = opts.pad ?? (opts.region ? 16 : 0);
+  const regions = [opts.region ?? page.locator('main').first()].flat();
+  await regions[0]?.scrollIntoViewIfNeeded();
+  // No focus ring or caret of the last field typed in: the screenshot shows the form at rest.
+  await page.evaluate(async () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    await document.fonts.ready;
+  });
   for (const secret of opts.blur ?? []) {
     await secret.evaluate((el) => {
       (el as HTMLElement).style.filter = 'blur(8px)';
@@ -75,15 +88,27 @@ export async function shot(
     width: document.documentElement.scrollWidth,
     height: document.documentElement.scrollHeight,
   }));
-  const box = await region.boundingBox();
-  if (!box) throw new Error(`shot ${id}: the region is not visible`);
+  const boxes = await Promise.all(regions.map((r) => r.boundingBox()));
+  if (boxes.some((b) => !b)) throw new Error(`shot ${id}: the region is not visible`);
+  const known = boxes.filter((b) => b !== null);
+  const x0 = Math.min(...known.map((b) => b.x));
+  const y0 = Math.min(...known.map((b) => b.y));
+  const box = {
+    x: x0,
+    y: y0,
+    width: Math.max(...known.map((b) => b.x + b.width)) - x0,
+    height: Math.max(...known.map((b) => b.y + b.height)) - y0,
+  };
   const left = Math.max(0, Math.floor(box.x + scroll.x - pad));
   const top = Math.max(0, Math.floor(box.y + scroll.y - pad));
   const clip = {
     x: left,
     y: top,
     width: Math.min(scroll.width, Math.ceil(box.x + scroll.x + box.width + pad)) - left,
-    height: Math.min(scroll.height, Math.ceil(box.y + scroll.y + box.height + pad)) - top,
+    height: Math.min(
+      opts.maxHeight ?? Number.POSITIVE_INFINITY,
+      Math.min(scroll.height, Math.ceil(box.y + scroll.y + box.height + pad)) - top,
+    ),
   };
 
   const hotspots: Hotspot[] = [];

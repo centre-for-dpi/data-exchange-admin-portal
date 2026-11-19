@@ -104,6 +104,11 @@ export async function createGatewayApplication(
   return { clientId, clientSecret };
 }
 
+/** Keeps a certificate obtained through the UI elsewhere (the user manual's journey). */
+export const rememberCertificate = (clientId: string, tls: ClientTls): void => {
+  certificates.set(clientId, tls);
+};
+
 /** The certificate of an application, as the gateway helpers present it. */
 export const certificateOf = (clientId: string): ClientTls | undefined =>
   certificates.get(clientId);

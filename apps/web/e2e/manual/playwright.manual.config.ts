@@ -25,13 +25,18 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 120_000,
   expect: { timeout: 30_000 },
-  use: { baseURL, trace: 'retain-on-failure' },
+  use: { baseURL, trace: 'retain-on-failure', actionTimeout: 30_000, navigationTimeout: 60_000 },
   projects: [
     {
       name: 'journey',
       testMatch: 'journey.manual.ts',
       timeout: 1_800_000,
-      use: { ...desktop, locale: process.env.MANUAL_LANG === 'en' ? 'en-US' : 'es-CO' },
+      use: {
+        ...desktop,
+        locale: process.env.MANUAL_LANG === 'en' ? 'en-US' : 'es-CO',
+        // Native widgets (the file picker) follow the browser's own language, not the locale.
+        launchOptions: { args: [`--lang=${process.env.MANUAL_LANG === 'en' ? 'en-US' : 'es'}`] },
+      },
     },
     { name: 'toolkit', testMatch: 'toolkit.manual.ts', use: desktop },
     { name: 'page', testMatch: 'page.manual.ts', use: desktop },

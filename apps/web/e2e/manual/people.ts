@@ -17,25 +17,26 @@ export interface Person {
 
 const person = (
   language: Lang,
+  suffix: string,
   key: Person['key'],
   firstName: string,
   lastName: string,
   domain: string,
 ): Person => ({
   key,
-  username: `${key}.${language}`,
-  email: `${key}.${language}@${domain}`,
+  username: `${key}.${language}${suffix}`,
+  email: `${key}.${language}${suffix}@${domain}`,
   firstName,
   lastName,
   password: `Clave-manual-${language}-segura1`,
 });
 
 /** Provider: Rosa (administrator), Diego (data steward), Tomás (technical lead). Consumer: Wanda. */
-export const peopleOf = (language: Lang): Record<Person['key'], Person> => ({
-  rosa: person(language, 'rosa', 'Rosa', 'Registro', 'civil-registry.example'),
-  diego: person(language, 'diego', 'Diego', 'Datos', 'civil-registry.example'),
-  tomas: person(language, 'tomas', 'Tomás', 'Técnico', 'civil-registry.example'),
-  wanda: person(language, 'wanda', 'Wanda', 'Bienestar', 'bienestar-wakanda.example'),
+export const peopleOf = (language: Lang, suffix = ''): Record<Person['key'], Person> => ({
+  rosa: person(language, suffix, 'rosa', 'Rosa', 'Registro', 'civil-registry.example'),
+  diego: person(language, suffix, 'diego', 'Diego', 'Datos', 'civil-registry.example'),
+  tomas: person(language, suffix, 'tomas', 'Tomás', 'Técnico', 'civil-registry.example'),
+  wanda: person(language, suffix, 'wanda', 'Wanda', 'Bienestar', 'bienestar-wakanda.example'),
 });
 
 /** A browser context of its own per person, in the run's language. */
