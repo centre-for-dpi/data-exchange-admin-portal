@@ -52,7 +52,10 @@ function expectOwnerOnlyAcl(file: string): void {
 
 function bash(code: string, cwd: string, pathFirst?: string) {
   // Git Bash always sets USERNAME; a task runner may strip it (turbo's strict env mode).
-  const env = { ...process.env, USERNAME: process.env.USERNAME || userInfo().username };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    USERNAME: process.env.USERNAME || userInfo().username,
+  };
   if (pathFirst) env.PATH = `${pathFirst}${delimiter}${env.PATH ?? ''}`;
   return spawnSync('bash', [], { cwd, input: code, encoding: 'utf8', env });
 }
