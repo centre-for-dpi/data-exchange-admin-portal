@@ -300,4 +300,59 @@ describe('complete audit (M2-09)', () => {
     await expect(owner.query('TRUNCATE audit_event')).rejects.toThrow();
     expect(await prisma.auditEvent.count({ where: { seq } })).toBe(1);
   });
+
+  describe('the chain trigger (B-01)', () => {
+    const forged = `INSERT INTO audit_event (seq, occurred_at, actor_type, actor_id, action, target_type, target_id, prev_hash, hash)
+      SELECT seq + $1, $2::timestamptz, 'system', 'forger', 'probe.forged', 'probe', 'x', hash, repeat('a', 64)
+      FROM audit_event ORDER BY seq DESC LIMIT 1`;
+
+    it('is not fooled by a temporary table of the same name (search_path)', async () => {
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(
+            'CREATE TEMP TABLE audit_event (seq bigint, hash text, occurred_at timestamptz)',
+          );
+          // seq jumps by 5: the real table says no, an empty temp table would say nothing.
+          await tx.$executeRawUnsafe(
+            forged.replaceAll('audit_event', 'public.audit_event'),
+            5,
+            new Date().toISOString(),
+          );
+        }),
+      ).rejects.toThrow(/does not follow/);
+    });
+
+    it('a transaction longer than the skew still appends its events at commit', async () => {
+      // The owner shortens the skew to 1 s (den_app cannot) and the transaction outlives it.
+      await owner.query('BEGIN');
+      try {
+        await owner.query("SET LOCAL den.audit_clock_skew_seconds = '1'");
+        await owner.query('SELECT pg_sleep(2.5)');
+        // Wall-clock time of the INSERT, as the API stamps at append time: fine (now() would not be).
+        await owner.query(
+          forged.replace('$2::timestamptz', 'clock_timestamp()').replace('$2', '$2'),
+          [1],
+        );
+        // The bound itself is active: five seconds ahead is rejected.
+        await owner.query('SAVEPOINT s');
+        await expect(
+          owner.query(
+            forged.replace('$2::timestamptz', "clock_timestamp() + interval '5 seconds'"),
+            [1],
+          ),
+        ).rejects.toThrow(/future/);
+      } finally {
+        await owner.query('ROLLBACK');
+      }
+    });
+
+    it('den_app cannot loosen the skew', async () => {
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe("SET LOCAL den.audit_clock_skew_seconds = '100000000'");
+          await tx.$executeRawUnsafe(forged, 1, new Date(Date.now() + 3_600_000).toISOString());
+        }),
+      ).rejects.toThrow(/future/);
+    });
+  });
 });
