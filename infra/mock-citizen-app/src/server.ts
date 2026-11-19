@@ -358,11 +358,14 @@ export function buildServer(
           tsaRoots: roots,
           allowPendingTimestamp: true,
         });
+        // A valid receipt proves a consultation, not this one (B-20): it must be for the one asked
+        // about, or the portal could answer with the receipt of any other.
+        const forThis = receipt?.record?.id === id;
         return render(reply, lang, {
           title: t.receiptTitle,
           path: `/consultas/${id}/comprobante`,
           signedIn: true,
-          body: receiptView(id, result, lang, t),
+          body: receiptView(id, forThis ? result : { ...result, valid: false }, forThis, lang, t),
         });
       });
 
@@ -395,7 +398,7 @@ export function buildServer(
           return reply.code(401).send({ error: 'invalid signature' });
         }
         const webhookId = String(request.headers['webhook-id']);
-        if (message.type !== 'subject_access.created' || !deps.store.firstTime(webhookId)) {
+        if (message.type !== 'subject_access.created' || deps.store.handled(webhookId)) {
           return reply.code(204).send();
         }
         const owner = deps.store.ownerOf(message.data?.alertId ?? '');
@@ -417,6 +420,9 @@ export function buildServer(
             )
             .replace('{link}', `${config.publicUrl}/consultas`),
         });
+        // Only now (B-20): if the mail server failed, the error answers 500 and the portal retries
+        // the same webhook id, which then still sends its email.
+        deps.store.markHandled(webhookId);
         return reply.code(204).send();
       });
       done();
@@ -516,20 +522,29 @@ export function buildServer(
     </section>`;
   }
 
-  function receiptView(id: string, r: ReceiptVerification, lang: Lang, t: Messages): Html {
+  function receiptView(
+    id: string,
+    r: ReceiptVerification,
+    forThis: boolean,
+    lang: Lang,
+    t: Messages,
+  ): Html {
     const state = (ok: boolean | string) =>
       ok === true || ok === 'valid' ? t.ok : ok === 'pending' ? t.pending : t.failed;
-    const headline = r.valid
-      ? r.checks.timestamp === 'pending'
-        ? t.receiptPending
-        : t.receiptValid
-      : t.receiptInvalid;
+    const headline = !forThis
+      ? t.receiptOther
+      : r.valid
+        ? r.checks.timestamp === 'pending'
+          ? t.receiptPending
+          : t.receiptValid
+        : t.receiptInvalid;
     return html`<h1>${t.receiptTitle}</h1>
       <p class="status ${r.valid ? 'ok' : 'bad'}" role="status" data-testid="receipt-status">
         ${headline}
       </p>
       <p>${t.receiptLead}</p>
       <ul>
+        <li>${t.checkRecord}: ${state(forThis)}</li>
         <li>${t.checkSignature}: ${state(r.checks.signature)}</li>
         <li>${t.checkInclusion}: ${state(r.checks.inclusion)}</li>
         <li>

@@ -11,7 +11,8 @@ export interface AlertOwner {
 /**
  * The citizen app's own mapping from the portal's opaque alert id to its user and their email, kept
  * in a small JSON file (a reference app; a real citizen app has its own database). Also remembers the
- * webhook ids already handled, so a retried notice sends one email.
+ * webhook ids already handled, so a retried notice sends one email; an id counts as handled only
+ * once its email went out (B-20), so a notice that failed to send is sent on the portal's retry.
  */
 export class AlertStore {
   private owners = new Map<string, AlertOwner>();
@@ -42,11 +43,14 @@ export class AlertStore {
     this.save();
   }
 
-  /** True the first time a webhook id is seen. */
-  firstTime(webhookId: string): boolean {
-    if (this.seen.has(webhookId)) return false;
+  /** Whether the notice of this webhook id was already sent. */
+  handled(webhookId: string): boolean {
+    return this.seen.has(webhookId);
+  }
+
+  /** The notice of this webhook id went out: a retry of it sends nothing. */
+  markHandled(webhookId: string): void {
     this.seen.add(webhookId);
-    return true;
   }
 
   private save(): void {

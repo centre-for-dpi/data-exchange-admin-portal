@@ -44,8 +44,10 @@ const es = {
   receiptValid: 'Comprobante válido',
   receiptInvalid: 'El comprobante no se pudo verificar',
   receiptPending: 'La consulta todavía no tiene sello de tiempo',
+  receiptOther: 'El comprobante no corresponde a esta consulta',
   receiptLead:
     'Esta aplicación verificó el comprobante por su cuenta, sin confiar en el portal: usó la clave pública del operador y el certificado de la autoridad de sellado de tiempo.',
+  checkRecord: 'El comprobante es de esta consulta',
   checkSignature: 'Firma del operador',
   checkInclusion: 'La consulta está en el lote sellado',
   checkTimestamp: 'Sello de tiempo independiente',
@@ -108,8 +110,10 @@ const en: Messages = {
   receiptValid: 'Valid receipt',
   receiptInvalid: 'The receipt could not be verified',
   receiptPending: 'The consultation has no time-stamp yet',
+  receiptOther: 'The receipt is not for this consultation',
   receiptLead:
     'This app checked the receipt on its own, without trusting the portal: it used the operator public key and the certificate of the time-stamping authority.',
+  checkRecord: 'The receipt is for this consultation',
   checkSignature: 'Operator signature',
   checkInclusion: 'The consultation is in the sealed batch',
   checkTimestamp: 'Independent time-stamp',
