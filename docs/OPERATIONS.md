@@ -150,6 +150,7 @@ Since M5-06, the alerts in `ARCHITECTURE.md §9` reach the operator by email (Al
 | `DenQueueBacklog` | API logs; SQL 2 (§4.2) |
 | `DenTransparencyRecordsDropped` | `dc logs api` ("Transparency records dropped", counts by reason). `invalid`: a gateway or Fluent Bit sending a format the collector does not know (versions out of step); `unknown_subscription` or `route_mismatch`: records that do not match what OPA authorized, possibly forged on the `logs` network |
 | `DenTransparencyUnsealed` | `dc logs api` (the sealer: "Transparency sealing round failed", or `DEN_TRANSPARENCY_SIGNING_JWK is not set`); the API's worker is on (`DEN_WORKER`) |
+| `DenAuditAnchorOverdue` | A finished day of the audit trail has no daily anchor (`den_audit_anchor_overdue_seconds`). `dc logs api` (the anchoring: "The TSA stamped the anchor ... in the future", TSA errors); that the API reaches `DEN_TSA_URL`; `GET /audit/verify` for an anchor dated in the future (`future_dated`), which blocks the anchoring until its day arrives and has to be investigated, not waited out |
 | `DenTransparencyUnstamped` | `dc logs api` ("Checkpoint N not stamped yet"); that the API reaches `DEN_TSA_URL` and that its stamps chain to `DEN_TSA_ROOTS_FILE` |
 
 ### 4.2 Diagnostic queries

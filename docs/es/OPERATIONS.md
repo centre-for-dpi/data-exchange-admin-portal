@@ -150,6 +150,7 @@ Desde M5-06 las alertas de `ARCHITECTURE.md §9` llegan por correo al operador (
 | `DenQueueBacklog` | Logs del API; SQL 2 (§4.2) |
 | `DenTransparencyRecordsDropped` | `dc logs api` ("Transparency records dropped", conteos por motivo). `invalid`: un gateway o un Fluent Bit que envía un formato que el colector no conoce (versiones desfasadas); `unknown_subscription` o `route_mismatch`: registros que no corresponden a lo que OPA autorizó, posiblemente falsificados en la red `logs` |
 | `DenTransparencyUnsealed` | `dc logs api` (el sellador: "Transparency sealing round failed", o `DEN_TRANSPARENCY_SIGNING_JWK is not set`); que el worker del API esté encendido (`DEN_WORKER`) |
+| `DenAuditAnchorOverdue` | Un día terminado de la bitácora no tiene su anclaje diario (`den_audit_anchor_overdue_seconds`). `dc logs api` (el anclaje: "The TSA stamped the anchor ... in the future", errores de la TSA); que el API alcance `DEN_TSA_URL`; `GET /audit/verify` por un anclaje con fecha futura (`future_dated`), que bloquea el anclaje hasta que llegue su día y hay que investigar, no esperar |
 | `DenTransparencyUnstamped` | `dc logs api` ("Checkpoint N not stamped yet"); que el API alcance `DEN_TSA_URL` y que sus sellos encadenen con `DEN_TSA_ROOTS_FILE` |
 
 ### 4.2 Consultas de diagnóstico
