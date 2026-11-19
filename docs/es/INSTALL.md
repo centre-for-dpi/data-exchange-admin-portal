@@ -124,7 +124,7 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 
 - las entidades reales se dan de alta desde el portal (autorregistro y solicitud de alta, o alta directa por el `platform_admin`);
 - las entidades ficticias sirven para practicar;
-- antes de un uso real, las personas del operador tienen cuentas propias: cada una se registra en el portal, verifica su correo y entra una vez, y después el servidor le da el rol con `sudo ./install.sh platform-role grant <correo> <rol>` (`platform_admin`, `platform_reviewer`, `regulator` o `auditor`; `list` muestra quién tiene cuál y `revoke` lo quita). En producción no hay usuarios semilla;
+- antes de un uso real, las personas del operador tienen cuentas propias: cada una se registra en el portal, verifica su correo y entra una vez, y después un administrador de plataforma le da el rol desde la consola (Consola del operador → Roles de plataforma y cuentas) o el servidor con `sudo ./install.sh platform-role grant <correo> <rol>` (`platform_admin`, `platform_reviewer`, `regulator` o `auditor`; `list` muestra quién tiene cuál y `revoke` lo quita). En producción no hay usuarios semilla;
 - cuando tienen sus roles, con al menos un `platform_admin` propio del operador, `sudo ./install.sh demo-users disable` desactiva los usuarios de demo: ya no pueden entrar, pierden sus roles de plataforma y la semilla los deja así en cada reinicio. Queda auditado y no hay comando para deshacerlo; después el ensayo de la demo ya no corre en esa instalación (`OPERATIONS.md §2.3`).
 
 ## 7. Comandos del día a día

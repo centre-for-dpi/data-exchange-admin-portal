@@ -49,7 +49,7 @@ The DEN Portal governs a data exchange network between public entities. It lets 
 | `app_developer` | Create applications for their entity, manage credentials, request access to APIs |
 | `entity_viewer` | See everything in their entity read-only |
 
-A user can belong to several entities with different roles. A user cannot approve a subscription they requested themselves (separation of duties).
+A user can belong to several entities with different roles. The roles that decide who gets an entity's data (`data_steward`, and `entity_admin`, who appoints stewards) require the second factor, like the platform roles (ADR-0035). A user cannot approve a subscription they requested themselves (separation of duties).
 
 ### 2.3 Anonymous user
 
@@ -309,7 +309,7 @@ branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/log
 - **Latency added by the gateway:** p95 < 50 ms (not counting the upstream) with a local OPA.
 - **Propagation:** approval or revocation reflected in the gateway in < 60 s.
 - **Initial scale:** 200 entities, 1,000 APIs, 5,000 subscriptions, 500 sustained requests/s at the gateway.
-- **Security:** OWASP ASVS L2; mandatory MFA for platform roles and `data_steward` (Keycloak asks for the code; the API requires it on every request, ADR-0021).
+- **Security:** OWASP ASVS L2; mandatory MFA for platform roles, `data_steward` and `entity_admin` (Keycloak asks for the code; the API requires it on every request, ADR-0021 and ADR-0035). Sessions without it read only their own resources: platform roles read other people's onboarding files through the review routes, which demand the factor.
 - **Privacy:** no bodies in logs; identifiers in paths masked; `X-DEN-End-User` stored as a hash with a per-deployment salt.
 - **Retention:** audit log 5 years (configurable); access logs 1 year (configurable).
 - **Accessibility:** WCAG 2.1 AA.

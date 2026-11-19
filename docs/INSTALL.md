@@ -124,7 +124,7 @@ The pilot **always** loads the seed: three fictitious entities (the operator, a 
 
 - real entities are onboarded from the portal (self-registration and an onboarding request, or direct registration by the `platform_admin`);
 - the fictitious entities are for practice;
-- before real use, the operator's people get their own accounts: each one registers in the portal, verifies the address and signs in once, and then the server gives the role with `sudo ./install.sh platform-role grant <email> <role>` (`platform_admin`, `platform_reviewer`, `regulator` or `auditor`; `list` shows who has which, `revoke` takes it away). In production there are no seed users;
+- before real use, the operator's people get their own accounts: each one registers in the portal, verifies the address and signs in once, and then a platform administrator gives the role from the console (Operator console → Platform roles and accounts) or the server does with `sudo ./install.sh platform-role grant <email> <role>` (`platform_admin`, `platform_reviewer`, `regulator` or `auditor`; `list` shows who has which, `revoke` takes it away). In production there are no seed users;
 - once they have their roles, with at least one `platform_admin` of the operator's own, `sudo ./install.sh demo-users disable` disables the demo users: they can no longer sign in, they lose their platform roles, and the seed leaves them that way on every restart. It is audited and there is no command to undo it; the demo rehearsal no longer runs on that installation afterwards (`OPERATIONS.md §2.3`).
 
 ## 7. Day-to-day commands
