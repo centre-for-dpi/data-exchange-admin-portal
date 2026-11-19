@@ -54,7 +54,7 @@ export function eventHash(prevHash: string | null, event: ChainedFields): string
  * are stamped by the API after it takes the chain lock, so on one clock the chain's time never
  * goes back; with several API instances their clocks (NTP, normally well under a second) and the
  * database's differ a little. A minute covers that without leaving room to backdate an event
- * across the daily anchor (ARCHITECTURE.md ง7). The audit_event trigger uses the same figure.
+ * across the daily anchor (ARCHITECTURE.md ยง7). The audit_event trigger uses the same figure.
  */
 export const CHAIN_CLOCK_SKEW_MS = 60_000;
 
@@ -89,7 +89,7 @@ export interface ChainCheck {
  * Detects a modified event (hash), a removed or reordered one (prev_hash or gap in seq) and an
  * event inserted without going through the chain (missing hash after the chain started, or a
  * position at or below zero), and an event whose time goes back along seq or is in the future
- * (B-01). It does not prove who wrote the chain: see ARCHITECTURE.md ง7.
+ * (B-01). It does not prove who wrote the chain: see ARCHITECTURE.md ยง7.
  */
 export class ChainVerifier {
   private previous: { seq: bigint; hash: string; occurredAt: Date } | undefined;

@@ -41,7 +41,7 @@ const toJson = (value: unknown): Prisma.InputJsonValue | null => {
  * the event is written in the same transaction as the change it describes, so both commit or
  * neither does.
  *
- * Hash chain (ARCHITECTURE.md ง7, M1-11): see `appendEvents`. In a transaction opened by
+ * Hash chain (ARCHITECTURE.md ยง7, M1-11): see `appendEvents`. In a transaction opened by
  * `PrismaService.$transaction` the event is kept and appended when the callback returns, just
  * before the commit, so the chain lock is held briefly however long the transaction is (B-04).
  * Callers must therefore not read the event back inside the transaction.
