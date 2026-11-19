@@ -23,7 +23,8 @@ const { positionals, values } = parseArgs({
   options: {
     out: { type: 'string', default: '.env' },
     'demo-password': { type: 'string' },
-    'traefik-network': { type: 'string', default: 'lab-router_default' },
+    // The reverse proxy's Docker network; den-edge is the one install.sh makes for its own.
+    'traefik-network': { type: 'string', default: 'den-edge' },
     // The gateway's own name (M3-10): its TLS ends in APISIX, behind a TLS passthrough.
     'gateway-host': { type: 'string' },
     // config/country/<code>.yaml; .env.example's value when absent.
@@ -52,10 +53,16 @@ if (
   process.exit(2);
 }
 // The realm's password policy (M6-01) refuses shorter ones, and Keycloak would not import it.
-// An empty value (install.sh's "Enter = random") counts as absent.
+// An empty value (install.sh's "Enter = random") counts as absent. It is written in single quotes
+// (B-30: $ and # stay literal for Compose, bash and Node) and goes into the realm's JSON on
+// import: no quotes, backslashes or line breaks.
 const demoPassword = values['demo-password'] || process.env.DEN_DEPLOY_DEMO_PASSWORD || undefined;
 if (demoPassword !== undefined && demoPassword.length < 12) {
   console.error('--demo-password: at least 12 characters (the realm password policy)');
+  process.exit(1);
+}
+if (demoPassword !== undefined && /['"\\\r\n]/.test(demoPassword)) {
+  console.error('--demo-password: no quotes, backslashes or line breaks');
   process.exit(1);
 }
 const out = resolve(root, values.out);
@@ -135,10 +142,15 @@ const set = {
   DEN_CONTRACT_RUNNER_TOKEN: secret(32),
   DEN_CONTRACT_RUNNER_GATEWAY_URL: 'http://apisix:9080',
   DEN_WG_HUB_AGENT_TOKEN: secret(32),
-  // The dev-style CA initialises its provisioner with this same password (infra/step-ca).
+  // The CA's own keys (step-ca only), and one password per provisioner key, the API's (B-16):
+  // infra/step-ca/configure.sh encrypts each provisioner's key with its own.
   STEP_CA_PASSWORD: stepCaPassword,
-  DEN_STEP_CA_PROVISIONER_PASSWORD: stepCaPassword,
+  DEN_STEP_CA_PROVISIONER_PASSWORD: secret(),
+  DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD: secret(),
+  DEN_STEP_CA_NODE_PROVISIONER_PASSWORD: secret(),
   AUTH_SECRET: randomBytes(32).toString('base64'),
+  // The proxy proves to the web that a request came through it (M-27, infra/edge/den.yml.template).
+  DEN_WEB_PROXY_TOKEN: secret(32),
   DEN_SECRETS_KEY: randomBytes(32).toString('base64'),
   DEN_TRANSPARENCY_SIGNING_JWK: `'${JSON.stringify(signingJwk)}'`,
   DEN_TRANSPARENCY_LOG_ID: 'den-transparency',
@@ -157,6 +169,8 @@ const set = {
   DEN_API_URL: 'http://api:4000',
   APISIX_ADMIN_URL: 'http://apisix:9180',
   DEN_GATEWAY_KEYCLOAK_URL: 'http://keycloak:8080/auth',
+  // Keycloak's Admin API for the API's reconciler, inside the network: not published (B-28).
+  DEN_KEYCLOAK_ADMIN_URL: 'http://keycloak:8080/auth',
   OPA_PORTAL_URL: 'http://api:4000/api/v1/opa',
   DEN_TRANSPARENCY_COLLECTOR_HOST: 'api',
   DEN_TSA_URL: 'http://tsa:3004',
@@ -166,12 +180,16 @@ const set = {
   DEN_STEP_CA_URL: 'https://step-ca:9000',
   // The step-ca volume is mounted read-only in the API container (docker-compose.deploy.yml).
   DEN_STEP_CA_ROOT_FILE: '/var/lib/den/step-ca/root_ca.crt',
+  // The API's mail (M-28): Mailpit on the Compose network until the operator names a real server.
+  DEN_SMTP_URL: 'smtp://mailpit:1025',
   // The api-documents volume (docker-compose.deploy.yml); .env.example's value is for development.
   DEN_DOCUMENTS_DIR: '/var/lib/den/documents',
   TRAEFIK_NETWORK: values['traefik-network'],
-  // Random unless asked: the seed users include platform administrators.
-  DEN_DEMO_USER_PASSWORD:
-    values['demo-password'] || process.env.DEN_DEPLOY_DEMO_PASSWORD || secret(12),
+  // Random unless asked, the one demo users share (it may be handed out at a workshop)...
+  DEN_DEMO_USER_PASSWORD: `'${demoPassword ?? secret(12)}'`,
+  // ...and always random for those with a critical role (platform administrator, operator,
+  // regulator, auditor, data steward; M-29): `install.sh credentials` shows it.
+  DEN_DEMO_CRITICAL_PASSWORD: secret(16),
   // Their one-time code key (M3-08): with the default, anyone could read it in the repo.
   DEN_DEMO_TOTP_SECRET: secret(20),
   MAILPIT_UI_AUTH: `mail:${secret(12)}`,
@@ -204,6 +222,7 @@ if (extra.length > 0) {
 writeFileSync(out, `${result.join('\n').trimEnd()}\n`, { mode: 0o600 });
 console.log(`Wrote ${out} for ${publicUrl} (kid ${signingJwk.kid}).`);
 console.log(
-  'Demo users password: DEN_DEMO_USER_PASSWORD; one-time codes: pnpm demo:otp (DEN_DEMO_TOTP_SECRET); ' +
+  'Demo users password: DEN_DEMO_USER_PASSWORD (critical roles: DEN_DEMO_CRITICAL_PASSWORD); ' +
+    'one-time codes: pnpm demo:otp (DEN_DEMO_TOTP_SECRET); ' +
     'Mailpit login: MAILPIT_UI_AUTH (in that file).',
 );

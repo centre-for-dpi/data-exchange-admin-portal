@@ -1,10 +1,13 @@
 # Routes of the portal and the gateway, for the bundled proxy (infra/compose/docker-compose.edge.yml)
 # or a Traefik already on the server (file provider). install.sh writes
 # infra/edge/dynamic/den.yml (or infra/edge/den-external.yml) from this file, replacing the
-# PORTAL_HOST, GATEWAY_HOST, TLS and ENTRYPOINT markers (each between two @).
+# PORTAL_HOST, GATEWAY_HOST, TLS, ENTRYPOINT, ADMIN_SOURCES and PROXY_TOKEN markers (each between
+# two @). The written file holds DEN_WEB_PROXY_TOKEN: install.sh makes it readable by root only.
 # Same routes as DEPLOYMENT.md §5.2; keep both in step.
 #
 # Never published: /api/v1/internal (transparency collector) and /api/v1/opa (OPA bundle).
+# Keycloak's administration (/auth/admin, and the master realm it signs in with) only from the
+# addresses in DEN_KEYCLOAK_ADMIN_ALLOW (B-28); from nowhere else, 403.
 
 http:
   middlewares:
@@ -23,12 +26,21 @@ http:
       rateLimit: { average: 50, burst: 100, period: 1s }
     den-rate-auth:
       rateLimit: { average: 20, burst: 60, period: 1s }
+    # The web believes X-Forwarded-For only from requests with this token (M-27): set here,
+    # overwriting whatever a client sent.
+    den-web-from-proxy:
+      headers:
+        customRequestHeaders: { X-DEN-Proxy-Token: '@PROXY_TOKEN@' }
+    # Keycloak's admin console and the master realm: the operator's addresses only (B-28).
+    den-keycloak-admin:
+      ipAllowList: { sourceRange: [@ADMIN_SOURCES@] }
 
   routers:
     den-web:
       rule: 'Host(`@PORTAL_HOST@`)'
       entryPoints: [@ENTRYPOINT@]
       service: den-web
+      middlewares: [den-web-from-proxy]
       tls: @TLS@
     den-api:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/api/v1`) && !PathPrefix(`/api/v1/internal`) && !PathPrefix(`/api/v1/opa`)'
@@ -41,6 +53,12 @@ http:
       entryPoints: [@ENTRYPOINT@]
       service: den-keycloak
       middlewares: [den-no-client-cert-headers, den-rate-auth]
+      tls: @TLS@
+    den-auth-admin:
+      rule: 'Host(`@PORTAL_HOST@`) && (PathPrefix(`/auth/admin`) || PathPrefix(`/auth/realms/master`))'
+      entryPoints: [@ENTRYPOINT@]
+      service: den-keycloak
+      middlewares: [den-keycloak-admin, den-no-client-cert-headers, den-rate-auth]
       tls: @TLS@
     den-gw:
       rule: 'Host(`@PORTAL_HOST@`) && PathPrefix(`/gw`)'

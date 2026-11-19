@@ -4,6 +4,26 @@
 **/.turbo
 **/coverage
 .git
+# Secrets and data of an installation (M-24): the images that copy the whole repository must not
+# carry them in a layer. .env.example stays: the services compare their secrets with it (M-25).
 .env
 .env.*
 !.env.example
+backups
+infra/edge/certs
+infra/edge/dynamic
+infra/edge/den-external.yml
+apps/api/data
+infra/mock-citizen-app/data
+**/*.pem
+**/*.key
+**/*.p12
+# Build and test leftovers.
+_site
+**/test-results
+**/playwright-report
+.hypothesis
+.schemathesis
+.superpowers
+.claude
+infra/helm/*/charts

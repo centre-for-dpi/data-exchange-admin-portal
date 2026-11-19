@@ -47,6 +47,15 @@ importers:
 
   apps/api:
     dependencies:
+      '@den/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@den/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@den/transparency-verifier':
+        specifier: workspace:*
+        version: link:../../packages/transparency-verifier
       '@fastify/rate-limit':
         specifier: 11.2.1
         version: 11.2.1
@@ -65,15 +74,6 @@ importers:
       '@prisma/client':
         specifier: 7.10.1
         version: 7.10.1(prisma@7.10.1(@types/node@24.19.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.7(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3)
-      '@den/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@den/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@den/transparency-verifier':
-        specifier: workspace:*
-        version: link:../../packages/transparency-verifier
       '@scalar/nestjs-api-reference':
         specifier: ^1.2.36
         version: 1.2.36
@@ -253,18 +253,18 @@ importers:
 
   infra/mock-citizen-app:
     dependencies:
-      '@fastify/cookie':
-        specifier: 11.1.5
-        version: 11.1.5
-      '@fastify/formbody':
-        specifier: 9.0.1
-        version: 9.0.1
       '@den/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@den/transparency-verifier':
         specifier: workspace:*
         version: link:../../packages/transparency-verifier
+      '@fastify/cookie':
+        specifier: 11.1.5
+        version: 11.1.5
+      '@fastify/formbody':
+        specifier: 9.0.1
+        version: 9.0.1
       fastify:
         specifier: ^5.12.8
         version: 5.12.8
@@ -392,6 +392,9 @@ importers:
       vitest:
         specifier: ^5.1.0
         version: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.7(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
 
 packages:
 

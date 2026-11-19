@@ -2,6 +2,9 @@
 # Start with `pnpm infra:up` (all services) or `pnpm infra:up:core` (without OpenSearch/Fluent Bit).
 # Every published port binds to 127.0.0.1 only and can be moved with *_PORT variables in .env.
 # Secrets come from the repo-root .env (see .env.example).
+# Third-party images by tag and digest (B-31): the tag says which release, the digest makes the
+# image the one that was reviewed. To move to another release, change both: the digest is the one
+# `docker buildx imagetools inspect <image>:<tag>` prints (the multi-platform index).
 name: den
 
 x-healthcheck-defaults: &healthcheck-defaults
@@ -33,7 +36,7 @@ services:
       test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8.0
+    image: quay.io/keycloak/keycloak:26.8.0@sha256:27b3230fbabb8c9ff3c66c864cf09dcd8a41aca82e5100679d109ef0eeb05741
     networks: [default, gateway]
     command:
       - start-dev
@@ -65,8 +68,20 @@ services:
       DEN_CITIZEN_APP_CLIENT_SECRET: ${DEN_CITIZEN_APP_CLIENT_SECRET:?set DEN_CITIZEN_APP_CLIENT_SECRET in .env}
       DEN_CITIZEN_APP_URL: ${DEN_CITIZEN_APP_URL:-http://localhost:3100}
       DEN_DEMO_USER_PASSWORD: ${DEN_DEMO_USER_PASSWORD:-den-demo-password}
+      # The demo users with a critical role (M-29): a password of their own in the pilot.
+      DEN_DEMO_CRITICAL_PASSWORD: ${DEN_DEMO_CRITICAL_PASSWORD:-${DEN_DEMO_USER_PASSWORD:-den-demo-password}}
       # TOTP key of the seed users with a critical role (M3-08); random in the pilot.
       DEN_DEMO_TOTP_SECRET: ${DEN_DEMO_TOTP_SECRET:-den-demo-totp-secret}
+      # The realm's outgoing mail (M-28): Mailpit unless .env names the operator's SMTP server.
+      DEN_KEYCLOAK_SMTP_HOST:
+      DEN_KEYCLOAK_SMTP_PORT:
+      DEN_KEYCLOAK_SMTP_FROM:
+      DEN_KEYCLOAK_SMTP_FROM_NAME:
+      DEN_KEYCLOAK_SMTP_AUTH:
+      DEN_KEYCLOAK_SMTP_USER:
+      DEN_KEYCLOAK_SMTP_PASSWORD:
+      DEN_KEYCLOAK_SMTP_STARTTLS:
+      DEN_KEYCLOAK_SMTP_SSL:
     volumes:
       - ../keycloak:/opt/keycloak/data/import:ro
     ports:
@@ -85,7 +100,7 @@ services:
       start_period: 30s
 
   etcd:
-    image: quay.io/coreos/etcd:v3.6.16
+    image: quay.io/coreos/etcd:v3.6.16@sha256:a9c7cc12156f4b26ca41f0b57ba5b76c45037ff6c1e47ea3d68cb7908d48a965
     networks: [gateway]
     command:
       - etcd
@@ -130,7 +145,7 @@ services:
         condition: service_healthy
 
   apisix:
-    image: apache/apisix:3.19.0-debian
+    image: apache/apisix:3.19.0-debian@sha256:9a7e45dc943fbf10ec916d1232bae4cda9302ae28a4696cfb83c2da01d261141
     networks: [gateway, providers, logs]
     environment:
       # The deployment's own key for the private keys APISIX keeps in etcd (M6-01).
@@ -171,7 +186,7 @@ services:
   opa-init:
     # OPA runs as uid 1000 and its volume is created as root: give it the persistence directory
     # (M6-04). The step-ca image is already in the stack and has a shell.
-    image: smallstep/step-ca:0.30.2
+    image: smallstep/step-ca:0.30.2@sha256:a2b17872915c193259b75a5474c398326f41bd199f0842093e52cf4182bc8270
     networks: [gateway]
     entrypoint: ['sh', '-c', 'chown 1000:1000 /var/lib/opa && chmod 700 /var/lib/opa']
     user: root
@@ -179,7 +194,7 @@ services:
       - opa-data:/var/lib/opa
 
   opa:
-    image: openpolicyagent/opa:1.21.4-static
+    image: openpolicyagent/opa:1.21.4-static@sha256:47f93480b09e24c220ae75f1e9133585ba6d698059951668d35e6a4fc32ebc82
     networks: [gateway]
     depends_on:
       opa-init:
@@ -224,13 +239,17 @@ services:
         ]
 
   step-ca:
-    image: smallstep/step-ca:0.30.2
+    image: smallstep/step-ca:0.30.2@sha256:a2b17872915c193259b75a5474c398326f41bd199f0842093e52cf4182bc8270
     networks: [default]
     environment:
       DOCKER_STEPCA_INIT_NAME: DEN Dev CA
       DOCKER_STEPCA_INIT_DNS_NAMES: localhost,step-ca
       DOCKER_STEPCA_INIT_PROVISIONER_NAME: den-portal
       DOCKER_STEPCA_INIT_PASSWORD: ${STEP_CA_PASSWORD:?set STEP_CA_PASSWORD in .env}
+      # Each provisioner's key under its own password (B-16, configure.sh); empty: the CA's.
+      DEN_STEP_CA_PROVISIONER_PASSWORD: ${DEN_STEP_CA_PROVISIONER_PASSWORD:-}
+      DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD: ${DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD:-}
+      DEN_STEP_CA_NODE_PROVISIONER_PASSWORD: ${DEN_STEP_CA_NODE_PROVISIONER_PASSWORD:-}
     # The image's entrypoint initialises the CA once; configure.sh then sets the provisioner of
     # the portal (template and durations, M3-01) and starts step-ca.
     command: ['bash', '/den/configure.sh']
@@ -252,7 +271,7 @@ services:
         ]
 
   opensearch:
-    image: opensearchproject/opensearch:3.9.0
+    image: opensearchproject/opensearch:3.9.0@sha256:3bf4fe26aeb9f7b03c0ebcb1302bb24e855ee6b89fd926d26a71a83ef6f7e076
     networks: [default, analytics]
     profiles: [observability]
     environment:
@@ -283,7 +302,7 @@ services:
       start_period: 30s
 
   fluent-bit:
-    image: fluent/fluent-bit:5.1.5-debug
+    image: fluent/fluent-bit:5.1.5-debug@sha256:c4b77279d6e89374408e8b2e4091c157c33100974cc797fcc4e86d9f1d0615f5
     # Its input has no authentication (B-17): only APISIX reaches it, on `logs`; it reaches
     # OpenSearch alone on `analytics`.
     networks: [logs, analytics]
@@ -304,7 +323,7 @@ services:
   # API (with DEN_METRICS_TOKEN) and OPA, and evaluates the alerts of infra/prometheus/rules;
   # Alertmanager mails them to the operator; Grafana shows the operator's dashboard.
   prometheus:
-    image: prom/prometheus:v3.15.1
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     networks: [default, gateway]
     profiles: [observability]
     # Prometheus does not expand variables in its configuration: the token goes to the file its
@@ -332,12 +351,22 @@ services:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9090/-/ready']
 
   alertmanager:
-    image: prom/alertmanager:v0.34.2
+    image: prom/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b
     networks: [default]
     profiles: [observability]
-    command: ['--config.file=/etc/alertmanager/alertmanager.yml', '--storage.path=/alertmanager']
+    # The operator's mail server and address over the file's (entrypoint.sh, M-28).
+    entrypoint: ['/bin/sh', '/den/entrypoint.sh']
+    command: []
+    environment:
+      DEN_ALERT_EMAIL_TO:
+      DEN_ALERT_SMTP_SMARTHOST:
+      DEN_ALERT_SMTP_FROM:
+      DEN_ALERT_SMTP_REQUIRE_TLS:
+      DEN_ALERT_SMTP_USER:
+      DEN_ALERT_SMTP_PASSWORD:
     volumes:
       - ../alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../alertmanager/entrypoint.sh:/den/entrypoint.sh:ro
       - alertmanager-data:/alertmanager
     ports:
       - 127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093
@@ -347,7 +376,7 @@ services:
 
   grafana:
     # AGPL-3.0: a separate service, never linked with our code (CLAUDE.md, rule 1).
-    image: grafana/grafana:13.3.0
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     networks: [default]
     profiles: [observability]
     environment:
@@ -375,7 +404,7 @@ services:
   # collector. Base profile, separate from the analytics pipeline above: without it, citizens
   # would not see the calls. Buffers on disk and retries while the collector is unreachable.
   fluent-bit-transparency:
-    image: fluent/fluent-bit:5.1.5-debug
+    image: fluent/fluent-bit:5.1.5-debug@sha256:c4b77279d6e89374408e8b2e4091c157c33100974cc797fcc4e86d9f1d0615f5
     # Its input has no authentication (B-17): only APISIX reaches it, on `logs`. The collector is
     # the API on the host here; in the pilot, the API on `collector` (docker-compose.deploy.yml).
     networks: [logs]
@@ -400,7 +429,7 @@ services:
   # upstream URI and any identification number, and prints the result (infra/fluent-bit/
   # gateway-errors.yaml). Base profile: APISIX needs it to start.
   fluent-bit-errors:
-    image: fluent/fluent-bit:5.1.5-debug
+    image: fluent/fluent-bit:5.1.5-debug@sha256:c4b77279d6e89374408e8b2e4091c157c33100974cc797fcc4e86d9f1d0615f5
     # Only APISIX sends to it (B-17).
     networks: [logs]
     command: ['/fluent-bit/bin/fluent-bit', '-c', '/fluent-bit/etc/den/gateway-errors.yaml']
@@ -418,7 +447,7 @@ services:
   # creates its certificate chain once (infra/tsa/init.sh). In production, the country's
   # accredited TSA.
   tsa-init:
-    image: smallstep/step-ca:0.30.2
+    image: smallstep/step-ca:0.30.2@sha256:a2b17872915c193259b75a5474c398326f41bd199f0842093e52cf4182bc8270
     networks: [default]
     entrypoint: ['sh', '/init/init.sh']
     user: root
@@ -427,7 +456,7 @@ services:
       - tsa-data:/tsa
 
   tsa:
-    image: ghcr.io/sigstore/timestamp-server:v2.1.4
+    image: ghcr.io/sigstore/timestamp-server:v2.1.4@sha256:72be23a6a1019c895ff34d2294c8074b2235723a37a735ad30ee9464a381f593
     networks: [default]
     command:
       [
@@ -454,7 +483,7 @@ services:
   # tcp://clamav:3310 (pilot) for the API. freshclam inside updates the signatures from the
   # internet; the first start takes a few minutes and about 1.2 GB of memory.
   clamav:
-    image: clamav/clamav:1.5.4
+    image: clamav/clamav:1.5.4@sha256:7054e3f34308c384ea43cd786ea17abf899bd44af40af9f1b099853d7a5c214e
     profiles: [antivirus]
     networks: [default]
     volumes:
@@ -468,7 +497,7 @@ services:
       start_period: 600s
 
   mailpit:
-    image: axllent/mailpit:v1.32.0
+    image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     networks: [default]
     ports:
       - 127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025

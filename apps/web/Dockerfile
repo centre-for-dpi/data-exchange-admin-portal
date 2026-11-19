@@ -3,7 +3,7 @@
 # Configuration comes from the environment at run time (AUTH_URL, KEYCLOAK_URL, DEN_API_URL…).
 
 # --- Build: the whole workspace, then the web with its production dependencies only. ---
-FROM node:24.22.1-alpine3.24 AS build
+FROM node:24.22.1-alpine3.24@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
 RUN npm install --global pnpm@11.15.0
 WORKDIR /repo
 COPY . .
@@ -18,13 +18,15 @@ RUN pnpm install --frozen-lockfile \
  && rm -rf /out/.next && cp -r apps/web/.next /out/.next && rm -rf /out/.next/cache
 
 # --- Runtime: no compilers, no dev dependencies and no package manager (M6-05). ---
-FROM node:24.22.1-alpine3.24
+FROM node:24.22.1-alpine3.24@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 # npm, npx, corepack and yarn ship in the base image; nothing installs packages here.
 RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
       /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
 # The country configuration (texts, branding) is read at run time from the repo layout.
 WORKDIR /repo
 COPY pnpm-workspace.yaml ./
+# The example values, so the web refuses to start with one of them as a secret (M-25).
+COPY .env.example ./
 COPY config ./config
 # /files/entity-check.sh (P-05) is made at build time from this file; the copy lets the route
 # read it at run time too, should Next.js ever render it again.

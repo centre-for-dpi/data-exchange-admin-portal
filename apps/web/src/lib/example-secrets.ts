@@ -1,7 +1,11 @@
 import { assertNoExampleSecrets, isDeployed } from '@den/config';
 
 /** The web's own secrets (A-2): the session cookie's key and its client of den-portal. */
-export const WEB_SECRETS = ['AUTH_SECRET', 'DEN_PORTAL_WEB_CLIENT_SECRET'] as const;
+export const WEB_SECRETS = [
+  'AUTH_SECRET',
+  'DEN_PORTAL_WEB_CLIENT_SECRET',
+  'DEN_WEB_PROXY_TOKEN',
+] as const;
 
 /**
  * M-25: a deployed web refuses to start while one of its secrets is the public value of

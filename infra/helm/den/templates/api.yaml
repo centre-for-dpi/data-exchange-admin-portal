@@ -53,7 +53,7 @@ spec:
         - name: api
           image: {{ include "den.image" (dict "root" . "name" "api") }}
           imagePullPolicy: {{ .Values.images.pullPolicy }}
-          # The image's default command also migrates and seeds (pilots): here only the server.
+          # The image's default command also seeds (pilots): here only the server.
           command: ['node', '--enable-source-maps', 'dist/main.js']
           ports:
             - { name: http, containerPort: {{ .Values.api.port }} }

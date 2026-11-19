@@ -17,8 +17,12 @@
 #       /citizen-app -> den-citizen-app:3100  (reference citizen app, MT-07)
 #       /tsa/api/v1/timestamp/certchain -> den-tsa:3004 (the TSA certificates, for verifiers)
 #       /grafana     -> den-grafana:3000      (operator dashboard, M5-06; Grafana's own login)
-#   - the API and the web app run in containers (apps/*/Dockerfile); the API applies migrations
-#     and the idempotent seed on start (DEN_ALLOW_SEED=true).
+#   - the API and the web app run in containers (apps/*/Dockerfile). `migrate` applies the
+#     migrations as the schema owner before the API starts; the API runs as den_app and loads the
+#     idempotent seed on start (DEN_ALLOW_SEED=true).
+#   - each container gets only the variables it uses (A-2): no service reads the whole .env, and
+#     only `migrate` knows the schema owner's password. A variable the code reads must be listed
+#     under its service (tests/infra/src/deploy-overlay.test.ts checks it).
 
 x-no-ports: &no-ports
   ports: !reset []
@@ -27,6 +31,7 @@ services:
   postgres:
     <<: *no-ports
     restart: unless-stopped
+    mem_limit: 2g
     # Continuous archiving to the encrypted pgBackRest repository (M6-06, ADR-0026): with the
     # scheduled backups below, recovery to any moment of the retention (OPERATIONS.md §6). A
     # segment is archived at least every 5 minutes, so at most 5 minutes of changes can be lost.
@@ -77,6 +82,12 @@ services:
       # Health stays at /health/ready on the management port (the health check above).
       KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
       KC_PROXY_HEADERS: xforwarded
+      # No public default for the demo users' passwords and one-time code key (M-25, M-29).
+      DEN_DEMO_USER_PASSWORD: ${DEN_DEMO_USER_PASSWORD:?set DEN_DEMO_USER_PASSWORD in .env}
+      DEN_DEMO_CRITICAL_PASSWORD: ${DEN_DEMO_CRITICAL_PASSWORD:?set DEN_DEMO_CRITICAL_PASSWORD in .env}
+      DEN_DEMO_TOTP_SECRET: ${DEN_DEMO_TOTP_SECRET:?set DEN_DEMO_TOTP_SECRET in .env}
+    # Memory caps (B-31): one service cannot starve the others on a shared server.
+    mem_limit: 2g
     healthcheck:
       # A shared host can take minutes to boot Keycloak (realm import included).
       start_period: 300s
@@ -91,6 +102,7 @@ services:
   apisix:
     <<: *no-ports
     restart: unless-stopped
+    mem_limit: 1g
     # The gateway has no business reaching the host (development tests only).
     extra_hosts: !reset []
     # Not on the platform network (M6-01): only the gateway's control plane and its upstreams.
@@ -112,6 +124,8 @@ services:
   opensearch:
     <<: *no-ports
     restart: unless-stopped
+    # A 512 MB heap (docker-compose.yml) plus the JVM's own and the page cache it needs.
+    mem_limit: 2g
 
   fluent-bit:
     restart: unless-stopped
@@ -127,6 +141,7 @@ services:
   prometheus:
     <<: *no-ports
     restart: unless-stopped
+    mem_limit: 1g
     # The API runs in a container here: api resolves to it, not to the host.
     extra_hosts: !reset []
 
@@ -137,6 +152,7 @@ services:
   grafana:
     <<: *no-ports
     restart: unless-stopped
+    mem_limit: 512m
     # For the operator, behind the proxy at /grafana (GRAFANA_ROOT_URL with the sub-path).
     networks:
       default: {}
@@ -154,6 +170,8 @@ services:
   clamav:
     <<: *no-ports
     restart: unless-stopped
+    # ~1.2 GB of signatures, twice that while freshclam reloads them.
+    mem_limit: 3g
 
   mailpit:
     <<: *no-ports
@@ -193,19 +211,152 @@ services:
     ports: !override
       - ${WG_HUB_UDP_PORT:-51820}:51820/udp
 
+  # Pending migrations, as the schema owner (DATABASE_MIGRATION_URL), before the API starts (A-2):
+  # the only container that knows that password. Prisma takes an advisory lock; nothing to do
+  # when the schema is current. The API itself runs as den_app (no DDL, insert-only audit).
+  migrate:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    # The API's image (built once, cached for the second service).
+    image: den/portal-api:deploy
+    restart: 'no'
+    command: ['node_modules/.bin/prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_MIGRATION_URL: ${DATABASE_MIGRATION_URL:?set DATABASE_MIGRATION_URL in .env}
+    networks: [default]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
     image: den/portal-api:deploy
     restart: unless-stopped
-    env_file: ../../.env
+    mem_limit: 1536m
+    # The seed (DEN_ALLOW_SEED) and the server; migrations ran in `migrate`. Set here, not left to
+    # the image, so that an image from before A-2 (which migrated on start) does not try to.
+    command:
+      - sh
+      - -c
+      - >-
+        if [ "$$DEN_ALLOW_SEED" = true ]; then node --enable-source-maps dist/seed/main.js; fi &&
+        exec node --enable-source-maps dist/main.js
+    # Only what the API reads (A-2). An empty entry takes its value from .env, or stays unset.
     environment:
       DEN_ALLOW_SEED: 'true'
-      DEN_SMTP_URL: smtp://mailpit:1025
+      # Mailpit until .env names the operator's SMTP server (M-28, DEPLOYMENT.md §3.9).
+      DEN_SMTP_URL: ${DEN_SMTP_URL:-smtp://mailpit:1025}
       # Where api-documents is mounted. Set here so an .env with the development value
       # (data/documents, not writable by `node`) cannot send uploads elsewhere.
       DEN_DOCUMENTS_DIR: /var/lib/den/documents
+      DEN_COUNTRY: ${DEN_COUNTRY:?set DEN_COUNTRY in .env}
+      API_PORT:
+      DEN_LOG_FORMAT:
+      DEN_WORKER:
+      DEN_BOOTSTRAP_ADMIN_EMAIL:
+      # Database, as den_app.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      # Secrets of the API.
+      DEN_SECRETS_KEY: ${DEN_SECRETS_KEY:?set DEN_SECRETS_KEY in .env}
+      DEN_SECRETS_KEYS_PREVIOUS:
+      DEN_SUBJECT_REF_KEY: ${DEN_SUBJECT_REF_KEY:?set DEN_SUBJECT_REF_KEY in .env}
+      DEN_END_USER_HASH_SALT: ${DEN_END_USER_HASH_SALT:?set DEN_END_USER_HASH_SALT in .env}
+      DEN_TRANSPARENCY_SIGNING_JWK: ${DEN_TRANSPARENCY_SIGNING_JWK:?set DEN_TRANSPARENCY_SIGNING_JWK in .env}
+      DEN_TRANSPARENCY_RETIRED_JWKS:
+      DEN_TRANSPARENCY_INGEST_TOKEN: ${DEN_TRANSPARENCY_INGEST_TOKEN:?set DEN_TRANSPARENCY_INGEST_TOKEN in .env}
+      DEN_TRANSPARENCY_LOG_ID:
+      DEN_TRANSPARENCY_BATCH_MAX:
+      DEN_TRANSPARENCY_SEAL_INTERVAL_SECONDS:
+      DEN_AUDIT_ANCHOR_INTERVAL_SECONDS:
+      DEN_LIFECYCLE_INTERVAL_SECONDS:
+      DEN_NODE_LIFECYCLE_INTERVAL_SECONDS:
+      DEN_OUTBOX_RETENTION_DAYS:
+      DEN_TSA_URL:
+      DEN_TSA_ROOTS_FILE:
+      DEN_TSA_REQUIRE_INDEPENDENT:
+      # Identity: tokens, the den-gateway provisioner, the web's address.
+      KEYCLOAK_URL: ${KEYCLOAK_URL:?set KEYCLOAK_URL in .env}
+      # Its Admin API inside the Compose network: the proxy does not publish /auth/admin (B-28).
+      DEN_KEYCLOAK_ADMIN_URL: ${DEN_KEYCLOAK_ADMIN_URL:-http://keycloak:8080/auth}
+      DEN_GATEWAY_PROVISIONER_CLIENT_ID:
+      DEN_GATEWAY_PROVISIONER_SECRET: ${DEN_GATEWAY_PROVISIONER_SECRET:?set DEN_GATEWAY_PROVISIONER_SECRET in .env}
+      DEN_WEB_URL:
+      DEN_MAIL_FROM:
+      DEN_INVITATION_TTL_DAYS:
+      # Citizens (ADR-0015).
+      DEN_CITIZEN_ISSUER:
+      DEN_CITIZEN_AUDIENCE:
+      DEN_CITIZEN_CLIENTS:
+      DEN_CITIZEN_DOCUMENT_TYPE_CLAIM:
+      DEN_CITIZEN_DOCUMENT_NUMBER_CLAIM:
+      DEN_CITIZEN_APPS: ${DEN_CITIZEN_APPS:?set DEN_CITIZEN_APPS in .env}
+      # Documents.
+      DEN_DOCUMENT_MAX_BYTES:
+      DEN_KIT_BUNDLE_MAX_BYTES:
+      DEN_CLAMAV_URL:
+      # The gateway: APISIX's Admin API, OPA, and what the reconciler writes into the routes.
+      APISIX_ADMIN_URL:
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY:?set APISIX_ADMIN_KEY in .env}
+      OPA_BUNDLE_TOKEN: ${OPA_BUNDLE_TOKEN:?set OPA_BUNDLE_TOKEN in .env}
+      DEN_OPA_DECISION_TOKEN: ${DEN_OPA_DECISION_TOKEN:?set DEN_OPA_DECISION_TOKEN in .env}
+      DEN_GATEWAY_KEYCLOAK_URL:
+      DEN_GATEWAY_OPA_URL:
+      DEN_GATEWAY_ACCESS_LOG_URL:
+      DEN_GATEWAY_TRANSPARENCY_LOG:
+      DEN_GATEWAY_PUBLIC_URL:
+      DEN_GATEWAY_TLS_HOSTS:
+      DEN_GATEWAY_NODES:
+      DEN_GATEWAY_CLIENT_NAME:
+      DEN_GATEWAY_PORTAL_API_URL:
+      DEN_GATEWAY_INTERNAL_URL:
+      DEN_GATEWAY_WG_HUB:
+      DEN_DEV_NODES:
+      DEN_XROAD_SECURITY_SERVER_URL:
+      DEN_XROAD_CLIENT:
+      DEN_XROAD_SECURITY_SERVER_CA:
+      # The network CA (step-ca): the provisioners' passwords (B-16), never the CA's own keys'.
+      DEN_STEP_CA_URL:
+      DEN_STEP_CA_PROVISIONER:
+      DEN_STEP_CA_GATEWAY_PROVISIONER:
+      DEN_STEP_CA_NODE_PROVISIONER:
+      DEN_STEP_CA_PROVISIONER_PASSWORD: ${DEN_STEP_CA_PROVISIONER_PASSWORD:?set DEN_STEP_CA_PROVISIONER_PASSWORD in .env}
+      DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD:
+      DEN_STEP_CA_NODE_PROVISIONER_PASSWORD:
+      DEN_STEP_CA_ROOT_FILE:
+      DEN_STEP_CA_ROOT_FINGERPRINT:
+      # Kit nodes and the WireGuard hub (M4).
+      DEN_NODE_CONTROL_TOKEN: ${DEN_NODE_CONTROL_TOKEN:?set DEN_NODE_CONTROL_TOKEN in .env}
+      DEN_NODE_CONTROL_URL:
+      DEN_NODE_ENROLLMENT_TTL_HOURS:
+      DEN_NODE_HEARTBEAT_SECONDS:
+      DEN_NODE_OFFLINE_AFTER_SECONDS:
+      DEN_NODE_CERT_VALIDITY_HOURS:
+      DEN_NODE_RENEWAL_GRACE_HOURS:
+      DEN_NODE_MIN_KIT_VERSION:
+      DEN_WG_SUBNET:
+      DEN_WG_HUB_PUBLIC_KEY:
+      DEN_WG_HUB_ENDPOINT:
+      DEN_WG_HUB_AGENT_URL:
+      DEN_WG_HUB_AGENT_TOKEN: ${DEN_WG_HUB_AGENT_TOKEN:?set DEN_WG_HUB_AGENT_TOKEN in .env}
+      # Validations at submission (M4-06).
+      DEN_VERSION_VALIDATION:
+      DEN_VALIDATION_TOKEN: ${DEN_VALIDATION_TOKEN:?set DEN_VALIDATION_TOKEN in .env}
+      DEN_CONTRACT_RUNNER_URL:
+      DEN_CONTRACT_RUNNER_TOKEN: ${DEN_CONTRACT_RUNNER_TOKEN:?set DEN_CONTRACT_RUNNER_TOKEN in .env}
+      DEN_CONTRACT_RUNNER_GATEWAY_URL:
+      DEN_CONTRACT_MAX_EXAMPLES:
+      DEN_CONTRACT_TIMEOUT_SECONDS:
+      # Analytics, metrics and the API's own limits.
+      DEN_OPENSEARCH_URL:
+      DEN_OPENSEARCH_AUTH:
+      DEN_PROMETHEUS_URL:
+      DEN_METRICS_TOKEN: ${DEN_METRICS_TOKEN:?set DEN_METRICS_TOKEN in .env}
+      DEN_RATE_LIMIT_PER_MINUTE:
+      DEN_RATE_LIMIT_STRICT_PER_MINUTE:
+      DEN_TRUST_PROXY:
     volumes:
       - api-documents:/var/lib/den/documents
       # Only the certificates of the CA (DEN_STEP_CA_ROOT_FILE): the API verifies step-ca's TLS
@@ -217,6 +368,8 @@ services:
         volume:
           subpath: certs
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       step-ca:
@@ -244,9 +397,24 @@ services:
       dockerfile: apps/web/Dockerfile
     image: den/portal-web:deploy
     restart: unless-stopped
-    env_file: ../../.env
+    mem_limit: 1g
+    # Only what the web reads (A-2): its session key and its client of den-portal, no other secret.
     environment:
       AUTH_TRUST_HOST: 'true'
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+      AUTH_URL:
+      DEN_COUNTRY: ${DEN_COUNTRY:?set DEN_COUNTRY in .env}
+      DEN_API_URL:
+      DEN_WEB_URL:
+      KEYCLOAK_URL: ${KEYCLOAK_URL:?set KEYCLOAK_URL in .env}
+      DEN_PORTAL_WEB_CLIENT_ID:
+      DEN_PORTAL_WEB_CLIENT_SECRET: ${DEN_PORTAL_WEB_CLIENT_SECRET:?set DEN_PORTAL_WEB_CLIENT_SECRET in .env}
+      DEN_GATEWAY_PUBLIC_URL:
+      DEN_CITIZEN_APP_URL:
+      DEN_SESSION_IDLE_SECONDS:
+      DEN_AUTH_REFRESH_BEFORE_SECONDS:
+      # The proxy sets it on the requests it sends here: only then is X-Forwarded-For believed (M-27).
+      DEN_WEB_PROXY_TOKEN: ${DEN_WEB_PROXY_TOKEN:?set DEN_WEB_PROXY_TOKEN in .env}
     depends_on:
       api:
         condition: service_healthy
@@ -261,15 +429,28 @@ services:
       dockerfile: infra/mock-citizen-app/Dockerfile
     image: den/mock-citizen-app:deploy
     restart: unless-stopped
-    env_file: ../../.env
+    mem_limit: 512m
+    # Only what the app reads (A-2): a demo prop on the internet, with its own two secrets.
     environment:
       CITIZEN_APP_PORTAL_API_URL: http://api:4000
       # Public material, fetched where anyone would: the operator JWKS and the TSA chain.
       CITIZEN_APP_JWKS_URL: ${DEN_PUBLIC_URL}/api/v1/transparency/jwks
       CITIZEN_APP_TSA_ROOT_URL: ${DEN_PUBLIC_URL}/tsa/api/v1/timestamp/certchain
-      CITIZEN_APP_SMTP_HOST: mailpit
-      CITIZEN_APP_SMTP_PORT: '1025'
+      CITIZEN_APP_TSA_ROOTS_FILE:
+      # A demo prop: Mailpit, or an SMTP server without authentication.
+      CITIZEN_APP_SMTP_HOST: ${CITIZEN_APP_SMTP_HOST:-mailpit}
+      CITIZEN_APP_SMTP_PORT: ${CITIZEN_APP_SMTP_PORT:-1025}
+      CITIZEN_APP_MAIL_FROM:
       CITIZEN_APP_DATA_FILE: /repo/infra/mock-citizen-app/data/alerts.json
+      DEN_CITIZEN_APP_URL: ${DEN_CITIZEN_APP_URL:?set DEN_CITIZEN_APP_URL in .env}
+      DEN_CITIZEN_ISSUER: ${DEN_CITIZEN_ISSUER:?set DEN_CITIZEN_ISSUER in .env}
+      DEN_CITIZEN_APP_CLIENT_SECRET: ${DEN_CITIZEN_APP_CLIENT_SECRET:?set DEN_CITIZEN_APP_CLIENT_SECRET in .env}
+      CITIZEN_APP_WEBHOOK_SECRET: ${CITIZEN_APP_WEBHOOK_SECRET:?set CITIZEN_APP_WEBHOOK_SECRET in .env}
+      CITIZEN_APP_CLIENT_ID:
+      CITIZEN_APP_ISSUER_INTERNAL_URL:
+      CITIZEN_APP_NAME_ES:
+      CITIZEN_APP_NAME_EN:
+      LOG_LEVEL:
     volumes:
       - citizen-app-data:/repo/infra/mock-citizen-app/data
     depends_on:
@@ -291,6 +472,7 @@ networks:
   runner:
   # The API and fluent-bit-transparency only (B-17).
   collector:
+  # The reverse proxy's network: install.sh's den-edge, or the one of a proxy already there (B-33).
   edge:
-    name: ${TRAEFIK_NETWORK:-lab-router_default}
+    name: ${TRAEFIK_NETWORK:?set TRAEFIK_NETWORK in .env (the Docker network of the reverse proxy)}
     external: true

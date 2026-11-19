@@ -7,6 +7,10 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.deploy.yml -f docker-compose.images.yml …
 services:
+  # The migrations run from the API's image (docker-compose.deploy.yml, A-2).
+  migrate:
+    build: !reset null
+    image: ghcr.io/centre-for-dpi/den-portal-api:${DEN_IMAGE_TAG:?set DEN_IMAGE_TAG in .env}
   api:
     build: !reset null
     image: ghcr.io/centre-for-dpi/den-portal-api:${DEN_IMAGE_TAG:?set DEN_IMAGE_TAG in .env}
