@@ -62,6 +62,60 @@ test.describe('operator review (M1-04)', () => {
     await expect(publisher.getByTestId('version-status')).toHaveText('En revisión');
   });
 
+  test('the publisher edits what the version declares after changes are requested (R-09)', async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    const publisher = await (await browser.newContext()).newPage();
+    const { versionUrl } = await submitNewApi(publisher);
+    const operator = await (await browser.newContext()).newPage();
+    await signIn(operator, 'ana.operadora', `/operator/reviews/${versionIdOf(versionUrl)}`);
+    await operator.getByLabel(/^Qué debe cambiar/).fill('Declara también el dato "estado".');
+    await operator.getByRole('button', { name: 'Pedir cambios' }).click();
+    await expect(operator.getByTestId('version-status')).toHaveText('Cambios solicitados');
+
+    // A data steward of the entity may not edit: the screen is a 404 for anyone who may not.
+    const steward = await (await browser.newContext()).newPage();
+    await signIn(steward, 'lucia.datos', `${new URL(versionUrl).pathname}/edit`);
+    await expect(steward.getByRole('heading', { level: 1 })).toHaveText('Página no encontrada');
+
+    await publisher.goto(versionUrl);
+    await publisher.getByRole('link', { name: 'Editar la versión' }).click();
+    await expect(publisher.getByRole('heading', { level: 1 })).toContainText('Editar');
+    // Prefilled with what the version declares.
+    await expect(publisher.getByLabel('Nombre del dato')).toHaveValue('regimen');
+    await expect(publisher.getByLabel('Verificación de requisitos de un trámite')).toBeChecked();
+    await expect(publisher.getByLabel('Ruta del servicio en el nodo')).toHaveValue('/salud');
+    await expectNoAccessibilityViolations(publisher);
+
+    // The API's field errors show next to the field: purposes cannot be empty.
+    await publisher.getByLabel('Verificación de requisitos de un trámite').uncheck();
+    await publisher.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(publisher.getByRole('alert').first()).toBeVisible();
+    await expect(publisher.getByText(/finalidad/i).first()).toBeVisible();
+
+    // Fix it, declare one more data item and a legal basis, and save.
+    await publisher.getByLabel('Verificación de requisitos de un trámite').check();
+    await publisher.getByRole('button', { name: 'Agregar dato' }).click();
+    await publisher.getByLabel('Nombre del dato').last().fill('estado');
+    await publisher.getByLabel('Base legal').fill('Ley de ejemplo, artículo 5.');
+    await publisher.getByRole('button', { name: 'Guardar cambios' }).click();
+    await publisher.waitForURL(new RegExp(`${new URL(versionUrl).pathname}$`));
+    await expect(publisher.getByTestId('version-status')).toHaveText('Cambios solicitados');
+    await expect(publisher.getByRole('cell', { name: 'estado' })).toBeVisible();
+    // What was saved comes back in the form.
+    await publisher.getByRole('link', { name: 'Editar la versión' }).click();
+    await expect(publisher.getByLabel('Base legal')).toHaveValue('Ley de ejemplo, artículo 5.');
+    await expect(publisher.getByLabel('Nombre del dato')).toHaveCount(2);
+    await publisher.goBack();
+
+    await publisher.getByRole('button', { name: 'Enviar a revisión' }).click();
+    await expect(publisher.getByTestId('version-status')).toHaveText('En revisión');
+    // In review the version is no longer editable.
+    await publisher.goto(`${versionUrl}/edit`);
+    await expect(publisher.getByRole('heading', { level: 1 })).toHaveText('Página no encontrada');
+  });
+
   test('the regulator can read a review but not decide', async ({ browser }) => {
     const publisher = await (await browser.newContext()).newPage();
     const { versionUrl } = await submitNewApi(publisher);

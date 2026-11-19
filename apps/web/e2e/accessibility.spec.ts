@@ -5,6 +5,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { type Browser, expect, type Page, test } from '@playwright/test';
 import {
   createApplication,
+  newVersion,
+  openapiFile,
   requestAccess,
   signIn,
   submitNewApi,
@@ -38,6 +40,8 @@ type User =
 interface Fixture {
   apiId: string;
   versionId: string;
+  /** A version of the same API still in draft (the edit screen needs one). */
+  draftVersionId: string;
   appId: string;
   subscriptionId: string;
   providerId: string;
@@ -70,6 +74,11 @@ const SCREENS: Screen[] = [
     route: '/my-apis/[apiId]/versions/new',
     user: 'pedro.publicador',
     path: (f) => `/my-apis/${f.apiId}/versions/new`,
+  },
+  {
+    route: '/my-apis/[apiId]/versions/[versionId]/edit',
+    user: 'pedro.publicador',
+    path: (f) => `/my-apis/${f.apiId}/versions/${f.draftVersionId}/edit`,
   },
   {
     route: '/my-apis/[apiId]/versions/[versionId]',
@@ -170,7 +179,8 @@ function routesInApp(): string[] {
       if (statSync(full).isDirectory()) walk(full);
       else if (name === 'page.tsx') {
         const route = relative(root, dir).split(/[\\/]/).filter(Boolean).join('/');
-        found.push(`/${route}`);
+        // The catch-all only raises a 404: audited below with the error pages.
+        if (!route.includes('[...')) found.push(`/${route}`);
       }
     }
   };
@@ -340,9 +350,14 @@ test.describe('accessibility audit of every screen (M6-02)', () => {
       slug: `accesibilidad-${id}`,
       classification: 'Datos sensibles',
     });
-    await pedro.context().close();
     const apiId = UUID.exec(versionUrl.split('/my-apis/')[1] ?? '')?.[0] ?? '';
     const versionId = UUID.exec(versionUrl.split('/versions/')[1] ?? '')?.[0] ?? '';
+    // A second version, left as a draft, for the edit screen.
+    await pedro.goto(`/my-apis/${apiId}`);
+    await newVersion(pedro, { version: '2.0', file: openapiFile });
+    await expect(pedro.getByTestId('version-status')).toHaveText('Borrador');
+    const draftVersionId = UUID.exec(pedro.url().split('/versions/')[1] ?? '')?.[0] ?? '';
+    await pedro.context().close();
     const ana = await sessionFor(browser, 'ana.operadora');
     await ana.goto(`/operator/reviews/${versionId}`);
     await waitForValidations(ana);
@@ -421,6 +436,7 @@ test.describe('accessibility audit of every screen (M6-02)', () => {
     fixture = {
       apiId,
       versionId,
+      draftVersionId,
       appId,
       subscriptionId,
       providerId,
@@ -459,10 +475,46 @@ test.describe('accessibility audit of every screen (M6-02)', () => {
 
 /** Outside the serial sweep: they need no published API and do not stop it. */
 test.describe('accessibility of the session and of Keycloak (M6-02)', () => {
+  // B-24: the pages for a path that does not exist and for a page that fails are translated
+  // and pass the same audit as every other screen.
+  const failing = [
+    // The API rejects a malformed cursor, which no page handles: the error boundary answers.
+    { name: 'error page', path: '/catalog?cursor=not-a-cursor', heading: 'Algo salió mal' },
+    { name: 'not-found page', path: '/no-such-page', heading: 'Página no encontrada' },
+  ];
+  for (const { name, path, heading } of failing) {
+    test(`the ${name} is translated and accessible (B-24)`, async ({ browser }) => {
+      // Signed in: the catalogue of this deployment is not public, and the error needs the API.
+      const page = await sessionFor(browser, 'carlos.dev');
+      const report: string[] = [];
+      for (const locale of LOCALES) {
+        await page.goto(locale === 'es' ? path : `/${locale}${path}`);
+        await expect(page.locator('h1')).toHaveText(
+          locale === 'es'
+            ? heading
+            : heading === 'Algo salió mal'
+              ? 'Something went wrong'
+              : 'Page not found',
+        );
+        for (const failure of await auditScreen(page, locale, false)) {
+          report.push(`${locale} — ${failure}`);
+        }
+      }
+      await page.context().close();
+      expect(report).toEqual([]);
+    });
+  }
+
   test('warns before the session ends for inactivity and lets the user keep it (2.2.1)', async ({
     browser,
   }) => {
     const page = await sessionFor(browser, 'carlos.dev');
+    // The notice asks the server how long the session really has left (B-25): here, two minutes.
+    await page.route('**/api/session/keepalive', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ json: { remainingSeconds: 100 } })
+        : route.continue(),
+    );
     await page.clock.install();
     await page.goto('/my-apps');
     // The countdown starts once the page is hydrated: only then move the clock.
@@ -482,6 +534,21 @@ test.describe('accessibility of the session and of Keycloak (M6-02)', () => {
     // The session is still there.
     await page.goto('/my-apps');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.context().close();
+  });
+
+  test('does not warn while the server says the session was renewed (B-25)', async ({
+    browser,
+  }) => {
+    const page = await sessionFor(browser, 'carlos.dev');
+    await page.clock.install();
+    await page.goto('/my-apps');
+    await page.getByTestId('session-timeout').waitFor({ state: 'attached' });
+    // The browser's own count is over, but the session was refreshed on the server meanwhile.
+    const asked = page.waitForResponse('**/api/session/keepalive');
+    await page.clock.fastForward('28:30');
+    expect((await asked).status()).toBe(200);
+    await expect(page.getByRole('alertdialog')).toBeHidden();
     await page.context().close();
   });
 

@@ -174,6 +174,9 @@
       "legalReferences": "Referencias normativas",
       "legalReferencesHint": "Una por línea",
       "submit": "Crear versión",
+      "submitEdit": "Guardar cambios",
+      "editing": "Editando la versión {version}: el número no cambia y lo que guardes reemplaza lo declarado.",
+      "openapiKeepHint": "Si no subes ni pegas un documento, la versión conserva el que ya tiene.",
       "node": "Nodo del kit",
       "nodeHint": "Donde corre el servicio. El gateway lo llama por el túnel del nodo.",
       "noNode": "Ninguno (servicio de prueba del entorno)",
@@ -205,6 +208,9 @@
       "lintOk": "El documento cumple las reglas de la red.",
       "lintErrors": "El documento tiene {count, plural, one {# error} other {# errores}}. Corrígelos para poder enviarlo a revisión.",
       "line": "Línea {line}",
+      "edit": "Editar la versión",
+      "editTitle": "Editar {api} · versión {version}",
+      "editHint": "Mientras la versión está en borrador o con cambios solicitados puedes corregir lo que declara: los datos que expone, la base legal, las finalidades y dónde vive el servicio.",
       "replace": "Reemplazar el documento OpenAPI",
       "replaceSubmit": "Subir y validar",
       "submit": "Enviar a revisión",
@@ -1323,6 +1329,18 @@
       "disabled": "Cuenta desactivada.",
       "enabled": "Cuenta activada."
     }
+  },
+  "errorPage": {
+    "title": "Algo salió mal",
+    "body": "No pudimos completar la operación. Inténtalo de nuevo; si el problema continúa, avisa al operador de la red e indícale el código de referencia.",
+    "reference": "Código de referencia: {digest}",
+    "retry": "Intentar de nuevo",
+    "home": "Volver al inicio"
+  },
+  "notFound": {
+    "title": "Página no encontrada",
+    "body": "La página que buscas no existe o no tienes acceso a ella.",
+    "home": "Volver al inicio"
   },
   "session": {
     "mfaRequired": "Tus roles exigen un segundo factor. Vuelve a entrar con el código de un solo uso de tu app autenticadora.",

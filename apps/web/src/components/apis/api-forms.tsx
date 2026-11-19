@@ -1,12 +1,13 @@
 'use client';
 
-import type { UpstreamType } from '@den/contracts';
+import type { ApiVersionDetail, UpstreamType } from '@den/contracts';
 import { useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 import {
   createApiAction,
   createVersionAction,
   replaceOpenapiAction,
+  updateVersionAction,
   deprecateVersionAction,
   revalidateVersionAction,
   submitVersionAction,
@@ -21,6 +22,21 @@ interface Option {
   label: string;
   description?: string;
 }
+
+/**
+ * What the user typed before the last failed submission, when there is one: React resets the
+ * uncontrolled inputs of a form after each action, so they are filled in again from it.
+ */
+function typedOf(state: FormState) {
+  const typed = state.values;
+  return {
+    text: (name: string, fallback: string): string => typed?.[name] ?? fallback,
+    checked: (name: string, fallback: boolean): boolean => (typed ? name in typed : fallback),
+    includes: (name: string, value: string, fallback: boolean): boolean =>
+      typed ? (typed[name] ?? '').split(NEWLINE).includes(value) : fallback,
+  };
+}
+const NEWLINE = String.fromCharCode(10);
 
 const CLASSIFICATIONS = ['public', 'internal', 'personal', 'sensitive'] as const;
 
@@ -84,11 +100,18 @@ interface ExposedField {
   sensitive: boolean;
 }
 
-function ExposedFieldsEditor({ state }: { state: FormState }) {
+function ExposedFieldsEditor({
+  state,
+  initial,
+}: {
+  state: FormState;
+  /** The fields already declared, when editing a version. */
+  initial?: ExposedField[];
+}) {
   const t = useTranslations('version.create');
-  const [fields, setFields] = useState<ExposedField[]>([
-    { name: '', personal: true, sensitive: false },
-  ]);
+  const [fields, setFields] = useState<ExposedField[]>(
+    initial && initial.length > 0 ? initial : [{ name: '', personal: true, sensitive: false }],
+  );
   const update = (index: number, patch: Partial<ExposedField>) =>
     setFields((all) => all.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   const errors = state.fieldErrors?.exposedFields ?? [];
@@ -164,10 +187,12 @@ function ExposedFieldsEditor({ state }: { state: FormState }) {
   );
 }
 
-function OpenapiInputs({ state }: { state: FormState }) {
+function OpenapiInputs({ state, keepHint = false }: { state: FormState; keepHint?: boolean }) {
   const t = useTranslations('version.create');
   return (
     <>
+      {/* Editing: both empty keeps the document the version has. */}
+      {keepHint ? <p className="text-sm text-muted-foreground">{t('openapiKeepHint')}</p> : null}
       <Field name="openapiFile" label={t('openapiFile')} state={state}>
         {(p) => (
           <input
@@ -201,14 +226,22 @@ function SandboxFields({
   nodes,
   state,
   kinds,
+  initial,
 }: {
   nodes: Option[];
   state: FormState;
   /** none, and the types the deployment accepts (P-04). */
   kinds: Array<'none' | 'node' | 'direct'>;
+  /** The sandbox upstream the version already has, when editing. */
+  initial?: ApiVersionDetail['sandboxUpstream'];
 }) {
   const t = useTranslations('version.create');
-  const [kind, setKind] = useState<'none' | 'node' | 'direct'>('none');
+  const [kind, setKind] = useState<'none' | 'node' | 'direct'>(
+    initial?.type === 'node' || initial?.type === 'direct' ? initial.type : 'none',
+  );
+  const node = initial?.type === 'node' ? initial : undefined;
+  const direct = initial?.type === 'direct' ? initial : undefined;
+  const typed = typedOf(state);
   return (
     <fieldset className="space-y-3">
       <legend className="mb-1 text-sm font-medium text-foreground-strong">{t('sandbox')}</legend>
@@ -235,65 +268,145 @@ function SandboxFields({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field name="sandboxNodeId" label={t('sandboxNode')} state={state}>
             {(p) => (
-              <select {...p} className={inputClass} defaultValue="">
+              <select
+                {...p}
+                className={inputClass}
+                defaultValue={typed.text('sandboxNodeId', node?.nodeId ?? '')}
+              >
                 <option value="">{t('noNode')}</option>
-                {nodes.map((node) => (
-                  <option key={node.value} value={node.value}>
-                    {node.label}
+                {nodes.map((n) => (
+                  <option key={n.value} value={n.value}>
+                    {n.label}
                   </option>
                 ))}
               </select>
             )}
           </Field>
           <Field name="sandboxUpstream" label={t('sandboxServicePath')} required state={state}>
-            {(p) => <input {...p} name="sandboxServicePath" type="text" className={inputClass} />}
+            {(p) => (
+              <input
+                {...p}
+                name="sandboxServicePath"
+                type="text"
+                defaultValue={typed.text('sandboxServicePath', node?.servicePath ?? '')}
+                className={inputClass}
+              />
+            )}
           </Field>
         </div>
       ) : kind === 'direct' ? (
         <Field name="sandboxUpstream" label={t('sandboxUrl')} required state={state}>
-          {(p) => <input {...p} name="sandboxUrl" type="url" className={inputClass} />}
+          {(p) => (
+            <input
+              {...p}
+              name="sandboxUrl"
+              type="url"
+              defaultValue={typed.text('sandboxUrl', direct?.url ?? '')}
+              className={inputClass}
+            />
+          )}
         </Field>
       ) : null}
     </fieldset>
   );
 }
 
-export function CreateVersionForm({
-  apiId,
-  purposes,
-  nodes = [],
-  upstreamTypes,
-}: {
+interface VersionFormProps {
   apiId: string;
   purposes: Option[];
   /** Kit nodes of the entity in the network (M4-04). */
   nodes?: Option[];
   /** Upstream types the deployment accepts (P-04): the form offers only these. */
   upstreamTypes: UpstreamType[];
-}) {
-  const t = useTranslations('version.create');
+}
+
+export function CreateVersionForm({ apiId, ...rest }: VersionFormProps) {
   const [state, action, pending] = useActionState(
     createVersionAction.bind(null, apiId),
     initialFormState,
   );
+  return <VersionForm {...rest} state={state} action={action} pending={pending} />;
+}
+
+/**
+ * Edits a version still in draft or with changes requested (R-07): the same form as creating one,
+ * filled with what the version declares. The number does not change, and leaving the OpenAPI
+ * empty keeps the document it has.
+ */
+export function EditVersionForm({
+  apiId,
+  version,
+  ...rest
+}: VersionFormProps & { version: ApiVersionDetail }) {
+  const [state, action, pending] = useActionState(
+    updateVersionAction.bind(null, apiId, version.id),
+    initialFormState,
+  );
+  return (
+    <VersionForm {...rest} state={state} action={action} pending={pending} version={version} />
+  );
+}
+
+function VersionForm({
+  purposes,
+  nodes = [],
+  upstreamTypes,
+  state,
+  action,
+  pending,
+  version,
+}: Omit<VersionFormProps, 'apiId'> & {
+  state: FormState;
+  action: (formData: FormData) => void;
+  pending: boolean;
+  /** Present when editing: the form starts from it. */
+  version?: ApiVersionDetail;
+}) {
+  const t = useTranslations('version.create');
   const choices = upstreamChoices(upstreamTypes);
-  const [upstreamType, setUpstreamType] = useState<UpstreamType>(choices.initial);
+  const upstream = version?.upstream;
+  const [upstreamType, setUpstreamType] = useState<UpstreamType>(upstream?.type ?? choices.initial);
+  // A version whose type the deployment no longer accepts keeps it in the list while editing.
+  const types = choices.types.includes(upstreamType)
+    ? choices.types
+    : [...choices.types, upstreamType];
+  const askType = choices.ask || types.length > 1;
+  const node = upstream?.type === 'node' ? upstream : undefined;
+  const direct = upstream?.type === 'direct' ? upstream : undefined;
+  const xroad = upstream?.type === 'xroad' ? upstream : undefined;
+  const typed = typedOf(state);
   const purposeErrors = state.fieldErrors?.allowedPurposes ?? [];
   return (
     <form action={action} className="space-y-5" noValidate>
       <ErrorSummary state={state} />
-      <Field name="version" label={t('version')} hint={t('versionHint')} required state={state}>
-        {(p) => <input {...p} type="text" defaultValue="1.0" className={inputClass} />}
-      </Field>
-      <OpenapiInputs state={state} />
+      {version ? (
+        <>
+          <p className="text-sm" data-testid="editing-version">
+            {t('editing', { version: version.version })}
+          </p>
+          <input type="hidden" name="defaultRateLimit" value={version.defaultRateLimit} />
+        </>
+      ) : (
+        <Field name="version" label={t('version')} hint={t('versionHint')} required state={state}>
+          {(p) => (
+            <input
+              {...p}
+              type="text"
+              defaultValue={typed.text('version', '1.0')}
+              className={inputClass}
+            />
+          )}
+        </Field>
+      )}
+      <OpenapiInputs state={state} keepHint={Boolean(version)} />
 
-      {choices.ask ? (
+      {askType ? (
         <fieldset className="space-y-3">
           <legend className="mb-1 text-sm font-medium text-foreground-strong">
             {t('upstreamType')}
           </legend>
           <div className="grid gap-2 sm:grid-cols-3">
-            {choices.types.map((type) => (
+            {types.map((type) => (
               <label
                 key={type}
                 className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border-control bg-background px-4 py-3 text-sm has-[:checked]:border-primary-ink has-[:checked]:bg-primary-soft"
@@ -324,11 +437,15 @@ export function CreateVersionForm({
         <>
           <Field name="nodeId" label={t('node')} hint={t('nodeHint')} state={state}>
             {(p) => (
-              <select {...p} className={inputClass} defaultValue="">
+              <select
+                {...p}
+                className={inputClass}
+                defaultValue={typed.text('nodeId', node?.nodeId ?? '')}
+              >
                 <option value="">{t('noNode')}</option>
-                {nodes.map((node) => (
-                  <option key={node.value} value={node.value}>
-                    {node.label}
+                {nodes.map((n) => (
+                  <option key={n.value} value={n.value}>
+                    {n.label}
                   </option>
                 ))}
               </select>
@@ -340,7 +457,7 @@ export function CreateVersionForm({
                 {...p}
                 name="servicePath"
                 type="text"
-                defaultValue="/"
+                defaultValue={typed.text('servicePath', node?.servicePath ?? '/')}
                 className={inputClass}
               />
             )}
@@ -362,23 +479,48 @@ export function CreateVersionForm({
             ] as const
           ).map(([name, required]) => (
             <Field key={name} name={name} label={t(name)} required={required} state={state}>
-              {(p) => <input {...p} type="text" className={`${inputClass} font-mono`} />}
+              {(p) => (
+                <input
+                  {...p}
+                  type="text"
+                  defaultValue={typed.text(name, xroadValue(xroad, name))}
+                  className={`${inputClass} font-mono`}
+                />
+              )}
             </Field>
           ))}
         </fieldset>
       ) : (
         <>
           <Field name="upstream" label={t('url')} required state={state}>
-            {(p) => <input {...p} name="url" type="url" className={inputClass} />}
+            {(p) => (
+              <input
+                {...p}
+                name="url"
+                type="url"
+                defaultValue={typed.text('url', direct?.url ?? '')}
+                className={inputClass}
+              />
+            )}
           </Field>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="mtls" className={checkClass} />
+            <input
+              type="checkbox"
+              name="mtls"
+              defaultChecked={typed.checked('mtls', direct?.mtls ?? false)}
+              className={checkClass}
+            />
             {t('mtls')}
           </label>
         </>
       )}
 
-      <SandboxFields nodes={nodes} state={state} kinds={choices.sandbox} />
+      <SandboxFields
+        nodes={nodes}
+        state={state}
+        kinds={choices.sandbox}
+        initial={version?.sandboxUpstream}
+      />
 
       <fieldset
         className="space-y-2"
@@ -394,6 +536,11 @@ export function CreateVersionForm({
               type="checkbox"
               name="allowedPurposes"
               value={purpose.value}
+              defaultChecked={typed.includes(
+                'allowedPurposes',
+                purpose.value,
+                version?.allowedPurposes.includes(purpose.value) ?? false,
+              )}
               className={`${checkClass} mt-0.5`}
             />
             <span>
@@ -411,10 +558,17 @@ export function CreateVersionForm({
         ) : null}
       </fieldset>
 
-      <ExposedFieldsEditor state={state} />
+      <ExposedFieldsEditor state={state} initial={version?.exposedFields} />
 
       <Field name="legalBasisText" label={t('legalBasis')} state={state}>
-        {(p) => <textarea {...p} rows={3} className={inputClass} />}
+        {(p) => (
+          <textarea
+            {...p}
+            rows={3}
+            defaultValue={typed.text('legalBasisText', version?.legalBasisText ?? '')}
+            className={inputClass}
+          />
+        )}
       </Field>
       <Field
         name="legalReferences"
@@ -422,13 +576,41 @@ export function CreateVersionForm({
         hint={t('legalReferencesHint')}
         state={state}
       >
-        {(p) => <textarea {...p} rows={3} className={inputClass} />}
+        {(p) => (
+          <textarea
+            {...p}
+            rows={3}
+            defaultValue={typed.text(
+              'legalReferences',
+              version?.legalReferences.join(NEWLINE) ?? '',
+            )}
+            className={inputClass}
+          />
+        )}
       </Field>
       <Button type="submit" disabled={pending}>
-        {t('submit')}
+        {version ? t('submitEdit') : t('submit')}
       </Button>
     </form>
   );
+}
+
+/** The value of an X-Road field of the form in the upstream the version already has. */
+function xroadValue(
+  upstream: Extract<ApiVersionDetail['upstream'], { type: 'xroad' }> | undefined,
+  name: string,
+): string {
+  if (!upstream) return '';
+  const id = upstream.serviceId;
+  const values: Record<string, string | undefined> = {
+    xroadInstance: id.instance,
+    xroadMemberClass: id.memberClass,
+    xroadMemberCode: id.memberCode,
+    xroadSubsystem: id.subsystemCode,
+    xroadService: id.serviceCode,
+    xroadPath: upstream.servicePath,
+  };
+  return values[name] ?? '';
 }
 
 export function ReplaceOpenapiForm({

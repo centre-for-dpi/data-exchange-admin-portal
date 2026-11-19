@@ -11,8 +11,10 @@ import {
 } from '../../../../../../components/apis/api-forms';
 import { VersionSheet } from '../../../../../../components/apis/version-sheet';
 import { VersionPurposesForm } from '../../../../../../components/purposes/forms';
+import { Button } from '../../../../../../components/ui/button';
 import { Notice } from '../../../../../../components/ui/notice';
 import { Page, PageHeader, Section } from '../../../../../../components/ui/page';
+import { Link } from '../../../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../../../lib/api';
 import { localize } from '../../../../../../lib/localize';
 import { getViewer } from '../../../../../../lib/viewer';
@@ -166,6 +168,13 @@ export default async function VersionPage({ params }: PageProps) {
 
       {canWrite && editable ? (
         <>
+          <Section title={t('version.detail.edit')} description={t('version.detail.editHint')}>
+            <Button asChild>
+              <Link href={`/my-apis/${api.id}/versions/${version.id}/edit`}>
+                {t('version.detail.edit')}
+              </Link>
+            </Button>
+          </Section>
           <Section title={t('version.detail.replace')}>
             <div className="card max-w-3xl p-6 md:p-8">
               <ReplaceOpenapiForm apiId={api.id} versionId={version.id} />

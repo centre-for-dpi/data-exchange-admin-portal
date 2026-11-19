@@ -36,6 +36,17 @@ async function openapiSource(formData: FormData): Promise<string> {
   return text(formData, 'openapiText');
 }
 
+/** What the version form held, to show it again: React resets the form after each action. */
+function typedValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (typeof value !== 'string' || key.startsWith('$')) continue;
+    // Several values under one name (the purposes): one per line.
+    values[key] = key in values ? `${values[key]}\n${value}` : value;
+  }
+  return values;
+}
+
 export async function createApiAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const entityId = await activeEntityId();
   if (!entityId) return fail(undefined);
@@ -81,13 +92,8 @@ function sandboxUpstreamOf(formData: FormData): { sandboxUpstream?: unknown } {
   return {};
 }
 
-export async function createVersionAction(
-  apiId: string,
-  _prev: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const entityId = await activeEntityId();
-  if (!entityId) return fail(undefined);
+/** What the version form declares, as the API takes it (shared by creating and editing). */
+function versionDeclaration(formData: FormData) {
   const upstreamType = text(formData, 'upstreamType');
   let exposedFields: unknown;
   try {
@@ -95,46 +101,86 @@ export async function createVersionAction(
   } catch {
     exposedFields = [];
   }
+  const rateLimit = Number(text(formData, 'defaultRateLimit'));
+  return {
+    upstream:
+      upstreamType === 'direct'
+        ? { type: 'direct', url: text(formData, 'url'), mtls: formData.get('mtls') === 'on' }
+        : upstreamType === 'xroad'
+          ? {
+              type: 'xroad',
+              serviceId: {
+                instance: text(formData, 'xroadInstance'),
+                memberClass: text(formData, 'xroadMemberClass'),
+                memberCode: text(formData, 'xroadMemberCode'),
+                ...(text(formData, 'xroadSubsystem')
+                  ? { subsystemCode: text(formData, 'xroadSubsystem') }
+                  : {}),
+                serviceCode: text(formData, 'xroadService'),
+              },
+              servicePath: text(formData, 'xroadPath'),
+            }
+          : {
+              type: 'node',
+              servicePath: text(formData, 'servicePath'),
+              ...(text(formData, 'nodeId') ? { nodeId: text(formData, 'nodeId') } : {}),
+            },
+    ...sandboxUpstreamOf(formData),
+    exposedFields,
+    allowedPurposes: formData.getAll('allowedPurposes').map(String),
+    ...(text(formData, 'legalBasisText')
+      ? { legalBasisText: text(formData, 'legalBasisText') }
+      : {}),
+    legalReferences: lines(text(formData, 'legalReferences')),
+    // Only when editing (the create form has no such field): the API would reset it to its default.
+    ...(Number.isInteger(rateLimit) && rateLimit > 0 ? { defaultRateLimit: rateLimit } : {}),
+  };
+}
+
+export async function createVersionAction(
+  apiId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const entityId = await activeEntityId();
+  if (!entityId) return fail(undefined);
   const result = await apiSend(
     'POST',
     `/entities/${entityId}/apis/${apiId}/versions`,
     {
       version: text(formData, 'version'),
       openapi: await openapiSource(formData),
-      upstream:
-        upstreamType === 'direct'
-          ? { type: 'direct', url: text(formData, 'url'), mtls: formData.get('mtls') === 'on' }
-          : upstreamType === 'xroad'
-            ? {
-                type: 'xroad',
-                serviceId: {
-                  instance: text(formData, 'xroadInstance'),
-                  memberClass: text(formData, 'xroadMemberClass'),
-                  memberCode: text(formData, 'xroadMemberCode'),
-                  ...(text(formData, 'xroadSubsystem')
-                    ? { subsystemCode: text(formData, 'xroadSubsystem') }
-                    : {}),
-                  serviceCode: text(formData, 'xroadService'),
-                },
-                servicePath: text(formData, 'xroadPath'),
-              }
-            : {
-                type: 'node',
-                servicePath: text(formData, 'servicePath'),
-                ...(text(formData, 'nodeId') ? { nodeId: text(formData, 'nodeId') } : {}),
-              },
-      ...sandboxUpstreamOf(formData),
-      exposedFields,
-      allowedPurposes: formData.getAll('allowedPurposes').map(String),
-      ...(text(formData, 'legalBasisText')
-        ? { legalBasisText: text(formData, 'legalBasisText') }
-        : {}),
-      legalReferences: lines(text(formData, 'legalReferences')),
+      ...versionDeclaration(formData),
     },
     apiVersionDetailSchema,
   );
-  if (!result.ok) return fail(result.problem);
+  if (!result.ok) return { ...(await fail(result.problem)), values: typedValues(formData) };
   redirect({ href: `/my-apis/${apiId}/versions/${result.data.id}`, locale: await getLocale() });
+  return {};
+}
+
+/**
+ * Replaces what a draft or changes-requested version declares (R-07, PUT .../versions/:id). The
+ * OpenAPI document is sent only when the form carries a new one; otherwise the API keeps it.
+ */
+export async function updateVersionAction(
+  apiId: string,
+  versionId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const entityId = await activeEntityId();
+  if (!entityId) return fail(undefined);
+  const openapi = await openapiSource(formData);
+  const result = await apiSend(
+    'PUT',
+    `/entities/${entityId}/apis/${apiId}/versions/${versionId}`,
+    { ...(openapi ? { openapi } : {}), ...versionDeclaration(formData) },
+    apiVersionDetailSchema,
+  );
+  if (!result.ok) return { ...(await fail(result.problem)), values: typedValues(formData) };
+  revalidatePath('/', 'layout');
+  redirect({ href: `/my-apis/${apiId}/versions/${versionId}`, locale: await getLocale() });
   return {};
 }
 
