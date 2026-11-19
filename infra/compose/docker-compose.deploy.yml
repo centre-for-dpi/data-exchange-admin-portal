@@ -434,6 +434,7 @@ services:
     mem_limit: 512m
     # Only what the app reads (A-2): a demo prop on the internet, with its own two secrets.
     environment:
+      DEN_COUNTRY: ${DEN_COUNTRY:?set DEN_COUNTRY in .env}
       CITIZEN_APP_PORTAL_API_URL: http://api:4000
       # Public material, fetched where anyone would: the operator JWKS and the TSA chain.
       CITIZEN_APP_JWKS_URL: ${DEN_PUBLIC_URL}/api/v1/transparency/jwks

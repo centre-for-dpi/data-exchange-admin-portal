@@ -223,6 +223,7 @@ const NOT_IN_THE_CONTAINER: Record<string, string[]> = {
     'DEN_P12_PASSWORD',
   ],
   'citizen-app': [
+    'DEN_CONFIG_DIR', // the image has config/country in place
     'DEN_API_URL', // CITIZEN_APP_PORTAL_API_URL is set
     'DEN_TSA_URL', // CITIZEN_APP_TSA_ROOT_URL is set
     'MAILPIT_SMTP_PORT', // CITIZEN_APP_SMTP_PORT is set
@@ -234,7 +235,8 @@ describe('deploy overlay: each container gets every variable its code reads', ()
   const apps: Record<string, string[]> = {
     api: ['apps/api/src', 'packages/config/src'],
     web: ['apps/web/src', 'packages/config/src'],
-    'citizen-app': ['infra/mock-citizen-app/src'],
+    // It loads the country configuration and checks its secrets through packages/config too.
+    'citizen-app': ['infra/mock-citizen-app/src', 'packages/config/src'],
   };
   it.each(Object.keys(apps))('%s', (name) => {
     const listed = new Set(Object.keys(environment(name)));
