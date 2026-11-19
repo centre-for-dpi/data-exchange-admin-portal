@@ -55,12 +55,15 @@ function mediaSchemaOf(content: unknown): unknown {
 /** Work shared by one whole comparison: the untrusted documents must not make it explode. */
 class Budget {
   private left = 200_000;
-  /** Reference pairs already compared (or being compared) for the request or response side. */
-  readonly done = new Set<string>();
+  /** Reference pairs being compared right now (a cycle through them compares equal). */
+  readonly inProgress = new Set<string>();
+  /** The breaks found by each finished pair of references, with the path they were found at. */
+  readonly results = new Map<string, { where: string; problems: string[] }>();
   /** Outcome of the structural equality of reference pairs; true while in progress (coinductive). */
   readonly equal = new Map<string, boolean>();
-  tick(): void {
-    if (--this.left < 0) throw new TooComplexError();
+  tick(n = 1): void {
+    this.left -= n;
+    if (this.left < 0) throw new TooComplexError();
   }
 }
 class TooComplexError extends Error {}
@@ -130,6 +133,11 @@ function refTarget(doc: Json, value: unknown): unknown {
 }
 
 const COMBINATORS = ['oneOf', 'anyOf', 'allOf', 'not', 'if', 'then', 'else', 'discriminator'];
+/** push(...list) overflows the stack on long lists. */
+function addAll(into: string[], list: string[]): void {
+  for (const item of list) into.push(item);
+}
+
 const MAX_DEPTH = 32;
 const MAX_EQUAL_DEPTH = 400;
 
@@ -158,11 +166,34 @@ function schemaBreaks(
   if (depth > MAX_DEPTH) return [`${where} is nested too deeply to compare`];
   const bRef = isObject(before.schema) ? before.schema.$ref : undefined;
   const aRef = isObject(after.schema) ? after.schema.$ref : undefined;
-  if (typeof bRef === 'string' || typeof aRef === 'string') {
-    const pair = `${input ? 'in' : 'out'}|${String(bRef)}|${String(aRef)}`;
-    if (budget.done.has(pair)) return []; // compared already, or being compared higher up
-    budget.done.add(pair);
+  // Only a pair of references is shared work; an inline schema is always compared on its own.
+  if (typeof bRef !== 'string' || typeof aRef !== 'string') {
+    return schemaBreaksOf(before, after, where, input, budget, depth);
   }
+  const pair = `${input ? 'in' : 'out'}|${bRef}|${aRef}`;
+  const known = budget.results.get(pair);
+  if (known) {
+    // The same pair found the same breaks, now seen at another path. Repeating a long list costs
+    // its length, so breaks that multiply through shared schemas end in 'too complex'.
+    budget.tick(known.problems.length);
+    return known.problems.map((p) => where + p.slice(known.where.length));
+  }
+  if (budget.inProgress.has(pair)) return []; // a genuine cycle: being compared higher up
+  budget.inProgress.add(pair);
+  const problems = schemaBreaksOf(before, after, where, input, budget, depth);
+  budget.inProgress.delete(pair);
+  budget.results.set(pair, { where, problems });
+  return problems;
+}
+
+function schemaBreaksOf(
+  before: Side,
+  after: Side,
+  where: string,
+  input: boolean,
+  budget: Budget,
+  depth: number,
+): string[] {
   const b = deref(before.doc, before.schema);
   const a = deref(after.doc, after.schema);
   if (!isObject(b) || !isObject(a)) {
@@ -189,8 +220,9 @@ function schemaBreaks(
       problems.push(`${where} removed property ${name}`);
       continue;
     }
-    problems.push(
-      ...schemaBreaks(
+    addAll(
+      problems,
+      schemaBreaks(
         { doc: before.doc, schema: raw },
         { doc: after.doc, schema: aProps[name] },
         `${where}.${name}`,
@@ -209,8 +241,9 @@ function schemaBreaks(
     for (const p of bReq) if (!aReq.has(p)) problems.push(`${where} no longer always returns ${p}`);
   }
   if (b.items !== undefined) {
-    problems.push(
-      ...schemaBreaks(
+    addAll(
+      problems,
+      schemaBreaks(
         { doc: before.doc, schema: b.items },
         { doc: after.doc, schema: a.items },
         `${where}[]`,
@@ -221,8 +254,9 @@ function schemaBreaks(
     );
   }
   if (isObject(b.additionalProperties)) {
-    problems.push(
-      ...schemaBreaks(
+    addAll(
+      problems,
+      schemaBreaks(
         { doc: before.doc, schema: b.additionalProperties },
         { doc: after.doc, schema: a.additionalProperties },
         `${where}{}`,
@@ -337,8 +371,9 @@ function compare(published: unknown, revision: unknown, budget: Budget): string[
         problems.push(`${key} removed parameter ${name}`);
         continue;
       }
-      problems.push(
-        ...schemaBreaks(
+      addAll(
+        problems,
+        schemaBreaks(
           { doc: published, schema: was.schema },
           { doc: revision, schema: is.schema },
           `${key} parameter ${name}`,
@@ -348,8 +383,9 @@ function compare(published: unknown, revision: unknown, budget: Budget): string[
       );
     }
     if (!old.bodyRequired && now.bodyRequired) problems.push(`${key} now requires a request body`);
-    problems.push(
-      ...schemaBreaks(
+    addAll(
+      problems,
+      schemaBreaks(
         { doc: published, schema: old.bodySchema },
         { doc: revision, schema: now.bodySchema },
         `${key} request body`,
@@ -362,8 +398,9 @@ function compare(published: unknown, revision: unknown, budget: Budget): string[
         problems.push(`${key} no longer returns ${status}`);
         continue;
       }
-      problems.push(
-        ...schemaBreaks(
+      addAll(
+        problems,
+        schemaBreaks(
           { doc: published, schema },
           { doc: revision, schema: now.responses.get(status) },
           `${key} ${status}`,

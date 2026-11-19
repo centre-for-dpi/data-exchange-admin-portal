@@ -332,7 +332,8 @@ describe('subscription lifecycle (M2-06)', () => {
     await app.get(NotificationsService).dispatch({ seq: event.seq.toString() });
     const carlos = realmUsers.find((u) => u.username === 'carlos.dev');
     const mail = sent.find((m) => m.to === carlos?.email && m.text.includes(id));
-    expect(mail?.subject).toMatch(/vence el/);
+    expect(mail?.subject).toBe('Un acceso está por vencer');
+    expect(mail?.text).toMatch(/vence el/);
   });
 
   describe('renewal', () => {

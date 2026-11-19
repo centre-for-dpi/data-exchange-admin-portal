@@ -269,3 +269,60 @@ describe('compatibility check: documents built to make it explode', () => {
     ]);
   });
 });
+
+describe('compatibility check: shared work never skips a break', () => {
+  const shared = (leaf: string, inlineLeaf: string) => ({
+    openapi: '3.0.3',
+    info: { title: 't', version: '1' },
+    components: { schemas: { Dato: { type: 'object', properties: { v: { type: leaf } } } } },
+    paths: {
+      '/a': {
+        get: {
+          operationId: 'a',
+          responses: {
+            '200': {
+              description: 'ok',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Dato' } } },
+            },
+          },
+        },
+      },
+      '/b': {
+        get: {
+          operationId: 'b',
+          responses: {
+            '200': {
+              description: 'ok',
+              content: {
+                'application/json': {
+                  schema: { type: 'object', properties: { v: { type: inlineLeaf } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  it('flags an inline schema that breaks although the same reference was inlined identically elsewhere', () => {
+    // Published: /a by reference, /b inline, both with v: string. Revision: /a still fine,
+    // /b inline with v: integer.
+    const published = shared('string', 'string');
+    const revision = shared('string', 'integer');
+    const problems = breakingChanges(published, revision);
+    expect(problems.some((p) => p.startsWith('GET /b'))).toBe(true);
+  });
+
+  it('reports a break of a reference pair at every path that uses it', () => {
+    const twice = (leaf: string) => {
+      const doc = shared(leaf, leaf);
+      const route = doc.paths['/b'].get.responses['200'].content['application/json'];
+      (route as { schema: unknown }).schema = { $ref: '#/components/schemas/Dato' };
+      return doc;
+    };
+    const problems = breakingChanges(twice('string'), twice('integer'));
+    expect(problems.filter((p) => p.startsWith('GET /a'))).not.toEqual([]);
+    expect(problems.filter((p) => p.startsWith('GET /b'))).not.toEqual([]);
+  });
+});
