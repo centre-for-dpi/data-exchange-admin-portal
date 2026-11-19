@@ -37,7 +37,7 @@ import { assertTransition, isEditable } from '../domain/api-version/state-machin
 import { Prisma } from '../generated/prisma/client.js';
 import { OutboxService } from '../outbox/outbox.service.js';
 import { HOST_CONTROL_PATH, hostControlToken } from '../reconcilers/apisix/desired-state.js';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService, type Tx } from '../prisma/prisma.service.js';
 import { GATEWAY_SYNC_TOPIC } from '../reconcilers/apisix/apisix.reconciler.js';
 import { POLICY_SYNC_TOPIC } from '../subscriptions/subscriptions.service.js';
 import { nodeContracts } from '../nodes/node-contracts.js';
@@ -904,13 +904,33 @@ export class ApisService {
    * asking again is limited: a cooldown per version since the last run started, and a cap per
    * entity and hour (counted from the audit trail).
    */
-  private async assertValidationAllowed(entityId: string, version: VersionRow): Promise<void> {
+  private async assertValidationAllowed(
+    tx: Tx,
+    entityId: string,
+    versionId: string,
+  ): Promise<void> {
     if (!validationEnabled()) return;
+    // One request at a time per entity: the checks below and the audit event that counts for the
+    // next request are one atomic step, so concurrent requests cannot all pass (the lock lasts
+    // until this transaction ends).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`den-validation:${entityId}`}))`;
     const s = validationSettings();
-    const started = storedValidation(version.validationReport)?.startedAt;
-    const waitMs = started ? Date.parse(started) + s.cooldownSeconds * 1000 - Date.now() : 0;
-    let retryMs = waitMs;
-    const recent = await this.prisma.auditEvent.count({
+    const current = await tx.apiVersion.findUniqueOrThrow({
+      where: { id: versionId },
+      select: { validationReport: true, status: true },
+    });
+    if (current.status !== 'in_review') {
+      throw new ConflictError('Only a version in review is validated');
+    }
+    const report = storedValidation(current.validationReport);
+    const started = report?.startedAt ? Date.parse(report.startedAt) : undefined;
+    let retryMs = started ? started + s.cooldownSeconds * 1000 - Date.now() : 0;
+    // A run already queued or running is not asked for again (a stale one stops counting after
+    // 15 minutes).
+    if (report?.status === 'running' && started && Date.now() - started < 15 * 60_000) {
+      retryMs = Math.max(retryMs, 60_000);
+    }
+    const recent = await tx.auditEvent.count({
       where: {
         action: 'api_version.validation_requested',
         actorEntityId: entityId,
@@ -957,8 +977,8 @@ export class ApisService {
     if (version.status !== 'in_review') {
       throw new ConflictError('Only a version in review is validated');
     }
-    await this.assertValidationAllowed(entityId, version);
     await this.prisma.$transaction(async (tx) => {
+      await this.assertValidationAllowed(tx, entityId, versionId);
       await this.audit.record(tx, {
         actor: this.actor(principal, entityId),
         action: 'api_version.validation_requested',

@@ -304,6 +304,9 @@ describe('validations when a version goes to review (M4-06)', () => {
       process.env.DEN_VALIDATION_MAX_PER_HOUR = '0';
       expect((await again()).statusCode).toBe(429);
       process.env.DEN_VALIDATION_MAX_PER_HOUR = '100000';
+      // A run still queued is not asked for again; once it finished, the request goes through.
+      expect((await again()).statusCode).toBe(429);
+      await app.get(VersionValidationService).run(versionId, fixed('passed', 'passed'));
       expect((await again()).statusCode).toBe(200);
     } finally {
       settings.forEach((k, i) => {
@@ -315,6 +318,22 @@ describe('validations when a version goes to review (M4-06)', () => {
     const url = `/entities/${salud}/apis/${apiId}/versions/${versionId}/validations`;
     expect((await request('POST', url, 'lucia.datos')).statusCode).toBe(403);
     expect((await request('POST', url, 'carlos.dev')).statusCode).toBe(404);
+  });
+
+  it('simultaneous requests queue one validation only (MB-2)', async () => {
+    const { apiId, versionId } = await submitted();
+    await app.get(VersionValidationService).run(versionId, fixed('passed', 'passed'));
+    const url = `/entities/${salud}/apis/${apiId}/versions/${versionId}/validations`;
+    const answers = await Promise.all(
+      Array.from({ length: 6 }, () => request('POST', url, 'pedro.publicador')),
+    );
+    expect(answers.filter((a) => a.statusCode === 200)).toHaveLength(1);
+    expect(answers.filter((a) => a.statusCode === 429)).toHaveLength(5);
+    expect(
+      await prisma.auditEvent.count({
+        where: { targetId: versionId, action: 'api_version.validation_requested' },
+      }),
+    ).toBe(1);
   });
 
   it('a direct sandbox host must prove it is the provider’s before the contract test runs (MB-2)', async () => {

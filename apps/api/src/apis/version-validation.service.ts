@@ -1,15 +1,14 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { timingSafeEqual } from 'node:crypto';
-import { lookup } from 'node:dns/promises';
 import {
   FieldErrorKey,
-  isPublicAddress,
   type Upstream,
   upstreamSchema,
   type VersionValidation,
   versionValidationSchema,
 } from '@den/contracts';
 import { z } from 'zod';
+import { pinnedGet } from './pinned-get.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ConflictError } from '../common/errors.js';
 import { OutboxService } from '../outbox/outbox.service.js';
@@ -155,23 +154,20 @@ export class GatewayValidationProbes implements ValidationProbes {
    * The contract test fuzzes the sandbox from the operator's network, so a `direct` host must
    * show it is the provider's (MB-2): it serves, over HTTPS at /.well-known/den-validation, the
    * token of this entity and host (hostControlToken). The name must resolve only to public
-   * addresses (this request leaves from the API's own network); redirects are not followed.
+   * addresses, and the connection goes to exactly the address that was vetted (pinnedGet, no DNS
+   * rebinding); redirects are not followed and at most 256 bytes are read.
    */
   async hostControl(entityId: string, upstream: Upstream): Promise<boolean> {
     const s = validationSettings();
     if (!s.token || upstream.type !== 'direct') return false;
     try {
       const url = new URL(upstream.url);
-      const addresses = await lookup(url.hostname, { all: true });
-      if (addresses.length === 0 || !addresses.every((a) => isPublicAddress(a.address))) {
-        return false;
-      }
-      const res = await fetch(`${url.origin}${HOST_CONTROL_PATH}`, {
-        redirect: 'manual',
-        signal: AbortSignal.timeout(10_000),
+      const answer = await pinnedGet(new URL(`${url.origin}${HOST_CONTROL_PATH}`), {
+        maxBytes: 256,
+        timeoutMs: 10_000,
       });
-      if (!res.ok) return false;
-      const body = Buffer.from((await res.text()).slice(0, 256).trim());
+      if (!answer.ok || answer.status !== 200) return false;
+      const body = Buffer.from(answer.body.trim());
       const expected = Buffer.from(hostControlToken(s.token, entityId, url.hostname));
       return body.length === expected.length && timingSafeEqual(body, expected);
     } catch {
