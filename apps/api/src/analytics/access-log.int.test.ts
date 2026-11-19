@@ -69,7 +69,11 @@ describe('access logs reach OpenSearch with metadata only (M5-01)', () => {
     apiKey: process.env.APISIX_ADMIN_KEY ?? '',
   });
   let provider: Server;
-  const run = randomUUID().slice(0, 8);
+  // Letters only: the pipeline drops a consumer-written request id with six digits in a row (M-16),
+  // which eight hex characters of a UUID contain about one run in ten.
+  const run = randomUUID()
+    .slice(0, 8)
+    .replace(/\d/g, (digit) => 'ghijklmnop'[Number(digit)] ?? 'x');
 
   const settings: GatewaySettings = {
     keycloakDiscoveryUrl:

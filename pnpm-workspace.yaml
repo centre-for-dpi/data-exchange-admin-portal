@@ -27,3 +27,13 @@ auditConfig:
     # @next/eslint-plugin-next > fast-glob), in no image. No fixed release exists yet (>=4.0.8);
     # remove this line once it is published and the lockfile picks it up.
     - GHSA-fc5q-39xc-vjpf
+
+minimumReleaseAgeExclude:
+  - effect@3.22.5
+
+# Security overrides (pnpm audit --audit-level high runs in CI). Each one names the advisory and
+# the dependency that pulls the vulnerable version; drop it when that dependency ships the fix.
+overrides:
+  # GHSA-7589-6fvf-x4pw: ReDoS in Effect's Schema.TemplateLiteral, <= 3.22.0. Stay on 3.x: 4.x breaks prisma's config loader. Only prisma's config
+  # loader (@prisma/config) uses it, at build and migration time, never in a request.
+  effect: '^3.22.1'
