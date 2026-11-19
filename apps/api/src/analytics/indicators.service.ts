@@ -150,7 +150,12 @@ export class IndicatorsService {
     }
     const [entities, versions, subscriptions] = await Promise.all([
       this.prisma.entity.findMany({
-        where: { slug: { in: consumers.map((c) => String(c.key)) } },
+        where: {
+          // Slugs are unique only among live entities (index entity_slug_live): a draft or a
+          // rejected request may hold the slug of a real consumer.
+          status: { notIn: ['requested', 'rejected'] },
+          slug: { in: consumers.map((c) => String(c.key)) },
+        },
         select: { id: true, slug: true, shortName: true },
       }),
       this.prisma.apiVersion.findMany({

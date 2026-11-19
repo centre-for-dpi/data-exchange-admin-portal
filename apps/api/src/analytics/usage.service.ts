@@ -100,7 +100,12 @@ export class UsageService {
     const consumerBuckets = buckets(aggs, 'consumers');
     const slugs = consumerBuckets.map((b) => String(b.key)).filter((k) => k !== NONE);
     const entities = await this.prisma.entity.findMany({
-      where: { slug: { in: slugs } },
+      where: {
+        // Slugs are unique only among live entities (index entity_slug_live): a draft or a
+        // rejected request may hold the slug of a real consumer.
+        status: { notIn: ['requested', 'rejected'] },
+        slug: { in: slugs },
+      },
       select: { id: true, slug: true, shortName: true },
     });
     const bySlug = new Map(entities.map((e) => [e.slug, e]));
