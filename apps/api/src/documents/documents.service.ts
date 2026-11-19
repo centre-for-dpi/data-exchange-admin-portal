@@ -26,6 +26,21 @@ export const documentMaxBytes = (): number => {
   return Number.isInteger(value) && value > 0 ? value : 10 * 1024 * 1024;
 };
 
+/**
+ * Documents are never deleted when replaced (the earlier file may already have been read, and its
+ * hash is evidence), so the number of replacements is capped instead (B-09): the n-th upload of
+ * the same agreement or designation is refused once `previousUploads` reaches the cap.
+ */
+export const MAX_DOCUMENT_REPLACEMENTS = 5;
+
+export function assertReplacementAllowed(previousUploads: number): void {
+  if (previousUploads > MAX_DOCUMENT_REPLACEMENTS) {
+    throw new ConflictError(
+      `This document was already replaced ${MAX_DOCUMENT_REPLACEMENTS} times; ask the operator to review it`,
+    );
+  }
+}
+
 export interface StoredDocument {
   id: string;
   fileName: string;

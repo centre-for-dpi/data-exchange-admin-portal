@@ -24,7 +24,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../common/errors.js';
-import { DocumentsService } from '../documents/documents.service.js';
+import { assertReplacementAllowed, DocumentsService } from '../documents/documents.service.js';
 import { assertTransition, OPEN_REQUEST_STATUSES } from '../domain/entity/state-machine.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService, type Tx } from '../prisma/prisma.service.js';
@@ -481,6 +481,10 @@ export class EntityRequestsService {
     const before = await this.loadForApplicant(requestId, principal);
     await this.prisma.$transaction(async (tx) => {
       await EntityRequestsService.stillRequested(tx, requestId);
+      // Replaced designations stay (the reviewer may have read them): the replacements are capped.
+      assertReplacementAllowed(
+        await tx.document.count({ where: { ownerEntityId: requestId, kind: 'designation' } }),
+      );
       const document = await this.documents.storePdf(tx, {
         ownerEntityId: requestId,
         kind: 'designation',

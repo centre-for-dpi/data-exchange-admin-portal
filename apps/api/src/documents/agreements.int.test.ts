@@ -15,6 +15,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { readRealmUsers } from '../seed/realm.js';
 import { runSeed } from '../seed/seed.js';
+import { MAX_DOCUMENT_REPLACEMENTS } from './documents.service.js';
 import { StorageService } from './storage.service.js';
 
 const openapi = readFileSync(
@@ -160,6 +161,16 @@ describe('exchange agreements and deletion by legal order (M2-07)', () => {
     expect((await upload(id, 'carlos.dev', Buffer.from('not a pdf'))).statusCode).toBe(415);
     expect((await upload(id, 'lucia.datos', PDF)).statusCode).toBe(404);
     await call('POST', `/entities/${salud}/access-requests/${id}/approve`, 'lucia.datos', {});
+    expect((await upload(id, 'carlos.dev', PDF)).statusCode).toBe(409);
+  });
+
+  it('caps how many times the agreement can be replaced (B-09)', async () => {
+    const id = await requested();
+    // The first upload plus MAX_DOCUMENT_REPLACEMENTS replacements are accepted; the next is not.
+    for (let n = 0; n <= MAX_DOCUMENT_REPLACEMENTS; n++) {
+      const res = await upload(id, 'carlos.dev', PDF);
+      expect(res.statusCode, `upload ${n + 1}: ${res.body}`).toBe(200);
+    }
     expect((await upload(id, 'carlos.dev', PDF)).statusCode).toBe(409);
   });
 
