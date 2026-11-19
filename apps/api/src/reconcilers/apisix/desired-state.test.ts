@@ -474,19 +474,63 @@ describe('parseHostPort', () => {
   });
 });
 
-describe('matches', () => {
-  it('accepts defaults APISIX adds but not changed or missing fields', () => {
+describe('matches (M-08: exact, not a subset)', () => {
+  it('accepts only the defaults APISIX may fill in, with their default value', () => {
     const desired = { a: 1, plugins: { opa: { policy: 'den/authz' } }, methods: ['GET'] };
-    expect(
-      matches(desired, {
-        ...desired,
-        create_time: 1,
-        plugins: { opa: { policy: 'den/authz', timeout: 3000 } },
-      }),
-    ).toBe(true);
+    expect(matches(desired, { ...desired, priority: 0 })).toBe(true);
+    expect(matches(desired, { ...desired, priority: 10 })).toBe(false);
+    expect(matches({ ...desired, labels: undefined }, desired)).toBe(true);
+  });
+
+  it('sees changed, missing and extra fields at every level', () => {
+    const desired = { a: 1, plugins: { opa: { policy: 'den/authz' } }, methods: ['GET'] };
     expect(matches(desired, { ...desired, plugins: {} })).toBe(false);
     expect(matches(desired, { ...desired, methods: ['GET', 'POST'] })).toBe(false);
     expect(matches(desired, { ...desired, a: 2 })).toBe(false);
+    // An extra field in a plugin's configuration, an extra plugin, an extra top-level field.
+    expect(
+      matches(desired, { ...desired, plugins: { opa: { policy: 'den/authz', timeout: 1 } } }),
+    ).toBe(false);
+    expect(
+      matches(desired, { ...desired, plugins: { ...desired.plugins, 'fault-injection': {} } }),
+    ).toBe(false);
+    expect(matches(desired, { ...desired, script: 'return {}' })).toBe(false);
+  });
+
+  it('sees an upstream node the desired state no longer has', () => {
+    const desired = { nodes: { '93.184.215.14:443': 1 }, tls: { verify: true } };
+    expect(matches(desired, { ...desired, nodes: { ...desired.nodes, '10.0.0.5:443': 1 } })).toBe(
+      false,
+    );
+    expect(matches(desired, { ...desired, tls: { verify: true, client_cert_id: 'x' } })).toBe(
+      false,
+    );
+  });
+});
+
+describe('drift comparison of a route (M-08)', () => {
+  it('a route that still carries den-assertion is rewritten once the feature is off', () => {
+    const withAssertion = desiredGateway(version(), {
+      ...settings,
+      assertion: { issuer: 'https://gw.example' },
+    }).route;
+    const withoutAssertion = desiredGateway(version(), settings).route;
+    // The metadata (the key) is deleted with the feature; a route left with the plugin answers 503.
+    expect(matches(withoutAssertion, withAssertion)).toBe(false);
+  });
+
+  it('a plugin or a script added to a managed route outside the portal is seen as drift', () => {
+    const desired = desiredGateway(version(), settings).route;
+    const tampered = {
+      ...desired,
+      script: 'return {}',
+      plugins: {
+        ...(desired.plugins as Record<string, unknown>),
+        'fault-injection': { abort: { http_status: 200 } },
+      },
+    };
+    expect(matches(desired, tampered)).toBe(false);
+    expect(matches(desired, structuredClone(desired))).toBe(true);
   });
 });
 

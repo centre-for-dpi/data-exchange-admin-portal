@@ -731,16 +731,19 @@ export function desiredTokenRoute(settings: GatewaySettings): ApisixObject {
 
 /**
  * APISIX stores the private key encrypted, so the key is not compared: a new key always comes
- * with a new certificate. A skip_mtls_uri_regex left behind (mTLS turned on) is a difference.
+ * with a new certificate. The certificate's validity, which APISIX may derive from it, is not
+ * compared either. Anything else must match exactly (`matches`): a skip_mtls_uri_regex left
+ * behind (mTLS turned on) is a difference.
  */
 export function sslMatches(desired: ApisixObject, actual: ApisixObject): boolean {
   const { key: _key, ...compared } = desired;
-  const wantSkip = (desired.client as { skip_mtls_uri_regex?: unknown } | undefined)
-    ?.skip_mtls_uri_regex;
-  const hasSkip = (actual.client as { skip_mtls_uri_regex?: unknown } | undefined)
-    ?.skip_mtls_uri_regex;
-  if (wantSkip === undefined && hasSkip !== undefined && hasSkip !== null) return false;
-  return matches(compared, actual);
+  const {
+    key: _stored,
+    validity_start: _start,
+    validity_end: _end,
+    ...held
+  } = actual as ApisixObject & { validity_start?: unknown; validity_end?: unknown };
+  return matches(compared, held);
 }
 
 /** The gateway's route for the control channel of kit nodes (M4-02). */
@@ -784,8 +787,23 @@ export function desiredNodeControlRoute(settings: GatewaySettings): ApisixObject
 }
 
 /**
- * True when every field of `desired` has the same value in `actual`. APISIX stores defaults for
- * fields we do not set, so `actual` may hold more; arrays must match exactly.
+ * Fields APISIX may hold on an object without the portal setting them, with the value APISIX
+ * gives them. APISIX 3.x stores a route, upstream or SSL object as it was sent (plugin
+ * configurations included); these are the schema defaults it may still fill in.
+ */
+const APISIX_DEFAULTS: ReadonlyMap<string, unknown> = new Map<string, unknown>([
+  ['priority', 0],
+  ['hash_on', 'vars'],
+  ['pass_host', 'pass'],
+  ['scheme', 'http'],
+]);
+
+/**
+ * True when `actual` holds exactly `desired` (ARCHITECTURE.md §4, ADR-0007): same fields with the
+ * same values at every level (plugins, their configuration, nodes, tls, vars, methods…), arrays
+ * in the same order. The only fields `actual` may add are APISIX's defaults with their default
+ * value: anything else (a plugin added by hand, one the desired state no longer has, an extra
+ * node, a `script`) is drift, and the reconciler writes the object back.
  */
 export function matches(desired: unknown, actual: unknown): boolean {
   if (Array.isArray(desired)) {
@@ -797,8 +815,16 @@ export function matches(desired: unknown, actual: unknown): boolean {
   }
   if (desired !== null && typeof desired === 'object') {
     if (actual === null || typeof actual !== 'object' || Array.isArray(actual)) return false;
-    const a = actual as Record<string, unknown>;
-    return Object.entries(desired).every(([key, value]) => matches(value, a[key]));
+    const want = desired as Record<string, unknown>;
+    const has = actual as Record<string, unknown>;
+    // A field set to undefined is not sent (JSON), so it is not expected back either.
+    const wanted = Object.keys(want).filter((key) => want[key] !== undefined);
+    const extra = Object.keys(has).filter(
+      (key) =>
+        !Object.hasOwn(want, key) &&
+        !(APISIX_DEFAULTS.has(key) && APISIX_DEFAULTS.get(key) === has[key]),
+    );
+    return extra.length === 0 && wanted.every((key) => matches(want[key], has[key]));
   }
   return desired === actual;
 }

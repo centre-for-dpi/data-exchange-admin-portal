@@ -82,6 +82,27 @@ describe('outbox -> pg-boss relay against PostgreSQL (M0-08)', () => {
     for (const job of jobs) await queue.instance.complete(topic, job.id);
   });
 
+  it('purges relayed rows past their retention, never pending ones (B-14)', async () => {
+    const days = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+    const row = (aggregate: string, publishedAt: Date | null) =>
+      prisma.outboxMessage.create({
+        data: { topic, aggregate, createdAt: days(30), publishedAt },
+        select: { id: true },
+      });
+    const old = await row(`purge:${randomUUID()}`, days(30));
+    const recent = await row(`purge:${randomUUID()}`, days(2));
+    const pending = await row(`purge:${randomUUID()}`, null);
+
+    expect(await queue.purgeOutbox(7)).toBeGreaterThanOrEqual(1);
+    const left = await prisma.outboxMessage.findMany({
+      where: { id: { in: [old.id, recent.id, pending.id] } },
+      select: { id: true },
+    });
+    expect(left.map((m) => m.id).sort()).toEqual([recent.id, pending.id].sort());
+    // The pending row is relayed later, like any other.
+    await prisma.outboxMessage.delete({ where: { id: pending.id } });
+  });
+
   it('rejects malformed topics', async () => {
     await expect(
       prisma.$transaction((tx) => outbox.enqueue(tx, { topic: 'Gateway Sync', aggregate: 'x' })),

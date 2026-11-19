@@ -12,6 +12,26 @@ const RELAY_INTERVAL_MS = 1_000;
 const RELAY_BATCH = 100;
 /** Time a relay batch may take (Prisma's interactive transactions default to 5 s). */
 const RELAY_TX_TIMEOUT_MS = 60_000;
+/** How often relayed outbox rows past their retention are purged, and how many per statement. */
+const PURGE_INTERVAL_MS = 60 * 60 * 1000;
+const PURGE_BATCH = 5_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Days a relayed outbox row is kept (DEN_OUTBOX_RETENTION_DAYS, default 7): long enough to look
+ * into a recent sync, never forever (B-14). Rows not yet relayed are never purged. A malformed
+ * value is a startup error.
+ */
+export function outboxRetentionDays(value = process.env.DEN_OUTBOX_RETENTION_DAYS): number {
+  if (value === undefined || value.trim() === '') return 7;
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 1) {
+    throw new Error(
+      `DEN_OUTBOX_RETENTION_DAYS must be a whole number of days (>= 1), got "${value}"`,
+    );
+  }
+  return days;
+}
 
 /**
  * Queues that are not reconcilers. Reconciliation queues coalesce by aggregate (`stately`);
@@ -72,6 +92,7 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
   private readonly logger = new Logger(QueueService.name);
   private boss?: PgBoss;
   private timer?: NodeJS.Timeout;
+  private purgeTimer?: NodeJS.Timeout;
   private relaying = false;
   private readonly knownQueues = new Set<string>();
 
@@ -83,12 +104,20 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
 
   async onApplicationBootstrap(): Promise<void> {
     if (!QueueService.enabled()) return;
+    const retentionDays = outboxRetentionDays();
     await this.start();
     this.timer = setInterval(() => void this.relayOnce(), RELAY_INTERVAL_MS);
+    const purge = () =>
+      this.purgeOutbox(retentionDays).catch((error: unknown) =>
+        this.logger.warn(`Outbox purge failed: ${String(error)}`),
+      );
+    void purge();
+    this.purgeTimer = setInterval(() => void purge(), PURGE_INTERVAL_MS);
   }
 
   async onApplicationShutdown(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
+    if (this.purgeTimer) clearInterval(this.purgeTimer);
     await this.boss?.stop({ graceful: true, timeout: 10_000 });
     this.boss = undefined;
   }
@@ -150,6 +179,25 @@ export class QueueService implements OnApplicationBootstrap, OnApplicationShutdo
         }
       },
     );
+  }
+
+  /**
+   * Deletes the outbox rows relayed more than `retentionDays` ago (B-14), in batches so no
+   * statement holds many rows. Returns how many were deleted. Idempotent: every replica may run it.
+   */
+  async purgeOutbox(retentionDays = outboxRetentionDays(), now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - retentionDays * DAY_MS);
+    let total = 0;
+    for (;;) {
+      const deleted = await this.prisma.$executeRaw`
+        DELETE FROM outbox WHERE id IN (
+          SELECT id FROM outbox
+          WHERE published_at IS NOT NULL AND published_at < ${cutoff}
+          ORDER BY created_at
+          LIMIT ${PURGE_BATCH})`;
+      total += deleted;
+      if (deleted < PURGE_BATCH) return total;
+    }
   }
 
   /** Moves pending outbox rows to their queues. Returns how many rows were processed. */

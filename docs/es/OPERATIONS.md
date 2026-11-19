@@ -102,10 +102,11 @@ Todos corren dentro del proceso `api`. Con `DEN_WORKER=off` no corre ninguno.
 | Proceso | Frecuencia | Qué hace | Si falla |
 | :-- | :-- | :-- | :-- |
 | Relevo del outbox | 1 s | Pasa las filas de `outbox` a colas de pg-boss | Las filas quedan sin `published_at` y se reintentan |
+| Purga del outbox | Al arrancar y cada hora | Borra las filas de `outbox` relevadas hace más de `DEN_OUTBOX_RETENTION_DAYS` (7) días; las que aún no se han relevado se conservan | Se registra; la siguiente ronda las purga |
 | `gateway.sync` | Al cambiar una versión de API | Reconciliador de APISIX: rutas, upstreams y plugins de esa versión | pg-boss reintenta; el error queda en `sync_state` |
-| Reconciliación completa APISIX | Al arrancar y cada 5 min | Asegura el TLS del gateway (y renueva su certificado), recalcula todas las versiones servidas, con los certificados de cliente del gateway que necesiten, y borra huérfanos | Se registra por versión y por objeto SSL; la siguiente pasada corrige |
+| Reconciliación completa APISIX | Al arrancar y cada 5 min | Asegura el TLS del gateway (y renueva su certificado), recalcula todas las versiones servidas, con los certificados de cliente del gateway que necesiten, y borra huérfanos (objetos, y objetos SSL, que ninguna versión servida o en revisión necesita). Cada unidad de trabajo toma un advisory lock compartido con `gateway.sync` y las demás réplicas | Se registra por versión y por objeto SSL; la siguiente pasada corrige |
 | `keycloak.sync` | Al cambiar una aplicación o sus secretos | Reconciliador de Keycloak: clientes `den-app-<uuid>` en `den-gateway`, secretos y su rotación (secreto rotado durante la ventana) | Igual que APISIX |
-| Reconciliación completa Keycloak | Al arrancar y cada 5 min | Corrige la deriva de todos los clientes | — |
+| Reconciliación completa Keycloak | Al arrancar y cada 5 min | Corrige la deriva de todos los clientes; una aplicación borrada, solo hasta que su cliente deshabilitado se haya aplicado después del borrado. Cada llamada a Keycloak se corta a los 10 s | — |
 | `policy.sync` | Al cambiar suscripciones, versiones o certificados de aplicación | Actualiza el estado de sincronización de OPA; el bundle se genera cuando OPA lo pide | Las suscripciones quedan "Aprobada (activándose)" hasta que OPA reporta la revisión |
 | `notification.dispatch` | Por evento de auditoría que notifica | Avisos en el portal y por correo | Reintentos de pg-boss |
 | `invitation.email` | Por invitación | Correo de invitación | Reintentos durante horas |

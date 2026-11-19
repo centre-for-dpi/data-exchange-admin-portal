@@ -73,16 +73,49 @@ export class KeycloakReconciler implements OnApplicationBootstrap, OnApplication
     if (kind === 'application' && id) await this.reconcileApplication(id);
   }
 
-  /** Full pass over every application (drift repair). Errors are recorded per application. */
+  /**
+   * Full pass over the applications (drift repair). Errors are recorded per application. A
+   * deleted application is visited until its client is confirmed disabled after the deletion
+   * (B-14): from then on it only changes through its own outbox job, so the pass does not grow
+   * with every application ever deleted.
+   */
   async reconcileAll(): Promise<void> {
-    const apps = await this.prisma.application.findMany({ select: { id: true } });
-    for (const app of apps) {
+    for (const app of await this.applicationsToVisit()) {
       try {
         await this.reconcileApplication(app.id);
       } catch (error) {
         this.logger.warn(`Keycloak reconcile of application ${app.id} failed: ${String(error)}`);
       }
     }
+  }
+
+  /** Every application except the deleted ones whose disabled client was applied since. */
+  async applicationsToVisit(): Promise<Array<{ id: string }>> {
+    const live = await this.prisma.application.findMany({
+      where: { status: { not: 'deleted' } },
+      select: { id: true },
+    });
+    const deleted = await this.prisma.application.findMany({
+      where: { status: 'deleted' },
+      select: { id: true, keycloakClientId: true, updatedAt: true },
+    });
+    if (deleted.length === 0) return live;
+    const applied = new Map(
+      (
+        await this.prisma.syncState.findMany({
+          where: {
+            target: { in: deleted.map((a) => syncTarget(a.keycloakClientId)) },
+            status: 'in_sync',
+          },
+          select: { target: true, appliedAt: true },
+        })
+      ).map((s) => [s.target, s.appliedAt]),
+    );
+    const pending = deleted.filter((a) => {
+      const at = applied.get(syncTarget(a.keycloakClientId));
+      return !at || at < a.updatedAt;
+    });
+    return [...live, ...pending.map((a) => ({ id: a.id }))];
   }
 
   async reconcileApplication(applicationId: string): Promise<ReconcileResult> {

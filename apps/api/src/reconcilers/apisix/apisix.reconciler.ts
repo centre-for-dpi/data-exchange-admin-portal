@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import {
   Inject,
@@ -28,7 +29,6 @@ import {
   desiredNodeControlRoute,
   desiredSsl,
   desiredTokenRoute,
-  GATEWAY_CLIENT_SSL_PREFIX,
   GATEWAY_SSL_ID,
   GATEWAY_XROAD_SSL_ID,
   gatewayClientName,
@@ -39,6 +39,7 @@ import {
   NODE_CONTROL_ROUTE_ID,
   needsGatewayPki,
   type UpstreamPki,
+  ROUTE_PREFIX,
   routeId,
   SANDBOX_ROUTE_PREFIX,
   sandboxBasePath,
@@ -56,6 +57,15 @@ import { GATEWAY_SYNC_TOPIC } from './topics.js';
 export { GATEWAY_SYNC_TOPIC } from './topics.js';
 export const APISIX_SETTINGS = Symbol('APISIX_SETTINGS');
 const FULL_RECONCILE_MS = 5 * 60 * 1000;
+/**
+ * Serializes the reconciler's units of work across API replicas ("den_apsx"): see serialized().
+ * Exported for the integration test that holds it.
+ */
+export const APISIX_RECONCILE_LOCK = 0x7269645f61707378n;
+/** Lifetime of a unit's transaction, which holds the lock (waiting for it included). */
+const UNIT_TIMEOUT_MS = 120_000;
+/** Time to get a database connection for that transaction. */
+const UNIT_MAX_WAIT_MS = 30_000;
 
 /** Versions the gateway serves: deprecated ones keep working until they are retired. */
 const SERVED = ['published', 'deprecated'] as const;
@@ -82,11 +92,21 @@ const hash = (value: unknown): string =>
  * in sync_state. Runs from the outbox (gateway.sync) and as a full pass every 5 minutes, which
  * also removes `den-` objects nothing in the database asks for. Objects without the prefix are
  * never touched.
+ *
+ * Every unit of work (one version, one gateway object, the orphan cleanup) runs under one
+ * PostgreSQL advisory lock, shared by the outbox jobs and the full passes of every replica: a
+ * unit reads the database and writes APISIX with no other unit in between, so a pass can neither
+ * delete what a job created while it ran nor write back a state a later job removed (M-09).
  */
 @Injectable()
 export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(ApisixReconciler.name);
   private timer?: NodeJS.Timeout;
+  /** Set while the current call chain holds the lock (units call other units). */
+  private readonly holding = new AsyncLocalStorage<true>();
+  /** The full pass in progress in this process, and whether another one was asked for meanwhile. */
+  private pass?: Promise<void>;
+  private passAgain = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -116,8 +136,47 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     if (kind === 'gateway' && id === 'all') await this.reconcileAll();
   }
 
-  /** Full pass: the gateway's TLS, every served version, then orphans. Errors are recorded. */
-  async reconcileAll(): Promise<void> {
+  /**
+   * Runs `work` holding the reconciler's advisory lock, inside a transaction that only holds it
+   * (the work queries with its own connections). Re-entrant: a unit that calls another one keeps
+   * the lock it has.
+   */
+  private serialized<T>(work: () => Promise<T>): Promise<T> {
+    if (this.holding.getStore()) return work();
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${APISIX_RECONCILE_LOCK})`;
+        return this.holding.run(true, work);
+      },
+      { timeout: UNIT_TIMEOUT_MS, maxWait: UNIT_MAX_WAIT_MS },
+    );
+  }
+
+  /**
+   * Full pass: the gateway's TLS, every served version, then orphans. Errors are recorded. One
+   * pass at a time per process: a call while one runs waits for it and for one more pass after
+   * it, which sees whatever changed meanwhile.
+   */
+  reconcileAll(): Promise<void> {
+    if (this.pass) {
+      this.passAgain = true;
+      return this.pass;
+    }
+    const run = async () => {
+      try {
+        do {
+          this.passAgain = false;
+          await this.fullPass();
+        } while (this.passAgain);
+      } finally {
+        this.pass = undefined;
+      }
+    };
+    this.pass = run();
+    return this.pass;
+  }
+
+  private async fullPass(): Promise<void> {
     try {
       await this.reconcileTls();
     } catch (error) {
@@ -151,38 +210,26 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
       }
     }
     // Check routes (M4-06): those of versions in review, and none of any other version.
+    let reviewing: Array<{ id: string }> = [];
     try {
-      const reviewing = await this.prisma.apiVersion.findMany({
+      reviewing = await this.prisma.apiVersion.findMany({
         where: { status: 'in_review' },
         select: { id: true },
       });
-      const keep = new Set(reviewing.map((v) => v.id));
       for (const v of reviewing) {
-        await this.reconcileChecks(v.id, await this.loadVersion(v.id)).catch((error: unknown) =>
+        await this.serialized(async () =>
+          this.reconcileChecks(v.id, await this.loadVersion(v.id)),
+        ).catch((error: unknown) =>
           this.logger.warn(`APISIX check routes of version ${v.id}: ${String(error)}`),
         );
       }
-      const served = new Set(versions.map((v) => v.id));
-      for (const id of await this.admin.list('routes')) {
-        // Sandbox routes (M4-08) of versions no longer served.
-        if (
-          id.startsWith(SANDBOX_ROUTE_PREFIX) &&
-          !served.has(id.slice(SANDBOX_ROUTE_PREFIX.length))
-        ) {
-          await this.admin.delete('routes', id);
-          continue;
-        }
-        if (!id.startsWith(CHECK_ROUTE_PREFIX)) continue;
-        const versionId = id.slice(CHECK_ROUTE_PREFIX.length).replace(/^sandbox-/, '');
-        if (!keep.has(versionId)) await this.admin.delete('routes', id);
-      }
     } catch (error) {
-      this.logger.warn(`APISIX check routes cleanup failed: ${String(error)}`);
+      this.logger.warn(`APISIX check routes reconcile failed: ${String(error)}`);
     }
     try {
       await this.removeOrphans(
         new Set(versions.map((v) => v.id)),
-        new Set(versions.map((v) => v.api.entityId)),
+        new Set(reviewing.map((v) => v.id)),
       );
     } catch (error) {
       this.logger.warn(`APISIX orphan cleanup failed: ${String(error)}`);
@@ -194,7 +241,14 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * other status. They take the token and the policy out of the way for the portal's validations,
    * so their builder (desiredCheckRoutes) keeps them narrow.
    */
-  async reconcileChecks(
+  reconcileChecks(
+    apiVersionId: string,
+    version: Awaited<ReturnType<typeof this.loadVersion>>,
+  ): Promise<void> {
+    return this.serialized(() => this.applyChecks(apiVersionId, version));
+  }
+
+  private async applyChecks(
     apiVersionId: string,
     version: Awaited<ReturnType<typeof this.loadVersion>>,
   ): Promise<void> {
@@ -233,10 +287,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
             select: { id: true, entityId: true, status: true },
           })
         : undefined;
-    const needsPki = [upstream, sandbox].some(
-      (u) => u && needsGatewayPki(u, entity.slug, this.settings),
-    );
-    const pki = needsPki ? await this.reconcileClientTls(entity) : undefined;
+    const pki = await this.ensureUpstreamTls(sandbox ? [upstream, sandbox] : [upstream], entity);
     const base = {
       id: version.id,
       entityId: entity.id,
@@ -301,9 +352,7 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
             select: { id: true, entityId: true, status: true },
           })
         : undefined;
-    const pki = needsGatewayPki(sandbox, entity.slug, this.settings)
-      ? await this.reconcileClientTls(entity)
-      : undefined;
+    const pki = await this.ensureUpstreamTls([sandbox], entity);
     const desired = desiredGateway(
       {
         id: version.id,
@@ -354,48 +403,139 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     }
   }
 
-  /** Deletes managed routes and upstreams whose version is not served (route first). */
-  private async removeOrphans(
-    served: ReadonlySet<string>,
-    providers: ReadonlySet<string>,
-  ): Promise<void> {
-    const managed = (ids: string[], prefix: string) =>
-      ids
-        .filter((id) => id.startsWith(`${MANAGED_PREFIX}${prefix}-`))
-        .filter((id) => !served.has(id.slice(`${MANAGED_PREFIX}${prefix}-`.length)));
-    for (const id of managed(await this.admin.list('routes'), 'route')) {
-      await this.admin.delete('routes', id);
-      this.logger.log(`Removed orphan APISIX route ${id}`);
-    }
-    for (const id of managed(await this.admin.list('upstreams'), 'upstream')) {
-      await this.deleteUpstream(id);
-      this.logger.log(`Removed orphan APISIX upstream ${id}`);
-    }
-    for (const id of await this.admin.list('ssls')) {
-      if (!id.startsWith(MANAGED_PREFIX) || id === GATEWAY_SSL_ID) continue;
-      // A provider's client identity stays while the provider serves some version.
-      if (
-        id.startsWith(GATEWAY_CLIENT_SSL_PREFIX) &&
-        providers.has(id.slice(GATEWAY_CLIENT_SSL_PREFIX.length))
-      ) {
-        continue;
+  /**
+   * Deletes the managed objects nothing in the database asks for, in one unit of work: routes
+   * before upstreams (route first), then SSL objects. `served` and `reviewing` are the versions
+   * the pass listed when it started; a candidate outside them is read again here, under the lock,
+   * and kept if it is served (or in review) now (M-09).
+   */
+  private removeOrphans(served: ReadonlySet<string>, reviewing: ReadonlySet<string>) {
+    return this.serialized(async () => {
+      const now = new Map<string, string | undefined>();
+      const statusNow = async (id: string) => {
+        if (!now.has(id)) {
+          const row = await this.prisma.apiVersion.findUnique({
+            where: { id },
+            select: { status: true },
+          });
+          now.set(id, row?.status);
+        }
+        return now.get(id);
+      };
+      const isServed = async (id: string) =>
+        served.has(id) || (SERVED as readonly string[]).includes((await statusNow(id)) ?? '');
+      const inReview = async (id: string) =>
+        reviewing.has(id) || (await statusNow(id)) === 'in_review';
+
+      for (const id of await this.admin.list('routes')) {
+        // Published routes and sandbox routes (M4-08) of versions no longer served.
+        const version = id.startsWith(ROUTE_PREFIX)
+          ? id.slice(ROUTE_PREFIX.length)
+          : id.startsWith(SANDBOX_ROUTE_PREFIX)
+            ? id.slice(SANDBOX_ROUTE_PREFIX.length)
+            : undefined;
+        // Check routes (M4-06) of versions no longer in review.
+        const checked = id.startsWith(CHECK_ROUTE_PREFIX)
+          ? id.slice(CHECK_ROUTE_PREFIX.length).replace(/^sandbox-/, '')
+          : undefined;
+        let keep = true;
+        if (version !== undefined) keep = await isServed(version);
+        else if (checked !== undefined) keep = await inReview(checked);
+        if (keep) continue;
+        await this.admin.delete('routes', id);
+        this.logger.log(`Removed orphan APISIX route ${id}`);
       }
-      await this.admin.delete('ssls', id);
-      this.logger.log(`Removed orphan APISIX SSL object ${id}`);
-    }
+      const upstreamPrefix = upstreamId('');
+      for (const id of await this.admin.list('upstreams')) {
+        if (!id.startsWith(upstreamPrefix)) continue;
+        if (await isServed(id.slice(upstreamPrefix.length))) continue;
+        await this.deleteUpstream(id);
+        this.logger.log(`Removed orphan APISIX upstream ${id}`);
+      }
+      // SSL objects: exactly the ones the versions in the database need now (A-5, M-10).
+      const desired = await this.desiredSsls();
+      for (const id of await this.admin.list('ssls')) {
+        if (!id.startsWith(MANAGED_PREFIX) || desired.has(id)) continue;
+        await this.admin.delete('ssls', id);
+        this.logger.log(`Removed orphan APISIX SSL object ${id}`);
+      }
+    });
+  }
+
+  /** Whether xroad upstreams reach the operator's Security Server over TLS (M4-05). */
+  private xroadOverTls(): boolean {
+    return this.settings.xroad?.securityServerUrl.startsWith('https:') ?? false;
   }
 
   /**
-   * The gateway's client certificate towards the upstreams of one provider entity (M3-03), as an
-   * SSL object of type client that its upstreams with mTLS reference by id: renewing it updates
-   * one object, not every upstream. Returns the network CA, which verifies kit nodes.
+   * The SSL objects an upstream presents: the provider entity's client certificate (direct with
+   * mTLS, nodes over TLS) or the gateway's X-Road certificate (xroad over HTTPS).
    */
+  private sslsOf(upstream: Upstream, entity: { id: string; slug: string }): string[] {
+    return [
+      ...(needsGatewayPki(upstream, entity.slug, this.settings)
+        ? [gatewayClientSslId(entity.id)]
+        : []),
+      ...(upstream.type === 'xroad' && this.xroadOverTls() ? [GATEWAY_XROAD_SSL_ID] : []),
+    ];
+  }
+
+  /**
+   * Ensures the SSL objects these upstreams of one entity present, before an upstream that
+   * references them is written. Only upstreams with TLS towards them depend on step-ca: the others
+   * keep working if the CA is down. Returns the network CA when the entity's PKI was needed.
+   */
+  private async ensureUpstreamTls(
+    upstreams: Upstream[],
+    entity: { id: string; slug: string },
+  ): Promise<UpstreamPki | undefined> {
+    const needed = new Set(upstreams.flatMap((u) => this.sslsOf(u, entity)));
+    // X-Road over HTTPS: the gateway's own certificate towards the Security Server (M4-05).
+    if (needed.has(GATEWAY_XROAD_SSL_ID)) await this.reconcileXroadTls();
+    return needed.has(gatewayClientSslId(entity.id))
+      ? await this.reconcileClientTls(entity)
+      : undefined;
+  }
+
+  /**
+   * The SSL objects the gateway must hold, from the database: its own TLS, and those the
+   * upstreams and sandbox upstreams of served versions, and of versions in review when they have
+   * check routes, present (sslsOf).
+   */
+  private async desiredSsls(): Promise<Set<string>> {
+    const statuses: Array<(typeof SERVED)[number] | 'in_review'> = [
+      ...SERVED,
+      ...(this.settings.validationToken ? (['in_review'] as const) : []),
+    ];
+    const versions = await this.prisma.apiVersion.findMany({
+      where: { status: { in: statuses } },
+      select: {
+        upstream: true,
+        sandboxUpstream: true,
+        api: { select: { entityId: true, entity: { select: { slug: true } } } },
+      },
+    });
+    const desired = new Set([GATEWAY_SSL_ID]);
+    for (const v of versions) {
+      const entity = { id: v.api.entityId, slug: v.api.entity.slug };
+      for (const raw of [v.upstream, v.sandboxUpstream]) {
+        const parsed = raw ? upstreamSchema.safeParse(raw) : undefined;
+        if (parsed?.success) for (const id of this.sslsOf(parsed.data, entity)) desired.add(id);
+      }
+    }
+    return desired;
+  }
+
   /**
    * The SSL object of the gateway's client certificate towards the operator's X-Road Security
    * Server (M4-05, SPIKE S-5): one identity, CN=<DEN_GATEWAY_CLIENT_NAME>.xroad, which the
    * operator registers in the Security Server as the internal TLS certificate of its subsystem.
    */
-  async reconcileXroadTls(now = new Date()): Promise<void> {
+  reconcileXroadTls(now = new Date()): Promise<void> {
+    return this.serialized(() => this.applyXroadTls(now));
+  }
+
+  private async applyXroadTls(now: Date): Promise<void> {
     const target = `apisix:ssl:${GATEWAY_XROAD_SSL_ID}`;
     let desiredHash = hash(null);
     try {
@@ -422,9 +562,18 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     }
   }
 
-  async reconcileClientTls(
+  /**
+   * The gateway's client certificate towards the upstreams of one provider entity (M3-03), as an
+   * SSL object of type client that its upstreams with mTLS reference by id: renewing it updates
+   * one object, not every upstream. Returns the network CA, which verifies kit nodes.
+   */
+  reconcileClientTls(entity: { id: string; slug: string }, now = new Date()): Promise<UpstreamPki> {
+    return this.serialized(() => this.applyClientTls(entity, now));
+  }
+
+  private async applyClientTls(
     entity: { id: string; slug: string },
-    now = new Date(),
+    now: Date,
   ): Promise<UpstreamPki> {
     const sslId = gatewayClientSslId(entity.id);
     const target = gatewayClientTlsSyncTarget(entity.id);
@@ -458,7 +607,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * The gateway's SSL object (S-3, M3-02): its server certificate, issued and renewed through
    * step-ca, and with features.mtls.required the network CA as `client.ca`.
    */
-  async reconcileTls(now = new Date()): Promise<'created' | 'updated' | 'unchanged'> {
+  reconcileTls(now = new Date()): Promise<'created' | 'updated' | 'unchanged'> {
+    return this.serialized(() => this.applyTls(now));
+  }
+
+  private async applyTls(now: Date): Promise<'created' | 'updated' | 'unchanged'> {
     let desiredHash = hash(null);
     try {
       const certificate = await this.certificates.server(this.settings.tls.hosts, now);
@@ -485,7 +638,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * clear, so the comparison is by issuer and kid. With the feature off, the metadata is removed:
    * no private key stays in etcd for nothing.
    */
-  async reconcileAssertionKey(now = new Date()): Promise<GatewayResult> {
+  reconcileAssertionKey(now = new Date()): Promise<GatewayResult> {
+    return this.serialized(() => this.applyAssertionKey(now));
+  }
+
+  private async applyAssertionKey(now: Date): Promise<GatewayResult> {
     let desiredHash = hash(null);
     try {
       const actual = await this.admin.get('plugin_metadata', ASSERTION_PLUGIN);
@@ -518,7 +675,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * The gateway's route to the den-gateway token endpoint (S-4, M3-10): applications get their
    * token over the TLS where APISIX verified their certificate, and Keycloak binds it to it.
    */
-  async reconcileTokenRoute(): Promise<'created' | 'updated' | 'unchanged'> {
+  reconcileTokenRoute(): Promise<'created' | 'updated' | 'unchanged'> {
+    return this.serialized(() => this.applyTokenRoute());
+  }
+
+  private async applyTokenRoute(): Promise<'created' | 'updated' | 'unchanged'> {
     const desired = desiredTokenRoute(this.settings);
     const desiredHash = hash(desired);
     try {
@@ -540,7 +701,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
    * The control channel of kit nodes (M4-02). Without DEN_GATEWAY_PORTAL_API_URL and
    * DEN_NODE_CONTROL_TOKEN the route is removed: nodes cannot reach the portal.
    */
-  async reconcileNodeControlRoute(): Promise<GatewayResult> {
+  reconcileNodeControlRoute(): Promise<GatewayResult> {
+    return this.serialized(() => this.applyNodeControlRoute());
+  }
+
+  private async applyNodeControlRoute(): Promise<GatewayResult> {
     const desired = desiredNodeControlRoute(this.settings);
     // The token is part of the route: hash it, never store it in sync_state.
     const desiredHash = hash(desired);
@@ -564,7 +729,11 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
     }
   }
 
-  async reconcileVersion(apiVersionId: string): Promise<GatewayResult> {
+  reconcileVersion(apiVersionId: string): Promise<GatewayResult> {
+    return this.serialized(() => this.applyVersion(apiVersionId));
+  }
+
+  private async applyVersion(apiVersionId: string): Promise<GatewayResult> {
     const version = await this.loadVersion(apiVersionId);
     const target = gatewaySyncTarget(apiVersionId);
     const served = version && (SERVED as readonly string[]).includes(version.status);
@@ -593,17 +762,8 @@ export class ApisixReconciler implements OnApplicationBootstrap, OnApplicationSh
           : undefined;
       const operations = listOperations(version.openapiSpec as Record<string, unknown>);
       const addresses = await this.assertPublicUpstream(upstreamConfig);
-      // Only upstreams with mTLS depend on step-ca: the others keep working if the CA is down.
-      const pki = needsGatewayPki(upstreamConfig, version.api.entity.slug, this.settings)
-        ? await this.reconcileClientTls(version.api.entity)
-        : undefined;
-      // X-Road over HTTPS: the gateway's own certificate towards the Security Server (M4-05).
-      if (
-        upstreamConfig.type === 'xroad' &&
-        this.settings.xroad?.securityServerUrl.startsWith('https:')
-      ) {
-        await this.reconcileXroadTls();
-      }
+      // The client certificate (mTLS) or the X-Road one the upstream presents, before it.
+      const pki = await this.ensureUpstreamTls([upstreamConfig], version.api.entity);
       const desired = desiredGateway(
         {
           id: version.id,

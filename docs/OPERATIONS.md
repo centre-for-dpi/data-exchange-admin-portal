@@ -102,10 +102,11 @@ They all run inside the `api` process. With `DEN_WORKER=off`, none of them runs.
 | Process | Frequency | What it does | If it fails |
 | :-- | :-- | :-- | :-- |
 | Outbox relay | 1 s | Moves the `outbox` rows to pg-boss queues | The rows stay without `published_at` and are retried |
+| Outbox purge | At startup and every hour | Deletes the `outbox` rows relayed more than `DEN_OUTBOX_RETENTION_DAYS` (7) days ago; rows not yet relayed are kept | Logged; the next round purges them |
 | `gateway.sync` | When an API version changes | APISIX reconciler: routes, upstreams and plugins of that version | pg-boss retries; the error is stored in `sync_state` |
-| Full APISIX reconciliation | At startup and every 5 min | Ensures the gateway's TLS (and renews its certificate), recomputes all served versions, with the gateway client certificates they need, and deletes orphans | Recorded per version and per SSL object; the next pass corrects it |
+| Full APISIX reconciliation | At startup and every 5 min | Ensures the gateway's TLS (and renews its certificate), recomputes all served versions, with the gateway client certificates they need, and deletes orphans (objects, and SSL objects, that no served or in-review version needs). Each unit of work holds an advisory lock shared with `gateway.sync` and the other replicas | Recorded per version and per SSL object; the next pass corrects it |
 | `keycloak.sync` | When an application or its secrets change | Keycloak reconciler: `den-app-<uuid>` clients in `den-gateway`, secrets and their rotation (rotated secret during the window) | Same as APISIX |
-| Full Keycloak reconciliation | At startup and every 5 min | Corrects drift in all clients | — |
+| Full Keycloak reconciliation | At startup and every 5 min | Corrects drift in all clients; a deleted application only until its disabled client has been applied after the deletion. Each Keycloak call is cut after 10 s | — |
 | `policy.sync` | When subscriptions, versions or application certificates change | Updates OPA's sync state; the bundle is generated when OPA requests it | Subscriptions stay "Approved (activating)" until OPA reports the revision |
 | `notification.dispatch` | Per audit event that triggers a notification | Notices in the portal and by email | pg-boss retries |
 | `invitation.email` | Per invitation | Invitation email | Retries for hours |

@@ -47,6 +47,9 @@ export interface KeycloakGatewayAdmin {
 
 export class KeycloakAdminError extends Error {}
 
+/** Time one Keycloak Admin API call may take: a hung Keycloak must not stall the reconciler. */
+export const KEYCLOAK_ADMIN_TIMEOUT_MS = 10_000;
+
 const FIELDS: Array<keyof GatewayClient> = [
   'clientId',
   'name',
@@ -70,11 +73,16 @@ export class HttpKeycloakGatewayAdmin implements KeycloakGatewayAdmin {
       clientId: string;
       clientSecret: string;
       fetchFn?: typeof fetch;
+      timeoutMs?: number;
     },
   ) {}
 
-  private get fetch(): typeof fetch {
-    return this.options.fetchFn ?? fetch;
+  /** Every call is cut after timeoutMs (B-14): the job fails and is retried. */
+  private fetch(url: string, init: RequestInit = {}): Promise<Response> {
+    return (this.options.fetchFn ?? fetch)(url, {
+      ...init,
+      signal: AbortSignal.timeout(this.options.timeoutMs ?? KEYCLOAK_ADMIN_TIMEOUT_MS),
+    });
   }
 
   private async accessToken(): Promise<string> {

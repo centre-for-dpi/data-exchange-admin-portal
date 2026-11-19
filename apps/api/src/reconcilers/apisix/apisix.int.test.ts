@@ -10,9 +10,15 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { readRealmUsers } from '../../seed/realm.js';
 import { runSeed } from '../../seed/seed.js';
 import { deleteUpstreamWhenUnused, HttpApisixAdmin } from './apisix-admin.js';
-import { APISIX_SETTINGS, ApisixReconciler, gatewaySyncTarget } from './apisix.reconciler.js';
+import {
+  APISIX_RECONCILE_LOCK,
+  APISIX_SETTINGS,
+  ApisixReconciler,
+  gatewaySyncTarget,
+} from './apisix.reconciler.js';
 import {
   type DevNode,
+  GATEWAY_XROAD_SSL_ID,
   gatewayClientSslId,
   type GatewaySettings,
   parseDevNodes,
@@ -218,6 +224,64 @@ describe('APISIX reconciler (M1-08)', () => {
     FULL_PASS_TIMEOUT,
   );
 
+  it('removes a plugin and an upstream node added by hand: exact comparison (M-08)', async () => {
+    const versionId = await publish('salud', `gw-extra-${run}`);
+    expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+    const route = (await admin.get('routes', routeId(versionId))) ?? {};
+    await admin.put('routes', routeId(versionId), {
+      ...route,
+      plugins: {
+        ...(route.plugins as Record<string, unknown>),
+        'response-rewrite': { headers: { set: { 'X-Added-By-Hand': '1' } } },
+      },
+    });
+    const upstream = (await admin.get('upstreams', upstreamId(versionId))) ?? {};
+    await admin.put('upstreams', upstreamId(versionId), {
+      ...upstream,
+      nodes: { ...(upstream.nodes as Record<string, number>), 'mock-salud:8001': 1 },
+    });
+
+    expect(await reconciler.reconcileVersion(versionId)).toBe('updated');
+    expect((await admin.get('routes', routeId(versionId)))?.plugins).not.toHaveProperty(
+      'response-rewrite',
+    );
+    expect((await admin.get('upstreams', upstreamId(versionId)))?.nodes).toEqual({
+      'mock-salud:8000': 1,
+    });
+    // What APISIX stores back is exactly what was written: nothing more to do, and it was drift.
+    expect(await reconciler.reconcileVersion(versionId)).toBe('unchanged');
+    const state = await prisma.syncState.findUniqueOrThrow({
+      where: { target: gatewaySyncTarget(versionId) },
+    });
+    expect(state.driftCount).toBe(1);
+  });
+
+  it('a unit of work waits for the advisory lock another replica holds (M-09)', async () => {
+    const versionId = await publish('salud', `gw-lock-${run}`);
+    let release = () => {};
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let locked = () => {};
+    const isLocked = new Promise<void>((resolve) => (locked = resolve));
+    // Another replica in the middle of a unit (a separate client: its own connection).
+    const replica = prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${APISIX_RECONCILE_LOCK})`;
+        locked();
+        await released;
+      },
+      { timeout: 30_000 },
+    );
+    await isLocked;
+    let done = false;
+    const reconciled = reconciler.reconcileVersion(versionId).finally(() => (done = true));
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    expect(done).toBe(false);
+    expect(await admin.get('routes', routeId(versionId))).toBeUndefined();
+    release();
+    await replica;
+    expect(await reconciled).toBe('created');
+  });
+
   it('a version the gateway cannot serve is recorded as an error and nothing is written', async () => {
     const versionId = await publish('socioeconomico', `gw-nonode-${run}`);
     await expect(reconciler.reconcileVersion(versionId)).rejects.toThrow(/DEN_DEV_NODES/);
@@ -361,6 +425,66 @@ describe('APISIX reconciler (M1-08)', () => {
       }
     });
   });
+
+  it(
+    'the X-Road client certificate survives a full pass while an xroad version uses it (A-5)',
+    async () => {
+      const versionId = await publish('salud', `gw-xroad-${run}`);
+      const salud = await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } });
+      const member = { memberClass: 'GOV', memberCode: `A5${run}` };
+      await prisma.entity.update({
+        where: { id: salud.id },
+        data: { xroadMemberClass: member.memberClass, xroadMemberCode: member.memberCode },
+      });
+      await setUpstream(versionId, {
+        type: 'xroad',
+        serviceId: { instance: 'CO', ...member, serviceCode: 'consultaAfiliado' },
+        servicePath: '',
+      });
+      // An https:// Security Server: the upstream presents den-ssl-gateway-xroad (M4-05).
+      settings.xroad = {
+        securityServerUrl: 'https://ss.xroad.example:8443',
+        client: 'CO/GOV/9000000001/DEN-GATEWAY',
+      };
+      try {
+        expect(await reconciler.reconcileVersion(versionId)).toBe('created');
+        expect(await admin.get('upstreams', upstreamId(versionId))).toMatchObject({
+          scheme: 'https',
+          tls: { client_cert_id: GATEWAY_XROAD_SSL_ID, verify: true },
+        });
+        expect(await admin.get('ssls', GATEWAY_XROAD_SSL_ID)).toMatchObject({ type: 'client' });
+
+        await reconciler.reconcileAll();
+        expect(await admin.get('ssls', GATEWAY_XROAD_SSL_ID)).toMatchObject({ type: 'client' });
+        expect(await reconciler.reconcileVersion(versionId)).toBe('unchanged');
+
+        // Once no xroad version needs it, the next pass removes it.
+        await prisma.apiVersion.update({ where: { id: versionId }, data: { status: 'retired' } });
+        await reconciler.reconcileAll();
+        // Unless a served xroad version left by another suite of this database still needs it.
+        const xroad = { path: ['type'], equals: 'xroad' };
+        const others = await prisma.apiVersion.count({
+          where: {
+            status: { in: ['published', 'deprecated'] },
+            OR: [{ upstream: xroad }, { sandboxUpstream: xroad }],
+          },
+        });
+        if (others === 0) expect(await admin.get('ssls', GATEWAY_XROAD_SSL_ID)).toBeUndefined();
+      } finally {
+        delete settings.xroad;
+        await prisma.entity.update({
+          where: { id: salud.id },
+          data: {
+            xroadMemberClass: salud.xroadMemberClass,
+            xroadMemberCode: salud.xroadMemberCode,
+          },
+        });
+        await reconciler.reconcileVersion(versionId).catch(() => undefined);
+        await admin.delete('ssls', GATEWAY_XROAD_SSL_ID);
+      }
+    },
+    FULL_PASS_TIMEOUT * 2,
+  );
 
   it('a retired version loses its route and upstream', async () => {
     const versionId = await publish('salud', `gw-retired-${run}`);

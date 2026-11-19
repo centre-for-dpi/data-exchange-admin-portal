@@ -54,11 +54,14 @@ const settings: GatewaySettings = {
   tls: { hosts: ['localhost'], mtlsRequired: false, clientName: 'den-gateway' },
 };
 
-/** Only what reconcileVersion touches for a retired version. */
-const prisma = {
+/** Only what reconcileVersion touches for a retired version, and the advisory lock. */
+const prismaStub = {
+  $transaction: (work: (tx: unknown) => Promise<unknown>) => work(prismaStub),
+  $executeRaw: () => Promise.resolve(1),
   apiVersion: { findUnique: () => Promise.resolve({ id: VERSION, status: 'retired' }) },
   syncState: { upsert: () => Promise.resolve({}) },
-} as unknown as PrismaService;
+};
+const prisma = prismaStub as unknown as PrismaService;
 
 const reconciler = (admin: ApisixAdmin) =>
   new ApisixReconciler(
