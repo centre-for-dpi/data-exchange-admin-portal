@@ -60,4 +60,19 @@ describe('portal OpenAPI (ADR-0013)', () => {
     expect(res.headers['content-type']).toContain('text/html');
     expect(res.body).toContain('/api/docs/openapi.json');
   });
+
+  it('loads the Scalar bundle from the API itself, under a CSP without third-party hosts (B-11)', async () => {
+    const page = await app.inject({ method: 'GET', url: '/api/docs' });
+    expect(page.body).not.toMatch(/https?:\/\/(?!localhost)/);
+    expect(page.body).toContain('<script src="/api/docs/scalar.js" nonce="');
+    const nonce = /nonce="([^"]+)"/.exec(page.body)?.[1] ?? '';
+    const csp = String(page.headers['content-security-policy']);
+    expect(csp).toContain(`script-src 'self' 'nonce-${nonce}'`);
+    expect(csp).not.toMatch(/https?:/);
+
+    const bundle = await app.inject({ method: 'GET', url: '/api/docs/scalar.js' });
+    expect(bundle.statusCode).toBe(200);
+    expect(bundle.headers['content-type']).toContain('javascript');
+    expect(bundle.body.length).toBeGreaterThan(1_000_000);
+  });
 });

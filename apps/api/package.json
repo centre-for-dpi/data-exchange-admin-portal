@@ -35,6 +35,7 @@
     "@den/config": "workspace:*",
     "@den/contracts": "workspace:*",
     "@den/transparency-verifier": "workspace:*",
+    "@scalar/api-reference": "1.78.0",
     "@scalar/nestjs-api-reference": "^1.2.36",
     "@stoplight/spectral-core": "^1.24.1",
     "@stoplight/spectral-functions": "^1.11.1",
