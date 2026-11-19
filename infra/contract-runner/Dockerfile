@@ -1,6 +1,6 @@
 # Contract test runner (M4-06): Schemathesis (MIT) behind a small internal HTTP API, so the portal
 # can test an API version's sandbox through the gateway when it goes to review.
-FROM alpine:3.22
+FROM alpine:3.22@sha256:49340b346798875b5592e5d420241f2f9cfba5f47e62ebb1446a1b34734e898f
 # Exactly the pinned packages, each with its license recorded (requirements.txt, B-32): no
 # dependency resolved at build time, and `pip check` fails if one is missing.
 COPY requirements.txt /tmp/requirements.txt

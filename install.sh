@@ -7,10 +7,13 @@
 #   sudo ./install.sh credentials  # where to log in and with what (demo users, Keycloak admin)
 #   sudo ./install.sh otp          # one-time code of the demo users with a critical role
 #   sudo ./install.sh logs [svc]   # follow the logs (all services, or one)
-#   sudo ./install.sh backup       # full pgBackRest backup, plus dumps, CA, TSA, documents, the
-#                                  # backup repository and .env into backups/
+#   sudo ./install.sh backup       # full pgBackRest backup, plus dumps, CA, TSA, documents and the
+#                                  # backup repository into backups/<date>/ (not .env: its keys are
+#                                  # kept apart); keeps the last DEN_BACKUP_KEEP (5)
 #   sudo ./install.sh restore [time]  # restore the database: latest state, or the moment given
 #                                  # ("2026-11-20 14:30:00-05"); stops and restarts everything
+#   sudo ./install.sh restore-volumes <backups/date>  # server lost: on a new server with the saved
+#                                  # .env, recreate the volumes from that backup and start
 #   sudo ./install.sh update       # backup, git pull --ff-only, rebuild and restart
 #   sudo ./install.sh images <tag>|build  # published images from ghcr.io (0.2.0, sha-<commit>)
 #                                  # instead of building the API, web, hub and runner here
@@ -33,9 +36,23 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 ENV_FILE="$ROOT/.env"
-NODE_IMAGE="node:24.22.1-alpine3.24"
+NODE_IMAGE="node:24.22.1-alpine3.24@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53"
 EDGE_NETWORK="den-edge"
 MIN_COMPOSE="2.26.0"
+# What `backup` saves besides the database dumps, and `restore-volumes` puts back (M-30).
+BACKUP_VOLUMES=(step-ca-data tsa-data api-documents citizen-app-data pgbackrest-repo)
+# Volume subpaths (the API mounts step-ca's certs/ only) need Docker Engine 26 (B-30).
+MIN_ENGINE="26.0.0"
+# Secrets that must not keep the public value of .env.example (M-25).
+EXAMPLE_SECRETS=(POSTGRES_PASSWORD DEN_APP_DB_PASSWORD KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD
+  DEN_PORTAL_WEB_CLIENT_SECRET DEN_GATEWAY_PROVISIONER_SECRET DEN_CITIZEN_APP_CLIENT_SECRET
+  DEN_DEMO_USER_PASSWORD DEN_DEMO_CRITICAL_PASSWORD DEN_DEMO_TOTP_SECRET APISIX_ADMIN_KEY
+  ETCD_ROOT_PASSWORD APISIX_ETCD_PASSWORD OPA_BUNDLE_TOKEN DEN_OPA_DECISION_TOKEN DEN_OPA_ADMIN_TOKEN
+  DEN_END_USER_HASH_SALT DEN_SUBJECT_REF_KEY DEN_TRANSPARENCY_INGEST_TOKEN STEP_CA_PASSWORD
+  DEN_STEP_CA_PROVISIONER_PASSWORD AUTH_SECRET DEN_SECRETS_KEY DEN_TRANSPARENCY_SIGNING_JWK
+  CITIZEN_APP_WEBHOOK_SECRET DEN_NODE_CONTROL_TOKEN DEN_WG_HUB_PRIVATE_KEY DEN_WG_HUB_AGENT_TOKEN
+  DEN_VALIDATION_TOKEN DEN_CONTRACT_RUNNER_TOKEN DEN_METRICS_TOKEN GRAFANA_ADMIN_PASSWORD
+  DEN_APISIX_KEYRING)
 
 # --- output -------------------------------------------------------------------------------------
 if [[ -t 1 ]]; then
@@ -78,16 +95,28 @@ env_get() {
   line=${line#\'}; line=${line%\'}; line=${line#\"}; line=${line%\"}
   printf '%s' "$line"
 }
+# env_set KEY VALUE: VALUE as written (quote it with env_quote unless it is a generated one).
 env_set() {
   local key=$1 value=$2
   if grep -qE "^$key=" "$ENV_FILE"; then
     local tmp; tmp=$(mktemp)
-    awk -v k="$key" -v v="$value" 'BEGIN{FS=OFS="="} $1==k{print k "=" v; next} {print}' "$ENV_FILE" >"$tmp"
+    # Through the environment, not awk -v, which reads backslashes as escapes (B-30).
+    K=$key V=$value awk 'BEGIN{FS=OFS="="} $1==ENVIRON["K"]{print ENVIRON["K"] "=" ENVIRON["V"]; next} {print}' \
+      "$ENV_FILE" >"$tmp"
     cat "$tmp" >"$ENV_FILE"; rm -f "$tmp"
   else
     printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
   fi
 }
+# env_quote VALUE: in single quotes, which Compose, bash and Node read literally ($, # and spaces
+# included, B-30). Fails on what they cannot carry that way: quotes, backslashes, line breaks.
+env_quote() {
+  case $1 in *"'"* | *'"'* | *'\'* | *$'\n'* | *$'\r'*) return 1 ;; esac
+  printf "'%s'" "$1"
+}
+# The value of KEY in .env.example (M-25).
+example_value() { ENV_FILE="$ROOT/.env.example" env_get "$1"; }
+random_secret() { head -c 32 /dev/urandom | base64 | tr -d '\n/+='; }
 
 # Secrets added by later versions to an existing .env (re-running never changes the others).
 ensure_env_additions() {
@@ -118,6 +147,101 @@ ensure_env_additions() {
     info "DEN_DOCUMENTS_DIR corregido en .env: /var/lib/den/documents (volumen api-documents)."
   fi
   migrate_citizen_app_env
+  ensure_r04_env
+}
+
+# R-04: what earlier .env files lack or carry wrong. Idempotent.
+ensure_r04_env() {
+  local key
+  # B-16: one password per step-ca provisioner, none the CA's own (STEP_CA_PASSWORD). On the next
+  # start configure.sh gives each provisioner a new key under its password; the API reads them.
+  if [[ -z $(env_get DEN_STEP_CA_PROVISIONER_PASSWORD) ||
+    $(env_get DEN_STEP_CA_PROVISIONER_PASSWORD) == "$(env_get STEP_CA_PASSWORD)" ]]; then
+    env_set DEN_STEP_CA_PROVISIONER_PASSWORD "$(random_secret)"
+    chmod 600 "$ENV_FILE"
+    info "DEN_STEP_CA_PROVISIONER_PASSWORD nueva en .env: ya no es la de la CA (B-16)."
+  fi
+  for key in DEN_STEP_CA_GATEWAY_PROVISIONER_PASSWORD DEN_STEP_CA_NODE_PROVISIONER_PASSWORD; do
+    if [[ -z $(env_get "$key") ]]; then
+      env_set "$key" "$(random_secret)"
+      chmod 600 "$ENV_FILE"
+      info "Nueva credencial interna en .env: $key."
+    fi
+  done
+  # M-29: the demo users with a critical role get a password apart from the shared one. On an
+  # existing Keycloak it is applied by `realms` (DEN_DEMO_CRITICAL_PENDING until then).
+  if [[ -z $(env_get DEN_DEMO_CRITICAL_PASSWORD) ]]; then
+    env_set DEN_DEMO_CRITICAL_PASSWORD "$(random_secret)"
+    env_set DEN_DEMO_CRITICAL_PENDING true
+    chmod 600 "$ENV_FILE"
+    info "Contraseña aparte para los usuarios de demo con rol crítico (DEN_DEMO_CRITICAL_PASSWORD): sudo ./install.sh credentials."
+  fi
+  # M-28: the API's mail inside the Compose network; .env.example's value is the host's Mailpit.
+  case $(env_get DEN_SMTP_URL) in
+    '' | smtp://127.0.0.1:1025 | smtp://localhost:1025)
+      env_set DEN_SMTP_URL smtp://mailpit:1025
+      info "DEN_SMTP_URL=smtp://mailpit:1025 en .env (Mailpit; el servidor real del operador va aquí, DEPLOYMENT.md §3.9)."
+      ;;
+  esac
+  # M-27: the proxy proves to the web that a request came through it; only then does the web
+  # forward the visitor's address. Written into the proxy's routes by write_edge.
+  if [[ -z $(env_get DEN_WEB_PROXY_TOKEN) ]]; then
+    env_set DEN_WEB_PROXY_TOKEN "$(random_secret)"
+    chmod 600 "$ENV_FILE"
+    info "Nueva credencial interna en .env: DEN_WEB_PROXY_TOKEN (el proxy la agrega a lo que manda a la web)."
+  fi
+  # B-28: the API reaches Keycloak's Admin API inside the network; the proxy no longer publishes it.
+  if [[ -z $(env_get DEN_KEYCLOAK_ADMIN_URL) ]]; then
+    env_set DEN_KEYCLOAK_ADMIN_URL http://keycloak:8080/auth
+  fi
+  ensure_trust_proxy
+}
+
+# M-27: the proxy in front and the web, which forwards the visitor's address, may set
+# X-Forwarded-For. By host name, resolved by the API on the Compose network: `edge` (the bundled
+# Traefik) or the container of the proxy already on the server, and `web`.
+ensure_trust_proxy() {
+  local current proxy
+  current=$(env_get DEN_TRUST_PROXY)
+  # Empty, or `web` alone (no proxy was found last time): look for the proxy.
+  if [[ -z $current || $current == web ]]; then
+    if [[ $(env_get DEN_INSTALL_PROXY) == bundled ]]; then proxy=edge; else proxy=$(external_proxy); fi
+    if [[ -z $proxy ]]; then
+      warn "No encontré el contenedor de tu proxy en la red $(env_get TRAEFIK_NETWORK): pon su nombre o su dirección en DEN_TRUST_PROXY de .env, antes de ,web (DEPLOYMENT.md §4.1). Mientras tanto el API no ve la dirección de los visitantes."
+      [[ -n $current ]] || env_set DEN_TRUST_PROXY web
+      return 0
+    fi
+    env_set DEN_TRUST_PROXY "$proxy,web"
+    info "DEN_TRUST_PROXY=$proxy,web en .env: el API ve la dirección de cada visitante (M-27)."
+  elif [[ ! $current =~ ^[0-9]+$ && ,${current// /}, != *,web,* ]]; then
+    env_set DEN_TRUST_PROXY "$current,web"
+    info "DEN_TRUST_PROXY: se agrega web, que reenvía la dirección del visitante al API (M-27)."
+  fi
+}
+
+# The Traefik container on the proxy's network (DEN_INSTALL_PROXY=external), if there is one.
+external_proxy() {
+  local net name
+  net=$(env_get TRAEFIK_NETWORK)
+  [[ -n $net ]] || return 0
+  for name in $(docker network inspect "$net" --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null); do
+    if docker inspect -f '{{.Config.Image}}' "$name" 2>/dev/null | grep -qi traefik; then
+      printf '%s' "$name"
+      return 0
+    fi
+  done
+}
+
+# M-25: no secret may keep the public value of .env.example (a hand-written or copied .env).
+check_example_secrets() {
+  local name value sample bad=()
+  for name in "${EXAMPLE_SECRETS[@]}"; do
+    value=$(env_get "$name")
+    sample=$(example_value "$name")
+    [[ -n $value && -n $sample && $value == "$sample" ]] && bad+=("$name")
+  done
+  ((${#bad[@]} == 0)) ||
+    fail "Estos secretos de .env tienen el valor de ejemplo de .env.example, público: ${bad[*]}. Genera valores propios (DEPLOYMENT.md §4.1)."
 }
 
 # The reference citizen app was renamed (carpeta -> citizen-app, commit 9de1423): a .env from
@@ -173,6 +297,35 @@ require_install() { [[ -f $ENV_FILE ]] || fail "No hay instalación en $ROOT (fa
 # --- checks -------------------------------------------------------------------------------------
 version_ge() { [[ $(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n 1) == "$2" ]]; }
 
+# Docker Engine with Docker's own script (get.docker.com), never piped into a shell (B-30): it is
+# downloaded, its SHA-256 shown and, with DEN_DOCKER_SCRIPT_SHA256 set (a checksum taken from a
+# channel you trust), checked; it runs only after you confirm. The alternative is Docker's
+# packages for your distribution (https://docs.docker.com/engine/install/), then run this again.
+install_docker() {
+  local script sum
+  info "Se puede instalar con el script oficial de Docker (https://get.docker.com) o con los paquetes"
+  info "de Docker para tu distribución (https://docs.docker.com/engine/install/) y ejecutar esto de nuevo."
+  yes_no "¿Descargo el script oficial para revisarlo y ejecutarlo?" s ||
+    fail "Instala Docker Engine ≥ $MIN_ENGINE con Compose ≥ $MIN_COMPOSE y vuelve a ejecutar."
+  script=$(mktemp)
+  curl -fsSL --proto '=https' --tlsv1.2 https://get.docker.com -o "$script" ||
+    fail "No pude descargar https://get.docker.com"
+  sum=$(sha256sum "$script" | cut -d ' ' -f 1)
+  info "Script descargado en $script ($(wc -c <"$script") bytes), SHA-256 $sum"
+  if [[ -n ${DEN_DOCKER_SCRIPT_SHA256-} ]]; then
+    [[ $sum == "${DEN_DOCKER_SCRIPT_SHA256,,}" ]] ||
+      fail "El SHA-256 no es el de DEN_DOCKER_SCRIPT_SHA256: no lo ejecuto."
+    ok "Coincide con DEN_DOCKER_SCRIPT_SHA256"
+  else
+    info "Revísalo antes (less $script) o compara su SHA-256 con uno que obtengas por otro canal"
+    info "(DEN_DOCKER_SCRIPT_SHA256=<sha256> sudo -E ./install.sh lo comprueba solo)."
+    yes_no "¿Lo ejecuto como root?" n || fail "No se instaló Docker. El script quedó en $script."
+  fi
+  sh "$script"
+  rm -f "$script"
+  systemctl enable --now docker >/dev/null 2>&1 || true
+}
+
 check_system() {
   step "Paso 1 · Verificación del servidor"
   [[ $(uname -s) == Linux ]] || fail "Este instalador es para Linux (encontré $(uname -s))."
@@ -192,21 +345,24 @@ check_system() {
   else fail "RAM: ${mem_gb} GB. El mínimo es 8 GB (ver docs/INSTALL.md §1)."; fi
   MEM_GB=$mem_gb
 
+  # The tools this script and the checks use (B-30).
+  local tool missing=()
+  for tool in curl git openssl; do command -v "$tool" >/dev/null 2>&1 || missing+=("$tool"); done
+  ((${#missing[@]} == 0)) ||
+    fail "Faltan programas: ${missing[*]}. Instálalos (p. ej. apt-get install ${missing[*]}) y vuelve a ejecutar."
+
   if ! command -v docker >/dev/null 2>&1; then
     warn "Docker no está instalado."
-    if yes_no "¿Instalo Docker Engine con el script oficial (get.docker.com)?" s; then
-      curl -fsSL https://get.docker.com | sh
-      systemctl enable --now docker >/dev/null 2>&1 || true
-    else
-      fail "Instala Docker Engine con Compose ≥ $MIN_COMPOSE y vuelve a ejecutar."
-    fi
+    install_docker
   fi
   docker info >/dev/null 2>&1 || fail "Docker no responde (¿está iniciado? systemctl start docker)"
-  local cv
+  local cv ev
+  ev=$(docker version --format '{{.Server.Version}}' 2>/dev/null) || true
+  version_ge "${ev:-0}" "$MIN_ENGINE" || fail "Docker Engine ${ev:-desconocido}; se necesita ≥ $MIN_ENGINE."
   cv=$(docker compose version --short 2>/dev/null | sed 's/^v//') || true
   [[ -n $cv ]] || fail "Falta el plugin Docker Compose v2 (paquete docker-compose-plugin)."
   version_ge "$cv" "$MIN_COMPOSE" || fail "Docker Compose $cv; se necesita ≥ $MIN_COMPOSE."
-  ok "Docker $(docker version --format '{{.Server.Version}}'), Compose $cv"
+  ok "Docker $ev, Compose $cv"
 
   local docker_root
   docker_root=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)
@@ -312,9 +468,17 @@ questions() {
     docker network inspect "$EDGE_NET" >/dev/null 2>&1 || fail "No existe la red de Docker '$EDGE_NET'."
     TLS=external
     info "El instalador escribe las rutas del portal y del gateway para tu Traefik (proveedor de archivos)."
-    ask EDGE_ENTRYPOINT "EntryPoint HTTPS de tu Traefik" "websecure"
-    ask EDGE_RESOLVER "certResolver de tu Traefik para el certificado del portal (\"-\": tu Traefik ya lo tiene)" "-"
-    ask EDGE_DIR "Carpeta de configuración dinámica de tu Traefik en este servidor (\"-\": solo generar el archivo)" "-"
+    while :; do
+      ask EDGE_ENTRYPOINT "EntryPoint HTTPS de tu Traefik" "websecure"
+      ask EDGE_RESOLVER "certResolver de tu Traefik para el certificado del portal (\"-\": tu Traefik ya lo tiene)" "-"
+      [[ $EDGE_ENTRYPOINT =~ ^[A-Za-z0-9_-]+$ && $EDGE_RESOLVER =~ ^[A-Za-z0-9_-]+$ ]] && break
+      warn "Solo letras, números, - y _ (nombres de Traefik)."
+    done
+    while :; do
+      ask EDGE_DIR "Carpeta de configuración dinámica de tu Traefik en este servidor (\"-\": solo generar el archivo)" "-"
+      env_quote "$EDGE_DIR" >/dev/null && break
+      warn "Sin comillas ni barras invertidas."
+    done
     [[ $EDGE_DIR == - || -d $EDGE_DIR ]] || fail "No existe la carpeta $EDGE_DIR."
   else
     PROXY=bundled
@@ -333,10 +497,22 @@ questions() {
       done
     else
       TLS=letsencrypt
-      ask ACME_EMAIL "Correo de contacto para Let's Encrypt (opcional)" ""
+      while :; do
+        ask ACME_EMAIL "Correo de contacto para Let's Encrypt (opcional)" ""
+        [[ -z $ACME_EMAIL || $ACME_EMAIL =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] &&
+          env_quote "$ACME_EMAIL" >/dev/null && break
+        warn "Escribe un correo (nombre@dominio) o deja vacío."
+      done
     fi
   fi
   info "El certificado del gateway ($GATEWAY_HOST) no se pide aquí: lo emite la CA de la red (step-ca)."
+  info "La consola de administración de Keycloak (/auth/admin) no se publica (B-28), salvo para las"
+  info "direcciones o redes que indiques aquí (p. ej. la IP fija de la oficina del operador)."
+  while :; do
+    ask ADMIN_ALLOW "Direcciones permitidas para /auth/admin, separadas por comas (Enter = ninguna)" ""
+    admin_sources "$ADMIN_ALLOW" >/dev/null && break
+    warn "Direcciones IP o redes CIDR (203.0.113.10, 198.51.100.0/24), separadas por comas."
+  done
 
   step "Paso 5 · Observabilidad (analítica, métricas y alertas)"
   info "OpenSearch guarda los metadatos de cada llamada para los indicadores; Prometheus, Alertmanager"
@@ -355,9 +531,16 @@ questions() {
   info "Es la única forma, por ahora, de tener el primer administrador de plataforma (docs/INSTALL.md §6)."
   while :; do
     ask_secret DEMO_PASSWORD "Contraseña común de los usuarios de demo, 12 caracteres o más (Enter = una aleatoria)"
-    [[ -z $DEMO_PASSWORD || ${#DEMO_PASSWORD} -ge 12 ]] && break
-    warn "La política de contraseñas de Keycloak exige 12 caracteres o más."
+    if [[ -n $DEMO_PASSWORD && ${#DEMO_PASSWORD} -lt 12 ]]; then
+      warn "La política de contraseñas de Keycloak exige 12 caracteres o más."
+    elif ! env_quote "$DEMO_PASSWORD" >/dev/null; then
+      warn "Sin comillas, barras invertidas ni saltos de línea (\$ y # sí se admiten)."
+    else
+      break
+    fi
   done
+  info "Los usuarios con rol crítico (plataforma, operador, regulador, auditoría, responsable de datos)"
+  info "reciben otra contraseña, aleatoria: la común se puede compartir en un taller (sudo ./install.sh credentials)."
 
   step "Resumen"
   printf '  %-28s %s\n' "País:" "$COUNTRY" \
@@ -383,10 +566,11 @@ DEN_PORTAL_HOST=$PORTAL_HOST
 DEN_GATEWAY_HOST=$GATEWAY_HOST
 DEN_INSTALL_PROXY=$PROXY
 DEN_INSTALL_TLS=$TLS
-DEN_ACME_EMAIL=${ACME_EMAIL-}
+DEN_ACME_EMAIL=$(env_quote "${ACME_EMAIL-}")
 DEN_EDGE_ENTRYPOINT=${EDGE_ENTRYPOINT-websecure}
 DEN_EDGE_CERT_RESOLVER=${EDGE_RESOLVER--}
-DEN_EDGE_DYNAMIC_DIR=${EDGE_DIR--}
+DEN_EDGE_DYNAMIC_DIR=$(env_quote "${EDGE_DIR--}")
+DEN_KEYCLOAK_ADMIN_ALLOW=$(env_quote "${ADMIN_ALLOW-}")
 DEN_INSTALL_OBSERVABILITY=$OBSERVABILITY
 DEN_INSTALL_ANTIVIRUS=$ANTIVIRUS
 EOF
@@ -407,6 +591,7 @@ load_env_settings() {
   EDGE_ENTRYPOINT=$(env_get DEN_EDGE_ENTRYPOINT)
   EDGE_RESOLVER=$(env_get DEN_EDGE_CERT_RESOLVER)
   EDGE_DIR=$(env_get DEN_EDGE_DYNAMIC_DIR)
+  ADMIN_ALLOW=$(env_get DEN_KEYCLOAK_ADMIN_ALLOW)
   [[ -n $PORTAL_HOST && -n $PROXY ]] ||
     fail ".env existe pero no lo escribió este instalador (faltan DEN_PORTAL_HOST / DEN_INSTALL_PROXY). Ver docs/INSTALL.md §7."
 }
@@ -441,10 +626,35 @@ EOF
   ok "Rutas del proxy en infra/edge/dynamic/den.yml"
 }
 
+# admin_sources "a, b": Traefik's sourceRange for Keycloak's administration (B-28), from
+# DEN_KEYCLOAK_ADMIN_ALLOW, each quoted; with none, loopback only, which no visitor has. Fails on an
+# entry that is not an address or a CIDR network.
+admin_sources() {
+  local entry entries out=()
+  IFS=',' read -r -a entries <<<"${1// /}"
+  for entry in "${entries[@]}"; do
+    [[ -z $entry ]] && continue
+    [[ $entry =~ ^[0-9A-Fa-f.:]+(/[0-9]{1,3})?$ ]] || return 1
+    out+=("'$entry'")
+  done
+  ((${#out[@]})) || out=("'127.0.0.1/32'")
+  local IFS=,
+  printf '%s' "${out[*]}"
+}
+
 # render_edge ENTRYPOINT TLS FILE: the routes of the portal and the gateway (den.yml.template).
 render_edge() {
-  sed -e "s/@PORTAL_HOST@/$PORTAL_HOST/g" -e "s/@GATEWAY_HOST@/$GATEWAY_HOST/g" -e "s/@TLS@/$2/g" \
-    -e "s/@ENTRYPOINT@/$1/g" infra/edge/den.yml.template >"$3"
+  local sources token
+  sources=$(admin_sources "${ADMIN_ALLOW-}") ||
+    fail "DEN_KEYCLOAK_ADMIN_ALLOW: direcciones IP o redes CIDR separadas por comas."
+  token=$(env_get DEN_WEB_PROXY_TOKEN)
+  [[ $token =~ ^[A-Za-z0-9_-]{32,}$ ]] ||
+    fail "DEN_WEB_PROXY_TOKEN: 32 o más letras, números, - o _ (sudo ./install.sh start la genera si falta)."
+  # It holds the proxy's token: readable by its owner (root) only.
+  (umask 077 && sed -e "s/@PORTAL_HOST@/$PORTAL_HOST/g" -e "s/@GATEWAY_HOST@/$GATEWAY_HOST/g" \
+    -e "s/@TLS@/$2/g" -e "s/@ENTRYPOINT@/$1/g" -e "s#@ADMIN_SOURCES@#${sources//,/, }#g" \
+    -e "s#@PROXY_TOKEN@#$token#g" infra/edge/den.yml.template >"$3.tmp") && mv -f "$3.tmp" "$3"
+  chmod 600 "$3"
 }
 
 # write_edge_external: the same routes for a Traefik that is already on this server (file
@@ -456,7 +666,7 @@ write_edge_external() {
   render_edge "${EDGE_ENTRYPOINT:-websecure}" "$tls" "$file"
   if [[ -n ${EDGE_DIR-} && $EDGE_DIR != - ]]; then
     [[ -d $EDGE_DIR ]] || fail "No existe la carpeta dinámica de tu Traefik: $EDGE_DIR"
-    install -m 644 "$file" "$EDGE_DIR/den.yml"
+    install -m 600 "$file" "$EDGE_DIR/den.yml"  # it holds DEN_WEB_PROXY_TOKEN
     ok "Rutas del portal y del gateway en $EDGE_DIR/den.yml (tu Traefik las carga solo si vigila esa carpeta)"
   else
     warn "Copia $ROOT/$file a la carpeta de configuración dinámica de tu Traefik: sin esas rutas el portal no responde."
@@ -509,12 +719,23 @@ start_stack() {
   ok "Todos los servicios están arriba"
 }
 
-curl_portal() { # path → HTTP code, through this server's proxy
-  if [[ $PROXY == bundled ]]; then
-    curl -sk -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$PORTAL_HOST:443:127.0.0.1" "https://$PORTAL_HOST$1" || true
-  else
-    curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "https://$PORTAL_HOST$1" || true
-  fi
+curl_portal() { # path [method] → HTTP code, through this server's proxy
+  local args=(-sk -o /dev/null -w '%{http_code}' --max-time 10 -X "${2:-GET}")
+  [[ $PROXY == bundled ]] && args+=(--resolve "$PORTAL_HOST:443:127.0.0.1")
+  curl "${args[@]}" "https://$PORTAL_HOST$1" || true
+}
+
+# not_public PATH METHOD WHAT: the proxy must not send PATH to the API (M-26). The API answers 401
+# there (it wants a token); the web, which gets every other path, 404. Only an exact 404 passes:
+# any other code, or no answer at all, is reported.
+not_public() {
+  local code
+  code=$(curl_portal "$1" "$2")
+  case $code in
+    404) ok "$3 no está expuesto al público (404 en $1)" ;;
+    000) warn "No pude comprobar $1: el proxy no respondió (¿DNS, puerto 443?)" ;;
+    *) warn "¡$2 $1 respondió $code desde afuera, se esperaba 404! $3 podría estar expuesto: revisa las rutas del proxy (DEPLOYMENT.md §5.2)." ;;
+  esac
 }
 
 verify() {
@@ -522,9 +743,11 @@ verify() {
   local code i
   code=$(curl_portal /api/v1/health)
   [[ $code == 200 ]] && ok "API del portal responde (/api/v1/health)" || warn "/api/v1/health respondió $code"
-  code=$(curl_portal /api/v1/opa/bundle.tar.gz)
-  [[ $code != 200 ]] && ok "El bundle de OPA no está expuesto al público ($code)" ||
-    warn "¡/api/v1/opa responde 200 desde afuera! Revisa las rutas del proxy."
+  not_public /api/v1/opa/bundle.tar.gz GET "El bundle de OPA"
+  not_public /api/v1/internal/subject-access POST "El colector de transparencia"
+  code=$(curl_portal /auth/admin/)
+  [[ -z ${ADMIN_ALLOW-} && $code != 403 ]] &&
+    warn "/auth/admin respondió $code desde aquí, se esperaba 403: la consola de Keycloak podría estar expuesta (B-28)."
   code=$(curl_portal /auth/realms/den-portal/.well-known/openid-configuration)
   [[ $code == 200 ]] && ok "Keycloak responde en /auth" || warn "Keycloak respondió $code (puede tardar unos minutos más)"
   if dc exec -T api wget -qO- 'http://opa:8181/health?bundles' >/dev/null 2>&1; then
@@ -557,7 +780,7 @@ summary() {
   printf '  %-26s %s\n' \
     "Portal:" "https://$PORTAL_HOST" \
     "Gateway (sistemas, mTLS):" "https://$GATEWAY_HOST" \
-    "Consola de Keycloak:" "https://$PORTAL_HOST/auth/admin/" \
+    "Consola de Keycloak:" "https://$PORTAL_HOST/auth/admin/ ($([[ -n ${ADMIN_ALLOW-} ]] && echo "desde $ADMIN_ALLOW" || echo "cerrada: DEN_KEYCLOAK_ADMIN_ALLOW"))" \
     "Correo de pruebas:" "https://$PORTAL_HOST/mail" \
     "App ciudadana demo:" "https://$PORTAL_HOST/citizen-app"
   [[ $OBSERVABILITY == true ]] && printf '  %-26s %s\n' "Tablero del operador:" "https://$PORTAL_HOST/grafana/"
@@ -584,9 +807,11 @@ cmd_install() {
   check_dns
   [[ -f $ENV_FILE ]] || write_env
   ensure_env_additions
+  check_example_secrets
   write_edge
   prepare_host
   start_stack
+  apply_pending_realms
   verify
   summary
 }
@@ -603,13 +828,14 @@ cmd_credentials() {
   require_install
   warn "Datos sensibles: no los compartas por canales abiertos."
   printf '  %-34s %s\n' \
-    "Usuarios de demo (contraseña):" "$(env_get DEN_DEMO_USER_PASSWORD)" \
+    "Roles críticos (contraseña aparte):" "$(env_get DEN_DEMO_CRITICAL_PASSWORD)" \
     "  operador / revisor:" "ana.operadora (segundo factor)" \
     "  administrador de plataforma:" "pablo.plataforma (segundo factor)" \
     "  regulador:" "marta.regulador (segundo factor)" \
     "  auditoría:" "sofia.auditora (segundo factor)" \
-    "  publicador (entidad de salud):" "pedro.publicador" \
     "  responsable de datos (salud):" "lucia.datos (segundo factor)" \
+    "Usuarios de demo (contraseña común):" "$(env_get DEN_DEMO_USER_PASSWORD)" \
+    "  publicador (entidad de salud):" "pedro.publicador" \
     "  administradora de entidad:" "elena.admin" \
     "  desarrollador (consumidor):" "carlos.dev" \
     "  ciudadana (app):" "ciudadana.demo" \
@@ -618,6 +844,9 @@ cmd_credentials() {
   [[ $(env_get DEN_INSTALL_OBSERVABILITY) == true ]] &&
     printf '  %-34s %s\n' "Grafana (/grafana):" "admin / $(env_get GRAFANA_ADMIN_PASSWORD)"
   info "Código de segundo factor de los usuarios de demo: sudo ./install.sh otp"
+  info "La contraseña común se puede compartir en un taller; la de los roles críticos, no (M-29)."
+  [[ $(env_get DEN_DEMO_CRITICAL_PENDING) == true ]] &&
+    warn "Keycloak aún tiene la contraseña común en los roles críticos: sudo ./install.sh realms"
   info "Si ya los desactivaste (demo-users disable), no entran: sudo ./install.sh demo-users list"
 }
 
@@ -638,7 +867,13 @@ cmd_platform_role() {
 # while no platform_admin of the operator's own is active.
 cmd_demo_users() {
   require_install
-  local cli=(dc exec -T api node --enable-source-maps dist/admin/demo-users-cli.js)
+  # The master administrator is not in the API's environment (A-2): it goes in for this command
+  # only, by name (`-e VAR` takes the value from here, never on a command line).
+  export KEYCLOAK_ADMIN_USER KEYCLOAK_ADMIN_PASSWORD
+  KEYCLOAK_ADMIN_USER=$(env_get KEYCLOAK_ADMIN_USER)
+  KEYCLOAK_ADMIN_PASSWORD=$(env_get KEYCLOAK_ADMIN_PASSWORD)
+  local cli=(dc exec -T -e KEYCLOAK_ADMIN_USER -e KEYCLOAK_ADMIN_PASSWORD api
+    node --enable-source-maps dist/admin/demo-users-cli.js)
   case ${1:-} in
     list) "${cli[@]}" list ;;
     disable)
@@ -666,10 +901,26 @@ cmd_realms() {
   require_install
   local url s
   url=$(env_get DEN_GATEWAY_KEYCLOAK_URL); url=${url:-http://keycloak:8080/auth}
+  # The critical roles' own demo password (M-29), once, on a realm made before it.
+  local pending=()
+  [[ $(env_get DEN_DEMO_CRITICAL_PENDING) == true ]] && pending=(--demo-critical-password)
   for s in keycloak-citizen-app.mjs keycloak-portal-mfa.mjs keycloak-client-policies.mjs; do
-    docker run --rm --network den_default -v "$ROOT:/w:ro" -w /w -e KEYCLOAK_URL="$url"       "$NODE_IMAGE" node "scripts/$s" || return 1
+    local args=()
+    [[ $s == keycloak-portal-mfa.mjs ]] && args=("${pending[@]}")
+    docker run --rm --network den_default -v "$ROOT:/w:ro" -w /w -e KEYCLOAK_URL="$url" \
+      "$NODE_IMAGE" node "scripts/$s" "${args[@]}" || return 1
   done
+  if ((${#pending[@]})); then
+    env_set DEN_DEMO_CRITICAL_PENDING false
+    ok "Los usuarios de demo con rol crítico tienen su propia contraseña (sudo ./install.sh credentials)"
+  fi
   ok "Realms de Keycloak al día con infra/keycloak"
+}
+
+# After a start: the realm steps a new variable left pending (M-29).
+apply_pending_realms() {
+  [[ $(env_get DEN_DEMO_CRITICAL_PENDING) == true ]] || return 0
+  cmd_realms || warn "No pude aplicar la contraseña de los roles críticos en Keycloak. Reintenta: sudo ./install.sh realms"
 }
 
 cmd_otp() {
@@ -692,13 +943,28 @@ cmd_backup() {
   dc exec -T postgres pg_dump -U "$user" -Fc "$db" >"$dir/den.dump"
   dc exec -T postgres pg_dump -U "$user" -Fc keycloak >"$dir/keycloak.dump"
   # The pgBackRest repository is encrypted: it can leave the server as is.
-  for v in step-ca-data tsa-data api-documents citizen-app-data pgbackrest-repo; do
+  for v in "${BACKUP_VOLUMES[@]}"; do
     docker volume inspect "den_$v" >/dev/null 2>&1 &&
       docker run --rm -v "den_$v:/v:ro" -v "$dir:/b" "$NODE_IMAGE" tar czf "/b/$v.tgz" -C /v .
   done
-  cp "$ENV_FILE" "$dir/env"
+  # Not .env (M-30): it holds the key of the encrypted repository above, the CA's password and
+  # every other secret. It is kept apart, off the server, never in the same place as the backups.
   chmod 600 "$dir"/*
-  ok "Respaldo completo: $(du -sh "$dir" | cut -f1). Cópialo fuera del servidor."
+  ok "Respaldo completo: $(du -sh "$dir" | cut -f1). Cópialo fuera del servidor; .env, aparte."
+  prune_backups
+}
+
+# Keeps the newest DEN_BACKUP_KEEP (5) backups/<date>/ (M-24): each holds the dumps and the CA.
+prune_backups() {
+  local keep old
+  keep=$(env_get DEN_BACKUP_KEEP)
+  [[ $keep =~ ^[1-9][0-9]*$ ]] || keep=5
+  [[ -d $ROOT/backups ]] || return 0
+  for old in $(find "$ROOT/backups" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*-[0-9]*' -printf '%f\n' |
+    grep -E '^[0-9]{8}-[0-9]{6}$' | sort -r | tail -n +$((keep + 1))); do
+    rm -r -- "${ROOT:?}/backups/$old"
+    info "Respaldo antiguo borrado: backups/$old (se conservan $keep, DEN_BACKUP_KEEP)"
+  done
 }
 
 cmd_restore() {
@@ -728,9 +994,53 @@ cmd_update() {
   exec bash "$ROOT/install.sh" update-apply
 }
 
+# The "server lost" procedure (OPERATIONS.md §6.1, M-30), on a new server with this repository and
+# the saved .env: creates the volumes without starting anything, fills them from a backups/<date>/
+# directory (`install.sh backup`), restores the database from the pgBackRest repository into the
+# empty data volume (PostgreSQL never initialises a new cluster), then starts everything and takes
+# a full backup on the new timeline. The same commands as scripts/restore-test.mjs.
+cmd_restore_volumes() {
+  require_install; load_env_settings
+  local dir=${1:-} v
+  [[ -n $dir && -f $dir/pgbackrest-repo.tgz ]] ||
+    fail "Uso: sudo ./install.sh restore-volumes <carpeta de respaldo> (con pgbackrest-repo.tgz, de install.sh backup)"
+  dir=$(cd "$dir" && pwd)
+  [[ -z $(dc ps -q 2>/dev/null) ]] ||
+    fail "Hay contenedores de esta instalación en marcha: esto es para un servidor nuevo. Para volver atrás en el mismo servidor: sudo ./install.sh restore"
+  if docker volume inspect den_pg-data >/dev/null 2>&1; then
+    warn "Ya existe el volumen de datos de PostgreSQL (den_pg-data): se reemplaza su contenido con el respaldo."
+    yes_no "¿Continuar?" n || exit 0
+  fi
+  step "Restauración en un servidor nuevo desde $dir"
+  ensure_env_additions
+  check_example_secrets
+  write_edge
+  prepare_host
+  info "Se crean imágenes, redes y volúmenes sin arrancar nada (10–20 minutos la primera vez)."
+  dc create --build
+  for v in "${BACKUP_VOLUMES[@]}"; do
+    if [[ ! -f $dir/$v.tgz ]]; then
+      warn "No hay $v.tgz en el respaldo: el volumen den_$v queda vacío."
+      continue
+    fi
+    docker volume create "den_$v" >/dev/null
+    docker run --rm -v "den_$v:/v" -v "$dir:/b:ro" "$NODE_IMAGE" \
+      sh -c 'find /v -mindepth 1 -delete && tar xzf "/b/$1.tgz" -C /v' sh "$v"
+    ok "Volumen den_$v restaurado"
+  done
+  # Into the empty data volume, as `restore` does after a lost volume.
+  dc run --rm --no-deps pgbackrest sh -c \
+    "mkdir -p /var/lib/postgresql/18 && pgbackrest --stanza=den --delta restore"
+  ok "Base de datos restaurada desde el repositorio de pgBackRest"
+  start_stack
+  dc exec -T pgbackrest pgbackrest --stanza=den --type=full backup
+  ok "Restaurado. Revisa la cadena de auditoría (Consola → Auditoría → Verificar integridad) y docs/OPERATIONS.md §6.1."
+}
+
 cmd_update_apply() {
   require_install; load_env_settings
   ensure_env_additions
+  check_example_secrets
   write_edge
   dc up -d --build --wait --wait-timeout 1800
   cmd_realms || warn "No pude aplicar la configuración de los realms de Keycloak. Reintenta: sudo ./install.sh realms"
@@ -751,7 +1061,7 @@ cmd_images() {
   else
     [[ $(uname -m) == x86_64 ]] || fail "Las imágenes publicadas son solo para x86_64; este servidor es $(uname -m)."
     env_set DEN_IMAGE_TAG "$tag"
-    if ! dc pull api web wg-hub contract-runner; then
+    if ! dc pull migrate api web wg-hub contract-runner; then
       env_set DEN_IMAGE_TAG ''
       fail "No pude bajar las imágenes $tag de ghcr.io (¿existe la etiqueta? ¿son públicas?). Sigo compilando aquí."
     fi
@@ -768,6 +1078,7 @@ case ${1:-install} in
   logs) require_install; shift; dc logs -f --tail=200 "$@" ;;
   backup) cmd_backup ;;
   restore) shift; cmd_restore "${1:-}" ;;
+  restore-volumes) shift; cmd_restore_volumes "${1:-}" ;;
   update) cmd_update ;;
   update-apply) cmd_update_apply ;;
   images) shift; cmd_images "${1:-}" ;;
@@ -775,7 +1086,11 @@ case ${1:-install} in
   demo-users) shift; cmd_demo_users "$@" ;;
   realms) cmd_realms ;;
   stop) require_install; dc stop ;;
-  start) require_install; ensure_env_additions; dc up -d --wait --wait-timeout 900 ;;
-  -h | --help | help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//' ;;
+  start)
+    require_install; ensure_env_additions; check_example_secrets
+    dc up -d --wait --wait-timeout 900
+    apply_pending_realms
+    ;;
+  -h | --help | help) sed -n '2,/^set -euo/p' "$0" | sed -e '$d' -e 's/^# \{0,1\}//' ;;
   *) fail "Comando desconocido: $1 (ver ./install.sh help)" ;;
 esac

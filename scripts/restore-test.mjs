@@ -7,6 +7,9 @@
 //      --once); a row written before a point in time and another one after it.
 //   2. Disaster: the data volume is lost. Restore the latest state into an empty volume: both rows
 //      are there (the backup plus the archived WAL after it).
+//   2b. The server is lost (M-30, install.sh restore-volumes): the repository travels as the archive
+//      `install.sh backup` makes; on new, empty volumes it is unpacked and the database restored
+//      from it before PostgreSQL ever starts: both rows again.
 //   3. Point-in-time recovery in place (--delta) to the moment between the rows: only the first.
 //   4. A full backup after the restore (new timeline) succeeds, and the repository is unreadable
 //      without its key.
@@ -19,7 +22,13 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE = 'den/postgres:restore-test';
 const RUN = `den-restore-test-${randomBytes(3).toString('hex')}`;
-const VOLUMES = { data: `${RUN}-data`, repo: `${RUN}-repo`, socket: `${RUN}-socket` };
+const VOLUMES = {
+  data: `${RUN}-data`,
+  repo: `${RUN}-repo`,
+  socket: `${RUN}-socket`,
+  // Stands for backups/<date>/ off the server.
+  archive: `${RUN}-archive`,
+};
 const ENV = {
   POSTGRES_USER: 'den',
   POSTGRES_PASSWORD: randomBytes(12).toString('hex'),
@@ -149,6 +158,47 @@ try {
   restore();
   startDatabase();
   expectRows('after,before', 'latest restore');
+
+  log('2b. Server lost: new volumes, the repository from its archive (install.sh restore-volumes)');
+  // install.sh backup: the repository volume as a .tgz.
+  docker(['volume', 'create', VOLUMES.archive]);
+  docker([
+    'run',
+    '--rm',
+    '-v',
+    `${VOLUMES.repo}:/v:ro`,
+    '-v',
+    `${VOLUMES.archive}:/b`,
+    IMAGE,
+    'tar',
+    'czf',
+    '/b/pgbackrest-repo.tgz',
+    '-C',
+    '/v',
+    '.',
+  ]);
+  stopDatabase();
+  for (const volume of [VOLUMES.data, VOLUMES.repo, VOLUMES.socket]) {
+    docker(['volume', 'rm', volume]);
+    docker(['volume', 'create', volume]);
+  }
+  // install.sh restore-volumes: unpack into the new volume, as root (owners kept), then restore
+  // into the empty data volume with the same command; only then does PostgreSQL start.
+  docker([
+    'run',
+    '--rm',
+    '-v',
+    `${VOLUMES.repo}:/v`,
+    '-v',
+    `${VOLUMES.archive}:/b:ro`,
+    IMAGE,
+    'sh',
+    '-c',
+    'find /v -mindepth 1 -delete && tar xzf /b/pgbackrest-repo.tgz -C /v',
+  ]);
+  restore();
+  startDatabase();
+  expectRows('after,before', 'restore on new volumes');
 
   log('3. Point-in-time recovery in place, to the moment between the rows');
   stopDatabase();

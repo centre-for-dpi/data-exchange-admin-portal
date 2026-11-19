@@ -2,7 +2,7 @@
 # ADR-0026). The pilot archives every WAL segment to an encrypted pgBackRest repository and the
 # `pgbackrest` service takes the scheduled backups (docker-compose.deploy.yml); development runs
 # it without archiving. Kubernetes uses CloudNativePG with Barman Cloud instead.
-FROM postgres:18.6-alpine
+FROM postgres:18.6-alpine@sha256:9ba53c7d41ea093baf5c1ba635ba5434c4f979880527d49bb7d9237d3193085b
 RUN apk add --no-cache 'pgbackrest~2.58' \
  && mkdir -p /var/lib/pgbackrest /var/log/pgbackrest /tmp/pgbackrest \
  && chown postgres:postgres /var/lib/pgbackrest /var/log/pgbackrest /tmp/pgbackrest \
