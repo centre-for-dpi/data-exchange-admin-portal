@@ -400,7 +400,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <li><span><b>The person signs in again.</b> Keycloak shows a <b>QR code</b>: they scan it with the authenticator app and type the 6-digit code. From then on they see the <b>Operator console</b>.</span></li>
 <li><span><b>Once the operator's own team has its roles</b>, whoever runs the server disables the demo accounts the pilot ships with (they hold platform roles and the demo password):<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo ./install.sh demo-users list
 sudo ./install.sh demo-users disable --reason "Operator team has its roles"</code></pre></div>
-<p>The installer cannot undo it, and the rehearsal with the demo personas stops working. It refuses while there is no active <code>platform_admin</code> of the operator's own.</p></div></span></li>
+<p>The installer cannot undo it, and the rehearsal with the demo personas stops working. It refuses while there is no active <code>platform_admin</code> of the operator's own. <code>sudo ./install.sh credentials</code> shows the demo passwords: the shared one (the one to hand out at a workshop) and the separate one of the demo users with a critical role.</p></div></span></li>
 </ol>
     </section>
 
@@ -432,16 +432,17 @@ sudo ./install.sh demo-users disable --reason "Operator team has its roles"</cod
 <li><span>Check the data, the document and that the emails are institutional.</span></li>
 <li><span><b>Operator decision:</b> <b>Approve the onboarding</b>, <b>Request corrections</b> (the requester reads the comment) or <b>Reject</b> (final; frees the identifier).</span></li>
 </ol>
-<p>On approval, the requester becomes the <b>administrator</b> and each officer receives an <b>invitation</b> by email, which expires after 14 days. On their next page the administrator is asked to set up the second factor (QR), like the data steward.</p>
+<p>On approval, the requester becomes the <b>administrator</b> and each officer receives an <b>invitation</b> by email, which expires after 14 days. On their next page the administrator is asked to enrol an authenticator app (QR), like the data steward (ADR-0035; step 4).</p>
     </section>
 
     <section id="4-the-officers-accept-their-invitation">
       <h2><span class="num">4</span>The officers accept their invitation</h2>
-<p><b>Who:</b> the data steward and the technical lead.</p>
+<p><b>Who:</b> the entity's administrator (the person who requested the onboarding), the data steward and the technical lead.</p>
 <ol class="steps">
+<li><span><b>The administrator</b>, once the onboarding is approved, signs in and <b>enrols an authenticator app</b>: Keycloak shows a QR code, they scan it and type the 6-digit code. Until they do they cannot act for the entity; from then on they see <b>My entity</b> and can invite the others.</span></li>
 <li><span>Each one registers with <b>exactly</b> the email in the request, verifies it and signs in.</span></li>
 <li><span><b>Invitations →</b> the entity's invitation, with its roles and expiry date <b>→ Accept</b>.</span></li>
-<li><span>The <b>data steward</b> sets up the second factor (QR) the first time they work in the entity.</span></li>
+<li><span>The <b>data steward</b> enrols the authenticator app (QR) the first time they work in the entity, as the administrator did.</span></li>
 </ol>
 <p>If <b>Invitations</b> is empty: the registered email is not identical to the request's, or it is not verified.</p>
     </section>
@@ -556,7 +557,7 @@ sudo docker compose restart den-node</code></pre></div></div></span></li>
 <tr><td>OpenAPI file</td><td class="wrap">The same one configured on the node</td></tr>
 <tr><td>Service type</td><td class="wrap">If the country only allows the node (the pilot, without an X-Road Security Server), the form does not ask: it says the service comes in through the entity's node. If it also allows X-Road, choose <b>Node of the entity (own API or instant API)</b></td></tr>
 <tr><td>Kit node / Service path on the node</td><td class="wrap">The node from 5.1 · <code>/afiliacion</code></td></tr>
-<tr><td>Test service (sandbox)</td><td class="wrap">None, or one with synthetic data</td></tr>
+<tr><td>Test service (sandbox)</td><td class="wrap">None, or one with synthetic data. A <code>direct</code> one (a public HTTPS host) must serve the entity's host-control proof at <code>/.well-known/den-validation</code> (the value comes from <code>GET .../versions/&lt;id&gt;/host-proof</code>; there is no screen for it yet), or the validation fails with "host control not proven"</td></tr>
 <tr><td>Allowed purposes</td><td class="wrap">The country's catalog, for example <i>Eligibility check for a procedure</i></td></tr>
 <tr><td>Data it exposes</td><td class="wrap">Every field of the response, marking the personal and the sensitive ones</td></tr>
 <tr><td>Legal basis / Legal references</td><td class="wrap">The rule that allows sharing the data</td></tr>
@@ -568,7 +569,7 @@ sudo docker compose restart den-node</code></pre></div></div></span></li>
 
     <section id="7-the-operator-approves-the-api">
       <h2><span class="num">7</span>The operator approves the API</h2>
-<p><b>Operator console → Versions in review →</b> the version: review the contract, the exposed data, the purposes and the validation result <b>→ Approve</b>. With failed validations the portal does not allow approving. Sensitive APIs also go to the regulator. On approval the route goes live on the gateway.</p>
+<p><b>Operator console → Versions in review →</b> the version: review the contract, the exposed data, the purposes and the validation result <b>→ Approve</b>. With failed validations the portal does not allow approving. Sensitive APIs also go to the regulator. On approval the route goes live on the gateway. If the operator <b>requests changes</b>, the provider reads the comment on the version sheet, corrects it (<b>My APIs → the version → Edit the version</b>: the creation form, prefilled), saves and sends it for review again.</p>
     </section>
 
     <section id="8-the-consumer-entity">
@@ -636,7 +637,9 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <tr><td>Invitations is empty</td><td class="wrap">The email is not identical to the request's, or not verified</td><td class="wrap">Register the account with the exact email</td></tr>
 <tr><td>"We could not complete the operation" uploading the onboarding document</td><td class="wrap">(Operator, installations before P-06) the API cannot write to its documents folder</td><td class="wrap"><code>sudo ./install.sh update</code> fixes it. By hand: in the portal's <code>.env</code>, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, and recreate the API container (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
 <tr><td>A platform role does not show</td><td class="wrap">The person never signed in</td><td class="wrap">Have them sign in once and grant it again (console or <code>platform-role grant</code>)</td></tr>
+<tr><td>A person lost their Keycloak user or changed address, and the portal sees a stranger with no roles</td><td class="wrap">The portal account is tied to the old identity</td><td class="wrap"><code>sudo ./install.sh relink-identity &lt;email&gt; [--sub &lt;keycloak user id&gt;] [--new-email &lt;address&gt;] --reason "..."</code>; memberships and roles stay, and the person enrols the second factor again</td></tr>
 <tr><td><b>Approve</b> is disabled, or "The version was not approved"</td><td class="wrap">The automatic validations have not passed (still running, or failed)</td><td class="wrap">The version sheet says what each failure means and what to try; fix it and <b>Run validations again</b></td></tr>
+<tr><td>"host control not proven" in the validation</td><td class="wrap">The <code>direct</code> sandbox's host does not serve the proof at <code>/.well-known/den-validation</code>, or serves another value (the proof is per entity and host)</td><td class="wrap">Serve the value from <code>host-proof</code> over HTTPS at that path; no redirects. Ask again after the cooldown</td></tr>
 <tr><td>Validation with <b>504</b> (timeout)</td><td class="wrap">The gateway does not reach the node through the tunnel</td><td class="wrap">On the node: <code>sudo /opt/den-node/install.sh status</code> (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: <code>sudo /opt/den-node/install.sh stop</code> and <code>start</code></td></tr>
 <tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash turned <code>/CN=…</code> into a path (a command typed by hand)</td><td class="wrap">Use the <b>Windows: Git Bash</b> tab on the application's page, or <code>bash entity-check.sh csr</code></td></tr>
 <tr><td><code>schannel: Failed to import cert file</code></td><td class="wrap">Windows' <code>curl</code> (Schannel) cannot use the PEM certificate and key</td><td class="wrap">Use <code>./entity-check.sh call</code> in Git Bash, which goes through OpenSSL there</td></tr>
@@ -663,11 +666,11 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <li><b>P-07</b> ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.</li>
 <li><b>P-08</b> ✔ Disabling the pilot's demo accounts and making the verification link last longer.</li>
 </ul>
-<p>Still open, from the 2026-11 general review (backlog section R):</p>
+<p>Still open, after the fixes of the 2026-11 general review (backlog section R, all of them done; its follow-ups are listed there):</p>
 <ul class="ticks">
-<li><b>Editing a version sent back for changes:</b> the portal's screen only replaces its OpenAPI. Its fields, purposes, legal basis and service can already be changed through the portal's API, but there is no form for it yet.</li>
-<li><b>R-09 (web):</b> after five minutes idle, the first page can fail as if the session had ended (reloading it works); dates show in UTC instead of the country's time zone; the error and "not found" pages are not translated; the notice that the session is ending arrives late.</li>
-<li><b>R-11:</b> some technical documents (architecture, specification, deployment) still describe behaviour the code has since changed; they are being aligned.</li>
+<li><b>Host-control proof:</b> the value a <code>direct</code> sandbox must serve is only available through the portal's API (<code>GET .../versions/&lt;id&gt;/host-proof</code>); the portal has no screen for it yet.</li>
+<li><b>Service level (SLA):</b> the field exists in the data model and nothing captures or shows it.</li>
+<li><b>An expired session on a render:</b> after the cookie fix, the first page after five idle minutes works; a refresh that fails on a rendered page is not retried (a reload does it).</li>
 </ul>
     </section>
 

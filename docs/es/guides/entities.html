@@ -365,14 +365,14 @@ details.faq[open] summary { color: var(--gov); }
     <section id="personas">
       <h2><span class="num">2</span>Personas que la entidad debe designar</h2>
       <div class="roles">
-        <div class="role"><header><code>entity_admin</code></header><span class="who">Jefe de TI o de la oficina de datos</span><p>Pide el alta de la entidad, invita a su gente, asigna roles y gestiona los nodos del kit.</p></div>
+        <div class="role"><header><code>entity_admin</code><span class="tag mfa">2.º factor obligatorio</span></header><span class="who">Jefe de TI o de la oficina de datos</span><p>Pide el alta de la entidad, invita a su gente, asigna roles y gestiona los nodos del kit.</p></div>
         <div class="role"><header><code>data_steward</code><span class="tag mfa">2.º factor obligatorio</span></header><span class="who">Responsable de datos (designación formal)</span><p>Aprueba, rechaza, suspende y revoca accesos a las APIs de la entidad.</p></div>
         <div class="role"><header><code>api_publisher</code></header><span class="who">Responsable técnico</span><p>Registra las APIs y las envía a revisión.</p></div>
         <div class="role"><header><code>app_developer</code></header><span class="who">Desarrollador del sistema consumidor</span><p>Crea aplicaciones, maneja credenciales y pide accesos.</p></div>
       </div>
       <ul class="ticks">
         <li>Cada persona necesita un <b>correo institucional propio</b>: la cuenta se verifica por correo y las invitaciones llegan a esa dirección.</li>
-        <li>El segundo factor se configura con una app autenticadora (FreeOTP, Aegis, Google Authenticator u otra TOTP) en el teléfono de la persona.</li>
+        <li>El segundo factor se configura con una app autenticadora (FreeOTP, Aegis, Google Authenticator u otra TOTP) en el teléfono de la persona. El administrador de la entidad y su responsable de datos deben registrarla en su primer inicio de sesión.</li>
         <li><b>Documento:</b> el acto de designación del responsable de datos y del responsable técnico, en PDF. Se adjunta en la solicitud de alta.</li>
       </ul>
     </section>
@@ -433,7 +433,7 @@ details.faq[open] summary { color: var(--gov); }
         <li><span>El futuro <code>entity_admin</code> entra a <code>https://&lt;portal&gt;</code>, crea su cuenta y confirma el correo.</span></li>
         <li><span>Pide el alta de la entidad: datos, responsables designados y documento de designación. El operador la revisa y la aprueba. Si la entidad ya está incorporada por un acto formal, el operador la da de alta directamente.</span></li>
         <li><span>El <code>entity_admin</code> invita a cada persona a su correo y le asigna roles. Cada invitado crea su cuenta con <b>ese mismo correo</b> y acepta la invitación.</span></li>
-        <li><span>El <code>data_steward</code> configura su segundo factor la primera vez que el portal lo pide.</span></li>
+        <li><span>El <code>entity_admin</code> (apenas el operador aprueba el alta) y el <code>data_steward</code> (tras aceptar la invitación) <b>registran una app autenticadora</b> la primera vez que el portal lo pide: escanean el código QR y escriben el código de 6 dígitos. El portal los envía a registrarla en su próxima página, y hasta que lo hagan no pueden actuar por la entidad. Si pierden el teléfono, el operador lo resuelve borrando la credencial en Keycloak para que la persona la registre de nuevo.</span></li>
       </ol>
     </section>
 
@@ -449,6 +449,8 @@ details.faq[open] summary { color: var(--gov); }
       <div class="callout info">
         <b>Guía de proveedoras</b>
         <p>El token de enrolamiento, la instalación del nodo, la publicación de la API con su sandbox y la revisión están paso a paso en la guía de proveedoras del repositorio del kit.</p>
+        <p><b>Un sandbox <code>direct</code></b> (un servicio de prueba en un host HTTPS público, en lugar del nodo) debe demostrar que la entidad controla el host antes de que el portal le lance la prueba de contrato: el portal da el valor (<code>GET /api/v1/entities/&lt;entityId&gt;/apis/&lt;apiId&gt;/versions/&lt;versionId&gt;/host-proof</code>, para el <code>api_publisher</code> de la entidad; todavía no hay pantalla) y el host lo sirve en <code>/.well-known/den-validation</code>. Sin él la validación falla con "host control not proven" y el operador no puede aprobar. Volver a pedir las validaciones tiene un límite: una vez cada 5 minutos por versión, 10 por hora por entidad.</p>
+        <p><b>Una versión que el operador devuelve</b> (<code>changes_requested</code>) se corrige en el portal: <b>Mis APIs →</b> la versión <b>→ Editar la versión</b>. El formulario es el de creación, ya llenado; guarda y envíala a revisión otra vez.</p>
       </div>
     </section>
 

@@ -400,7 +400,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <li><span><b>La persona vuelve a entrar.</b> Keycloak le muestra un <b>código QR</b>: lo escanea con la app autenticadora y escribe el código de 6 dígitos. Desde ahí ve la <b>Consola del operador</b>.</span></li>
 <li><span><b>Cuando el equipo propio ya tiene sus roles</b>, quien administra el servidor desactiva las cuentas de demostración que trae el piloto (tienen roles de plataforma y la contraseña de demostración):<div style="margin-top:8px;display:grid;gap:10px"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>sudo ./install.sh demo-users list
 sudo ./install.sh demo-users disable --reason "Equipo del operador con sus roles"</code></pre></div>
-<p>No se puede deshacer desde el instalador, y el ensayo con las personas de demostración deja de funcionar. Se niega si no queda un <code>platform_admin</code> propio activo.</p></div></span></li>
+<p>No se puede deshacer desde el instalador, y el ensayo con las personas de demostración deja de funcionar. Se niega si no queda un <code>platform_admin</code> propio activo. <code>sudo ./install.sh credentials</code> muestra las contraseñas de demostración: la compartida (la que se reparte en un taller) y la aparte de los usuarios de demostración con un rol crítico.</p></div></span></li>
 </ol>
     </section>
 
@@ -432,16 +432,17 @@ sudo ./install.sh demo-users disable --reason "Equipo del operador con sus roles
 <li><span>Revisa los datos, el documento y que los correos sean institucionales.</span></li>
 <li><span><b>Decisión del operador:</b> <b>Aprobar el alta</b>, <b>Pedir correcciones</b> (el solicitante lee el comentario) o <b>Rechazar</b> (definitivo; libera el identificador).</span></li>
 </ol>
-<p>Al aprobar, quien pidió el alta queda como <b>administradora</b> y cada responsable recibe una <b>invitación</b> por correo, que vence a los 14 días. En su siguiente página, a la administradora se le pide configurar el segundo factor (QR), como al responsable de datos.</p>
+<p>Al aprobar, quien pidió el alta queda como <b>administradora</b> y cada responsable recibe una <b>invitación</b> por correo, que vence a los 14 días. En su siguiente página, a la administradora se le pide registrar una app autenticadora (QR), como al responsable de datos (ADR-0035; paso 4).</p>
     </section>
 
     <section id="4-los-responsables-aceptan-su-invitacion">
       <h2><span class="num">4</span>Los responsables aceptan su invitación</h2>
-<p><b>Quién:</b> el responsable de datos y el responsable técnico.</p>
+<p><b>Quién:</b> la administradora de la entidad (quien pidió el alta), el responsable de datos y el responsable técnico.</p>
 <ol class="steps">
+<li><span><b>La administradora</b>, una vez aprobada el alta, entra y <b>registra una app autenticadora</b>: Keycloak le muestra un código QR, lo escanea y escribe el código de 6 dígitos. Hasta que lo haga no puede actuar por la entidad; desde ahí ve <b>Mi entidad</b> y puede invitar a los demás.</span></li>
 <li><span>Cada uno se registra con <b>exactamente</b> el correo que aparece en la solicitud, lo verifica y entra.</span></li>
 <li><span><b>Invitaciones →</b> la invitación de la entidad, con sus roles y su fecha de vencimiento <b>→ Aceptar</b>.</span></li>
-<li><span>El <b>responsable de datos</b> configura su segundo factor (QR) la primera vez que trabaja en la entidad.</span></li>
+<li><span>El <b>responsable de datos</b> registra la app autenticadora (QR) la primera vez que trabaja en la entidad, como hizo la administradora.</span></li>
 </ol>
 <p>Si <b>Invitaciones</b> sale vacía: el correo de registro no es idéntico al de la solicitud, o no está verificado.</p>
     </section>
@@ -556,7 +557,7 @@ sudo docker compose restart den-node</code></pre></div></div></span></li>
 <tr><td>Archivo OpenAPI</td><td class="wrap">El mismo que se configuró en el nodo</td></tr>
 <tr><td>Tipo de servicio</td><td class="wrap">Si el país solo admite el nodo (el piloto, sin Security Server de X-Road), el formulario no lo pregunta: dice que el servicio llega por el nodo de la entidad. Si también admite X-Road, elige <b>Nodo de la entidad (API propia o API instantánea)</b></td></tr>
 <tr><td>Nodo del kit / Ruta del servicio en el nodo</td><td class="wrap">El nodo de 5.1 · <code>/afiliacion</code></td></tr>
-<tr><td>Servicio de pruebas (sandbox)</td><td class="wrap">Sin sandbox, o uno con datos sintéticos</td></tr>
+<tr><td>Servicio de pruebas (sandbox)</td><td class="wrap">Sin sandbox, o uno con datos sintéticos. Uno <code>direct</code> (un host HTTPS público) debe servir la prueba de control del host de la entidad en <code>/.well-known/den-validation</code> (el valor sale de <code>GET .../versions/&lt;id&gt;/host-proof</code>; todavía no hay pantalla), o la validación falla con "host control not proven"</td></tr>
 <tr><td>Finalidades permitidas</td><td class="wrap">Las del catálogo del país, por ejemplo <i>Verificación de requisitos de un trámite</i></td></tr>
 <tr><td>Datos que expone</td><td class="wrap">Cada campo de la respuesta, marcando los personales y los sensibles</td></tr>
 <tr><td>Base legal / Referencias normativas</td><td class="wrap">La norma que permite compartir los datos</td></tr>
@@ -568,7 +569,7 @@ sudo docker compose restart den-node</code></pre></div></div></span></li>
 
     <section id="7-el-operador-aprueba-la-api">
       <h2><span class="num">7</span>El operador aprueba la API</h2>
-<p><b>Consola del operador → Versiones en revisión →</b> la versión: revisa el contrato, los datos que expone, las finalidades y el resultado de las validaciones <b>→ Aprobar</b>. Con las validaciones fallidas, el portal no deja aprobar. Las APIs sensibles pasan además por el regulador. Al aprobar, la ruta queda viva en el gateway.</p>
+<p><b>Consola del operador → Versiones en revisión →</b> la versión: revisa el contrato, los datos que expone, las finalidades y el resultado de las validaciones <b>→ Aprobar</b>. Con las validaciones fallidas, el portal no deja aprobar. Las APIs sensibles pasan además por el regulador. Al aprobar, la ruta queda viva en el gateway. Si el operador <b>pide cambios</b>, el proveedor lee el comentario en la ficha de la versión, la corrige (<b>Mis APIs → la versión → Editar la versión</b>: el formulario de creación, ya llenado), guarda y la envía otra vez a revisión.</p>
     </section>
 
     <section id="8-la-entidad-consumidora">
@@ -635,7 +636,9 @@ curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt
 <tr><td>Invitaciones vacía</td><td class="wrap">El correo no es idéntico al de la solicitud, o no está verificado</td><td class="wrap">Registra la cuenta con el correo exacto</td></tr>
 <tr><td>"No pudimos completar la operación" al subir el documento del alta</td><td class="wrap">(Operador, instalaciones anteriores a P-06) el API no puede escribir en su carpeta de documentos</td><td class="wrap"><code>sudo ./install.sh update</code> lo corrige. A mano: en el <code>.env</code> del portal, <code>DEN_DOCUMENTS_DIR=/var/lib/den/documents</code>, y recrea el contenedor del API (<code>docker compose ... up -d --no-build --no-deps api</code>)</td></tr>
 <tr><td>No aparece un rol de plataforma</td><td class="wrap">La persona no ha entrado nunca al portal</td><td class="wrap">Que entre una vez y volver a darlo (consola o <code>platform-role grant</code>)</td></tr>
+<tr><td>Una persona perdió su usuario de Keycloak o cambió de dirección, y el portal ve a una desconocida sin roles</td><td class="wrap">La cuenta del portal está atada a la identidad anterior</td><td class="wrap"><code>sudo ./install.sh relink-identity &lt;correo&gt; [--sub &lt;id del usuario de Keycloak&gt;] [--new-email &lt;dirección&gt;] --reason "..."</code>; las membresías y los roles se quedan, y la persona registra otra vez el segundo factor</td></tr>
 <tr><td><b>Aprobar</b> está deshabilitado, o "La versión no se aprobó"</td><td class="wrap">Las validaciones automáticas no han pasado (siguen en curso o fallaron)</td><td class="wrap">La ficha de la versión dice qué significa cada falla y qué intentar; corrige y <b>Repetir validaciones</b></td></tr>
+<tr><td>"host control not proven" en la validación</td><td class="wrap">El host del sandbox <code>direct</code> no sirve la prueba en <code>/.well-known/den-validation</code>, o sirve otro valor (la prueba es por entidad y host)</td><td class="wrap">Sirve el valor de <code>host-proof</code> por HTTPS en esa ruta; sin redirecciones. Vuelve a pedirla pasado el tiempo de espera</td></tr>
 <tr><td>Validación con <b>504</b> (tiempo agotado)</td><td class="wrap">El gateway no llega al nodo por el túnel</td><td class="wrap">En el nodo: <code>sudo /opt/den-node/install.sh status</code> (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: <code>sudo /opt/den-node/install.sh stop</code> y <code>start</code></td></tr>
 <tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash convirtió <code>/CN=…</code> en una ruta (comando escrito a mano)</td><td class="wrap">Usa la pestaña <b>Windows: Git Bash</b> de la página de la aplicación, o <code>bash entity-check.sh csr</code></td></tr>
 <tr><td><code>schannel: Failed to import cert file</code></td><td class="wrap">El <code>curl</code> de Windows (Schannel) no puede usar el certificado y la clave PEM</td><td class="wrap">Usa <code>./entity-check.sh call</code> en Git Bash, que ahí va por OpenSSL</td></tr>
@@ -662,11 +665,11 @@ curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt
 <li><b>P-07</b> ✔ Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.</li>
 <li><b>P-08</b> ✔ Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.</li>
 </ul>
-<p>Sigue abierto, de la revisión general de 2026-11 (sección R del backlog):</p>
+<p>Sigue abierto, tras las correcciones de la revisión general de 2026-11 (sección R del backlog, todas hechas; sus pendientes están listados allí):</p>
 <ul class="ticks">
-<li><b>Editar una versión devuelta para cambios:</b> la pantalla del portal solo reemplaza su OpenAPI. Sus campos, finalidades, base legal y servicio ya se pueden cambiar por el API del portal, pero todavía no hay formulario para eso.</li>
-<li><b>R-09 (web):</b> tras cinco minutos sin actividad, la primera página puede fallar como si la sesión hubiera terminado (al recargarla funciona); las fechas salen en UTC y no en la zona horaria del país; las páginas de error y de "no encontrado" no están traducidas; el aviso de que la sesión va a terminar llega tarde.</li>
-<li><b>R-11:</b> algunos documentos técnicos (arquitectura, especificación, despliegue) todavía describen comportamientos que el código ya cambió; se están alineando.</li>
+<li><b>Prueba de control del host:</b> el valor que debe servir un sandbox <code>direct</code> solo está disponible por el API del portal (<code>GET .../versions/&lt;id&gt;/host-proof</code>); el portal todavía no tiene pantalla para él.</li>
+<li><b>Nivel de servicio (SLA):</b> el campo existe en el modelo de datos y nada lo captura ni lo muestra.</li>
+<li><b>Sesión vencida en una página renderizada:</b> tras la corrección de la cookie, la primera página después de cinco minutos sin actividad funciona; un refresco que falla en una página renderizada no se reintenta (recargar lo hace).</li>
 </ul>
     </section>
 

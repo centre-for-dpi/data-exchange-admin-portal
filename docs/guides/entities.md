@@ -18,12 +18,12 @@ This guide explains what each entity has to **appoint, provide and do** to conne
 
 | Role in the portal | Usually | What they do | Second factor |
 | :-- | :-- | :-- | :-- |
-| `entity_admin` | Head of IT or of the data office | Requests the entity's registration, invites its people and assigns roles, manages the kit's nodes | — |
+| `entity_admin` | Head of IT or of the data office | Requests the entity's registration, invites its people and assigns roles, manages the kit's nodes | **Required** |
 | `data_steward` | The person accountable for the data (formal appointment) | Approves, rejects, suspends and revokes access to the entity's APIs | **Required** |
 | `api_publisher` | Technical lead | Registers the APIs and submits them for review | — |
 | `app_developer` | Developer of the consumer system | Creates applications, manages credentials and requests access | — |
 
-Each person needs their **own institutional email address**: the account is verified by email, and invitations are sent to that address. The second factor is set up with an authenticator app (FreeOTP, Aegis, Google Authenticator or any other TOTP app) on the person's phone.
+Each person needs their **own institutional email address**: the account is verified by email, and invitations are sent to that address. The second factor is set up with an authenticator app (FreeOTP, Aegis, Google Authenticator or any other TOTP app) on the person's phone. The entity's administrator and its data steward have to enrol it at their first sign-in.
 
 **Document:** the act appointing the data steward and the technical lead, as a PDF. It is attached to the registration request.
 
@@ -149,11 +149,16 @@ It checks DNS, outbound HTTPS to the portal and to the gateway, and that the gat
 1. The future `entity_admin` goes to `https://<portal>`, creates an account and confirms the email address.
 2. They request the entity's registration: its details, the appointed leads and the appointment document. The operator reviews and approves it. If the entity has already been onboarded by a formal act, the operator registers it directly.
 3. The `entity_admin` invites each person by email and assigns roles. Each invitee creates an account with **that same email address** and accepts the invitation.
-4. The `data_steward` sets up the second factor the first time the portal asks for it.
+4. The `entity_admin` (as soon as the operator approves the registration) and the `data_steward` (after accepting the invitation) **enrol an authenticator app** the first time the portal asks for it: they scan the QR code and type the 6-digit code. The portal sends them to enrol at their next page, and until they do they cannot act for the entity. A lost phone is recovered by the operator, who deletes the credential in Keycloak so the person enrols again.
 
 ### 4.3 Provider entity: install the node and publish an API
 
 This is covered in the **provider guide** in the kit repository: the enrollment token, installing the node, publishing the API with its sandbox, the review, and what the service receives with each request.
+
+Two things on the portal's side:
+
+- **A `direct` sandbox** (a test service at a public HTTPS host, instead of the node) must prove that the entity controls the host before the portal fires the contract test at it: the portal gives the value (`GET /api/v1/entities/<entityId>/apis/<apiId>/versions/<versionId>/host-proof`, for the entity's `api_publisher`; there is no screen for it yet) and the host serves it at `/.well-known/den-validation`. Without it the validation fails with "host control not proven" and the operator cannot approve. Asking for the validations again is limited (once every 5 minutes per version, 10 an hour per entity).
+- **A version the operator returns** (`changes_requested`) is corrected on the portal: **My APIs →** the version **→ Edit the version**. The form is the creation form, prefilled (fields, legal basis, purposes, service and, if you wish, the OpenAPI); save and send it for review again.
 
 ### 4.4 Consumer entity: first request
 

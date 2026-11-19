@@ -365,14 +365,14 @@ details.faq[open] summary { color: var(--gov); }
     <section id="personas">
       <h2><span class="num">2</span>People the entity must appoint</h2>
       <div class="roles">
-        <div class="role"><header><code>entity_admin</code></header><span class="who">Head of IT or of the data office</span><p>Requests the entity's registration, invites its people, assigns roles and manages the kit's nodes.</p></div>
+        <div class="role"><header><code>entity_admin</code><span class="tag mfa">2nd factor required</span></header><span class="who">Head of IT or of the data office</span><p>Requests the entity's registration, invites its people, assigns roles and manages the kit's nodes.</p></div>
         <div class="role"><header><code>data_steward</code><span class="tag mfa">2nd factor required</span></header><span class="who">Data steward (formal appointment)</span><p>Approves, rejects, suspends and revokes access to the entity's APIs.</p></div>
         <div class="role"><header><code>api_publisher</code></header><span class="who">Technical lead</span><p>Registers the APIs and submits them for review.</p></div>
         <div class="role"><header><code>app_developer</code></header><span class="who">Developer of the consumer system</span><p>Creates applications, manages credentials and requests access.</p></div>
       </div>
       <ul class="ticks">
         <li>Each person needs their <b>own institutional email address</b>: the account is verified by email, and invitations are sent to that address.</li>
-        <li>The second factor is set up with an authenticator app (FreeOTP, Aegis, Google Authenticator or any other TOTP app) on the person's phone.</li>
+        <li>The second factor is set up with an authenticator app (FreeOTP, Aegis, Google Authenticator or any other TOTP app) on the person's phone. The entity's administrator and its data steward have to enrol it at their first sign-in.</li>
         <li><b>Document:</b> the act appointing the data steward and the technical lead, as a PDF. It is attached to the registration request.</li>
       </ul>
     </section>
@@ -433,7 +433,7 @@ details.faq[open] summary { color: var(--gov); }
         <li><span>The future <code>entity_admin</code> goes to <code>https://&lt;portal&gt;</code>, creates an account and confirms the email address.</span></li>
         <li><span>They request the entity's registration: its details, the appointed leads and the appointment document. The operator reviews and approves it. If the entity has already been onboarded by a formal act, the operator registers it directly.</span></li>
         <li><span>The <code>entity_admin</code> invites each person by email and assigns their roles. Each invitee creates an account with <b>that same email address</b> and accepts the invitation.</span></li>
-        <li><span>The <code>data_steward</code> sets up the second factor the first time the portal asks for it.</span></li>
+        <li><span>The <code>entity_admin</code> (as soon as the operator approves the registration) and the <code>data_steward</code> (after accepting the invitation) <b>enrol an authenticator app</b> the first time the portal asks for it: they scan the QR code and type the 6-digit code. The portal sends them to enrol at their next page, and until they do they cannot act for the entity. A lost phone is recovered by the operator, who deletes the credential in Keycloak so the person enrols again.</span></li>
       </ol>
     </section>
 
@@ -449,6 +449,8 @@ details.faq[open] summary { color: var(--gov); }
       <div class="callout info">
         <b>Provider guide</b>
         <p>The enrollment token, installing the node, publishing the API with its sandbox, and the review are covered step by step in the provider guide in the kit repository.</p>
+        <p><b>A <code>direct</code> sandbox</b> (a test service at a public HTTPS host, instead of the node) must prove that the entity controls the host before the portal fires the contract test at it: the portal gives the value (<code>GET /api/v1/entities/&lt;entityId&gt;/apis/&lt;apiId&gt;/versions/&lt;versionId&gt;/host-proof</code>, for the entity's <code>api_publisher</code>; there is no screen for it yet) and the host serves it at <code>/.well-known/den-validation</code>. Without it the validation fails with "host control not proven" and the operator cannot approve. Asking for the validations again is limited: once every 5 minutes per version, 10 an hour per entity.</p>
+        <p><b>A version the operator returns</b> (<code>changes_requested</code>) is corrected on the portal: <b>My APIs →</b> the version <b>→ Edit the version</b>. The form is the creation form, prefilled; save and send it for review again.</p>
       </div>
     </section>
 

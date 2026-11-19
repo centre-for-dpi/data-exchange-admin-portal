@@ -60,11 +60,13 @@ flowchart LR
 | `data_steward` | Each entity's data steward | Approve, reject, suspend and revoke access to its APIs |
 | `app_developer` | Each entity | Create applications, credentials and access requests |
 
-Critical roles (platform roles and `data_steward`) require a **second factor** (a TOTP code from an authenticator app). Nobody approves what they themselves requested (separation of duties).
+Critical roles (the platform roles, `entity_admin` and `data_steward`) require a **second factor** (a TOTP code from an authenticator app). Nobody approves what they themselves requested (separation of duties).
 
 Each person of the operator registers in the portal, verifies the address and signs in once. The first `platform_admin` is granted on the server, with `sudo ./install.sh platform-role grant <email> <role>`, audited (`list` shows who has which, `revoke` takes it away; the command also serves for recovery). From then on, that administrator grants and revokes the other roles, and disables or enables accounts, from **Operator console → Platform roles and accounts**, with a reason that goes to the audit log.
 
-The pilot always loads the demo users (`pablo.plataforma`, `ana.operadora` and the others in `infra/keycloak/README.md`), with their platform roles and the installer's demo password. Once the operator's own people have their roles, with at least one `platform_admin` of its own, disable them: `sudo ./install.sh demo-users disable`. They can no longer sign in (disabled in Keycloak), they lose their platform roles, and the seed leaves them that way on every restart and update. It is audited, it refuses while the only active `platform_admin` is a demo user, and no command undoes it; `demo-users list` shows their state. From then on the demo rehearsal (`DEMO.md`) no longer runs on that installation.
+A person who lost their Keycloak user, or changed address, would register as a stranger and get none of their memberships or roles. `sudo ./install.sh relink-identity <email> [--sub <keycloak user id>] [--new-email <address>] --reason "..."` points their portal account at the new identity: memberships and roles stay, and it is audited. It refuses if the new identity has already signed in to the portal, and the person enrols the second factor again.
+
+The pilot always loads the demo users (`pablo.plataforma`, `ana.operadora` and the others in `infra/keycloak/README.md`), with their platform roles and the installer's demo password. The demo users with a critical role (the platform roles, the data steward and the entity administrator) have a different password of their own, and the shared one is the one to hand out at a workshop; `sudo ./install.sh credentials` shows both. Once the operator's own people have their roles, with at least one `platform_admin` of its own, disable them: `sudo ./install.sh demo-users disable`. They can no longer sign in (disabled in Keycloak), they lose their platform roles, and the seed leaves them that way on every restart and update. It is audited, it refuses while the only active `platform_admin` is a demo user, and no command undoes it; `demo-users list` shows their state. From then on the demo rehearsal (`DEMO.md`) no longer runs on that installation.
 
 The email verification link lasts 60 minutes (Keycloak's default is 5). `sudo ./install.sh update` applies it, with the rest of the realm settings, to an installation made before; `sudo ./install.sh realms` does only that.
 
@@ -165,8 +167,8 @@ draft → in review → approved by the operator → [approved by the regulator,
 ```
 
 1. The entity's publisher uploads the OpenAPI contract and states where the service lives, which data it exposes, the legal basis and the allowed purposes.
-2. When it is submitted for review, the portal tests connectivity (through the gateway) and the contract against the sandbox.
-3. The operator reviews the API's details and data minimization. If the classification is **sensitive**, the regulator approves too.
+2. When it is submitted for review, the portal tests connectivity (through the gateway) and the contract against the sandbox. A `direct` sandbox (a public HTTPS host instead of the node) must first prove that the provider controls it, by serving a value at `/.well-known/den-validation`; without it the contract test fails and the operator cannot approve. Asking again is limited (`DEN_VALIDATION_COOLDOWN_SECONDS`, 300, per version; `DEN_VALIDATION_MAX_PER_HOUR`, 10, per entity; `DEPLOYMENT.md §4`).
+3. The operator reviews the API's details and data minimization. If the classification is **sensitive**, the regulator approves too. If it asks for changes, the provider corrects the version on the portal (**My APIs → the version → Edit the version**) and sends it again.
 4. Once published, the route appears in the gateway within seconds, **closed**: with no subscriptions, nobody gets in.
 
 ### 5.2 Requesting and granting access
@@ -231,7 +233,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
    git clone https://github.com/centre-for-dpi/data-exchange-admin-portal.git den && cd den
    sudo ./install.sh
    ```
-   The script asks for the country, the two names, the proxy and the certificate, whether to enable observability and the document antivirus, and the demo password (12 characters or more). It then generates all the secrets, builds, starts and checks everything.
+   The script asks for the country, the two names, the proxy and the certificate, the addresses allowed to reach Keycloak's administration (by default none: `/auth/admin` is blocked at the edge, `DEN_KEYCLOAK_ADMIN_ALLOW`), whether to enable observability and the document antivirus, and the demo password (12 characters or more). It then generates all the secrets, builds, starts and checks everything.
 3. **Hand over:**
    - an encrypted copy of `.env`, kept off the server (in the operator's custody);
    - the credentials (`sudo ./install.sh credentials`) to the right people;
@@ -248,15 +250,15 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 | The step-ca volume | The network CA's keys | Operator (encrypted backup) |
 | `PGBACKREST_REPO1_CIPHER_PASS` | Encrypts the database backups: without it, none of them can be restored | Operator, copy off the server, next to the `.env` |
 | `DEN_SECRETS_KEY` | Seals the clients' secrets and the key the gateway signs with | Operator, inside the `.env` |
-| Keycloak administrator | Control over identities | Operator, two people |
+| Keycloak administrator | Control over identities; its console (`/auth/admin`) answers 403 except from the addresses in `DEN_KEYCLOAK_ADMIN_ALLOW` | Operator, two people |
 | Users with the `regulator` role | Oversight | Regulator |
 
 ## 8. Day-to-day operations
 
 - **Daily** (`OPERATIONS.md §4.1`): healthy services (`sudo ./install.sh status`), nothing out of sync with the gateway, an intact audit chain (Console → Audit → "Verify integrity"), an intact transparency log.
 - **Backups:** the database backs itself up (pgBackRest): every change is archived within a few minutes and there is a backup every day, with a month of history. Run `sudo ./install.sh backup` before each update and regularly, to take a copy off the server. Also keep the `PGBACKREST_REPO1_CIPHER_PASS` key from the `.env` off the server: without it, nothing can be restored.
-- **Restore:** `sudo ./install.sh restore` returns to the latest state; `sudo ./install.sh restore "2026-11-20 14:30:00-05"`, to that point in time (`OPERATIONS.md §6`).
-- **Update:** `sudo ./install.sh update`, which backs up, updates, rebuilds, restarts and applies the realm settings to Keycloak (`sudo ./install.sh realms` on its own).
+- **Restore:** `sudo ./install.sh restore` returns to the latest state; `sudo ./install.sh restore "2026-11-20 14:30:00-05"`, to that point in time (`OPERATIONS.md §6`). If the server itself is lost, `sudo ./install.sh restore-volumes <backups/date>` on a new server with the saved `.env` recreates every volume from a backup directory (`OPERATIONS.md §6.1`).
+- **Update:** `sudo ./install.sh update` backs up, pulls, **re-runs the installer from the files just pulled** (so the new version adds its variables and secrets to `.env`), refuses secrets that still have the public example's value, rebuilds, restarts and applies the realm settings to Keycloak (`sudo ./install.sh realms` on its own). A pilot installed before the 2026-11 review follows `DEPLOYMENT.md §5.5`: the first update with the old installer stops asking for a new variable, and a second one finishes it.
 - **Operator runbook** (`RUNBOOK.md`): registering an entity up to its first published API, suspension and offboarding; incidents with severities and a procedure for each case; rotation of the intermediate CA, planned and emergency; mass certificate revocation.
 - **Mass certificate revocation:** Console → Mass certificate revocation, only `platform_admin` with a second factor. It filters by entity, by issue date and by intermediate, shows a preview, and revokes only if the set has not changed. Each certificate stops working within 60 seconds and the developers receive a notification. It cannot be undone.
 - **Gateway signing key:** the portal rotates it on its own every 90 days; the previous one stays in the JWKS so that archived assertions keep verifying. If it is compromised, rotate it immediately as compromised (`POST /api/v1/admin/gateway-signing-keys/rotate`) and notify the providers (`RUNBOOK.md §2.2`).
@@ -292,7 +294,7 @@ Full details in [`INSTALL.md`](../INSTALL.md). Summary:
 
 | Decision | Today | What it implies |
 | :-- | :-- | :-- |
-| Second factor for `entity_admin` and `api_publisher` | Only the platform roles (including `regulator` and `auditor`) and `data_steward` | ASVS level 2 requires it for all access. It is a configuration setting, but it changes how entities sign in |
+| Second factor for `api_publisher` and `app_developer` | Not required: the platform roles (including `regulator` and `auditor`), `entity_admin` and `data_steward` are (ADR-0035) | ASVS level 2 requires it for all access. Extending it is a code change (`MFA_ENTITY_ROLES`), and it changes how developers sign in |
 | Public catalog | Off (`features.publicCatalog`) | When on, anyone can see the APIs with a public classification, without the steward's contact details or the status of the nodes |
 | Signed gateway assertion | On (`features.gatewayAssertion`) | Each provider can verify it, and decide whether to require it |
 | Provider channels | The node and X-Road (`features.upstreams`); X-Road only with the operator's Security Server | Adding `direct` lets entities publish a public HTTPS API without a node: the entity must expose its API to the gateway and keep its own certificates (ADR-0029) |

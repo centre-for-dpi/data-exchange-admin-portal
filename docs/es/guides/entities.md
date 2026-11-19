@@ -18,12 +18,12 @@ Esta guía explica qué tiene que **designar, disponer y hacer** cada entidad pa
 
 | Rol en el portal | Quién suele ser | Qué hace | Segundo factor |
 | :-- | :-- | :-- | :-- |
-| `entity_admin` | Jefe de TI o de la oficina de datos | Pide el alta de la entidad, invita a su gente y asigna roles, gestiona los nodos del kit | — |
+| `entity_admin` | Jefe de TI o de la oficina de datos | Pide el alta de la entidad, invita a su gente y asigna roles, gestiona los nodos del kit | **Obligatorio** |
 | `data_steward` (responsable de datos) | Quien responde por los datos (designación formal) | Aprueba, rechaza, suspende y revoca accesos a las APIs de la entidad | **Obligatorio** |
 | `api_publisher` | Responsable técnico | Registra las APIs y las envía a revisión | — |
 | `app_developer` | Desarrollador del sistema consumidor | Crea aplicaciones, maneja credenciales y pide accesos | — |
 
-Cada persona necesita un **correo institucional propio**: la cuenta se verifica por correo y las invitaciones llegan a esa dirección. El segundo factor se configura con una app autenticadora (FreeOTP, Aegis, Google Authenticator u otra TOTP) en el teléfono de la persona.
+Cada persona necesita un **correo institucional propio**: la cuenta se verifica por correo y las invitaciones llegan a esa dirección. El segundo factor se configura con una app autenticadora (FreeOTP, Aegis, Google Authenticator u otra TOTP) en el teléfono de la persona. El administrador de la entidad y su responsable de datos deben registrarla en su primer inicio de sesión.
 
 **Documento:** el acto de designación del responsable de datos y del responsable técnico, en PDF. Se adjunta en la solicitud de alta.
 
@@ -149,11 +149,16 @@ Comprueba el DNS, la salida HTTPS al portal y al gateway, y que el certificado d
 1. El futuro `entity_admin` entra a `https://<portal>`, crea su cuenta y confirma el correo.
 2. Pide el alta de la entidad: datos, responsables designados y documento de designación. El operador la revisa y la aprueba. Si la entidad ya está incorporada por un acto formal, el operador la da de alta directamente.
 3. El `entity_admin` invita a cada persona a su correo y asigna roles. Cada invitado crea su cuenta con **ese mismo correo** y acepta la invitación.
-4. El `data_steward` configura su segundo factor la primera vez que el portal lo pide.
+4. El `entity_admin` (apenas el operador aprueba el alta) y el `data_steward` (tras aceptar la invitación) **registran una app autenticadora** la primera vez que el portal lo pide: escanean el código QR y escriben el código de 6 dígitos. El portal los envía a registrarla en su próxima página, y hasta que lo hagan no pueden actuar por la entidad. Si pierden el teléfono, el operador lo resuelve borrando la credencial en Keycloak para que la persona la registre de nuevo.
 
 ### 4.3 Entidad proveedora: instalar el nodo y publicar una API
 
 Está en la **guía de proveedoras** del repositorio del kit: el token de enrolamiento, la instalación del nodo, la publicación de la API con su sandbox, la revisión y lo que recibe el servicio en cada consulta.
+
+Dos cosas del lado del portal:
+
+- **Un sandbox `direct`** (un servicio de prueba en un host HTTPS público, en lugar del nodo) debe demostrar que la entidad controla el host antes de que el portal le lance la prueba de contrato: el portal da el valor (`GET /api/v1/entities/<entityId>/apis/<apiId>/versions/<versionId>/host-proof`, para el `api_publisher` de la entidad; todavía no hay pantalla) y el host lo sirve en `/.well-known/den-validation`. Sin él la validación falla con "host control not proven" y el operador no puede aprobar. Volver a pedir las validaciones tiene un límite (una vez cada 5 minutos por versión, 10 por hora por entidad).
+- **Una versión que el operador devuelve** (`changes_requested`) se corrige en el portal: **Mis APIs →** la versión **→ Editar la versión**. El formulario es el de creación, ya llenado (campos, base legal, finalidades, servicio y, si quieres, el OpenAPI); guarda y envíala a revisión otra vez.
 
 ### 4.4 Entidad consumidora: primera consulta
 
