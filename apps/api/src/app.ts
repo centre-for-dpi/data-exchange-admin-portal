@@ -1,7 +1,9 @@
 import type { Type } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { PLATFORM_PERMISSIONS } from './auth/authz.policy.js';
 import { TOKEN_VERIFIER, type TokenVerifier } from './auth/token-verifier.js';
+import { PrismaService } from './prisma/prisma.service.js';
 import { registerRateLimit } from './common/rate-limit.js';
 import { METRICS_PATH, MetricsService, metricsTokenMatches } from './metrics/metrics.service.js';
 import { AppModule } from './app.module.js';
@@ -37,6 +39,26 @@ const verifiedSubject = async (token: string): Promise<string | null> => {
 };
 const uploadTokenValid = async (token: string): Promise<boolean> =>
   !tokenVerifier || (await verifiedSubject(token)) !== null;
+
+/** The portal's database, set once the app exists (configureApp); none in bare adapters. */
+let prisma: PrismaService | undefined;
+/**
+ * Whether the caller may upload the kit's bundle (kit_release.manage), checked before its up to
+ * 128 MiB body is read: a valid token alone would let any self-registered user make the API
+ * buffer it. Roles come from PostgreSQL, never from the token (ADR-0004); the guard still makes
+ * the full check (MFA included) after the body is read.
+ */
+const kitBundleUploader = async (token: string): Promise<boolean> => {
+  if (!tokenVerifier || !prisma) return true;
+  const sub = await verifiedSubject(token);
+  if (!sub) return false;
+  const allowed: readonly string[] = PLATFORM_PERMISSIONS['kit_release.manage'];
+  const user = await prisma.user.findUnique({
+    where: { keycloakSub: sub },
+    select: { status: true, platformRoles: { select: { role: true } } },
+  });
+  return user?.status === 'active' && user.platformRoles.some(({ role }) => allowed.includes(role));
+};
 
 /**
  * Who may set X-Forwarded-For (DEN_TRUST_PROXY, M6-01): request.ip is then the caller's address,
@@ -105,9 +127,16 @@ export function createAdapter(): FastifyAdapter {
           // The token is verified here, before the body is read (M6-01): a made-up one does not
           // get to send megabytes. The guard checks the caller's roles after.
           const token = /^Bearer (\S+)$/.exec(request.headers.authorization ?? '')?.[1];
-          if (token && (await uploadTokenValid(token))) return;
-          const problem = toProblem({ statusCode: 401 }, instancePath(request.url));
-          await reply.code(401).type(PROBLEM_CONTENT_TYPE).send(problem);
+          if (!token || !(await uploadTokenValid(token))) {
+            const problem = toProblem({ statusCode: 401 }, instancePath(request.url));
+            await reply.code(401).type(PROBLEM_CONTENT_TYPE).send(problem);
+            return;
+          }
+          // The bundle's limit is much larger: only its uploaders get to send it (P-03).
+          if (bundle && !(await kitBundleUploader(token))) {
+            const problem = toProblem({ statusCode: 403 }, instancePath(request.url));
+            await reply.code(403).type(PROBLEM_CONTENT_TYPE).send(problem);
+          }
         },
       ];
       return;
@@ -141,6 +170,11 @@ export async function configureApp(app: NestFastifyApplication): Promise<NestFas
     tokenVerifier = app.get<TokenVerifier>(TOKEN_VERIFIER, { strict: false });
   } catch {
     tokenVerifier = undefined;
+  }
+  try {
+    prisma = app.get(PrismaService, { strict: false });
+  } catch {
+    prisma = undefined;
   }
   await registerRateLimit(app, verifiedSubject);
   await app.init();

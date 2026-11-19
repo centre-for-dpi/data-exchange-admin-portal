@@ -201,6 +201,32 @@ describe('the node kit from the portal (P-03)', () => {
     }
   });
 
+  it('refuses a non-uploader before reading the bundle body', async () => {
+    // A valid token is not enough to make the API buffer up to 128 MiB: the role is checked in
+    // onRequest. A declared length over the limit gets the 403 there; only the uploader reaches
+    // the body checks (413 for the same request).
+    const version = newVersion();
+    const b = bundle();
+    await call('PUT', `/admin/kit-releases/${version}`, 'pablo.plataforma', release(version, b));
+    const oversized = async (who: string) =>
+      app.inject({
+        method: 'PUT',
+        url: `/api/v1/admin/kit-releases/${version}/bundle`,
+        headers: {
+          ...(await auth(who)),
+          'content-type': 'application/gzip',
+          'content-length': String(128 * 1024 * 1024 + 1),
+        },
+        payload: b.bytes,
+      });
+    for (const who of ['elena.admin', 'ana.operadora']) {
+      const res = await oversized(who);
+      expect(res.statusCode, who).toBe(403);
+      expect(res.headers['content-type']).toContain('application/problem+json');
+    }
+    expect((await oversized('pablo.plataforma')).statusCode).not.toBe(403);
+  });
+
   it('mirrors the declared bundle only, once, and serves it anonymously for good', async () => {
     const version = newVersion();
     const b = bundle();
