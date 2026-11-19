@@ -79,7 +79,7 @@ describe('review: receipt tampering', () => {
     const base = receiptFor(0);
     for (const timestamp of [v1.timestamp, '', 'AAAA', undefined, 1, {}]) {
       const result = await verify({ ...base, timestamp });
-      expect(result.valid, String(timestamp)).toBe(false);
+      expect(result.valid, JSON.stringify(timestamp)).toBe(false);
       expect(result.checks.timestamp).toBe('invalid');
     }
     // Trusting no root at all is not "valid" either.

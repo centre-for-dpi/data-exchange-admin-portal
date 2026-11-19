@@ -208,25 +208,14 @@ Igual que los pasos 2 a 4. Si una sola persona tendrá todos los papeles, pone s
 
 ### 8.3 El certificado de la aplicación (mTLS)
 
-La clave privada se genera **en el servidor donde correrá la aplicación** y nunca sale de ahí; al portal solo va la solicitud (CSR). Lo más fácil es el script `entity-check.sh` del repositorio del portal, que el operador entrega a las entidades:
+La clave privada se genera **en el servidor donde correrá la aplicación** y nunca sale de ahí; al portal solo va la solicitud (CSR). La página de la aplicación, en **Certificado de cliente (mTLS)**, trae los comandos listos con el Client ID, en pestañas: **Linux o macOS**, **Windows: Git Bash** y **Windows: PowerShell** (esta encuentra sola el OpenSSL de Git for Windows). Cópialos y ejecútalos en el servidor de la aplicación. Otra opción es el script `entity-check.sh`, que se descarga desde esa misma página (o en `https://<portal>/files/entity-check.sh`):
 
 ```bash
-./entity-check.sh csr <CLIENT_ID>      # crea <CLIENT_ID>.key (solo legible por su dueño) y <CLIENT_ID>.csr
+bash entity-check.sh csr <CLIENT_ID>   # crea <CLIENT_ID>.key (solo legible por su dueño) y <CLIENT_ID>.csr
 cat <CLIENT_ID>.csr
 ```
 
-Funciona igual en Linux, macOS y Git Bash en Windows, se niega a sobrescribir una clave existente, comprueba que el CSR nombre exactamente al Client ID y, si OpenSSL falla, dice por qué sin dejar una clave a medias.
-
-Sin el script, el comando equivalente es:
-
-```bash
-umask 077
-MSYS_NO_PATHCONV=1 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-  -keyout <CLIENT_ID>.key -out <CLIENT_ID>.csr -subj "/CN=<CLIENT_ID>"
-openssl req -in <CLIENT_ID>.csr -noout -subject      # debe mostrar: subject=CN=<CLIENT_ID>
-```
-
-`MSYS_NO_PATHCONV=1` es para **Git Bash en Windows**, que si no convierte `/CN=…` en una ruta (`C:/Program Files/Git/CN=…`): OpenSSL lo rechaza y deja la clave creada sin CSR. En Linux y macOS no hace nada. El `CN` debe ser **exactamente** el Client ID.
+Comandos y script hacen lo mismo: la clave queda legible solo para su dueño, nunca se sobrescribe una clave existente y, si OpenSSL falla, no queda nada a medias. Antes de pegar, la última línea debe mostrar `subject=CN=<CLIENT_ID>` (OpenSSL 3.0 lo escribe `CN = <CLIENT_ID>`): el `CN` debe ser **exactamente** el Client ID. Con una copia de `entity-check.sh` anterior al 18 de noviembre, `csr` rechazaba todo CSR en Debian 12 y Ubuntu (OpenSSL 3.0): descarga la de la página.
 
 En la aplicación, **Certificado de cliente (mTLS)**: pega el CSR completo (de `-----BEGIN CERTIFICATE REQUEST-----` a `-----END CERTIFICATE REQUEST-----`) **→ Solicitar certificado → Descargar**. Se descarga como `<CLIENT_ID>.pem`: déjalo con ese nombre junto a la clave.
 
@@ -293,7 +282,7 @@ curl -sS --cacert red-ca.pem --cert <CLIENT_ID>.pem --key <CLIENT_ID>.key \
 | No aparece un rol de plataforma | La persona no ha entrado nunca al portal | Que entre una vez y repetir `platform-role grant` |
 | **Aprobar** está deshabilitado, o "La versión no se aprobó" | Las validaciones automáticas no han pasado (siguen en curso o fallaron) | La ficha de la versión dice qué significa cada falla y qué intentar; corrige y **Repetir validaciones** |
 | Validación con **504** (tiempo agotado) | El gateway no llega al nodo por el túnel | En el nodo: `sudo /opt/den-node/install.sh status` (el túnel debe tener un saludo reciente). Si la red del servidor cambió de dirección y el túnel no se recupera: `sudo /opt/den-node/install.sh stop` y `start` |
-| `subject name is expected to be in the format /type0=value0…` | Git Bash convirtió `/CN=…` en una ruta | Usa `./entity-check.sh csr`, o borra la clave a medio crear y repite con `MSYS_NO_PATHCONV=1` |
+| `subject name is expected to be in the format /type0=value0…` | Git Bash convirtió `/CN=…` en una ruta (comando escrito a mano) | Usa la pestaña **Windows: Git Bash** de la página de la aplicación, o `bash entity-check.sh csr` |
 | `schannel: Failed to import cert file` | El `curl` de Windows (Schannel) no puede usar el certificado y la clave PEM | Usa `./entity-check.sh call` en Git Bash, que ahí va por OpenSSL |
 | `bash` no se reconoce (PowerShell) | Windows no trae bash propio | Abre **Git Bash** y ejecuta ahí los comandos |
 | El portal rechaza el CSR | El `CN` no es el Client ID, o la clave no es ECDSA P-256/P-384 ni RSA 2048–4096 | Genera otro con el Client ID exacto |
@@ -307,7 +296,7 @@ Encontrado en el ensayo y anotado en el backlog del portal (sección P):
 - **P-02** ✔ Aviso cuando el nodo sirve un contrato distinto del publicado.
 - **P-03** ✔ El paquete del kit, su huella y los comandos en la pantalla de nodos del portal.
 - **P-04** ✔ Que solo se ofrezcan los tipos de servicio que el país permite (el nodo y X-Road), con nombres claros.
-- **P-05** Que la pantalla de la aplicación muestre un comando de CSR que funcione en Linux, Git Bash y PowerShell (o remita a `entity-check.sh`).
+- **P-05** ✔ Que la pantalla de la aplicación muestre un comando de CSR que funcione en Linux, Git Bash y PowerShell (o remita a `entity-check.sh`).
 - **P-06** ✔ El `.env` del despliegue mandaba los documentos a una carpeta donde el API no puede escribir.
 - **P-07** ✔ Que el portal no deje aprobar con validaciones fallidas y explique qué hacer con cada fallo.
 - **P-08** ✔ Desactivar las cuentas de demostración del piloto y alargar el enlace de verificación.

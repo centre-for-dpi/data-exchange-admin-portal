@@ -522,16 +522,10 @@ sudo ./install.sh                                  # sudo DEN_LANG=es ./install.
 <h3>8.2 Create the application</h3>
 <p><b>My applications → Create application:</b> name, what the entity will use it for, environment, technical contact's email <b>→ Create application</b>. <b>"Save the secret now"</b> shows the <b>Client ID</b> and the <b>Client secret</b>: <b>the secret is shown once.</b> Keep it in the application server's secret store.</p>
 <h3>8.3 The application's certificate (mTLS)</h3>
-<p>The private key is generated <b>on the server where the application will run</b> and never leaves it; only the request (CSR) goes to the portal. The easiest way is the portal repository's <code>entity-check.sh</code> script, which the operator hands to the entities:</p>
-<div class="code"><button class="copy" type="button">Copy</button><pre><code>./entity-check.sh csr &lt;CLIENT_ID&gt;      # makes &lt;CLIENT_ID&gt;.key (readable only by its owner) and &lt;CLIENT_ID&gt;.csr
+<p>The private key is generated <b>on the server where the application will run</b> and never leaves it; only the request (CSR) goes to the portal. The application's page, under <b>Client certificate (mTLS)</b>, has the commands ready with the Client ID, in tabs: <b>Linux or macOS</b>, <b>Windows: Git Bash</b> and <b>Windows: PowerShell</b> (which finds Git for Windows' OpenSSL by itself). Copy them and run them on the application's server. Another option is the <code>entity-check.sh</code> script, downloaded from that same page (or at <code>https://&lt;portal&gt;/files/entity-check.sh</code>):</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code>bash entity-check.sh csr &lt;CLIENT_ID&gt;   # makes &lt;CLIENT_ID&gt;.key (readable only by its owner) and &lt;CLIENT_ID&gt;.csr
 cat &lt;CLIENT_ID&gt;.csr</code></pre></div>
-<p>It works the same on Linux, macOS and Git Bash on Windows, refuses to overwrite an existing key, checks that the CSR names exactly the Client ID and, if OpenSSL fails, says why without leaving a half-made key.</p>
-<p>Without the script, the equivalent command is:</p>
-<div class="code"><button class="copy" type="button">Copy</button><pre><code>umask 077
-MSYS_NO_PATHCONV=1 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-  -keyout &lt;CLIENT_ID&gt;.key -out &lt;CLIENT_ID&gt;.csr -subj "/CN=&lt;CLIENT_ID&gt;"
-openssl req -in &lt;CLIENT_ID&gt;.csr -noout -subject      # must show: subject=CN=&lt;CLIENT_ID&gt;</code></pre></div>
-<p><code>MSYS_NO_PATHCONV=1</code> is for <b>Git Bash on Windows</b>, which otherwise turns <code>/CN=…</code> into a path (<code>C:/Program Files/Git/CN=…</code>): OpenSSL rejects it and leaves the key without a CSR. On Linux and macOS it does nothing. The <code>CN</code> must be <b>exactly</b> the Client ID.</p>
+<p>Commands and script do the same: the key is readable only by its owner, an existing key is never overwritten and, if OpenSSL fails, nothing half-made is left. Before pasting, the last line must show <code>subject=CN=&lt;CLIENT_ID&gt;</code> (OpenSSL 3.0 writes <code>CN = &lt;CLIENT_ID&gt;</code>): the <code>CN</code> must be <b>exactly</b> the Client ID. With a copy of <code>entity-check.sh</code> from before 18 November, <code>csr</code> rejected every CSR on Debian 12 and Ubuntu (OpenSSL 3.0): download the one on the page.</p>
 <p>In the application, <b>Client certificate (mTLS)</b>: paste the whole CSR (from <code>-----BEGIN CERTIFICATE REQUEST-----</code> to <code>-----END CERTIFICATE REQUEST-----</code>) <b>→ Request certificate → Download</b>. It downloads as <code>&lt;CLIENT_ID&gt;.pem</code>: keep it with that name next to the key.</p>
 <h3>8.4 Request access</h3>
 <p><b>Catalogue →</b> the API <b>→ Request access:</b></p>
@@ -588,7 +582,7 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <tr><td>A platform role does not show</td><td class="wrap">The person never signed in</td><td class="wrap">Have them sign in once and run <code>platform-role grant</code> again</td></tr>
 <tr><td><b>Approve</b> is disabled, or "The version was not approved"</td><td class="wrap">The automatic validations have not passed (still running, or failed)</td><td class="wrap">The version sheet says what each failure means and what to try; fix it and <b>Run validations again</b></td></tr>
 <tr><td>Validation with <b>504</b> (timeout)</td><td class="wrap">The gateway does not reach the node through the tunnel</td><td class="wrap">On the node: <code>sudo /opt/den-node/install.sh status</code> (the tunnel must have a recent handshake). If the server's network changed address and the tunnel does not recover: <code>sudo /opt/den-node/install.sh stop</code> and <code>start</code></td></tr>
-<tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash turned <code>/CN=…</code> into a path</td><td class="wrap">Use <code>./entity-check.sh csr</code>, or delete the half-made key and repeat with <code>MSYS_NO_PATHCONV=1</code></td></tr>
+<tr><td><code>subject name is expected to be in the format /type0=value0…</code></td><td class="wrap">Git Bash turned <code>/CN=…</code> into a path (a command typed by hand)</td><td class="wrap">Use the <b>Windows: Git Bash</b> tab on the application's page, or <code>bash entity-check.sh csr</code></td></tr>
 <tr><td><code>schannel: Failed to import cert file</code></td><td class="wrap">Windows' <code>curl</code> (Schannel) cannot use the PEM certificate and key</td><td class="wrap">Use <code>./entity-check.sh call</code> in Git Bash, which goes through OpenSSL there</td></tr>
 <tr><td><code>bash</code> is not recognized (PowerShell)</td><td class="wrap">Windows has no bash of its own</td><td class="wrap">Open <b>Git Bash</b> and run the commands there</td></tr>
 <tr><td>The portal rejects the CSR</td><td class="wrap">The <code>CN</code> is not the Client ID, or the key is not ECDSA P-256/P-384 or RSA 2048–4096</td><td class="wrap">Make another one with the exact Client ID</td></tr>
@@ -604,7 +598,7 @@ curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_I
 <li><b>P-02</b> ✔ A warning when the node serves a contract other than the published one.</li>
 <li><b>P-03</b> ✔ The kit bundle, its checksum and the commands on the portal's nodes page.</li>
 <li><b>P-04</b> ✔ Offering only the service types the country allows (the node and X-Road), with clear names.</li>
-<li><b>P-05</b> The application page showing a CSR command that works on Linux, Git Bash and PowerShell (or pointing to <code>entity-check.sh</code>).</li>
+<li><b>P-05</b> ✔ The application page showing a CSR command that works on Linux, Git Bash and PowerShell (or pointing to <code>entity-check.sh</code>).</li>
 <li><b>P-06</b> ✔ The deployment's <code>.env</code> sent documents to a folder the API cannot write.</li>
 <li><b>P-07</b> ✔ Not letting a version be approved with failed validations, and explaining what to do with each failure.</li>
 <li><b>P-08</b> ✔ Disabling the pilot's demo accounts and making the verification link last longer.</li>
