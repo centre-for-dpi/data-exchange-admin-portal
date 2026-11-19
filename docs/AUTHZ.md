@@ -63,6 +63,8 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | `sync.read` | ✓ | ✓ | · | · |
 | `sync.retry` | ✓ | · | · | · |
 | `network.map.read` | ✓ | ✓ | ✓ | · |
+| `kit_release.read` | ✓ | ✓ | · | · |
+| `kit_release.manage` | ✓ | · | · | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Routes
@@ -79,6 +81,9 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | POST | `/api/v1/admin/entities/:id/suspend` | platform: `entity_admin.decide` |
 | PUT | `/api/v1/admin/entities/:id/xroad-member` | platform: `entity_admin.decide` |
 | POST | `/api/v1/admin/gateway-signing-keys/rotate` | platform: `gateway_key.rotate` |
+| GET | `/api/v1/admin/kit-releases` | platform: `kit_release.read` |
+| PUT | `/api/v1/admin/kit-releases/:version` | platform: `kit_release.manage` |
+| PUT | `/api/v1/admin/kit-releases/:version/bundle` | platform: `kit_release.manage` |
 | GET | `/api/v1/admin/nodes` | platform: `node.list` |
 | GET | `/api/v1/admin/purposes` | platform: `purpose.read` |
 | POST | `/api/v1/admin/purposes` | platform: `purpose.manage` |
@@ -163,6 +168,8 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | GET | `/api/v1/gateway/jwks` | public (no session; internal routes require their own service token) |
 | GET | `/api/v1/health` | public (no session; internal routes require their own service token) |
 | POST | `/api/v1/internal/subject-access` | public (no session; internal routes require their own service token) |
+| GET | `/api/v1/kit/current` | public (no session; internal routes require their own service token) |
+| GET | `/api/v1/kit/releases/:version/:file` | public (no session; internal routes require their own service token) |
 | GET | `/api/v1/me` | any session; own resources only |
 | GET | `/api/v1/me/invitations` | any session; own resources only |
 | POST | `/api/v1/me/invitations/:invitationId/accept` | any session; own resources only |

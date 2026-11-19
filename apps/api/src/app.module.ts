@@ -95,6 +95,9 @@ import { TransparencyController } from './transparency/evidence/transparency.con
 import { TsaClient } from './transparency/evidence/tsa.client.js';
 import { SubjectAccessController } from './transparency/subject-access.controller.js';
 import { SubjectAccessService } from './transparency/subject-access.service.js';
+import { AdminKitReleasesController } from './kit/admin-kit-releases.controller.js';
+import { KitController } from './kit/kit.controller.js';
+import { KitReleasesService } from './kit/kit-releases.service.js';
 
 @Module({
   imports: [CoreModule, AuthModule, ReconcilersModule],
@@ -139,6 +142,8 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     UsageController,
     IndicatorsController,
     SyncConsoleController,
+    KitController,
+    AdminKitReleasesController,
   ],
   providers: [
     StorageService,
@@ -183,6 +188,7 @@ import { SubjectAccessService } from './transparency/subject-access.service.js';
     AccessLogIndexReconciler,
     MetricsService,
     SyncConsoleService,
+    KitReleasesService,
     UsageService,
     IndicatorsService,
     {

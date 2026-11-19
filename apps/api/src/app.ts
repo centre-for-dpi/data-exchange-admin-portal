@@ -9,6 +9,9 @@ import { PROBLEM_CONTENT_TYPE, toProblem } from './common/problem.js';
 import { instancePath, ProblemDetailsFilter } from './common/problem.filter.js';
 import { documentMaxBytes, PDF_MIME } from './documents/documents.service.js';
 import { PDF_UPLOAD_PATHS } from './documents/pdf-reply.js';
+import { KIT_BUNDLE_MEDIA_TYPE } from '@den/contracts';
+import { KIT_BUNDLE_UPLOAD_PATH } from './kit/kit-paths.js';
+import { kitBundleMaxBytes } from './kit/kit-releases.service.js';
 import { registerApiDocs } from './openapi/docs.js';
 import {
   ingestTokenMatches,
@@ -79,15 +82,22 @@ export function createAdapter(): FastifyAdapter {
     .addContentTypeParser(PDF_MIME, { parseAs: 'buffer' }, (_request, body, done) => {
       done(null, body);
     });
+  // The kit's bundle (P-03), for the operator's mirror: raw too, on its one upload route.
+  adapter
+    .getInstance()
+    .addContentTypeParser(KIT_BUNDLE_MEDIA_TYPE, { parseAs: 'buffer' }, (_request, body, done) => {
+      done(null, body);
+    });
   // The transparency collector receives whole Fluent Bit chunks (internal, service token only).
   // Its larger body limit applies only once the token is checked: onRequest runs before the body
   // is read, so an unauthenticated caller gets 401 without the API buffering anything.
   adapter.getInstance().addHook('onRoute', (route) => {
-    // Document uploads (PDF): a larger limit, but only for callers that present a token; the
-    // guard verifies it after the body is read.
-    const upload = PDF_UPLOAD_PATHS.some((path) => route.url === `/${API_PREFIX}/${path}`);
-    if (upload && route.method === 'PUT') {
-      route.bodyLimit = documentMaxBytes();
+    // Document uploads (PDF) and the kit's bundle: a larger limit, but only for callers that
+    // present a token; the guard checks their roles after the body is read.
+    const pdf = PDF_UPLOAD_PATHS.some((path) => route.url === `/${API_PREFIX}/${path}`);
+    const bundle = route.url === `/${API_PREFIX}/${KIT_BUNDLE_UPLOAD_PATH}`;
+    if ((pdf || bundle) && route.method === 'PUT') {
+      route.bodyLimit = bundle ? kitBundleMaxBytes() : documentMaxBytes();
       const existing = route.onRequest ? [route.onRequest].flat() : [];
       route.onRequest = [
         ...existing,

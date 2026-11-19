@@ -105,6 +105,11 @@ export const AUDIT_ACTIONS = [
   'node.services_changed',
   'node.certificate_renewed',
   'node.decommissioned',
+  // Releases of the node kit the operator offers (P-03)
+  'kit_release.created',
+  'kit_release.updated',
+  'kit_release.made_current',
+  'kit_release.mirrored',
   // Transparency for the data subject (MT)
   'subject_access.purged',
   'subject_alert.updated',

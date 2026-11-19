@@ -3,7 +3,13 @@ import type { CountryConfig } from '@den/config';
 import type { AuditService } from '../audit/audit.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import type { PrismaService, Tx } from '../prisma/prisma.service.js';
-import { SEED_ENTITIES, SEED_ROLES, type SeedEntity, type SeedRoles } from './seed-data.js';
+import {
+  SEED_ENTITIES,
+  SEED_KIT_RELEASE,
+  SEED_ROLES,
+  type SeedEntity,
+  type SeedRoles,
+} from './seed-data.js';
 
 export const SEED_ACTOR = 'system:seed';
 
@@ -17,7 +23,10 @@ export interface RealmUser {
 }
 
 export interface SeedSummary {
-  created: Record<'entities' | 'users' | 'platformRoles' | 'memberships' | 'purposes', number>;
+  created: Record<
+    'entities' | 'users' | 'platformRoles' | 'memberships' | 'purposes' | 'kitReleases',
+    number
+  >;
   updated: Record<'purposes', number>;
   warnings: string[];
 }
@@ -33,7 +42,8 @@ const asJson = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJ
 
 /**
  * Idempotent development seed (M1-01): fictitious entities, the Keycloak seed users with their
- * roles, and the purpose catalogue from the country configuration. It only creates what is missing
+ * roles, the purpose catalogue from the country configuration, and the kit's current version
+ * while there is none (P-03). It only creates what is missing
  * (and refreshes config-sourced purposes); it never deletes or overwrites changes made in the
  * portal, and gives no roles to a disabled account. Every change is audited in the same
  * transaction (CLAUDE.md, rule 4).
@@ -46,7 +56,14 @@ export async function runSeed(
   const entities = input.entities ?? SEED_ENTITIES;
   const roles = input.roles ?? SEED_ROLES;
   const summary: SeedSummary = {
-    created: { entities: 0, users: 0, platformRoles: 0, memberships: 0, purposes: 0 },
+    created: {
+      entities: 0,
+      users: 0,
+      platformRoles: 0,
+      memberships: 0,
+      purposes: 0,
+      kitReleases: 0,
+    },
     updated: { purposes: 0 },
     warnings: [],
   };
@@ -218,6 +235,29 @@ export async function runSeed(
     }
     if (disabled.length > 0) {
       summary.warnings.push(`disabled, roles not granted: ${disabled.join(', ')}`);
+    }
+
+    // The kit's current version (P-03), only while the portal has no release at all: once the
+    // operator sets one, the releases are theirs.
+    if ((await tx.kitRelease.count()) === 0) {
+      const release = await tx.kitRelease.create({
+        data: { ...SEED_KIT_RELEASE, madeCurrentAt: new Date(), createdBy: SEED_ACTOR },
+      });
+      const target = { type: 'kit_release', id: release.id };
+      await audit.record(tx, {
+        actor,
+        action: 'kit_release.created',
+        target,
+        after: { ...SEED_KIT_RELEASE, signatureUrl: null, allowedSigners: null, mirrored: false },
+      });
+      await audit.record(tx, {
+        actor,
+        action: 'kit_release.made_current',
+        target,
+        before: { currentReleaseId: null },
+        after: { currentReleaseId: release.id, version: release.version },
+      });
+      summary.created.kitReleases += 1;
     }
   });
 

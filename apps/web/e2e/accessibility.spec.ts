@@ -54,6 +54,7 @@ interface Screen {
 
 const SCREENS: Screen[] = [
   { route: '/', user: 'anonymous', path: () => '/' },
+  { route: '/kit', user: 'anonymous', path: () => '/kit' },
   { route: '/catalog', user: 'pedro.publicador', path: () => '/catalog' },
   { route: '/catalog/[apiId]', user: 'pedro.publicador', path: (f) => `/catalog/${f.apiId}` },
   {
@@ -134,6 +135,7 @@ const SCREENS: Screen[] = [
   { route: '/operator/nodes', user: 'pablo.plataforma', path: () => '/operator/nodes' },
   { route: '/operator/bootcamp', user: 'pablo.plataforma', path: () => '/operator/bootcamp' },
   { route: '/operator/sync', user: 'pablo.plataforma', path: () => '/operator/sync' },
+  { route: '/operator/kit', user: 'pablo.plataforma', path: () => '/operator/kit' },
   { route: '/regulator', user: 'marta.regulador', path: () => '/regulator' },
   { route: '/regulator/indicators', user: 'marta.regulador', path: () => '/regulator/indicators' },
   {

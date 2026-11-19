@@ -177,6 +177,10 @@ export const PLATFORM_PERMISSIONS = {
   'sync.retry': ['platform_admin'],
   /** The exchange map (M5-05): which entity consumes from which, with volume. */
   'network.map.read': ['platform_admin', 'platform_reviewer', 'regulator'],
+  /** The releases of the node kit the operator has offered, newest first (P-03). */
+  'kit_release.read': ['platform_admin', 'platform_reviewer'],
+  /** Set the kit's current version, correct it and mirror its bundle (operator admin, P-03). */
+  'kit_release.manage': ['platform_admin'],
   /** Audit trail of the whole network and verification of its hash chain (SPEC.md §6). */
   'audit.read': ['platform_admin', 'platform_reviewer', 'regulator', 'auditor'],
 } as const satisfies Record<string, readonly PlatformRole[]>;

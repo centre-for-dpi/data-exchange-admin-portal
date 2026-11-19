@@ -207,6 +207,7 @@ enrollment_issued → enrolled → online ⇄ offline
 4. El nodo renueva su certificado antes de que venza. `entity_admin` o `platform_admin` pueden dar de baja un nodo (`decommissioned`): deja de funcionar para siempre.
 5. Las APIs con upstream `node` muestran el estado del nodo.
 6. **Contrato que sirve el nodo (P-02).** Para cada versión publicada (u obsoleta) en un nodo, el portal compara el SHA-256 que el nodo informa en su heartbeat para el servicio en el `servicePath` de la versión con el `openapiSha256` de la versión publicada: **coincide**, **distinto** (con ambos hashes y desde cuándo) o **sin informar** (no hay servicio en esa ruta, o el servicio no tiene OpenAPI en el nodo, cuyos registros muestran entonces rutas `(unknown)`). Se muestra en la ficha de la versión (proveedor y revisor), en la página de nodos de la entidad y en la consola de sincronización del operador. El paso de coincide a distinto avisa a los `api_publisher` y `entity_admin` de la entidad; todo cambio de estado se audita. Nunca bloquea el tráfico: el gateway sigue enrutando con el contrato publicado.
+7. **El kit para instalar (P-03).** El kit se publica en su propio repositorio (ADR-0011). El operador (`platform_admin`) define la versión vigente en la consola: versión, enlace al paquete (https), tamaño, SHA-256 y, cuando los releases se firmen, el enlace a la firma y el `allowed_signers` del operador. Cada cambio queda auditado; una versión anterior puede volver a ser la vigente. Todo miembro de la entidad la ve en _Mi entidad → Nodos del kit_, junto a "Registrar un nodo", y cualquiera en el sitio público (`/kit`), con los comandos para descargarla, verificarla e instalarla en el servidor de la entidad y la URL del propio portal para responder al instalador. Opcionalmente el operador sube el paquete y el portal lo sirve en `/kit/<versión>/` sin sesión (no contiene nada secreto: enrolarse exige el token); la subida solo se acepta con el tamaño y el SHA-256 declarados y después no cambia. La página dice que su suma de verificación es una comodidad, no una garantía: quien controla el portal controla tanto el archivo como su suma; la garantía es la firma del operador, verificada con una clave entregada por otro canal.
 
 **Preparación del bootcamp (M4-07).** Antes del bootcamp, cada entidad confirma cinco requisitos: un servidor para el nodo, un usuario de solo lectura de la base de datos, salida a internet por 443, los responsables designados (se calcula: miembros con `api_publisher` y `data_steward`) y el caso de uso. Los marca el `entity_admin` (o el operador) y el operador ve el avance de todas las entidades.
 
@@ -230,13 +231,14 @@ enrollment_issued → enrolled → online ⇄ offline
 - Inicio: buscador del catálogo, accesos rápidos según rol, pendientes (bandeja).
 - Catálogo: filtros por sector, entidad, clasificación, estado; tarjetas con datos personales expuestos.
 - Detalle de API: descripción, ficha del servicio, documentación interactiva (Scalar) con "probar en sandbox", versiones, finalidades permitidas, estado del nodo, botón "Solicitar acceso".
-- Mi entidad: datos, miembros e invitaciones, nodos, acuerdos.
+- Mi entidad: datos, miembros e invitaciones, nodos (con el kit para instalar, P-03), acuerdos.
+- El kit del nodo (público, `/kit`): versión vigente, suma de verificación y cómo instalarlo (P-03).
 - Mis APIs (proveedor): lista, crear/editar versión, envío a revisión, solicitudes recibidas, consumidores activos, uso.
 - Mis aplicaciones (consumidor): credenciales, certificados, suscripciones y su estado, uso, guía de integración (programas en curl, Python, Node.js, Java y C#).
 - Bandeja de solicitudes (responsable de datos): pendientes, historial, acciones de aprobar/rechazar/suspender/revocar.
 
 **Consola del operador**
-- Altas de entidades, revisiones de API, nodos (estado, versión, último heartbeat), estado de sincronización del gateway (último reconcile, diferencias), suscripciones globales, finalidades, configuración.
+- Altas de entidades, revisiones de API, nodos (estado, versión, último heartbeat), estado de sincronización del gateway (último reconcile, diferencias), suscripciones globales, finalidades, la versión vigente del kit del nodo y su espejo (P-03), configuración.
 
 **Vista del regulador**
 - Indicadores de la red (§8), aprobaciones pendientes que le corresponden, mapa de intercambios (qué entidad consume de cuál), auditoría y exportación.

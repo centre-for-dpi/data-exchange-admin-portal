@@ -72,7 +72,8 @@
   "footer": {
     "operatedBy": "Operado por {operator}",
     "supervisedBy": "Supervisado por {regulator}",
-    "privacy": "El gateway no almacena el contenido de las consultas: solo quién consultó, qué operación y con qué finalidad."
+    "privacy": "El gateway no almacena el contenido de las consultas: solo quién consultó, qué operación y con qué finalidad.",
+    "kit": "El kit del nodo"
   },
   "comingSoon": {
     "body": "Esta sección estará disponible en una próxima versión del portal."
@@ -840,6 +841,12 @@
       },
       "secrets": {
         "resealed": "Valores sellados de nuevo con la clave actual"
+      },
+      "kit_release": {
+        "created": "Versión del kit registrada",
+        "updated": "Versión del kit corregida",
+        "made_current": "Versión del kit hecha vigente",
+        "mirrored": "Paquete del kit servido desde el portal"
       }
     },
     "filters": {
@@ -1678,7 +1685,13 @@
       "validations_pending": "La versión no se aprobó: las validaciones automáticas todavía no terminan. Espera un momento y recarga la página.",
       "validations_failed": "La versión no se aprobó: sus validaciones automáticas fallaron. El proveedor debe corregir el servicio y repetirlas.",
       "upstream_type_not_allowed": "Esta red no acepta ese canal para el servicio. Los proveedores entran por el nodo de la entidad.",
-      "xroad_not_configured": "X-Road no está configurado en este despliegue: el operador no tiene Security Server."
+      "xroad_not_configured": "X-Road no está configurado en este despliegue: el operador no tiene Security Server.",
+      "kit_bundle_link": "El enlace debe terminar en el nombre del paquete (.tar.gz o .tgz).",
+      "sha256_hex": "64 caracteres hexadecimales (un SHA-256).",
+      "no_control_characters": "Texto sin caracteres de control.",
+      "kit_bundle_checksum_mismatch": "El archivo no es el del release: su SHA-256 no coincide con el registrado.",
+      "kit_bundle_size_mismatch": "El archivo no tiene el tamaño registrado para la versión.",
+      "kit_bundle_mirrored": "Esta versión ya está en el espejo: su archivo, tamaño y suma ya no cambian."
     },
     "codes": {
       "validation_failed": "Revisa los datos enviados.",
@@ -1739,5 +1752,81 @@
     "confirmRequired": "Confirma que entiendes lo que se revocará.",
     "revoke": "Revocar {count, plural, one {# certificado} other {# certificados}}",
     "done": "Se {count, plural, one {revocó # certificado} other {revocaron # certificados}}. El gateway los rechaza desde el siguiente bundle de OPA."
+  },
+  "kit": {
+    "title": "El kit del nodo",
+    "publicLead": "Las entidades proveedoras conectan sus servicios a la red a través del nodo: un software que se instala en un servidor de la entidad y abre un túnel cifrado hacia afuera. Esta es la versión que el operador ofrece ahora.",
+    "publicToken": "Para instalarlo hace falta un token de enrolamiento, que la administración de la entidad emite en el portal (Mi entidad → Nodos del kit → Registrar un nodo) cuando la entidad ya hace parte de la red. Una entidad que aún no hace parte inicia sesión y solicita su ingreso primero.",
+    "sectionTitle": "Kit para instalar",
+    "sectionLead": "Descárgalo en el servidor donde va a correr el nodo. El token de enrolamiento sale de \"Registrar un nodo\".",
+    "none": "El operador aún no ha publicado una versión del kit.",
+    "version": "Versión",
+    "since": "Vigente desde",
+    "download": "Descarga",
+    "fromRelease": "{file} (release)",
+    "fromPortal": "{file} (espejo de este portal)",
+    "size": "Tamaño",
+    "sizeValue": "{megabytes} MB ({bytes} bytes)",
+    "sha256": "SHA-256",
+    "signature": "Firma",
+    "allowedSigners": "allowed_signers del operador",
+    "checksumIsConvenience": "La suma de verificación de esta página es una comodidad, no una garantía: quien controla el portal controla tanto el archivo como su suma.",
+    "unsignedCheck": "Esta versión aún no está firmada. Antes de instalar, compara la suma con la que el operador te entrega por otro canal (por ejemplo, el acuerdo con tu entidad).",
+    "signedCheck": "La garantía es la firma del operador: verifícala con la clave del operador tal como la recibiste por otro canal (por ejemplo, el acuerdo con tu entidad), no con la que se muestra aquí.",
+    "commandsTitle": "Descargar, verificar e instalar",
+    "commandsLead": "En el servidor de la entidad (Ubuntu Server 22.04 o 24.04), con un usuario con sudo. El segundo comando debe decir \"OK\" (o \"La suma coincide\"); si no, no abras el paquete.",
+    "commandsFromRelease": "Comandos, descargando del release",
+    "commandsFromPortal": "Comandos, descargando del espejo de este portal",
+    "portalAnswer": "Cuando el instalador pregunte la URL del portal, responde <url></url>; luego pega el token de enrolamiento cuando lo pida.",
+    "afterInstall": "El instalador termina con \"El nodo está en línea\" y el nodo aparece En línea en la página Nodos del kit. La guía del propio kit viene dentro del paquete (INSTALL.md).",
+    "copy": "Copiar",
+    "copied": "Copiado.",
+    "copyCommands": "Copiar: {source}"
+  },
+  "kitAdmin": {
+    "title": "Kit del nodo",
+    "lead": "La versión del kit que las entidades ven en su página Nodos del kit y en el sitio público. El kit se publica en su propio repositorio: aquí indicas cuál versión es la vigente, su enlace y su suma de verificación, y puedes servir su paquete desde este portal para los servidores que no alcanzan el release.",
+    "currentTitle": "Lo que ven las entidades ahora",
+    "historyTitle": "Versiones",
+    "historyEmpty": "Aún no hay versiones.",
+    "version": "Versión",
+    "state": "Estado",
+    "size": "Tamaño",
+    "mirror": "Espejo",
+    "actions": "Acciones",
+    "isCurrent": "Vigente",
+    "previous": "Anterior",
+    "mirroredOn": "En el espejo desde {date}",
+    "notMirrored": "Sin espejo",
+    "makeCurrent": "Hacer vigente",
+    "makeCurrentFor": "Hacer vigente la versión {version}",
+    "correctFor": "Corregir {version}",
+    "mirroredLocked": "En el espejo: su archivo, tamaño y suma ya no cambian.",
+    "form": {
+      "title": "Definir la versión vigente",
+      "lead": "Copia el enlace, el tamaño y el SHA-256 del release del kit (su archivo \".sha256\"). Al guardar, pasa a ser la versión vigente de inmediato; una versión existente se corrige.",
+      "label": "Definir la versión vigente del kit",
+      "editOf": "Corregir {version}",
+      "version": "Versión (por ejemplo 0.2.0)",
+      "url": "Enlace al paquete (https, termina en .tar.gz)",
+      "sizeBytes": "Tamaño en bytes",
+      "sha256": "SHA-256 del paquete",
+      "signatureUrl": "Enlace a la firma (opcional, cuando los releases se firmen)",
+      "allowedSigners": "allowed_signers del operador (opcional)",
+      "submit": "Hacerla la versión vigente",
+      "save": "Guardar la corrección",
+      "saved": "Guardado: es la versión vigente."
+    },
+    "upload": {
+      "formName": "Servir el paquete de {version} desde el portal",
+      "file": "Paquete de {version} ({file})",
+      "hint": "Debe tener exactamente {bytes} bytes y el SHA-256 del release; después no se puede reemplazar.",
+      "submit": "Subir al espejo",
+      "uploading": "Subiendo…",
+      "done": "En el espejo: el portal lo sirve en /kit/{version}/.",
+      "choose": "Elige primero el archivo del paquete.",
+      "tooLarge": "El archivo es más grande de lo que acepta el portal (DEN_KIT_BUNDLE_MAX_BYTES)."
+    },
+    "sizeMb": "{megabytes} MB"
   }
 }

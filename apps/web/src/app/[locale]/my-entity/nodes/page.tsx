@@ -1,4 +1,4 @@
-import { nodeListSchema } from '@den/contracts';
+import { currentKitReleaseSchema, nodeListSchema } from '@den/contracts';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -8,6 +8,7 @@ import {
   ReissueTokenForm,
   RevokeTokenButton,
 } from '../../../../components/nodes/node-forms';
+import { KitReleasePanel } from '../../../../components/kit/kit-release';
 import { NodeContractBadge, NodeContractDetails } from '../../../../components/nodes/node-contract';
 import { StatusBadge } from '../../../../components/ui/badge';
 import { EmptyState, Page, PageHeader, Section } from '../../../../components/ui/page';
@@ -36,7 +37,11 @@ export default async function EntityNodesPage({ params }: PageProps) {
   if (!active) notFound();
   const canManage =
     active.roles.includes('entity_admin') || viewer.platformRoles.includes('platform_admin');
-  const nodes = await apiGet(`/entities/${active.entity.id}/nodes`, nodeListSchema);
+  const [nodes, kit] = await Promise.all([
+    apiGet(`/entities/${active.entity.id}/nodes`, nodeListSchema),
+    // P-03: the kit to install, public; a failure only hides it.
+    apiGet('/kit/current', currentKitReleaseSchema, { anonymous: true }).catch(() => null),
+  ]);
   const when = (value: string | null) =>
     value ? format.dateTime(new Date(value), { dateStyle: 'medium', timeStyle: 'short' }) : '—';
   // P-02: the published versions each node serves, differing ones first.
@@ -183,6 +188,11 @@ export default async function EntityNodesPage({ params }: PageProps) {
               </tbody>
             </table>
           </div>
+        </Section>
+      ) : null}
+      {kit ? (
+        <Section id="kit-release" title={t('kit.sectionTitle')} description={t('kit.sectionLead')}>
+          <KitReleasePanel release={kit.release} locale={locale} />
         </Section>
       ) : null}
       {canManage ? (

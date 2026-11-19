@@ -325,6 +325,17 @@ La rotación y la revocación de los secretos y certificados de las aplicaciones
 | `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | **No se rotan**: rompen el vínculo con los registros anteriores (`DEPLOYMENT.md §4.1`) |
 | CA intermedia | `RUNBOOK.md §3` |
 
+### 5.7 Una versión nueva del kit del nodo (P-03)
+
+El kit se publica en su propio repositorio. Cuando sale un release, como `platform_admin` (con segundo factor):
+
+1. **Consola del operador → Kit del nodo → Definir la versión vigente:** la versión (`0.2.0`), el enlace al paquete del release (`https://…/den-node-kit-0.2.0.tar.gz`), su tamaño en bytes y su SHA-256 (el archivo `.sha256` del release, o `sha256sum` del archivo descargado). Al guardar pasa a ser la vigente de inmediato en la página _Nodos del kit_ de cada entidad y en `/kit`; la bitácora registra `kit_release.created` y `kit_release.made_current`.
+2. **Espejo (opcional)**, para entidades cuyos servidores alcanzan el portal pero no GitHub: en la fila de la versión, elige el paquete descargado y **Subir al espejo**. El portal solo lo acepta con ese tamaño y ese SHA-256 y lo sirve en `<portal>/kit/<versión>/<archivo>` (y `<archivo>.sha256`), sin sesión; después no se puede reemplazar. La página ofrece entonces los dos enlaces. Un paquete más grande que `DEN_KIT_BUNDLE_MAX_BYTES` (128 MiB) se rechaza: aumenta ese valor en el API y recréalo, y revisa el límite de cuerpo del proxy (`DEPLOYMENT.md §5.2`).
+3. **Volver atrás:** **Hacer vigente** en una versión anterior. **Corregir** una versión (enlace, tamaño o suma equivocados) con su formulario; una vez en el espejo solo cambian los campos de la firma.
+4. Entrega a cada entidad la suma (y, cuando los releases se firmen, la clave del operador) **también por otro canal**, por ejemplo el acuerdo: quien controla el portal controla tanto el archivo como la suma que muestra.
+
+El seed de desarrollo deja v0.2.0 como vigente solo mientras el portal no tiene ningún release.
+
 ## 6. Respaldos
 
 Las bases `den` y `keycloak` se respaldan con pgBackRest en el piloto y con Barman Cloud en Kubernetes (ADR-0026). Las dos permiten volver a cualquier instante de la retención, no solo al último respaldo.

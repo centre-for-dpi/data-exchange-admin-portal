@@ -10,7 +10,7 @@ import type { FastifyRequest } from 'fastify';
  *   API accepts), or by its address otherwise. A made-up or expired token is not a bucket of its
  *   own: rotating invented tokens lands on the address's quota. Pages of the portal call the API
  *   server-side with the user's own token, all from one address, hence the user as the key.
- * - Expensive routes (PDF uploads, a new version and its OpenAPI lint, onboarding requests,
+ * - Expensive routes (PDF uploads, the kit's bundle, a new version and its OpenAPI lint, onboarding requests,
  *   invitations, a node's enrollment): DEN_RATE_LIMIT_STRICT_PER_MINUTE (30), per user or address.
  * - Not limited: only the routes of the platform's own services, each with its own credential
  *   (the transparency collector, OPA's bundle and status, a node's control channel after its
@@ -24,6 +24,7 @@ const STRICT = new Set([
   '/api/v1/entity-requests',
   '/api/v1/entities/:entityId/invitations',
   '/api/v1/nodes/enroll',
+  '/api/v1/admin/kit-releases/:version/bundle',
 ]);
 const EXEMPT = new Set([
   '/api/v1/health',

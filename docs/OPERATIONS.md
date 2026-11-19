@@ -325,6 +325,17 @@ Rotating and revoking the applications' secrets and certificates is done by thei
 | `DEN_SUBJECT_REF_KEY`, `DEN_END_USER_HASH_SALT` | **Not rotated**: they break the link with earlier records (`DEPLOYMENT.md §4.1`) |
 | Intermediate CA | `RUNBOOK.md §3` |
 
+### 5.7 A new version of the node kit (P-03)
+
+The kit is released in its own repository. When it publishes a release, as `platform_admin` (with the second factor):
+
+1. **Operator console → Node kit → Set the current version:** the version (`0.2.0`), the link to the bundle asset (`https://…/den-node-kit-0.2.0.tar.gz`), its size in bytes and its SHA-256 (the release's `.sha256` file, or `sha256sum` of the downloaded file). Saving makes it current at once on every entity's _Kit nodes_ page and on `/kit`; the audit log records `kit_release.created` and `kit_release.made_current`.
+2. **Mirror (optional)**, for entities whose servers reach the portal but not GitHub: in the version's row, choose the downloaded bundle and **Upload to the mirror**. The portal accepts it only with that size and SHA-256 and serves it at `<portal>/kit/<version>/<file>` (and `<file>.sha256`), without a session; it cannot be replaced afterwards. The page then offers both links. A bundle larger than `DEN_KIT_BUNDLE_MAX_BYTES` (128 MiB) is refused: raise it on the API and recreate it, and check the proxy's body limit (`DEPLOYMENT.md §5.2`).
+3. **Roll back:** **Make current** on an earlier version. **Correct** a version (wrong link, size or checksum) with its form; once mirrored only the signature fields can change.
+4. Give each entity the checksum (and, once releases are signed, the operator's key) **through another channel** as well, for example the agreement: whoever controls the portal controls both the file and the checksum it shows.
+
+The development seed sets v0.2.0 as current only while the portal has no release at all.
+
 ## 6. Backups
 
 The `den` and `keycloak` databases are backed up with pgBackRest on the pilot and with Barman Cloud on Kubernetes (ADR-0026). Both let you go back to any instant within the retention period, not just to the last backup.

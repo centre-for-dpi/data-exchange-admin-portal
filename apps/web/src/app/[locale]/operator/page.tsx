@@ -20,6 +20,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 const REVIEW_ROLES = ['platform_admin', 'platform_reviewer', 'regulator'];
+const KIT_ROLES = ['platform_admin', 'platform_reviewer'];
 
 export default async function OperatorPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
@@ -77,6 +78,11 @@ export default async function OperatorPage({ params, searchParams }: PageProps) 
                   {t('certificateRevocations.title')}
                 </Link>
               </>
+            ) : null}
+            {viewer.platformRoles.some((r) => KIT_ROLES.includes(r)) ? (
+              <Link href="/operator/kit" className="link">
+                {t('kitAdmin.title')}
+              </Link>
             ) : null}
           </>
         }

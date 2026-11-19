@@ -30,6 +30,9 @@ export const ValidationMessage = {
   explain_revocation: 'explain why access is revoked (10+ characters)',
   reference_legal_order: 'reference the legal order',
   file_name_format: 'a file name without path separators or control characters',
+  kit_bundle_link: 'the link must end in the bundle file name (.tar.gz or .tgz)',
+  sha256_hex: '64 hexadecimal characters (a SHA-256)',
+  no_control_characters: 'text without control characters',
 } as const;
 
 export type ValidationMessageKey = keyof typeof ValidationMessage;

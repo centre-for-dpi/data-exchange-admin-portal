@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { createReadStream, type ReadStream } from 'node:fs';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { Injectable } from '@nestjs/common';
 
@@ -26,6 +27,13 @@ export class StorageService {
 
   get(key: string): Promise<Buffer> {
     return readFile(this.path(key));
+  }
+
+  /** The bytes as a stream, for large files (the kit's mirrored bundle, P-03), and their size. */
+  async open(key: string): Promise<{ size: number; stream: ReadStream }> {
+    const path = this.path(key);
+    const { size } = await stat(path);
+    return { size, stream: createReadStream(path) };
   }
 
   /** Deletes the bytes for good (legal order); a missing file is not an error. */

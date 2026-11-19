@@ -72,7 +72,8 @@
   "footer": {
     "operatedBy": "Operated by {operator}",
     "supervisedBy": "Supervised by {regulator}",
-    "privacy": "The gateway does not store the content of requests: only who asked, which operation and for what purpose."
+    "privacy": "The gateway does not store the content of requests: only who asked, which operation and for what purpose.",
+    "kit": "The node kit"
   },
   "comingSoon": {
     "body": "This section will be available in a future version of the portal."
@@ -840,6 +841,12 @@
       },
       "secrets": {
         "resealed": "Sealed values sealed again with the current key"
+      },
+      "kit_release": {
+        "created": "Kit release registered",
+        "updated": "Kit release corrected",
+        "made_current": "Kit version made current",
+        "mirrored": "Kit bundle mirrored on the portal"
       }
     },
     "filters": {
@@ -1678,7 +1685,13 @@
       "validations_pending": "The version was not approved: the automatic validations have not finished yet. Wait a moment and reload the page.",
       "validations_failed": "The version was not approved: its automatic validations failed. The provider must fix the service and run them again.",
       "upstream_type_not_allowed": "This network does not accept that channel for the service. Providers come in through the entity's node.",
-      "xroad_not_configured": "X-Road is not configured in this deployment: the operator has no Security Server."
+      "xroad_not_configured": "X-Road is not configured in this deployment: the operator has no Security Server.",
+      "kit_bundle_link": "The link must end in the bundle file name (.tar.gz or .tgz).",
+      "sha256_hex": "64 hexadecimal characters (a SHA-256).",
+      "no_control_characters": "Text without control characters.",
+      "kit_bundle_checksum_mismatch": "The file is not the release: its SHA-256 differs from the one registered.",
+      "kit_bundle_size_mismatch": "The file does not have the size registered for the release.",
+      "kit_bundle_mirrored": "This version is already mirrored: its file, size and checksum no longer change."
     },
     "codes": {
       "validation_failed": "Check the data you sent.",
@@ -1739,5 +1752,81 @@
     "confirmRequired": "Confirm that you understand what will be revoked.",
     "revoke": "Revoke {count, plural, one {# certificate} other {# certificates}}",
     "done": "{count, plural, one {# certificate was} other {# certificates were}} revoked. The gateway rejects them from the next OPA bundle."
+  },
+  "kit": {
+    "title": "The node kit",
+    "publicLead": "Provider entities connect their services to the network through the node: software installed on one of the entity's servers, which opens an encrypted tunnel outward. This is the version the operator offers now.",
+    "publicToken": "Installing it takes an enrollment token, which the entity's administrator issues in the portal (My entity → Kit nodes → Register a node) once the entity is part of the network. An entity that is not part of it yet signs in and asks to join first.",
+    "sectionTitle": "Kit to install",
+    "sectionLead": "Download it on the server where the node will run. The enrollment token comes from \"Register a node\".",
+    "none": "The operator has not published a version of the kit yet.",
+    "version": "Version",
+    "since": "Current since",
+    "download": "Download",
+    "fromRelease": "{file} (release)",
+    "fromPortal": "{file} (this portal's mirror)",
+    "size": "Size",
+    "sizeValue": "{megabytes} MB ({bytes} bytes)",
+    "sha256": "SHA-256",
+    "signature": "Signature",
+    "allowedSigners": "Operator's allowed_signers",
+    "checksumIsConvenience": "The checksum on this page is a convenience, not a guarantee: whoever controls the portal controls both the file and its checksum.",
+    "unsignedCheck": "This release is not signed yet. Before installing, compare the checksum with the one the operator gives you through another channel (for example, the agreement with your entity).",
+    "signedCheck": "The guarantee is the operator's signature: check it with the operator's key as you received it through another channel (for example, the agreement with your entity), not with the one shown here.",
+    "commandsTitle": "Download, check and install",
+    "commandsLead": "On the entity's server (Ubuntu Server 22.04 or 24.04), as a user with sudo. The second command must say \"OK\"; if it does not, do not open the bundle.",
+    "commandsFromRelease": "Commands, downloading from the release",
+    "commandsFromPortal": "Commands, downloading from this portal's mirror",
+    "portalAnswer": "When the installer asks for the portal URL, answer <url></url>; then paste the enrollment token when it asks for it.",
+    "afterInstall": "The installer ends with \"The node is online\", and the node shows as Online on the Kit nodes page. The kit's own guide is inside the bundle (INSTALL.md).",
+    "copy": "Copy",
+    "copied": "Copied.",
+    "copyCommands": "Copy: {source}"
+  },
+  "kitAdmin": {
+    "title": "Node kit",
+    "lead": "The kit version entities see on their Kit nodes page and on the public site. The kit is released in its own repository: here you say which version is current, its link and its checksum, and you can mirror its bundle on this portal for servers that cannot reach the release.",
+    "currentTitle": "What entities see now",
+    "historyTitle": "Releases",
+    "historyEmpty": "No releases yet.",
+    "version": "Version",
+    "state": "State",
+    "size": "Size",
+    "mirror": "Mirror",
+    "actions": "Actions",
+    "isCurrent": "Current",
+    "previous": "Previous",
+    "mirroredOn": "Mirrored on {date}",
+    "notMirrored": "Not mirrored",
+    "makeCurrent": "Make current",
+    "makeCurrentFor": "Make current version {version}",
+    "correctFor": "Correct {version}",
+    "mirroredLocked": "Mirrored: its file, size and checksum no longer change.",
+    "form": {
+      "title": "Set the current version",
+      "lead": "Copy the link, the size and the SHA-256 from the kit's release (its \".sha256\" file). Saving makes it the current version at once; an existing version is corrected.",
+      "label": "Set the current version of the kit",
+      "editOf": "Correct {version}",
+      "version": "Version (for example 0.2.0)",
+      "url": "Link to the bundle (https, ending in .tar.gz)",
+      "sizeBytes": "Size in bytes",
+      "sha256": "SHA-256 of the bundle",
+      "signatureUrl": "Link to the signature (optional, once releases are signed)",
+      "allowedSigners": "Operator's allowed_signers (optional)",
+      "submit": "Make it the current version",
+      "save": "Save the correction",
+      "saved": "Saved: it is the current version."
+    },
+    "upload": {
+      "formName": "Mirror the bundle of {version}",
+      "file": "Bundle of {version} ({file})",
+      "hint": "It must have exactly {bytes} bytes and the SHA-256 of the release; it cannot be replaced afterwards.",
+      "submit": "Upload to the mirror",
+      "uploading": "Uploading…",
+      "done": "Mirrored: the portal serves it under /kit/{version}/.",
+      "choose": "Choose the bundle file first.",
+      "tooLarge": "The file is larger than the portal accepts (DEN_KIT_BUNDLE_MAX_BYTES)."
+    },
+    "sizeMb": "{megabytes} MB"
   }
 }

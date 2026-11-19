@@ -147,6 +147,29 @@ export async function apiPutBytes<S extends z.ZodType>(
   return { ok: true, data: schema.parse(await res.json()) };
 }
 
+/**
+ * PUT streaming a request body to the API with the user's token (the kit's bundle, P-03): the
+ * web server never holds the whole file. Returns the raw response.
+ */
+export async function apiPutStream(
+  path: string,
+  body: ReadableStream<Uint8Array>,
+  contentType: string,
+): Promise<Response> {
+  return fetch(`${apiUrl()}/api/v1${path}`, {
+    method: 'PUT',
+    headers: {
+      authorization: `Bearer ${await accessToken()}`,
+      accept: 'application/json',
+      'content-type': contentType,
+    },
+    body,
+    // Node's fetch streams a request body only half-duplex.
+    duplex: 'half',
+    cache: 'no-store',
+  } as RequestInit & { duplex: 'half' });
+}
+
 /** GET returning the raw response (downloads), with the user's token. */
 export async function apiGetRaw(path: string): Promise<Response> {
   return fetch(`${apiUrl()}/api/v1${path}`, {

@@ -207,6 +207,7 @@ enrollment_issued → enrolled → online ⇄ offline
 4. The node renews its certificate before it expires. `entity_admin` or `platform_admin` can decommission a node (`decommissioned`): it stops working for good.
 5. APIs with a `node` upstream show the node's status.
 6. **Contract the node serves (P-02).** For each published (or deprecated) version on a node, the portal compares the SHA-256 the node reports in its heartbeat for the service on the version's `servicePath` with the published version's `openapiSha256`: **matches**, **differs** (with both hashes and since when) or **not reported** (no service on that path, or the service has no OpenAPI on the node, whose logs then show `(unknown)` routes). It is shown on the version sheet (provider and reviewer), on the entity's node page and in the operator's sync console. The change from matches to differs notifies the entity's `api_publisher`s and `entity_admin`s; every change of status is audited. It never blocks traffic: the gateway keeps routing by the published contract.
+7. **The kit to install (P-03).** The kit is released in its own repository (ADR-0011). The operator (`platform_admin`) sets the current version in the console: version, link to the bundle (https), size, SHA-256 and, once releases are signed, the signature's link and the operator's `allowed_signers`. Each change is audited; an earlier version can be made current again. Every member of the entity sees it on _My entity → Kit nodes_, next to "Register a node", and anyone on the public site (`/kit`), with the commands to download, check and install it on the entity's server and the portal's own URL to answer the installer. Optionally the operator uploads the bundle and the portal serves it under `/kit/<version>/` without a session (nothing in it is secret: enrolling takes the token); the upload is accepted only with the declared size and SHA-256 and never changes afterwards. The page says that its checksum is a convenience, not a guarantee: whoever controls the portal controls both the file and its checksum; the guarantee is the operator's signature, checked with a key delivered through another channel.
 
 **Bootcamp preparation (M4-07).** Before the bootcamp, each entity confirms five requirements: a server for the node, a read-only database user, outbound internet access on 443, the designated officers (computed: members with `api_publisher` and `data_steward`) and the use case. The `entity_admin` (or the operator) checks them off, and the operator sees the progress of every entity.
 
@@ -230,13 +231,14 @@ enrollment_issued → enrolled → online ⇄ offline
 - Home: catalog search, quick links by role, pending items (inbox).
 - Catalog: filters by sector, entity, classification, status; cards showing the personal data exposed.
 - API detail: description, service sheet, interactive documentation (Scalar) with "try in sandbox", versions, allowed purposes, node status, "Request access" button.
-- My entity: data, members and invitations, nodes, agreements.
+- My entity: data, members and invitations, nodes (with the kit to install, P-03), agreements.
+- The node kit (public, `/kit`): current version, checksum and how to install it (P-03).
 - My APIs (provider): list, create/edit a version, submit for review, requests received, active consumers, usage.
 - My applications (consumer): credentials, certificates, subscriptions and their status, usage, integration guide (programs in curl, Python, Node.js, Java and C#).
 - Request inbox (data steward): pending, history, approve/reject/suspend/revoke actions.
 
 **Operator console**
-- Entity registrations, API reviews, nodes (status, version, last heartbeat), gateway sync status (last reconcile, differences), all subscriptions, purposes, configuration.
+- Entity registrations, API reviews, nodes (status, version, last heartbeat), gateway sync status (last reconcile, differences), all subscriptions, purposes, the node kit's current version and its mirror (P-03), configuration.
 
 **Regulator view**
 - Network indicators (§8), pending approvals that fall to the regulator, exchange map (which entity consumes from which), audit and export.

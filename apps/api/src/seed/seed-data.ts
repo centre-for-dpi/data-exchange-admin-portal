@@ -73,3 +73,16 @@ export const SEED_ROLES: Readonly<Record<string, SeedRoles>> = {
   'elena.admin': { entities: { salud: ['entity_admin'] } },
   'carlos.dev': { entities: { 'programas-sociales': ['app_developer'] } },
 };
+
+/**
+ * The kit's first public release (P-03), set as the current version when the portal has none,
+ * so the nodes page shows how to download it. The operator replaces it in the console; the seed
+ * never touches the releases once there is one.
+ */
+export const SEED_KIT_RELEASE = {
+  version: '0.2.0',
+  url: 'https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz',
+  fileName: 'den-node-kit-0.2.0.tar.gz',
+  sizeBytes: 26_006_019,
+  sha256: '4e196fae6d46a4c5942c0bdc1d35cdf29dc6ca25d667a0341dadf1b5c47c21d9',
+} as const;

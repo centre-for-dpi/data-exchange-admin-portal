@@ -63,6 +63,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `sync.read` | ✓ | ✓ | · | · |
 | `sync.retry` | ✓ | · | · | · |
 | `network.map.read` | ✓ | ✓ | ✓ | · |
+| `kit_release.read` | ✓ | ✓ | · | · |
+| `kit_release.manage` | ✓ | · | · | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Rutas
@@ -79,6 +81,9 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | POST | `/api/v1/admin/entities/:id/suspend` | plataforma: `entity_admin.decide` |
 | PUT | `/api/v1/admin/entities/:id/xroad-member` | plataforma: `entity_admin.decide` |
 | POST | `/api/v1/admin/gateway-signing-keys/rotate` | plataforma: `gateway_key.rotate` |
+| GET | `/api/v1/admin/kit-releases` | plataforma: `kit_release.read` |
+| PUT | `/api/v1/admin/kit-releases/:version` | plataforma: `kit_release.manage` |
+| PUT | `/api/v1/admin/kit-releases/:version/bundle` | plataforma: `kit_release.manage` |
 | GET | `/api/v1/admin/nodes` | plataforma: `node.list` |
 | GET | `/api/v1/admin/purposes` | plataforma: `purpose.read` |
 | POST | `/api/v1/admin/purposes` | plataforma: `purpose.manage` |
@@ -163,6 +168,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | GET | `/api/v1/gateway/jwks` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/health` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | POST | `/api/v1/internal/subject-access` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/kit/current` | pública (sin sesión; las internas exigen su propio token de servicio) |
+| GET | `/api/v1/kit/releases/:version/:file` | pública (sin sesión; las internas exigen su propio token de servicio) |
 | GET | `/api/v1/me` | cualquier sesión; solo recursos propios |
 | GET | `/api/v1/me/invitations` | cualquier sesión; solo recursos propios |
 | POST | `/api/v1/me/invitations/:invitationId/accept` | cualquier sesión; solo recursos propios |

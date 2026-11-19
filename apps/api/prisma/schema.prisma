@@ -1242,3 +1242,36 @@ model BootcampChecklistItem {
   @@unique([entityId, item])
   @@map("bootcamp_checklist_item")
 }
+
+// ---------------------------------------------------------------------------------------------
+// Releases of the node kit the operator offers (P-03). The kit is another product (ADR-0011):
+// the portal says which version is current, where to get it and its checksum, and can mirror
+// its bundle.
+// ---------------------------------------------------------------------------------------------
+
+model KitRelease {
+  id               String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// Semantic version, without build metadata (a path segment of the mirror).
+  version          String    @unique
+  /// Where entities download the bundle (https), e.g. the kit's GitHub Release asset.
+  url              String
+  /// The last segment of `url`; the mirror serves the bundle under /kit/<version>/<fileName>.
+  fileName         String    @map("file_name")
+  sizeBytes        Int       @map("size_bytes")
+  /// SHA-256 of the bundle, lower-case hex.
+  sha256           String
+  /// Detached signature and the operator's allowed_signers, once releases are signed (kit K5).
+  signatureUrl     String?   @map("signature_url")
+  allowedSigners   String?   @map("allowed_signers")
+  /// The current version is the one made current last.
+  madeCurrentAt    DateTime? @map("made_current_at") @db.Timestamptz(3)
+  /// Storage key of the mirrored bundle (StorageService), checked against sha256 on upload.
+  mirrorStorageKey String?   @map("mirror_storage_key")
+  mirroredAt       DateTime? @map("mirrored_at") @db.Timestamptz(3)
+  createdBy        String    @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([madeCurrentAt])
+  @@map("kit_release")
+}

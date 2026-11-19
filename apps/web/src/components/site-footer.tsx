@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { getTranslations } from 'next-intl/server';
+import { Link } from '../i18n/navigation';
 import { getSite } from '../lib/site';
 
 export async function SiteFooter() {
@@ -25,6 +26,11 @@ export async function SiteFooter() {
             {t('supervisedBy', { regulator: site.regulator.name })}
           </p>
           <p>{t('privacy')}</p>
+          <p>
+            <Link href="/kit" className="underline underline-offset-4 hover:text-white">
+              {t('kit')}
+            </Link>
+          </p>
         </div>
       </div>
     </footer>

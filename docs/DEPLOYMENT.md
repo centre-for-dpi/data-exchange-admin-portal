@@ -253,7 +253,7 @@ It also serves the data subject API that the citizen app consumes.
 
 - Image: `apps/api/Dockerfile`, built from the repo root (`COPY . .`). **The country configuration (`config/country/*.yaml`) is baked into the image**: a change in the YAML requires a rebuild.
 - On startup: `prisma migrate deploy` (migrations as owner) → the seed (`dist/seed/main.js`) if `DEN_ALLOW_SEED=true` → `node dist/main.js` on `API_PORT` (4000). If the country configuration is invalid or `DEN_COUNTRY` is missing, it exits with code 1.
-- It runs as user `node`. Documents in `/var/lib/den/documents` (`DEN_DOCUMENTS_DIR`, volume `api-documents`).
+- It runs as user `node`. Documents in `/var/lib/den/documents` (`DEN_DOCUMENTS_DIR`, volume `api-documents`); the kit bundles the operator mirrors (P-03) live there too, up to `DEN_KIT_BUNDLE_MAX_BYTES` each (128 MiB by default).
 - **Background jobs in the same process** (`OPERATIONS.md §3`). `DEN_WORKER=off` starts the API without them (tests, read-only replicas).
 - It exposes `/api/v1/*`. Routes that **never** go to the public ingress: `/api/v1/internal/*` (transparency collector) and `/api/v1/opa/*` (OPA bundle and status).
 
@@ -447,6 +447,8 @@ http:
 
 Traefik gives higher priority to the longer rule, so `/api/v1`, `/auth`, etc. win over `/`.
 
+**The kit's mirror (P-03)** needs no route of its own: `/kit/<version>/<file>` is a page path of the web (`/`), which streams it from the API, and so is the operator's upload (`/files/kit-releases/<version>/bundle`). The proxy must accept request bodies as large as the bundle (tens of MB): Traefik has no limit by default; another proxy (nginx `client_max_body_size`) has to allow `DEN_KIT_BUNDLE_MAX_BYTES`.
+
 **mTLS (M3-10, `features.mtls.required`).** The gateway's TLS must terminate at APISIX (SPIKE S-3): behind a proxy that terminates TLS, `/gw` cannot pass on the client certificate. Three things are needed:
 
 1. **A name of its own for the gateway**, for example `gw.example.org`, with TLS passthrough to APISIX's port 9443. There APISIX presents its server certificate, issued by step-ca for `DEN_GATEWAY_TLS_HOSTS`. In `.env`: `DEN_GATEWAY_PUBLIC_URL=https://gw.example.org` and `DEN_GATEWAY_TLS_HOSTS=gw.example.org` (`make-deploy-env.mjs --gateway-host gw.example.org`). Applications also request their token there: `https://gw.example.org/oauth/token`.
@@ -628,6 +630,7 @@ Besides `country`, `publicUrl`, `gatewayHost` and `gatewayPublicUrl`:
 - `stepCa.rootFingerprint` and `stepCa.pkiSecret` (§9.3);
 - `postgres.backup.destinationPath` (`s3://<bucket>/<path>`) and, with the operator's own storage, `endpointURL` and `endpointCASecret`. Without `destinationPath` the chart does not install; backups are only disabled on purpose (`postgres.backup.enabled=false`, as in kind);
 - `keycloak.smtp` (the realm's server and sender) and `prometheus.alertmanager.config` (server, sender and recipients of the alerts);
+- with ingress-nginx, `ingress.annotations` with `nginx.ingress.kubernetes.io/proxy-body-size` large enough for the PDF uploads and the kit bundle the operator mirrors (P-03; its default is 1 MiB). `/kit/<version>/` goes to the web through `/` like any page;
 - `antivirus.replicas` (2 by default: with antivirus enabled, an upload fails if ClamAV does not respond) and its resources;
 - `grafana."grafana.ini".server.root_url`: `<publicUrl>/grafana/`. Without it, Grafana redirects to `localhost`;
 - `networkPolicy`: the ingress namespace (`ingressControllerNamespace`), and the private networks that the gateway (`gatewayExtraEgressCidrs`: providers inside the operator's network, an X-Road Security Server) or the API and Keycloak (`servicesEgressCidrs`: mail, the TSA) need to reach. By default they only go out to public addresses.

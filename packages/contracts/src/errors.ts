@@ -100,6 +100,12 @@ export const FieldErrorKey = {
   ValidationsPending: 'validations_pending',
   /** Approving a version whose automatic validations failed (M4-06, P-07). */
   ValidationsFailed: 'validations_failed',
+  /** The uploaded kit bundle is not the declared one: its SHA-256 differs (P-03). */
+  KitBundleChecksumMismatch: 'kit_bundle_checksum_mismatch',
+  /** The uploaded kit bundle does not have the declared size (P-03). */
+  KitBundleSizeMismatch: 'kit_bundle_size_mismatch',
+  /** The release's bundle is already mirrored: its path never serves other bytes (P-03). */
+  KitBundleMirrored: 'kit_bundle_mirrored',
 } as const;
 
 export type FieldErrorKey = (typeof FieldErrorKey)[keyof typeof FieldErrorKey];

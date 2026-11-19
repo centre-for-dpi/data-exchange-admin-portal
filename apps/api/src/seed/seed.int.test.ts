@@ -29,6 +29,7 @@ describe('development seed (M1-01)', () => {
       platformRoles: 0,
       memberships: 0,
       purposes: 0,
+      kitReleases: 0,
     });
     expect(second.updated).toEqual({ purposes: 0 });
     expect(await prisma.auditEvent.count({ where: { actorId: SEED_ACTOR } })).toBe(auditAfterFirst);
@@ -78,6 +79,14 @@ describe('development seed (M1-01)', () => {
     expect(carlos.memberships.map((m) => [m.entity.slug, m.roles])).toEqual([
       ['programas-sociales', ['app_developer']],
     ]);
+  });
+
+  it('offers a current kit version (P-03)', async () => {
+    const current = await prisma.kitRelease.findFirst({
+      where: { madeCurrentAt: { not: null } },
+      orderBy: { madeCurrentAt: 'desc' },
+    });
+    expect(current?.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('loads the purpose catalogue from the country configuration', async () => {
