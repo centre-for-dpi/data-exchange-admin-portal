@@ -3,6 +3,7 @@ import createMiddleware from 'next-intl/middleware';
 import { auth } from './auth';
 import { routing } from './i18n/routing';
 import { contentSecurityPolicy, newNonce, originOf } from './lib/security-headers';
+import { forwardSessionCookies } from './lib/session-cookie';
 import { homePathFor, requiresSession } from './lib/session-routes';
 
 const intl = createMiddleware(routing);
@@ -38,6 +39,8 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
 
   const response = await withAuth(request, event as never);
   response?.headers.set('content-security-policy', csp);
+  // A token refreshed here is also the one this request's page and server actions use (M-21).
+  if (response) forwardSessionCookies(request, response);
   const rewrite = response?.headers.get('x-middleware-rewrite');
   if (response && rewrite) {
     const target = new URL(rewrite, request.url);
