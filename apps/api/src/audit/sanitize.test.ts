@@ -18,6 +18,34 @@ describe('sanitizeForAudit', () => {
     });
   });
 
+  it('keeps the UUID identifiers of rows that hold a secret (B-03)', () => {
+    const id = '0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b';
+    expect(
+      sanitizeForAudit({
+        tokenId: id,
+        credentialId: id,
+        token_id: id,
+        token: id,
+        enrollmentToken: 'abc',
+        tokenId2: 'x',
+      }),
+    ).toEqual({
+      tokenId: id,
+      credentialId: id,
+      token_id: id,
+      token: REDACTED,
+      enrollmentToken: REDACTED,
+      tokenId2: REDACTED,
+    });
+  });
+
+  it('redacts an identifier-looking key that does not hold a UUID', () => {
+    expect(sanitizeForAudit({ tokenId: 'sk-live-abc', credentialId: { value: 'x' } })).toEqual({
+      tokenId: REDACTED,
+      credentialId: REDACTED,
+    });
+  });
+
   it('makes values JSON-safe', () => {
     const date = new Date('2026-11-11T12:00:00Z');
     expect(sanitizeForAudit({ at: date, n: 10n, f: () => 1, u: undefined, list: [date] })).toEqual({
