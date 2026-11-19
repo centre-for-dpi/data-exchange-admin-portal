@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { AdminEntityQuery, EntityStatus, SubscriptionStatus } from '@den/contracts';
 import { AuditService } from '../audit/audit.service.js';
 import type { Principal } from '../auth/principal.service.js';
-import { ConflictError, NotFoundError } from '../common/errors.js';
+import { ConflictError, InvalidTransitionError, NotFoundError } from '../common/errors.js';
 import { assertTransition as assertVersionTransition } from '../domain/api-version/state-machine.js';
 import { assertTransition } from '../domain/entity/state-machine.js';
 import { LIVE_STATUSES } from '../domain/subscription/state-machine.js';
@@ -243,6 +243,12 @@ export class EntityStatusService {
 
   async reactivate(entityId: string, principal: Principal, comment?: string, requestId?: string) {
     const before = await this.load(entityId);
+    // `under_review -> active` is the approval of an onboarding request, which has its own
+    // checks (impartiality, membership, invitations). Reactivation is only for a suspension, so
+    // the state machine alone is not enough: two actions share the `active` target (M-04).
+    if (before.status !== 'suspended') {
+      throw new InvalidTransitionError('entity', before.status, 'active');
+    }
     await this.prisma.$transaction((tx) =>
       this.decide(
         tx,
