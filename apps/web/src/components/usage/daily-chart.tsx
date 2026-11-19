@@ -97,7 +97,9 @@ export function ColumnChart({
           width={width}
           height={HEIGHT}
           viewBox={`0 0 ${width} ${HEIGHT}`}
-          className="block"
+          // Never wider than its container, even for the instant before the width is measured again
+          // (a window or zoom change): 1.4.10 reflow.
+          className="block h-auto max-w-full"
           role="group"
           aria-labelledby={titleId}
           onPointerLeave={() => setActive(null)}
