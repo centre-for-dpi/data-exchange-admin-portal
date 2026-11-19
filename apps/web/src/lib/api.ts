@@ -16,6 +16,25 @@ export class ApiError extends Error {
 const apiUrl = (): string => process.env.DEN_API_URL ?? 'http://localhost:4000';
 
 /**
+ * The URL of an API path. Ids in paths come from route parameters and form fields: a segment
+ * that climbs out of the path or ends it early (`..`, an encoded slash, a backslash, a fragment)
+ * would make the web call another endpoint with the user's token (B-26). Pages validate their
+ * UUIDs first (lib/route-params.ts); this is the last line for everything else.
+ */
+export function apiEndpoint(path: string): string {
+  const pathname = path.split('?')[0] ?? '';
+  const unsafe =
+    !path.startsWith('/') ||
+    // eslint-disable-next-line no-control-regex
+    /[\\#\u0000-\u001f\u007f]/.test(path) ||
+    /%(2e|2f|5c|23|00)/i.test(pathname) ||
+    pathname.split('/').some((segment, i) => i > 0 && (segment === '..' || segment === '.')) ||
+    pathname.includes('//');
+  if (unsafe) throw new ApiError(404);
+  return `${apiUrl()}/api/v1${path}`;
+}
+
+/**
  * Calls apps/api from the server with the user's access token, read from the encrypted session
  * cookie. The token never reaches the browser. Responses are validated with the shared zod
  * contracts (packages/contracts).
@@ -41,7 +60,7 @@ export async function apiGet<S extends z.ZodType>(
     ...(await forwardedForHeader()),
   };
   if (!options.anonymous) headers.authorization = `Bearer ${await accessToken()}`;
-  const url = `${apiUrl()}/api/v1${path}`;
+  const url = apiEndpoint(path);
   let res: Response;
   try {
     res = await fetch(url, { headers, cache: 'no-store' });
@@ -103,7 +122,7 @@ export async function apiSend<S extends z.ZodType>(
   body: unknown,
   schema: S,
 ): Promise<ApiResult<z.output<S>>> {
-  const res = await fetch(`${apiUrl()}/api/v1${path}`, {
+  const res = await fetch(apiEndpoint(path), {
     method,
     headers: {
       authorization: `Bearer ${await accessToken()}`,
@@ -132,7 +151,7 @@ export async function apiPutBytes<S extends z.ZodType>(
   contentType: string,
   schema: S,
 ): Promise<ApiResult<z.output<S>>> {
-  const res = await fetch(`${apiUrl()}/api/v1${path}`, {
+  const res = await fetch(apiEndpoint(path), {
     method: 'PUT',
     headers: {
       authorization: `Bearer ${await accessToken()}`,
@@ -162,7 +181,7 @@ export async function apiPutStream(
   body: ReadableStream<Uint8Array>,
   contentType: string,
 ): Promise<Response> {
-  return fetch(`${apiUrl()}/api/v1${path}`, {
+  return fetch(apiEndpoint(path), {
     method: 'PUT',
     headers: {
       authorization: `Bearer ${await accessToken()}`,
@@ -179,7 +198,7 @@ export async function apiPutStream(
 
 /** GET returning the raw response (downloads), with the user's token. */
 export async function apiGetRaw(path: string): Promise<Response> {
-  return fetch(`${apiUrl()}/api/v1${path}`, {
+  return fetch(apiEndpoint(path), {
     headers: { authorization: `Bearer ${await accessToken()}`, ...(await forwardedForHeader()) },
     cache: 'no-store',
   });

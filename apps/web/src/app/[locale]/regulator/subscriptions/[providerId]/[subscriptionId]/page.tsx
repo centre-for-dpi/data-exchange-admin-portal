@@ -8,6 +8,7 @@ import { SubscriptionFacts } from '../../../../../../components/subscriptions/su
 import { EmptyState, Page, PageHeader, Section } from '../../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../../lib/api';
 import { getViewer } from '../../../../../../lib/viewer';
+import { uuidParams } from '../../../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; providerId: string; subscriptionId: string }>;
@@ -26,14 +27,14 @@ async function load(providerId: string, subscriptionId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { locale, providerId, subscriptionId } = await params;
+  const { locale, providerId, subscriptionId } = uuidParams(await params, 'providerId', 'subscriptionId');
   const t = await getTranslations({ locale, namespace: 'subscriptions' });
   return { title: t('detailTitle', { api: (await load(providerId, subscriptionId)).api.name }) };
 }
 
 /** An access request to sensitive data, as the regulator sees it (M2-04). */
 export default async function RegulatorSubscriptionPage({ params }: PageProps) {
-  const { locale, providerId, subscriptionId } = await params;
+  const { locale, providerId, subscriptionId } = uuidParams(await params, 'providerId', 'subscriptionId');
   setRequestLocale(locale);
   const t = await getTranslations();
   if (!(await getViewer()).platformRoles.includes('regulator')) notFound();

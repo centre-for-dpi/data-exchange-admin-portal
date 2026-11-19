@@ -14,6 +14,7 @@ import { Link } from '../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { localize } from '../../../../lib/localize';
 import { getViewer } from '../../../../lib/viewer';
+import { uuidParams } from '../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; apiId: string }>;
@@ -37,13 +38,13 @@ async function load(apiId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { apiId } = await params;
+  const { apiId } = uuidParams(await params, 'apiId');
   const { detail } = await load(apiId);
   return { title: detail.api.name };
 }
 
 export default async function CatalogApiPage({ params, searchParams }: PageProps) {
-  const { locale, apiId } = await params;
+  const { locale, apiId } = uuidParams(await params, 'apiId');
   setRequestLocale(locale);
   const t = await getTranslations();
   const format = await getFormatter();

@@ -19,6 +19,7 @@ import { Card, Page, PageHeader, Section } from '../../../../components/ui/page'
 import { ApiError, apiGet } from '../../../../lib/api';
 import { csrCommands, csrScriptCommand } from '../../../../lib/csr-commands';
 import { getViewer } from '../../../../lib/viewer';
+import { uuidParams } from '../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; appId: string }>;
@@ -43,12 +44,12 @@ async function load(appId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { appId } = await params;
+  const { appId } = uuidParams(await params, 'appId');
   return { title: (await load(appId)).name };
 }
 
 export default async function ApplicationPage({ params }: PageProps) {
-  const { locale, appId } = await params;
+  const { locale, appId } = uuidParams(await params, 'appId');
   setRequestLocale(locale);
   const t = await getTranslations('myApps');
   const format = await getFormatter();

@@ -8,6 +8,7 @@ import { Page, PageHeader } from '../../../../../components/ui/page';
 import { ApiError, apiGet } from '../../../../../lib/api';
 import { localize } from '../../../../../lib/localize';
 import { getViewer } from '../../../../../lib/viewer';
+import { uuidParams } from '../../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; requestId: string }>;
@@ -20,7 +21,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function EditEntityRequestPage({ params }: PageProps) {
-  const { locale, requestId } = await params;
+  const { locale, requestId } = uuidParams(await params, 'requestId');
   setRequestLocale(locale);
   const t = await getTranslations('entityRequests');
   const viewer = await getViewer();

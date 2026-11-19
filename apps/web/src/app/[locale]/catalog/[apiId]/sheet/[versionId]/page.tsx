@@ -8,6 +8,7 @@ import { PrintButton } from '../../../../../../components/catalog/print-button';
 import { Link } from '../../../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../../../lib/api';
 import { localize } from '../../../../../../lib/localize';
+import { uuidParams } from '../../../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; apiId: string; versionId: string }>;
@@ -23,7 +24,7 @@ async function load(apiId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { locale, apiId } = await params;
+  const { locale, apiId } = uuidParams(await params, 'apiId');
   const t = await getTranslations({ locale, namespace: 'serviceSheet' });
   const detail = await load(apiId);
   return { title: t('title', { api: detail.api.name }) };
@@ -35,7 +36,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  * browser. Only what the catalogue already shows to this viewer: nothing about the upstream.
  */
 export default async function ServiceSheetPage({ params }: PageProps) {
-  const { locale, apiId, versionId } = await params;
+  const { locale, apiId, versionId } = uuidParams(await params, 'apiId', 'versionId');
   setRequestLocale(locale);
   const t = await getTranslations();
   const format = await getFormatter();

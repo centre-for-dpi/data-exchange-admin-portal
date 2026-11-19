@@ -16,6 +16,7 @@ import { Link } from '../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { localize } from '../../../../lib/localize';
 import { getViewer } from '../../../../lib/viewer';
+import { uuidParams } from '../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; requestId: string }>;
@@ -40,7 +41,7 @@ async function load(requestId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { requestId } = await params;
+  const { requestId } = uuidParams(await params, 'requestId');
   return { title: (await load(requestId)).legalName };
 }
 
@@ -48,7 +49,7 @@ const DECIDE_ROLES = ['platform_admin', 'platform_reviewer'];
 
 /** One onboarding request, for its applicant and for the operator (SPEC.md §4.1). */
 export default async function EntityRequestPage({ params }: PageProps) {
-  const { locale, requestId } = await params;
+  const { locale, requestId } = uuidParams(await params, 'requestId');
   setRequestLocale(locale);
   const t = await getTranslations();
   const format = await getFormatter();

@@ -16,6 +16,7 @@ import { Page, PageHeader, Section } from '../../../../../../components/ui/page'
 import { ApiError, apiGet } from '../../../../../../lib/api';
 import { localize } from '../../../../../../lib/localize';
 import { getViewer } from '../../../../../../lib/viewer';
+import { uuidParams } from '../../../../../../lib/route-params';
 
 /** First retirement date (YYYY-MM-DD) the notice period allows, with a day of margin. */
 function earliestRetirementDate(noticeDays: number, now = new Date()): string {
@@ -45,14 +46,14 @@ async function load(apiId: string, versionId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { locale, apiId, versionId } = await params;
+  const { locale, apiId, versionId } = uuidParams(await params, 'apiId', 'versionId');
   const { api, version } = await load(apiId, versionId);
   const t = await getTranslations({ locale, namespace: 'version.detail' });
   return { title: t('title', { api: api.name, version: version.version }) };
 }
 
 export default async function VersionPage({ params }: PageProps) {
-  const { locale, apiId, versionId } = await params;
+  const { locale, apiId, versionId } = uuidParams(await params, 'apiId', 'versionId');
   setRequestLocale(locale);
   const t = await getTranslations();
   const { entity, api, version } = await load(apiId, versionId);

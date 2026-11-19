@@ -13,6 +13,7 @@ import { ApiError, apiGet } from '../../../../../lib/api';
 import { localize } from '../../../../../lib/localize';
 import { approvalBlock } from '../../../../../lib/validation-hints';
 import { getViewer } from '../../../../../lib/viewer';
+import { uuidParams } from '../../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; versionId: string }>;
@@ -28,14 +29,14 @@ async function load(versionId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { locale, versionId } = await params;
+  const { locale, versionId } = uuidParams(await params, 'versionId');
   const review = await load(versionId);
   const t = await getTranslations({ locale, namespace: 'operator.review' });
   return { title: t('title', { api: review.api.name, version: review.version.version }) };
 }
 
 export default async function ReviewPage({ params }: PageProps) {
-  const { locale, versionId } = await params;
+  const { locale, versionId } = uuidParams(await params, 'versionId');
   setRequestLocale(locale);
   const t = await getTranslations();
   const viewer = await getViewer();

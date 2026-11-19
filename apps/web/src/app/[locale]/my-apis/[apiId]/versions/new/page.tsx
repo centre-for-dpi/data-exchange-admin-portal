@@ -12,6 +12,7 @@ import { ApiError, apiGet } from '../../../../../../lib/api';
 import { Page, PageHeader } from '../../../../../../components/ui/page';
 import { localize } from '../../../../../../lib/localize';
 import { getViewer } from '../../../../../../lib/viewer';
+import { uuidParams } from '../../../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; apiId: string }>;
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function NewVersionPage({ params }: PageProps) {
-  const { locale, apiId } = await params;
+  const { locale, apiId } = uuidParams(await params, 'apiId');
   setRequestLocale(locale);
   const t = await getTranslations();
   const entity = (await getViewer()).activeEntity;

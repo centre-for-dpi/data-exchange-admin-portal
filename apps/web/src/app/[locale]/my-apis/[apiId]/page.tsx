@@ -10,6 +10,7 @@ import { AuditTimeline } from '../../../../components/audit/audit-views';
 import { ApiError, apiGet } from '../../../../lib/api';
 import { entityTimeline } from '../../../../lib/audit';
 import { getViewer } from '../../../../lib/viewer';
+import { uuidParams } from '../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; apiId: string }>;
@@ -30,13 +31,13 @@ async function loadApi(apiId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { apiId } = await params;
+  const { apiId } = uuidParams(await params, 'apiId');
   const { api } = await loadApi(apiId);
   return { title: api.name };
 }
 
 export default async function ApiPage({ params }: PageProps) {
-  const { locale, apiId } = await params;
+  const { locale, apiId } = uuidParams(await params, 'apiId');
   setRequestLocale(locale);
   const t = await getTranslations();
   const { entity, api } = await loadApi(apiId);

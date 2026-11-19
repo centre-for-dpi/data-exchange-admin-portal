@@ -14,6 +14,7 @@ import { Link } from '../../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../../lib/api';
 import { entityTimeline } from '../../../../../lib/audit';
 import { getViewer } from '../../../../../lib/viewer';
+import { uuidParams } from '../../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; subscriptionId: string }>;
@@ -34,14 +35,14 @@ async function load(subscriptionId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { locale, subscriptionId } = await params;
+  const { locale, subscriptionId } = uuidParams(await params, 'subscriptionId');
   const t = await getTranslations({ locale, namespace: 'subscriptions' });
   return { title: t('detailTitle', { api: (await load(subscriptionId)).api.name }) };
 }
 
 /** Consumer view of one of the entity's access requests. */
 export default async function ConsumerSubscriptionPage({ params }: PageProps) {
-  const { locale, subscriptionId } = await params;
+  const { locale, subscriptionId } = uuidParams(await params, 'subscriptionId');
   setRequestLocale(locale);
   const t = await getTranslations('subscriptions');
   const detail = await load(subscriptionId);

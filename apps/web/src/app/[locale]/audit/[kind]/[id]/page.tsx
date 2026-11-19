@@ -6,6 +6,7 @@ import { AuditTimeline } from '../../../../../components/audit/audit-views';
 import { Page, PageHeader } from '../../../../../components/ui/page';
 import { Link } from '../../../../../i18n/navigation';
 import { ApiError, apiGet } from '../../../../../lib/api';
+import { uuidParams } from '../../../../../lib/route-params';
 
 interface PageProps {
   params: Promise<{ locale: string; kind: string; id: string }>;
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 /** Platform timeline of one subscription or API (DEMO.md step 10). */
 export default async function AuditTimelinePage({ params }: PageProps) {
-  const { locale, kind, id } = await params;
+  const { locale, kind, id } = uuidParams(await params, 'id');
   setRequestLocale(locale);
   const t = await getTranslations('audit');
   const { kind: k, timeline } = await load(kind, id);

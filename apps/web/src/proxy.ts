@@ -55,7 +55,10 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
 }
 
 export const config = {
-  // Everything except Auth.js, the branding route, document downloads (/files), Next internals
-  // and files with an extension.
-  matcher: ['/((?!api|branding|files|_next|_vercel|.*\\..*).*)'],
+  // Everything except Auth.js, the branding route, document downloads (/files), the kit mirror
+  // (/kit/<version>/<file>), Next internals and static files. Only static extensions are
+  // excluded: a route parameter with a dot in it still goes through the proxy (B-26).
+  matcher: [
+    '/((?!api|branding|files|_next|_vercel|kit/.+|.*\\.(?:ico|png|jpe?g|gif|svg|webp|avif|css|js|map|txt|xml|json|woff2?|ttf|otf|webmanifest)$).*)',
+  ],
 };
