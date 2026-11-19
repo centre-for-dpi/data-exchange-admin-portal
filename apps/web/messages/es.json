@@ -772,7 +772,9 @@
       "user": {
         "registered": "Cuenta registrada",
         "created": "Usuario creado",
-        "disabled": "Cuenta desactivada"
+        "disabled": "Cuenta desactivada",
+        "enabled": "Cuenta activada",
+        "identity_relinked": "Identidad vinculada de nuevo"
       },
       "platform_role": {
         "granted": "Rol de plataforma asignado",
@@ -1264,6 +1266,58 @@
     "purgeButton": "Eliminar contenido",
     "older": "Documentos anteriores"
   },
+  "platformUsers": {
+    "title": "Roles de plataforma y cuentas",
+    "lead": "Quién tiene los roles de operador, revisor, regulador y auditor, y quién puede entrar. Cada cambio queda auditado con tu nombre y el motivo. El primer administrador y la recuperación se hacen desde la línea de comandos del servidor.",
+    "email": "Correo electrónico",
+    "role": "Rol",
+    "choose": "Elige un rol",
+    "reason": "Motivo",
+    "reasonHint": "Quién lo pidió y con qué fundamento, para la bitácora (10 caracteres o más).",
+    "roles": {
+      "platform_admin": "Administración de la plataforma",
+      "platform_reviewer": "Revisión del operador",
+      "regulator": "Regulador",
+      "auditor": "Auditoría"
+    },
+    "holders": {
+      "title": "Quién tiene un rol de plataforma",
+      "empty": "No hay ningún rol de plataforma otorgado.",
+      "person": "Persona",
+      "status": "Cuenta",
+      "active": "Activa",
+      "disabled": "Desactivada",
+      "granted": "Otorgado",
+      "actions": "Acciones",
+      "byCommandLine": "Desde el servidor",
+      "byAdministrator": "Por un administrador",
+      "lastAdmin": "El último administrador de plataforma activo no puede perder el rol ni ser desactivado: da primero el rol a otra persona."
+    },
+    "grant": {
+      "title": "Dar un rol",
+      "lead": "La persona debe haberse registrado con ese correo, verificarlo y entrar una vez. En su siguiente ingreso se le pedirá el segundo factor.",
+      "emailHint": "El correo con el que la persona se registró.",
+      "button": "Dar el rol"
+    },
+    "revoke": {
+      "open": "Quitar {role} a {name}",
+      "form": "Quitar {role} a {name}",
+      "button": "Quitar el rol"
+    },
+    "status": {
+      "title": "Desactivar o activar una cuenta",
+      "lead": "A una cuenta desactivada se le rechaza toda petición y no recibe avisos; sus membresías y roles se conservan y vuelven a funcionar si la activas. No se toca Keycloak: la persona aún puede entrar allí, y no alcanza nada.",
+      "emailHint": "Cualquier cuenta del portal, con o sin rol de plataforma.",
+      "disable": "Desactivar la cuenta",
+      "enable": "Activar la cuenta"
+    },
+    "outcome": {
+      "granted": "Rol otorgado.",
+      "unchanged": "Nada que cambiar: la persona ya lo tenía.",
+      "disabled": "Cuenta desactivada.",
+      "enabled": "Cuenta activada."
+    }
+  },
   "session": {
     "mfaRequired": "Tus roles exigen un segundo factor. Vuelve a entrar con el código de un solo uso de tu app autenticadora.",
     "mfaAction": "Verificar con el código",
@@ -1710,7 +1764,10 @@
       "no_control_characters": "Texto sin caracteres de control.",
       "kit_bundle_checksum_mismatch": "El archivo no es el del release: su SHA-256 no coincide con el registrado.",
       "kit_bundle_size_mismatch": "El archivo no tiene el tamaño registrado para la versión.",
-      "kit_bundle_mirrored": "Esta versión ya está en el espejo: su archivo, tamaño y suma ya no cambian."
+      "kit_bundle_mirrored": "Esta versión ya está en el espejo: su archivo, tamaño y suma ya no cambian.",
+      "last_platform_admin": "Es el último administrador de plataforma activo: da primero el rol a otra persona.",
+      "unknown_account": "Ninguna cuenta del portal tiene ese correo: la persona debe registrarse, verificarlo y entrar una vez.",
+      "account_not_active": "Esa cuenta está desactivada: actívala antes de darle un rol."
     },
     "codes": {
       "validation_failed": "Revisa los datos enviados.",

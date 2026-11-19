@@ -18,6 +18,7 @@ function deps(overrides: Partial<Parameters<typeof runPlatformRolesCli>[1]> = {}
       list: vi.fn(() =>
         Promise.resolve([
           {
+            userId: 'u1',
             email: 'ana@operador.example',
             fullName: 'Ana',
             status: 'active',

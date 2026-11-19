@@ -131,6 +131,11 @@ const SCREENS: Screen[] = [
     user: 'pablo.plataforma',
     path: () => '/operator/certificates',
   },
+  {
+    route: '/operator/platform-users',
+    user: 'pablo.plataforma',
+    path: () => '/operator/platform-users',
+  },
   { route: '/operator/purposes', user: 'pablo.plataforma', path: () => '/operator/purposes' },
   { route: '/operator/nodes', user: 'pablo.plataforma', path: () => '/operator/nodes' },
   { route: '/operator/bootcamp', user: 'pablo.plataforma', path: () => '/operator/bootcamp' },

@@ -9,7 +9,7 @@ Reglas del guard global (ADR-0014): sin sesión, 401. En rutas de una entidad: q
 ni tiene un rol de plataforma permitido recibe 404; un miembro sin el rol, 403. En rutas de
 plataforma: sin el rol, 403. Una ruta sin declaración de acceso no se puede llamar (403).
 
-Segundo factor (M3-08, ADR-0021): quien tiene un rol de plataforma o `data_steward`
+Segundo factor (M3-08, ADR-0021): quien tiene un rol de plataforma o uno de `data_steward`, `entity_admin`
 en alguna entidad recibe 403 `mfa_required` en toda ruta de entidad o de plataforma si su sesión
 no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me`) siguen abiertas.
 
@@ -65,6 +65,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | `network.map.read` | ✓ | ✓ | ✓ | · |
 | `kit_release.read` | ✓ | ✓ | · | · |
 | `kit_release.manage` | ✓ | · | · | · |
+| `platform_role.read` | ✓ | · | · | · |
+| `platform_role.manage` | ✓ | · | · | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Rutas
@@ -85,6 +87,9 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | PUT | `/api/v1/admin/kit-releases/:version` | plataforma: `kit_release.manage` |
 | PUT | `/api/v1/admin/kit-releases/:version/bundle` | plataforma: `kit_release.manage` |
 | GET | `/api/v1/admin/nodes` | plataforma: `node.list` |
+| GET | `/api/v1/admin/platform-roles` | plataforma: `platform_role.read` |
+| POST | `/api/v1/admin/platform-roles/grant` | plataforma: `platform_role.manage` |
+| POST | `/api/v1/admin/platform-roles/revoke` | plataforma: `platform_role.manage` |
 | GET | `/api/v1/admin/purposes` | plataforma: `purpose.read` |
 | POST | `/api/v1/admin/purposes` | plataforma: `purpose.manage` |
 | PUT | `/api/v1/admin/purposes/:code` | plataforma: `purpose.manage` |
@@ -92,6 +97,8 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | POST | `/api/v1/admin/purposes/:code/deactivate` | plataforma: `purpose.manage` |
 | GET | `/api/v1/admin/sync` | plataforma: `sync.read` |
 | POST | `/api/v1/admin/sync/retry` | plataforma: `sync.retry` |
+| POST | `/api/v1/admin/users/disable` | plataforma: `platform_role.manage` |
+| POST | `/api/v1/admin/users/enable` | plataforma: `platform_role.manage` |
 | GET | `/api/v1/audit/events` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/export` | plataforma: `audit.read` |
 | GET | `/api/v1/audit/timeline/:kind/:id` | plataforma: `audit.read` |
@@ -199,7 +206,9 @@ no se abrió con el código de un solo uso. Las rutas de cualquier sesión (`/me
 | POST | `/api/v1/review/api-versions/:versionId/approve` | plataforma: `review.decide` |
 | POST | `/api/v1/review/api-versions/:versionId/request-changes` | plataforma: `review.decide` |
 | GET | `/api/v1/review/entities` | plataforma: `entity_review.read` |
+| GET | `/api/v1/review/entities/:requestId` | plataforma: `entity_review.read` |
 | POST | `/api/v1/review/entities/:requestId/approve` | plataforma: `entity_review.decide` |
+| GET | `/api/v1/review/entities/:requestId/designation-document` | plataforma: `entity_review.read` |
 | POST | `/api/v1/review/entities/:requestId/reject` | plataforma: `entity_review.decide` |
 | POST | `/api/v1/review/entities/:requestId/request-changes` | plataforma: `entity_review.decide` |
 | GET | `/api/v1/transparency/checkpoints` | pública (sin sesión; las internas exigen su propio token de servicio) |

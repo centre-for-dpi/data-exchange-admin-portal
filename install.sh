@@ -21,6 +21,9 @@
 #   sudo ./install.sh platform-role grant|revoke <email> <role> [--reason "..."] | list
 #                                  # platform roles of the operator's own people, audited;
 #                                  # the person registers and signs in once first
+#   sudo ./install.sh relink-identity <email> [--sub <keycloak user id>] [--new-email <address>] --reason "..."
+#                                  # points a portal account at a new Keycloak user or address
+#                                  # (the person lost theirs); memberships and roles stay, audited
 #   sudo ./install.sh demo-users list|disable [--reason "..."] [--yes]
 #                                  # the seed's demo users: disable them (Keycloak and portal,
 #                                  # audited) once your own people have their platform roles
@@ -836,7 +839,7 @@ cmd_credentials() {
     "  responsable de datos (salud):" "lucia.datos (segundo factor)" \
     "Usuarios de demo (contraseña común):" "$(env_get DEN_DEMO_USER_PASSWORD)" \
     "  publicador (entidad de salud):" "pedro.publicador" \
-    "  administradora de entidad:" "elena.admin" \
+    "  administradora de entidad:" "elena.admin (segundo factor)" \
     "  desarrollador (consumidor):" "carlos.dev" \
     "  ciudadana (app):" "ciudadana.demo" \
     "Keycloak (realm master):" "$(env_get KEYCLOAK_ADMIN_USER) / $(env_get KEYCLOAK_ADMIN_PASSWORD)" \
@@ -852,6 +855,13 @@ cmd_credentials() {
 
 # Platform roles (operator, reviewer, regulator, auditor) for the operator's own people: no screen
 # grants them yet. The person registers in the portal, verifies the address and signs in once.
+# Re-links an existing portal account to a new Keycloak user or address (B-22).
+cmd_relink_identity() {
+  require_install
+  [[ $# -ge 1 ]] || fail "Uso: ./install.sh relink-identity <correo> [--sub <id del usuario en Keycloak>] [--new-email <correo nuevo>] --reason \"motivo\""
+  dc exec -T api node --enable-source-maps dist/admin/identity-relink-cli.js "$@"
+}
+
 cmd_platform_role() {
   require_install
   [[ $# -ge 1 ]] || fail "Uso: ./install.sh platform-role grant|revoke <correo> <rol> [--reason \"motivo\"] | list"
@@ -1083,6 +1093,7 @@ case ${1:-install} in
   update-apply) cmd_update_apply ;;
   images) shift; cmd_images "${1:-}" ;;
   platform-role) shift; cmd_platform_role "$@" ;;
+  relink-identity) shift; cmd_relink_identity "$@" ;;
   demo-users) shift; cmd_demo_users "$@" ;;
   realms) cmd_realms ;;
   stop) require_install; dc stop ;;

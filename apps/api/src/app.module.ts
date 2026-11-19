@@ -47,6 +47,8 @@ import { DocumentsController } from './documents/documents.controller.js';
 import { DocumentsService } from './documents/documents.service.js';
 import { StorageService } from './documents/storage.service.js';
 import { EntitiesController } from './entities/entities.controller.js';
+import { PlatformUsersController } from './admin/platform-users.controller.js';
+import { PlatformUsersService } from './admin/platform-users.service.js';
 import { AdminEntitiesController } from './entities/admin-entities.controller.js';
 import { EntityMembersController } from './entities/entity-members.controller.js';
 import { EntityStatusService } from './entities/entity-status.service.js';
@@ -109,6 +111,7 @@ import { KitReleasesService } from './kit/kit-releases.service.js';
     EntitiesController,
     EntityMembersController,
     AdminEntitiesController,
+    PlatformUsersController,
     EntityRequestsController,
     DocumentsController,
     EntityReviewsController,
@@ -153,6 +156,7 @@ import { KitReleasesService } from './kit/kit-releases.service.js';
     NotificationsService,
     MembersService,
     EntityStatusService,
+    PlatformUsersService,
     { provide: MAIL_TRANSPORT, useFactory: createSmtpTransport },
     ApisService,
     PurposesService,

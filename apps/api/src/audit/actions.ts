@@ -9,6 +9,8 @@ export const AUDIT_ACTIONS = [
   'user.registered',
   'user.created',
   'user.disabled',
+  'user.enabled',
+  'user.identity_relinked',
   'platform_role.granted',
   'platform_role.revoked',
   'notification_preference.updated',

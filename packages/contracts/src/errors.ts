@@ -106,6 +106,12 @@ export const FieldErrorKey = {
   KitBundleSizeMismatch: 'kit_bundle_size_mismatch',
   /** The release's bundle is already mirrored: its path never serves other bytes (P-03). */
   KitBundleMirrored: 'kit_bundle_mirrored',
+  /** Removing or disabling the last active platform_admin (M-03). */
+  LastPlatformAdmin: 'last_platform_admin',
+  /** No portal account has that e-mail address (M-03). */
+  UnknownAccount: 'unknown_account',
+  /** A platform role goes only to an active account (M-03). */
+  AccountNotActive: 'account_not_active',
 } as const;
 
 export type FieldErrorKey = (typeof FieldErrorKey)[keyof typeof FieldErrorKey];

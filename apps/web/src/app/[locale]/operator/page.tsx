@@ -77,6 +77,9 @@ export default async function OperatorPage({ params, searchParams }: PageProps) 
                 <Link href="/operator/certificates" className="link">
                   {t('certificateRevocations.title')}
                 </Link>
+                <Link href="/operator/platform-users" className="link">
+                  {t('platformUsers.title')}
+                </Link>
               </>
             ) : null}
             {viewer.platformRoles.some((r) => KIT_ROLES.includes(r)) ? (

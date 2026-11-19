@@ -9,7 +9,7 @@ Rules of the global guard (ADR-0014): without a session, 401. On entity routes: 
 and has no allowed platform role gets 404; a member without the role, 403. On platform
 routes: without the role, 403. A route without an access declaration cannot be called (403).
 
-Second factor (M3-08, ADR-0021): whoever has a platform role or `data_steward`
+Second factor (M3-08, ADR-0021): whoever has a platform role or one of `data_steward`, `entity_admin`
 in some entity gets 403 `mfa_required` on every entity or platform route if their session
 was not opened with the one-time code. Routes for any session (`/me`) stay open.
 
@@ -65,6 +65,8 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | `network.map.read` | ✓ | ✓ | ✓ | · |
 | `kit_release.read` | ✓ | ✓ | · | · |
 | `kit_release.manage` | ✓ | · | · | · |
+| `platform_role.read` | ✓ | · | · | · |
+| `platform_role.manage` | ✓ | · | · | · |
 | `audit.read` | ✓ | ✓ | ✓ | ✓ |
 
 ## Routes
@@ -85,6 +87,9 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | PUT | `/api/v1/admin/kit-releases/:version` | platform: `kit_release.manage` |
 | PUT | `/api/v1/admin/kit-releases/:version/bundle` | platform: `kit_release.manage` |
 | GET | `/api/v1/admin/nodes` | platform: `node.list` |
+| GET | `/api/v1/admin/platform-roles` | platform: `platform_role.read` |
+| POST | `/api/v1/admin/platform-roles/grant` | platform: `platform_role.manage` |
+| POST | `/api/v1/admin/platform-roles/revoke` | platform: `platform_role.manage` |
 | GET | `/api/v1/admin/purposes` | platform: `purpose.read` |
 | POST | `/api/v1/admin/purposes` | platform: `purpose.manage` |
 | PUT | `/api/v1/admin/purposes/:code` | platform: `purpose.manage` |
@@ -92,6 +97,8 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | POST | `/api/v1/admin/purposes/:code/deactivate` | platform: `purpose.manage` |
 | GET | `/api/v1/admin/sync` | platform: `sync.read` |
 | POST | `/api/v1/admin/sync/retry` | platform: `sync.retry` |
+| POST | `/api/v1/admin/users/disable` | platform: `platform_role.manage` |
+| POST | `/api/v1/admin/users/enable` | platform: `platform_role.manage` |
 | GET | `/api/v1/audit/events` | platform: `audit.read` |
 | GET | `/api/v1/audit/export` | platform: `audit.read` |
 | GET | `/api/v1/audit/timeline/:kind/:id` | platform: `audit.read` |
@@ -199,7 +206,9 @@ was not opened with the one-time code. Routes for any session (`/me`) stay open.
 | POST | `/api/v1/review/api-versions/:versionId/approve` | platform: `review.decide` |
 | POST | `/api/v1/review/api-versions/:versionId/request-changes` | platform: `review.decide` |
 | GET | `/api/v1/review/entities` | platform: `entity_review.read` |
+| GET | `/api/v1/review/entities/:requestId` | platform: `entity_review.read` |
 | POST | `/api/v1/review/entities/:requestId/approve` | platform: `entity_review.decide` |
+| GET | `/api/v1/review/entities/:requestId/designation-document` | platform: `entity_review.read` |
 | POST | `/api/v1/review/entities/:requestId/reject` | platform: `entity_review.decide` |
 | POST | `/api/v1/review/entities/:requestId/request-changes` | platform: `entity_review.decide` |
 | GET | `/api/v1/transparency/checkpoints` | public (no session; internal routes require their own service token) |

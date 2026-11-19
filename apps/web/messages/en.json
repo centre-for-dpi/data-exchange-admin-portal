@@ -772,7 +772,9 @@
       "user": {
         "registered": "Account registered",
         "created": "User created",
-        "disabled": "Account disabled"
+        "disabled": "Account disabled",
+        "enabled": "Account enabled",
+        "identity_relinked": "Identity relinked"
       },
       "platform_role": {
         "granted": "Platform role granted",
@@ -1264,6 +1266,58 @@
     "purgeButton": "Delete content",
     "older": "Older documents"
   },
+  "platformUsers": {
+    "title": "Platform roles and accounts",
+    "lead": "Who holds the operator, reviewer, regulator and auditor roles, and who can sign in. Every change is audited with your name and the reason. The first administrator and recovery are done from the server's command line.",
+    "email": "E-mail address",
+    "role": "Role",
+    "choose": "Choose a role",
+    "reason": "Reason",
+    "reasonHint": "Who asked and on what basis, for the audit trail (10+ characters).",
+    "roles": {
+      "platform_admin": "Platform administrator",
+      "platform_reviewer": "Operator reviewer",
+      "regulator": "Regulator",
+      "auditor": "Auditor"
+    },
+    "holders": {
+      "title": "Who holds a platform role",
+      "empty": "No platform role is granted.",
+      "person": "Person",
+      "status": "Account",
+      "active": "Active",
+      "disabled": "Disabled",
+      "granted": "Granted",
+      "actions": "Actions",
+      "byCommandLine": "From the server",
+      "byAdministrator": "By an administrator",
+      "lastAdmin": "The last active platform administrator cannot lose the role or be disabled: give the role to someone else first."
+    },
+    "grant": {
+      "title": "Grant a role",
+      "lead": "The person must have registered with that address, verified it and signed in once. They will be asked for the second factor at their next sign-in.",
+      "emailHint": "The address the person registered with.",
+      "button": "Grant the role"
+    },
+    "revoke": {
+      "open": "Revoke {role} from {name}",
+      "form": "Revoke {role} from {name}",
+      "button": "Revoke the role"
+    },
+    "status": {
+      "title": "Disable or enable an account",
+      "lead": "A disabled account is refused on every request and gets no notices; its memberships and roles stay and work again if you enable it. Keycloak is not touched: the person can still sign in there, and reaches nothing.",
+      "emailHint": "Any portal account, with or without a platform role.",
+      "disable": "Disable the account",
+      "enable": "Enable the account"
+    },
+    "outcome": {
+      "granted": "Role granted.",
+      "unchanged": "Nothing to change: the person already had it.",
+      "disabled": "Account disabled.",
+      "enabled": "Account enabled."
+    }
+  },
   "session": {
     "mfaRequired": "Your roles require a second factor. Sign in again with the one-time code from your authenticator app.",
     "mfaAction": "Verify with the code",
@@ -1710,7 +1764,10 @@
       "no_control_characters": "Text without control characters.",
       "kit_bundle_checksum_mismatch": "The file is not the release: its SHA-256 differs from the one registered.",
       "kit_bundle_size_mismatch": "The file does not have the size registered for the release.",
-      "kit_bundle_mirrored": "This version is already mirrored: its file, size and checksum no longer change."
+      "kit_bundle_mirrored": "This version is already mirrored: its file, size and checksum no longer change.",
+      "last_platform_admin": "This is the last active platform administrator: give the role to someone else first.",
+      "unknown_account": "No portal account has that e-mail address: the person must register, verify it and sign in once.",
+      "account_not_active": "That account is disabled: enable it before granting a role."
     },
     "codes": {
       "validation_failed": "Check the data you sent.",

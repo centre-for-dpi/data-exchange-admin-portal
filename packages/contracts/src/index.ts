@@ -9,6 +9,7 @@ export * from './net.js';
 export * from './audit.js';
 export * from './transparency.js';
 export * from './entities.js';
+export * from './platform-users.js';
 export * from './gateway.js';
 export * from './notifications.js';
 export * from './nodes.js';
