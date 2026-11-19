@@ -146,6 +146,13 @@ jobs:
       - name: Helm lint and template
         working-directory: infra/helm
         run: |
+          # Helm needs the repositories of the dependencies defined to fetch them.
+          helm repo add cnpg https://cloudnative-pg.github.io/charts
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo add opensearch https://opensearch-project.github.io/helm-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana-community https://grafana-community.github.io/helm-charts
           for chart in den-platform den; do helm dependency build "$chart"; done
           helm lint den-platform
           helm template den-platform den-platform --namespace den-platform > /dev/null
@@ -188,6 +195,13 @@ jobs:
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: pnpm --filter @den/web exec playwright install-deps chromium
       - run: docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability up -d --wait --wait-timeout 300
+      # The database as `pnpm db:migrate` and `pnpm db:seed` leave it in development: the API no
+      # longer migrates when it starts (A-2) and Playwright's signed-in users come from the seed.
+      - name: Migrate and seed the database
+        run: |
+          set -a; . ./.env; set +a
+          pnpm db:deploy
+          pnpm db:seed
       # The realms as imported, against the live Keycloak: logins, second factor, citizens' realm.
       - run: pnpm --filter @den/infra-tests exec vitest run --config vitest.integration.config.ts src/keycloak.int.test.ts
       # The specs that guard what a change most easily breaks unnoticed: the CSP and the cookies,

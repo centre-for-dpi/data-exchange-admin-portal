@@ -263,7 +263,15 @@ describe('transparency evidence (MT-04)', () => {
     it('gives a receipt anyone can verify with the public keys and the TSA certificate', async () => {
       const [id] = await ingest(5);
       await evidence.sealPending();
-      expect((await evidence.stampPending()).length).toBeGreaterThan(0);
+      // A round stamps the oldest batches first, and the shared test database keeps batches from
+      // other tests: stamp until none waits, so this record's batch is stamped too.
+      let stamped = 0;
+      for (let round = 0; round < 50; round++) {
+        const n = (await evidence.stampPending()).length;
+        if (n === 0) break;
+        stamped += n;
+      }
+      expect(stamped).toBeGreaterThan(0);
 
       const res = await call('GET', `/transparency/records/${id}/receipt`, 'marta.regulador');
       expect(res.statusCode, res.body).toBe(200);
