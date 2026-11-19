@@ -22,7 +22,8 @@
 #                                  # the seed's demo users: disable them (Keycloak and portal,
 #                                  # audited) once your own people have their platform roles
 #   sudo ./install.sh realms       # the realm files' settings on the existing realms (update
-#                                  # runs it): login flow, policies, 60-minute verification link
+#                                  # runs it): login flow, policies, 60-minute verification link,
+#                                  # the citizen app's client
 #
 # Re-running the install keeps the existing .env: secrets of a running deployment never change
 # under it (database passwords, signing key, subject key; DEPLOYMENT.md §4.1).
@@ -115,6 +116,41 @@ ensure_env_additions() {
   if [[ $(env_get DEN_DOCUMENTS_DIR) != /var/lib/den/documents ]]; then
     env_set DEN_DOCUMENTS_DIR /var/lib/den/documents
     info "DEN_DOCUMENTS_DIR corregido en .env: /var/lib/den/documents (volumen api-documents)."
+  fi
+  migrate_citizen_app_env
+}
+
+# The reference citizen app was renamed (carpeta -> citizen-app, commit 9de1423): a .env from
+# before keeps the old names and Compose refuses to start without DEN_CITIZEN_APP_CLIENT_SECRET.
+# The values are carried over (same secret: the realm client keeps it); the old lines stay, unused.
+# `install.sh realms` renames the Keycloak client (scripts/keycloak-citizen-app.mjs).
+migrate_citizen_app_env() {
+  local old new
+  old=$(env_get DEN_CARPETA_CLIENT_SECRET)
+  if [[ -z $(env_get DEN_CITIZEN_APP_CLIENT_SECRET) && -n $old ]]; then
+    env_set DEN_CITIZEN_APP_CLIENT_SECRET "$old"
+    chmod 600 "$ENV_FILE"
+    info "DEN_CITIZEN_APP_CLIENT_SECRET en .env, copiado de DEN_CARPETA_CLIENT_SECRET (app ciudadana renombrada)."
+  fi
+  # The pilot published the app at /carpeta; the proxy routes /citizen-app now.
+  old=$(env_get DEN_CARPETA_URL)
+  if [[ -z $(env_get DEN_CITIZEN_APP_URL) && -n $old ]]; then
+    env_set DEN_CITIZEN_APP_URL "${old%/carpeta}$([[ $old == */carpeta ]] && echo /citizen-app)"
+    info "DEN_CITIZEN_APP_URL en .env: $(env_get DEN_CITIZEN_APP_URL) (antes DEN_CARPETA_URL)."
+  fi
+  # The client id the API accepts, and the notices' receiver (its id and its Compose address).
+  old=$(env_get DEN_CITIZEN_CLIENTS)
+  new=$(printf '%s' "$old" | sed -E 's/(^|,)carpeta-ciudadana(,|$)/\1citizen-app\2/')
+  if [[ $new != "$old" ]]; then
+    env_set DEN_CITIZEN_CLIENTS "$new"
+    info "DEN_CITIZEN_CLIENTS en .env: carpeta-ciudadana -> citizen-app."
+  fi
+  old=$(env_get DEN_CITIZEN_APPS)
+  new=$(printf '%s' "$old" | sed -e 's/"carpeta-ciudadana"/"citizen-app"/' \
+    -e 's#http://carpeta:3100/carpeta/#http://citizen-app:3100/citizen-app/#')
+  if [[ $new != "$old" ]]; then
+    env_set DEN_CITIZEN_APPS "'$new'"
+    info "DEN_CITIZEN_APPS en .env: la app ciudadana de referencia es citizen-app."
   fi
 }
 
@@ -623,13 +659,14 @@ cmd_demo_users() {
 
 # The settings of infra/keycloak/*-realm.json on realms Keycloak imported before (--import-realm
 # skips existing realms): login flow and second factor, password policy, events, redirect URIs,
-# the 60-minute verification link (P-08) and the secret rotation policy. Idempotent; it reaches
+# the 60-minute verification link (P-08), the secret rotation policy and the citizen app's client
+# (renamed carpeta-ciudadana -> citizen-app, R-10). Idempotent; it reaches
 # Keycloak on the Compose network as the master administrator of .env.
 cmd_realms() {
   require_install
   local url s
   url=$(env_get DEN_GATEWAY_KEYCLOAK_URL); url=${url:-http://keycloak:8080/auth}
-  for s in keycloak-portal-mfa.mjs keycloak-client-policies.mjs; do
+  for s in keycloak-citizen-app.mjs keycloak-portal-mfa.mjs keycloak-client-policies.mjs; do
     docker run --rm --network den_default -v "$ROOT:/w:ro" -w /w -e KEYCLOAK_URL="$url"       "$NODE_IMAGE" node "scripts/$s" || return 1
   done
   ok "Realms de Keycloak al día con infra/keycloak"
@@ -739,6 +776,6 @@ case ${1:-install} in
   realms) cmd_realms ;;
   stop) require_install; dc stop ;;
   start) require_install; ensure_env_additions; dc up -d --wait --wait-timeout 900 ;;
-  -h | --help | help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h | --help | help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) fail "Comando desconocido: $1 (ver ./install.sh help)" ;;
 esac

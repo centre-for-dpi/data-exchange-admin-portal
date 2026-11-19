@@ -43,6 +43,7 @@ At startup, Keycloak imports (`--import-realm`) the `*-realm.json` files in this
 Simulates the national digital identity, which in production is the country's own (`DEN_CITIZEN_ISSUER`).
 
 - Client `citizen-app`: the reference citizen app (MT-07, `DEN_CITIZEN_APP_URL`). It is confidential, uses Authorization Code + PKCE S256 and has no password grant. The access token carries `aud = den-transparency-api`, `sub` and the verified document (`document_type`, `document_number`); no name or email. It lasts 5 minutes.
+  - A realm imported before the rename (commit `9de1423`) has `carpeta-ciudadana` instead: `node scripts/keycloak-citizen-app.mjs` creates `citizen-app` from this file and deletes the old client, without deleting data (`install.sh realms` runs it; `docs/DEPLOYMENT.md` §5.4).
 - The document is set by the identity provider: the user profile only lets the administrator edit it.
 - Seed citizens, with password `DEN_DEMO_USER_PASSWORD`:
 

@@ -152,6 +152,19 @@ describe('realm den-citizens (MT-05)', () => {
     expect(realm.registrationAllowed).toBe(false);
   });
 
+  // R-10: an installation from before the rename has the client `carpeta-ciudadana`, and
+  // --import-realm skips the existing realm. `install.sh realms` (update runs it) migrates it
+  // before keycloak-portal-mfa.mjs sets the client's redirect URIs.
+  it('the realm update renames the client of an installation from before citizen-app', () => {
+    const script = readFileSync(fromRoot('scripts/keycloak-citizen-app.mjs'), 'utf8');
+    expect(script).toContain("const CLIENT_ID = 'citizen-app';");
+    expect(script).toContain("const LEGACY_CLIENT_IDS = ['carpeta-ciudadana'];");
+    const installer = readFileSync(fromRoot('install.sh'), 'utf8');
+    expect(installer).toMatch(
+      /for s in keycloak-citizen-app\.mjs keycloak-portal-mfa\.mjs keycloak-client-policies\.mjs;/,
+    );
+  });
+
   it('gives every citizen a verified document the citizen cannot edit', () => {
     for (const user of realm.users) {
       expect(user.attributes?.document_type?.[0]).toMatch(/^[A-Z]{2,4}$/);

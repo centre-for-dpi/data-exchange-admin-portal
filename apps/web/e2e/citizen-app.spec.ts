@@ -14,7 +14,7 @@ import { expectNoAccessibilityViolations } from './helpers';
 test.describe('reference citizen app (MT-07)', () => {
   test('who consulted my data, the notice and the receipt', async ({ browser, page }) => {
     test.setTimeout(300_000);
-    const slug = `citizenApp-${Date.now().toString(36)}`;
+    const slug = `citizen-app-${Date.now().toString(36)}`;
     const { apiName, clientId, clientSecret } = await activeAffiliationSubscription(
       browser,
       page,

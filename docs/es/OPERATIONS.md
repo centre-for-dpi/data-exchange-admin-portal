@@ -281,7 +281,7 @@ node scripts/keycloak-client-policies.mjs     # KEYCLOAK_URL y el administrador 
 
 En el piloto, `KEYCLOAK_URL` es la URL pública (`$DEN_PUBLIC_URL/auth`). Comprobación: en la consola de Keycloak, realm `den-gateway` → Client policies, aparece `den-secret-rotation` activa.
 
-**Con `install.sh` (piloto).** `sudo ./install.sh realms` corre este script y `keycloak-portal-mfa.mjs` (sin `--demo-otp`) en un contenedor de Node en la red de Compose, con la URL interna de Keycloak (`DEN_GATEWAY_KEYCLOAK_URL`) y el administrador de `master` del `.env`. `sudo ./install.sh update` lo corre después de reiniciar; si falla, lo dice y la actualización sigue.
+**Con `install.sh` (piloto).** `sudo ./install.sh realms` corre `keycloak-citizen-app.mjs` (el cliente de la app ciudadana en `den-citizens`, antes `carpeta-ciudadana`; DEPLOYMENT.md §5.4), `keycloak-portal-mfa.mjs` (sin `--demo-otp`) y este script en un contenedor de Node en la red de Compose, con la URL interna de Keycloak (`DEN_GATEWAY_KEYCLOAK_URL`) y el administrador de `master` del `.env`. `sudo ./install.sh update` lo corre después de reiniciar; si falla, lo dice y la actualización sigue.
 
 **Segundo factor (M3-08, ADR-0021).** El flujo de login `den-browser` y el mapa de niveles se aplican también desde el JSON, con un script idempotente:
 
