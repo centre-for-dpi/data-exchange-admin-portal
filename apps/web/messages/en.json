@@ -824,7 +824,8 @@
         "updated": "Data subject notices updated"
       },
       "transparency": {
-        "checkpoint": "Transparency batch sealed"
+        "checkpoint": "Transparency batch sealed",
+        "receipt_read": "Transparency receipt read"
       },
       "audit": {
         "anchored": "Daily anchor of the audit trail",

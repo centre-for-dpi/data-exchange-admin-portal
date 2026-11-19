@@ -114,6 +114,7 @@ export const AUDIT_ACTIONS = [
   'subject_access.purged',
   'subject_alert.updated',
   'transparency.checkpoint',
+  'transparency.receipt_read',
   // The audit trail itself (M2-09)
   'audit.anchored',
   'audit.exported',

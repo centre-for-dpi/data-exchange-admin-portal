@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req } from '@nestjs/common';
 import {
   transparencyCheckpointPageSchema,
   transparencyCheckpointParamsSchema,
@@ -10,7 +10,13 @@ import {
   transparencyVerificationSchema,
 } from '@den/contracts';
 import { z } from 'zod';
-import { PlatformAccess, Public } from '../../auth/decorators.js';
+import {
+  type AuthenticatedRequest,
+  CurrentPrincipal,
+  PlatformAccess,
+  Public,
+} from '../../auth/decorators.js';
+import type { Principal } from '../../auth/principal.service.js';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
 import { ApiOperation } from '../../openapi/api-operation.decorator.js';
 import { TransparencyEvidenceService } from './transparency-evidence.service.js';
@@ -93,14 +99,22 @@ export class TransparencyController {
     summary: 'Verifiable receipt of one call in the transparency register',
     description:
       'The record, its audit path in the batch, the signed checkpoint and the TSA time-stamp. ' +
-      'Check it offline with den-verify-receipt. 409 while the record is not sealed yet.',
+      'Check it offline with den-verify-receipt. 409 while the record is not sealed yet. ' +
+      'It carries the data subject’s pseudonym: each read is audited (transparency.receipt_read).',
     tags: ['transparency'],
     params: recordParamsSchema,
     responses: { 200: { description: 'The receipt', schema: transparencyReceiptSchema } },
     errors: [400, 401, 403, 404, 409],
   })
-  receipt(@Param(new ZodValidationPipe(recordParamsSchema)) params: { id: string }) {
-    return this.evidence.receipt(params.id);
+  receipt(
+    @Param(new ZodValidationPipe(recordParamsSchema)) params: { id: string },
+    @CurrentPrincipal() principal: Principal,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.evidence.receipt(params.id, {
+      actor: { type: 'user', id: principal.keycloakSub },
+      requestId: request.id,
+    });
   }
 
   @Get('verify')

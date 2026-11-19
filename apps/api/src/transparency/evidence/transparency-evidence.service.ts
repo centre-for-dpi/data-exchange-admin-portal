@@ -27,7 +27,7 @@ import {
   verifyCheckpoint,
   verifyTimestampToken,
 } from '@den/transparency-verifier';
-import { AuditService } from '../../audit/audit.service.js';
+import { type AuditActor, AuditService } from '../../audit/audit.service.js';
 import { ConflictError, NotFoundError } from '../../common/errors.js';
 import type { SubjectAccessRecord } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -279,33 +279,53 @@ export class TransparencyEvidenceService implements OnApplicationBootstrap, OnAp
     return toPublicCheckpoint(row);
   }
 
-  /** Receipt of one call: record, audit path, signed checkpoint and time-stamp. */
-  async receipt(recordId: string): Promise<TransparencyReceipt> {
-    const record = await this.prisma.subjectAccessRecord.findUnique({ where: { id: recordId } });
-    if (!record) throw new NotFoundError('Record');
-    const leaf = await this.prisma.transparencyLeaf.findUnique({
-      where: { recordId },
-      include: { checkpoint: { include: { timestamp: true } } },
+  /**
+   * Receipt of one call: record, audit path, signed checkpoint and time-stamp. It carries the
+   * data subject's pseudonym, so a read by someone other than the data subject (`reader`: the
+   * operator, the regulator, an auditor) is audited in the same transaction (B-18), never with the
+   * pseudonym. The data subject's own read (citizen API) passes no reader.
+   */
+  async receipt(
+    recordId: string,
+    reader?: { actor: AuditActor; requestId?: string | undefined },
+  ): Promise<TransparencyReceipt> {
+    return this.prisma.$transaction(async (tx) => {
+      const record = await tx.subjectAccessRecord.findUnique({ where: { id: recordId } });
+      if (!record) throw new NotFoundError('Record');
+      const leaf = await tx.transparencyLeaf.findUnique({
+        where: { recordId },
+        include: { checkpoint: { include: { timestamp: true } } },
+      });
+      if (!leaf)
+        throw new ConflictError('The record is not sealed yet; try again in a few seconds');
+      const leaves = await tx.transparencyLeaf.findMany({
+        where: { checkpointSeq: leaf.checkpointSeq },
+        orderBy: { leafIndex: 'asc' },
+        select: { leafHash: true },
+      });
+      if (reader) {
+        await this.audit.record(tx, {
+          actor: reader.actor,
+          action: 'transparency.receipt_read',
+          target: { type: 'subject_access_record', id: recordId },
+          after: { checkpointSeq: leaf.checkpointSeq, stamped: leaf.checkpoint.timestamp !== null },
+          ...(reader.requestId ? { requestId: reader.requestId } : {}),
+        });
+      }
+      return {
+        v: 1,
+        record: toAccessRecord(record),
+        leafIndex: leaf.leafIndex,
+        proof: inclusionProof(
+          leaves.map((l) => fromHex(l.leafHash)),
+          leaf.leafIndex,
+        ).map(toHex),
+        checkpoint: leaf.checkpoint.jws,
+        timestamp: leaf.checkpoint.timestamp
+          ? Buffer.from(leaf.checkpoint.timestamp.token).toString('base64')
+          : null,
+      };
     });
-    if (!leaf) throw new ConflictError('The record is not sealed yet; try again in a few seconds');
-    const leaves = await this.prisma.transparencyLeaf.findMany({
-      where: { checkpointSeq: leaf.checkpointSeq },
-      orderBy: { leafIndex: 'asc' },
-      select: { leafHash: true },
-    });
-    return {
-      v: 1,
-      record: toAccessRecord(record),
-      leafIndex: leaf.leafIndex,
-      proof: inclusionProof(
-        leaves.map((l) => fromHex(l.leafHash)),
-        leaf.leafIndex,
-      ).map(toHex),
-      checkpoint: leaf.checkpoint.jws,
-      timestamp: leaf.checkpoint.timestamp
-        ? Buffer.from(leaf.checkpoint.timestamp.token).toString('base64')
-        : null,
-    };
   }
 
   /**

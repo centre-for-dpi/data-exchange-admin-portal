@@ -276,6 +276,18 @@ describe('transparency evidence (MT-04)', () => {
       expect(result).toMatchObject({ valid: true, checks: { timestamp: 'valid' } });
       // The receipt carries metadata and the pseudonym only.
       expect(JSON.stringify(receipt)).not.toMatch(/numeroIdentificacion|1000000001/);
+      // Whoever reads it, it leaves a trace (B-18), without the pseudonym.
+      const read = await prisma.auditEvent.findFirst({
+        where: { action: 'transparency.receipt_read', targetId: id },
+        orderBy: { seq: 'desc' },
+      });
+      expect(read).toMatchObject({
+        actorType: 'user',
+        actorId: subOf('marta.regulador'),
+        targetType: 'subject_access_record',
+      });
+      expect(read?.requestId).toBeTruthy();
+      expect(JSON.stringify({ ...read, seq: null })).not.toContain(receipt.record.subjectRef);
     });
 
     it('answers 409 for a record not sealed yet and 404 for an unknown one', async () => {
@@ -287,6 +299,12 @@ describe('transparency evidence (MT-04)', () => {
         (await call('GET', `/transparency/records/${randomUUID()}/receipt`, 'sofia.auditora'))
           .statusCode,
       ).toBe(404);
+      // Nothing was handed over, nothing to audit.
+      expect(
+        await prisma.auditEvent.count({
+          where: { action: 'transparency.receipt_read', targetId: id },
+        }),
+      ).toBe(0);
       await evidence.sealPending();
       await evidence.stampPending();
     });
