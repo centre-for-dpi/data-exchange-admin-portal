@@ -5,8 +5,8 @@ description: >-
   docs/ARCHITECTURE.md §11: the portal (web, API), the gateway (APISIX with its local OPA, on
   each node), etcd, the kit nodes' hub and the platform's dependencies.
 type: application
-version: 0.1.0
-appVersion: '0.1.0'
+version: 0.2.0
+appVersion: '0.2.0'
 kubeVersion: '>=1.29.0-0'
 home: https://github.com/centre-for-dpi/data-exchange-admin-portal
 sources:

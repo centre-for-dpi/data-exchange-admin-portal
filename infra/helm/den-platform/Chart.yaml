@@ -6,8 +6,8 @@ description: >-
   another store) and cert-manager (internal certificates). Installed once per cluster, before the den chart: Helm cannot create an operator
   and its resources in one release, since the resources reach the operator's webhook first.
 type: application
-version: 0.1.0
-appVersion: '0.1.0'
+version: 0.2.0
+appVersion: '0.2.0'
 kubeVersion: '>=1.29.0-0'
 annotations:
   # Apache-2.0, all four (CLAUDE.md, rule 1).

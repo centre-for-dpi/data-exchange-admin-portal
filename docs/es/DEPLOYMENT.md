@@ -644,6 +644,8 @@ Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
 - **Publicación.** Con una etiqueta `vX.Y.Z` publica en `ghcr.io/centre-for-dpi/<imagen>:X.Y.Z` (el `appVersion` del chart), con las atestaciones de SBOM y de procedencia de BuildKit. A mano (`workflow_dispatch`) solo construye y escanea, salvo que se marque `publish`.
 - **Acciones fijadas.** Las acciones de terceros están fijadas por commit.
 
+**v0.2.0 (2026-11-19).** Las primeras imágenes `den-*`: `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.2.0`, x86_64, con los seguimientos del piloto P-01 a P-08 (`BACKLOG.md`). Un piloto las usa con `sudo ./install.sh images 0.2.0`, una vez que un dueño de la organización hizo públicos los cuatro paquetes.
+
 **v0.1.0 (2026-11-17).** Primera publicación, desde el repositorio antes de hacerse público y antes del cambio de nombre a DEN (ADR-0028): `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, privadas. Esas imágenes leen las variables `RID_*` antiguas y no funcionan con este código; todavía no hay imágenes `den-*`. La próxima versión las publica desde este repositorio, y un dueño de la organización hace público cada paquete (configuración del paquete → Change visibility) para que clústeres y pilotos las bajen sin credenciales.
 
 Las imágenes del API y de la web son de varias etapas. La de ejecución lleva solo las dependencias de producción (`pnpm deploy --prod`) y los archivos del repositorio que lee el proceso: la configuración del país y, en el API, las políticas de OPA y el realm del seed del piloto. No lleva gestor de paquetes. El contenedor de migraciones corre `node_modules/.bin/prisma migrate deploy`.
