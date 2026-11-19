@@ -151,7 +151,7 @@ Las historias marcadas **SPIKE** son investigaciones con tiempo acotado: el entr
 - **Estados de dominio:** enums en Prisma + máquinas de estado explícitas en `domain/<contexto>/state-machine.ts`. Una transición inválida lanza `InvalidTransitionError` (409).
 - **Fechas:** almacenar en UTC, mostrar en la zona del país (`config.country.timezone`).
 - **IDs externos deterministas** para recursos en APISIX/Keycloak: `den-<tipo>-<uuid>` para poder reconciliar sin estado extra.
-- **Multi-entidad:** todo query de dominio filtra por `entityId` a través de un helper (`scopedRepo`), nunca a mano.
+- **Multi-entidad:** las lecturas y escrituras de una sola entidad sobre tablas con `entityId` pasan por `scopedRepo`. Quedan fuera, y filtran `entityId` explícitamente, solo las consultas que el helper no expone (claves compuestas, `upsert`, `FOR UPDATE`, listas de entidades del operador, transacciones en `members.service.ts` y `bootcamp.service.ts`): el valor sale siempre del contexto que fijó el guard (`entity.entityId`) o de la sesión, nunca de un parámetro de la petición, y cada una tiene su test de autorización (otra entidad recibe 404).
 - **Feature flags:** en `config/country/*.yaml` bajo `features:` (por ejemplo `mtls.required`, `approval.regulatorForSensitive`).
 
 ## Cosas que NO hacer
