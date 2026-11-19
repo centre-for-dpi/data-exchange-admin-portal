@@ -1,0 +1,279 @@
+{
+  "$comment": [
+    "Licenses of what pnpm license:check cannot read from npm (B-32), reviewed by hand; scripts/license-manifest.mjs checks that it covers every pinned Python package, every third-party image and every Helm chart dependency the repository uses, and that each license fits the policy (ADR-0002, ADR-0008, ADR-0012).",
+    "images: the license of the software each image ships. Not checked: the operating system packages inside them (apk, deb) and the images the Helm chart dependencies pull (recorded by chart). See docs/adr/0033-licenses-beyond-npm.md."
+  ],
+  "python": {
+    "infra/contract-runner/requirements.txt": [
+      {
+        "name": "anyio",
+        "version": "4.16.0",
+        "license": "MIT"
+      },
+      {
+        "name": "certifi",
+        "version": "2026.10.23",
+        "license": "MPL-2.0"
+      },
+      {
+        "name": "charset-normalizer",
+        "version": "3.5.2",
+        "license": "MIT"
+      },
+      {
+        "name": "click",
+        "version": "8.5.1",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "name": "graphql-core",
+        "version": "3.3.2",
+        "license": "MIT"
+      },
+      {
+        "name": "harfile",
+        "version": "0.7.0",
+        "license": "MIT"
+      },
+      {
+        "name": "hypothesis",
+        "version": "6.170.15",
+        "license": "MPL-2.0"
+      },
+      {
+        "name": "hypothesis-graphql",
+        "version": "0.13.6",
+        "license": "MIT"
+      },
+      {
+        "name": "idna",
+        "version": "3.20",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "name": "iniconfig",
+        "version": "2.3.1",
+        "license": "MIT"
+      },
+      {
+        "name": "jsonschema_rs",
+        "version": "0.61.2",
+        "license": "MIT"
+      },
+      {
+        "name": "markdown-it-py",
+        "version": "4.3.0",
+        "license": "MIT"
+      },
+      {
+        "name": "MarkupSafe",
+        "version": "3.0.4",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "name": "mdurl",
+        "version": "0.1.2",
+        "license": "MIT"
+      },
+      {
+        "name": "packaging",
+        "version": "26.3",
+        "license": "Apache-2.0 OR BSD-2-Clause"
+      },
+      {
+        "name": "pluggy",
+        "version": "1.7.0",
+        "license": "MIT"
+      },
+      {
+        "name": "Pygments",
+        "version": "2.21.0",
+        "license": "BSD-2-Clause"
+      },
+      {
+        "name": "pyrate-limiter",
+        "version": "4.5.1",
+        "license": "MIT"
+      },
+      {
+        "name": "pytest",
+        "version": "9.2.0",
+        "license": "MIT"
+      },
+      {
+        "name": "PyYAML",
+        "version": "6.0.3",
+        "license": "MIT"
+      },
+      {
+        "name": "requests",
+        "version": "2.34.2",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "rich",
+        "version": "15.0.0",
+        "license": "MIT"
+      },
+      {
+        "name": "schemathesis",
+        "version": "4.33.4",
+        "license": "MIT"
+      },
+      {
+        "name": "sortedcontainers",
+        "version": "2.4.0",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "typing_extensions",
+        "version": "4.16.0",
+        "license": "Python-2.0",
+        "declared": "PSF-2.0",
+        "note": "Its LICENSE file is the full Python license stack (PSF, BeOpen, CNRI, CWI), SPDX Python-2.0."
+      },
+      {
+        "name": "urllib3",
+        "version": "2.8.0",
+        "license": "MIT"
+      },
+      {
+        "name": "Werkzeug",
+        "version": "3.1.9",
+        "license": "BSD-3-Clause"
+      }
+    ]
+  },
+  "images": [
+    {
+      "image": "alpine",
+      "license": "MIT AND GPL-2.0-only",
+      "distribution": true,
+      "note": "Alpine Linux, base of the contract runner and the WireGuard hub: musl (MIT), busybox and apk-tools (GPL-2.0-only) as separate programs; the apk packages are not checked here."
+    },
+    {
+      "image": "alpine/helm",
+      "license": "Apache-2.0",
+      "note": "Helm in a container (scripts/helm-kind.mjs); a tool, not deployed."
+    },
+    {
+      "image": "apache/apisix",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "aquasec/trivy",
+      "license": "Apache-2.0",
+      "note": "Image scanner of the images workflow; a tool, not deployed."
+    },
+    {
+      "image": "axllent/mailpit",
+      "license": "MIT"
+    },
+    {
+      "image": "clamav/clamav",
+      "license": "GPL-2.0-only",
+      "separateService": true,
+      "note": "Antivirus of the uploaded documents, its own container reached over the network (clamd)."
+    },
+    {
+      "image": "fluent/fluent-bit",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "ghcr.io/sigstore/timestamp-server",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "grafana/grafana",
+      "license": "AGPL-3.0-only",
+      "separateService": true,
+      "note": "The operator's dashboard, its own container."
+    },
+    {
+      "image": "grafana/k6",
+      "license": "AGPL-3.0-only",
+      "separateService": true,
+      "note": "Load test tool (scripts/load-test.mjs), its own container; not deployed."
+    },
+    {
+      "image": "kindest/node",
+      "license": "Apache-2.0",
+      "note": "kind test clusters (Kubernetes); not deployed."
+    },
+    {
+      "image": "node",
+      "license": "MIT",
+      "note": "Node.js on Alpine, base of our own images; the apk packages are not checked here."
+    },
+    {
+      "image": "openpolicyagent/opa",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "opensearchproject/opensearch",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "postgres",
+      "license": "PostgreSQL",
+      "note": "On Alpine; pgBackRest (MIT) is added in infra/postgres/Dockerfile."
+    },
+    {
+      "image": "prom/alertmanager",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "prom/prometheus",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "quay.io/coreos/etcd",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "quay.io/keycloak/keycloak",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "smallstep/step-ca",
+      "license": "Apache-2.0"
+    },
+    {
+      "image": "traefik",
+      "license": "MIT"
+    }
+  ],
+  "helmCharts": [
+    {
+      "chart": "cert-manager",
+      "license": "Apache-2.0"
+    },
+    {
+      "chart": "cloudnative-pg",
+      "license": "Apache-2.0"
+    },
+    {
+      "chart": "external-secrets",
+      "license": "Apache-2.0"
+    },
+    {
+      "chart": "grafana",
+      "license": "AGPL-3.0-only",
+      "separateService": true,
+      "note": "The chart is Apache-2.0; it deploys Grafana (AGPL-3.0) as its own service."
+    },
+    {
+      "chart": "opensearch",
+      "license": "Apache-2.0"
+    },
+    {
+      "chart": "plugin-barman-cloud",
+      "license": "Apache-2.0"
+    },
+    {
+      "chart": "prometheus",
+      "license": "Apache-2.0",
+      "note": "With its subcharts (Alertmanager, kube-state-metrics, node-exporter, Pushgateway), all Apache-2.0."
+    }
+  ]
+}

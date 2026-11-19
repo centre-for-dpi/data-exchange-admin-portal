@@ -25,7 +25,7 @@ pnpm dev                 # web en 3000, API en 4000
 
 ## Reglas que se revisan
 
-1. **Solo open source, con licencia aprobada por la OSI.** Revisa la licencia antes de agregar una dependencia; la lista permitida está en ADR-0002, ADR-0008 y ADR-0012. `pnpm license:check` debe pasar.
+1. **Solo open source, con licencia aprobada por la OSI.** Revisa la licencia antes de agregar una dependencia; la lista permitida está en ADR-0002, ADR-0008 y ADR-0012. `pnpm license:check` debe pasar. Lee por sí mismo las licencias de npm; para las imágenes de contenedores, las dependencias de los charts de Helm y los paquetes de Python del ejecutor de contratos, registra la licencia en `scripts/third-party-licenses.json` (ADR-0033). Los paquetes dentro de las imágenes (apk, deb) no se revisan.
 2. **No se guarda el contenido de las respuestas**, ni en el portal, ni en el gateway, ni en los logs. Rutas y query strings se registran enmascarados; los titulares solo aparecen como seudónimos con clave (ADR-0006, ADR-0015).
 3. **La autorización vive en el backend.** Cada endpoint verifica rol y pertenencia a la entidad, con tests de autorización: el rol correcto puede, los demás reciben 403 y otra entidad recibe 404.
 4. **Todo cambio de estado de dominio emite un evento de auditoría** en la misma transacción.

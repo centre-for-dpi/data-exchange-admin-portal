@@ -25,7 +25,7 @@ pnpm dev                 # web on 3000, API on 4000
 
 ## Rules that are checked in review
 
-1. **Open source only, with an OSI-approved license.** Check the license before adding a dependency; the allowed list is in ADR-0002, ADR-0008 and ADR-0012. `pnpm license:check` must pass.
+1. **Open source only, with an OSI-approved license.** Check the license before adding a dependency; the allowed list is in ADR-0002, ADR-0008 and ADR-0012. `pnpm license:check` must pass. It reads npm licenses itself; for container images, Helm chart dependencies and the contract runner's Python packages, record the license in `scripts/third-party-licenses.json` (ADR-0033). The packages inside images (apk, deb) are not checked.
 2. **No response content is stored**, in the portal, the gateway or the logs. Paths and query strings are logged masked; data subjects only appear as keyed pseudonyms (ADR-0006, ADR-0015).
 3. **Authorization lives in the backend.** Every endpoint checks role and entity membership, with authorization tests: the right role can, other roles get 403, another entity gets 404.
 4. **Every domain state change emits an audit event** in the same transaction.

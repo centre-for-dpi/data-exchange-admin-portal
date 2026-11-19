@@ -3,10 +3,14 @@
 // `pnpm license:check`: lists the licenses of every installed dependency (prod + dev, all
 // workspace packages) and fails if any is outside the ADR-0008 policy and not covered by a
 // per-package exception in scripts/license-exceptions.json. `--verbose` prints every package.
+// Then what npm does not cover (B-32, ADR-0033): the contract runner's pinned Python packages, the
+// third-party container images and the Helm chart dependencies, against the licenses recorded in
+// scripts/third-party-licenses.json (offline: scripts/license-manifest.mjs).
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkManifest, collectUsage } from './license-manifest.mjs';
 import { evaluateLicenses } from './license-policy.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -82,6 +86,25 @@ if (report.unusedExceptions.length > 0) {
   for (const e of report.unusedExceptions) {
     console.error(`  ${e.package}  ${e.license}`);
   }
+}
+
+const manifest = checkManifest(
+  JSON.parse(readFileSync(resolve(repoRoot, 'scripts/third-party-licenses.json'), 'utf8')),
+  collectUsage(repoRoot),
+);
+const { python, images, charts } = manifest.counts;
+console.log(
+  `\nBeyond npm (scripts/third-party-licenses.json): ${python} Python packages, ` +
+    `${images} third-party images, ${charts} Helm chart dependencies`,
+);
+if (manifest.problems.length > 0) {
+  failed = true;
+  console.error('\nNot covered or not allowed:');
+  for (const problem of manifest.problems) console.error(`  ${problem}`);
+  console.error(
+    '\nRecord the license of what was added or changed in scripts/third-party-licenses.json ' +
+      '(ADR-0033), or replace it.',
+  );
 }
 
 if (failed) {

@@ -1,0 +1,32 @@
+# The contract runner's Python packages (M4-06): Schemathesis and everything it needs, pinned, so
+# the image is reproducible and `pnpm license:check` can check each license (B-32) against
+# scripts/third-party-licenses.json. The Dockerfile installs exactly these (--no-deps, pip check).
+# To upgrade: install schemathesis==<new> in a clean venv of the image (alpine:3.22, python3),
+# copy `pip freeze` here (without pip) and record each new or changed package's license.
+anyio==4.16.0
+certifi==2026.10.23
+charset-normalizer==3.5.2
+click==8.5.1
+graphql-core==3.3.2
+harfile==0.7.0
+hypothesis==6.170.15
+hypothesis-graphql==0.13.6
+idna==3.20
+iniconfig==2.3.1
+jsonschema_rs==0.61.2
+markdown-it-py==4.3.0
+MarkupSafe==3.0.4
+mdurl==0.1.2
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+pyrate-limiter==4.5.1
+pytest==9.2.0
+PyYAML==6.0.3
+requests==2.34.2
+rich==15.0.0
+schemathesis==4.33.4
+sortedcontainers==2.4.0
+typing_extensions==4.16.0
+urllib3==2.8.0
+Werkzeug==3.1.9
