@@ -167,3 +167,105 @@ describe('compatibility check: what it cannot compare is incompatible', () => {
     expect(breakingChanges(withRequired(['a']), withRequired([]))).not.toEqual([]);
   });
 });
+
+describe('compatibility check: documents built to make it explode', () => {
+  /** Level i references level i+1 three times: 3^25 paths when expanded, 25 pairs when decided. */
+  const bomb = (leaf: string) => {
+    const schemas: Record<string, unknown> = {};
+    const levels = 25;
+    for (let i = 0; i < levels; i++) {
+      const next = { $ref: `#/components/schemas/L${i + 1}` };
+      schemas[`L${i}`] = { type: 'object', properties: { a: next, b: next, c: next } };
+    }
+    schemas[`L${levels}`] = { type: leaf };
+    return {
+      openapi: '3.0.3',
+      info: { title: 't', version: '1' },
+      components: { schemas },
+      paths: {
+        '/x': {
+          get: {
+            operationId: 'x',
+            responses: {
+              '200': {
+                description: 'ok',
+                content: { 'application/json': { schema: { $ref: '#/components/schemas/L0' } } },
+              },
+            },
+          },
+        },
+      },
+    };
+  };
+  const composedBomb = (leaf: string) => {
+    const doc = bomb(leaf);
+    (
+      doc.paths['/x'].get.responses['200'].content['application/json'] as Record<string, unknown>
+    ).schema = {
+      allOf: [{ $ref: '#/components/schemas/L0' }],
+    };
+    return doc;
+  };
+
+  it('finishes quickly and stays conservative', () => {
+    const started = Date.now();
+    expect(breakingChanges(bomb('string'), bomb('string'))).toEqual([]);
+    expect(breakingChanges(bomb('string'), bomb('integer')).length).toBeGreaterThan(0);
+    expect(breakingChanges(composedBomb('string'), composedBomb('string'))).toEqual([]);
+    expect(breakingChanges(composedBomb('string'), composedBomb('integer')).length).toBeGreaterThan(
+      0,
+    );
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('reports a document beyond the work budget as too complex', () => {
+    // Distinct schemas at every level: nothing to share, so the budget stops it.
+    const wide = (n: number) => {
+      const schemas: Record<string, unknown> = {};
+      for (let i = 0; i < n; i++) {
+        schemas[`S${i}`] = {
+          type: 'object',
+          properties: Object.fromEntries(
+            Array.from({ length: 50 }, (_, k) => [
+              `p${k}`,
+              { type: 'string', description: `${i}` },
+            ]),
+          ),
+        };
+      }
+      return {
+        openapi: '3.0.3',
+        info: { title: 't', version: '1' },
+        paths: {
+          '/x': {
+            get: {
+              operationId: 'x',
+              responses: {
+                '200': {
+                  description: 'ok',
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: Object.fromEntries(
+                          Array.from({ length: n }, (_, i) => [
+                            `s${i}`,
+                            { $ref: `#/components/schemas/S${i}` },
+                          ]),
+                        ),
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        components: { schemas },
+      };
+    };
+    expect(breakingChanges(wide(5000), wide(5000))).toEqual([
+      'The schemas are too complex to compare',
+    ]);
+  });
+});

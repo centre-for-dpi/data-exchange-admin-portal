@@ -52,24 +52,86 @@ function mediaSchemaOf(content: unknown): unknown {
   return isObject(media) ? media.schema : undefined;
 }
 
-/** Resolves every local `$ref` below a value; a cycle is replaced by a marker. */
-function expand(doc: Json, value: unknown, stack: string[] = []): unknown {
-  if (Array.isArray(value)) return value.map((v) => expand(doc, v, stack));
-  if (!isObject(value)) return value;
-  if (typeof value.$ref === 'string') {
-    const ref = value.$ref;
-    if (stack.includes(ref)) return { $cycle: ref };
-    const target = deref(doc, value);
-    // An unresolvable reference stays visible, so two different ones never compare equal.
-    return isObject(target) && Object.keys(target).length === 0
-      ? { $unresolved: ref }
-      : expand(doc, target, [...stack, ref]);
+/** Work shared by one whole comparison: the untrusted documents must not make it explode. */
+class Budget {
+  private left = 200_000;
+  /** Reference pairs already compared (or being compared) for the request or response side. */
+  readonly done = new Set<string>();
+  /** Outcome of the structural equality of reference pairs; true while in progress (coinductive). */
+  readonly equal = new Map<string, boolean>();
+  tick(): void {
+    if (--this.left < 0) throw new TooComplexError();
   }
-  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, expand(doc, v, stack)]));
+}
+class TooComplexError extends Error {}
+
+/**
+ * Structural equality with local `$ref`s resolved lazily on both sides. A pair of references is
+ * decided once (a cycle counts as equal while it is being decided), so a document whose schemas
+ * reference each other many times costs one comparison per pair, not one per path.
+ */
+function equalResolved(
+  da: Json,
+  a: unknown,
+  db: Json,
+  b: unknown,
+  budget: Budget,
+  depth = 0,
+): boolean {
+  budget.tick();
+  if (depth > MAX_EQUAL_DEPTH) throw new TooComplexError();
+  const aRef = isObject(a) && typeof a.$ref === 'string' ? a.$ref : undefined;
+  const bRef = isObject(b) && typeof b.$ref === 'string' ? b.$ref : undefined;
+  if (aRef !== undefined || bRef !== undefined) {
+    const key = `${aRef ?? ''}|${bRef ?? ''}`;
+    // Only a pair of references is memoized; a reference against an inline value is resolved.
+    if (aRef !== undefined && bRef !== undefined) {
+      const known = budget.equal.get(key);
+      if (known !== undefined) return known;
+      budget.equal.set(key, true);
+    }
+    const ra = aRef !== undefined ? refTarget(da, a) : a;
+    const rb = bRef !== undefined ? refTarget(db, b) : b;
+    const result =
+      ra !== undefined && rb !== undefined && equalResolved(da, ra, db, rb, budget, depth + 1);
+    if (aRef !== undefined && bRef !== undefined) budget.equal.set(key, result);
+    return result;
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((v, i) => equalResolved(da, v, db, b[i], budget, depth + 1))
+    );
+  }
+  if (isObject(a) && isObject(b)) {
+    const ka = Object.keys(a).sort();
+    const kb = Object.keys(b).sort();
+    return (
+      ka.length === kb.length &&
+      ka.every((k, i) => k === kb[i] && equalResolved(da, a[k], db, b[k], budget, depth + 1))
+    );
+  }
+  return a === b;
+}
+
+/** The target of a local `$ref` one step; undefined when it does not resolve. */
+function refTarget(doc: Json, value: unknown): unknown {
+  if (!isObject(value) || typeof value.$ref !== 'string' || !value.$ref.startsWith('#/')) {
+    return undefined;
+  }
+  let target: unknown = doc;
+  for (const part of value.$ref.slice(2).split('/')) {
+    const key = part.replaceAll('~1', '/').replaceAll('~0', '~');
+    target = isObject(target) ? target[key] : undefined;
+  }
+  return target;
 }
 
 const COMBINATORS = ['oneOf', 'anyOf', 'allOf', 'not', 'if', 'then', 'else', 'discriminator'];
 const MAX_DEPTH = 32;
+const MAX_EQUAL_DEPTH = 400;
 
 interface Side {
   doc: Json;
@@ -87,18 +149,19 @@ function schemaBreaks(
   after: Side,
   where: string,
   input: boolean,
-  pairs: string[] = [],
+  budget: Budget,
   depth = 0,
 ): string[] {
+  budget.tick();
   if (before.schema === undefined) return [];
   if (after.schema === undefined) return [`${where} no longer declares a schema`];
   if (depth > MAX_DEPTH) return [`${where} is nested too deeply to compare`];
   const bRef = isObject(before.schema) ? before.schema.$ref : undefined;
   const aRef = isObject(after.schema) ? after.schema.$ref : undefined;
   if (typeof bRef === 'string' || typeof aRef === 'string') {
-    const pair = `${String(bRef)}|${String(aRef)}`;
-    if (pairs.includes(pair)) return []; // being compared higher up
-    pairs = [...pairs, pair];
+    const pair = `${input ? 'in' : 'out'}|${String(bRef)}|${String(aRef)}`;
+    if (budget.done.has(pair)) return []; // compared already, or being compared higher up
+    budget.done.add(pair);
   }
   const b = deref(before.doc, before.schema);
   const a = deref(after.doc, after.schema);
@@ -106,7 +169,7 @@ function schemaBreaks(
     return canonical(b) === canonical(a) ? [] : [`${where} changed its schema`];
   }
   if (COMBINATORS.some((k) => k in b || k in a)) {
-    return canonical(expand(before.doc, b)) === canonical(expand(after.doc, a))
+    return equalResolved(before.doc, b, after.doc, a, budget)
       ? []
       : [`${where} changed a composed schema (${COMBINATORS.join('/')}), which cannot be compared`];
   }
@@ -132,7 +195,7 @@ function schemaBreaks(
         { doc: after.doc, schema: aProps[name] },
         `${where}.${name}`,
         input,
-        pairs,
+        budget,
         depth + 1,
       ),
     );
@@ -152,7 +215,7 @@ function schemaBreaks(
         { doc: after.doc, schema: a.items },
         `${where}[]`,
         input,
-        pairs,
+        budget,
         depth + 1,
       ),
     );
@@ -164,7 +227,7 @@ function schemaBreaks(
         { doc: after.doc, schema: a.additionalProperties },
         `${where}{}`,
         input,
-        pairs,
+        budget,
         depth + 1,
       ),
     );
@@ -224,6 +287,16 @@ function operations(doc: Json): Map<string, Operation> {
 }
 
 export function breakingChanges(published: unknown, revision: unknown): string[] {
+  try {
+    return compare(published, revision, new Budget());
+  } catch (error) {
+    // Fail closed: what is too intricate to compare is not known to be compatible.
+    if (error instanceof TooComplexError) return ['The schemas are too complex to compare'];
+    throw error;
+  }
+}
+
+function compare(published: unknown, revision: unknown, budget: Budget): string[] {
   if (!isObject(published) || !isObject(revision)) return ['The document is not an OpenAPI object'];
   const before = operations(published);
   const after = operations(revision);
@@ -270,6 +343,7 @@ export function breakingChanges(published: unknown, revision: unknown): string[]
           { doc: revision, schema: is.schema },
           `${key} parameter ${name}`,
           true,
+          budget,
         ),
       );
     }
@@ -280,6 +354,7 @@ export function breakingChanges(published: unknown, revision: unknown): string[]
         { doc: revision, schema: now.bodySchema },
         `${key} request body`,
         true,
+        budget,
       ),
     );
     for (const [status, schema] of old.responses) {
@@ -293,6 +368,7 @@ export function breakingChanges(published: unknown, revision: unknown): string[]
           { doc: revision, schema: now.responses.get(status) },
           `${key} ${status}`,
           false,
+          budget,
         ),
       );
     }
