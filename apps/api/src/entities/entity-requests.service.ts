@@ -87,25 +87,46 @@ export class EntityRequestsService {
   // Reading
   // ------------------------------------------------------------------------------------------
 
-  private canReview(principal: Principal): boolean {
-    const allowed: readonly string[] = PLATFORM_PERMISSIONS['entity_review.read'];
-    return principal.platformRoles.some((r) => allowed.includes(r));
-  }
+  /** Statuses after an approval: the entity exists, so the applicant's access is its membership. */
+  private static readonly APPROVED: readonly EntityStatus[] = ['active', 'suspended', 'offboarded'];
 
-  /**
-   * The request, for its applicant or for the operator. Anyone else gets 404, as for any resource
-   * outside their reach. Entities created by the seed (no applicant) are not requests.
-   */
-  private async load(requestId: string, principal: Principal): Promise<Loaded> {
+  private async find(requestId: string): Promise<Loaded> {
     const entity = await this.prisma.entity.findUnique({
       where: { id: requestId },
       include: INCLUDE,
     });
+    // Entities created by the seed or by the operator (no applicant) are not requests.
     if (!entity?.applicantId) throw new NotFoundError('Entity request');
-    if (entity.applicantId !== principal.userId && !this.canReview(principal)) {
+    return entity;
+  }
+
+  /**
+   * The request for its applicant, on the routes any session may call (@SignedIn: they skip the
+   * second factor because they only reach the caller's own resources, ADR-0021). Anyone else,
+   * reviewers included, gets 404: they read through `/review/entities/:id`, which enforces the
+   * second factor (M-01). Once the entity is approved the applicant keeps reading the file only
+   * while they hold an active membership in it (B-23): the file holds the designated people's
+   * names and e-mails and the designation document.
+   */
+  private async load(requestId: string, principal: Principal): Promise<Loaded> {
+    const entity = await this.find(requestId);
+    if (entity.applicantId !== principal.userId) throw new NotFoundError('Entity request');
+    if (
+      EntityRequestsService.APPROVED.includes(entity.status) &&
+      !principal.memberships.some((m) => m.entityId === entity.id)
+    ) {
       throw new NotFoundError('Entity request');
     }
     return entity;
+  }
+
+  /** The request for the platform roles that review (the caller's role is checked by the guard). */
+  private async loadForReview(requestId: string, principal: Principal): Promise<Loaded> {
+    const allowed: readonly string[] = PLATFORM_PERMISSIONS['entity_review.read'];
+    if (!principal.platformRoles.some((r) => allowed.includes(r))) {
+      throw new NotFoundError('Entity request');
+    }
+    return this.find(requestId);
   }
 
   private async view(entity: Loaded): Promise<EntityRequest> {
@@ -162,6 +183,11 @@ export class EntityRequestsService {
     return this.view(await this.load(requestId, principal));
   }
 
+  /** Any applicant's request, for the operator console (`entity_review.read`). */
+  async getForReview(requestId: string, principal: Principal): Promise<EntityRequest> {
+    return this.view(await this.loadForReview(requestId, principal));
+  }
+
   private static item(e: {
     id: string;
     status: EntityStatus;
@@ -182,14 +208,22 @@ export class EntityRequestsService {
     };
   }
 
-  /** The caller's own requests, newest first. */
+  /**
+   * The caller's own requests, newest first. An approved one is listed only while the caller
+   * holds an active membership in the entity (B-23), so the list never links to a 404.
+   */
   async mine(principal: Principal): Promise<EntityRequestList> {
     const rows = await this.prisma.entity.findMany({
       where: { applicantId: principal.userId },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    return { items: rows.map((row) => EntityRequestsService.item(row)) };
+    const visible = rows.filter(
+      (row) =>
+        !EntityRequestsService.APPROVED.includes(row.status) ||
+        principal.memberships.some((m) => m.entityId === row.id),
+    );
+    return { items: visible.map((row) => EntityRequestsService.item(row)) };
   }
 
   /**
@@ -210,9 +244,16 @@ export class EntityRequestsService {
     };
   }
 
-  /** The designation document, for the applicant and the operator. */
+  /** The designation document, for the applicant. */
   async designationDocument(requestId: string, principal: Principal) {
     const entity = await this.load(requestId, principal);
+    if (!entity.designationDocumentId) throw new NotFoundError('Designation document');
+    return this.documents.read(entity.designationDocumentId);
+  }
+
+  /** The designation document of any request, for the operator console. */
+  async designationDocumentForReview(requestId: string, principal: Principal) {
+    const entity = await this.loadForReview(requestId, principal);
     if (!entity.designationDocumentId) throw new NotFoundError('Designation document');
     return this.documents.read(entity.designationDocumentId);
   }
@@ -373,10 +414,8 @@ export class EntityRequestsService {
 
   /** Only the applicant edits, and only while it is their turn (`requested`). */
   private async loadForApplicant(requestId: string, principal: Principal): Promise<Loaded> {
+    // Applicant only: anyone else, the operator included, gets 404 (M-01).
     const entity = await this.load(requestId, principal);
-    if (entity.applicantId !== principal.userId) {
-      throw new ForbiddenError('Only the applicant can change the request');
-    }
     if (entity.status !== 'requested') {
       throw new ConflictError('The request can only be changed while it is with the applicant');
     }
@@ -539,7 +578,7 @@ export class EntityRequestsService {
     comment: string | undefined,
     requestIdHeader: string | undefined,
   ): Promise<EntityRequest> {
-    const before = await this.load(requestId, principal);
+    const before = await this.loadForReview(requestId, principal);
     const role = this.reviewerRole(principal);
     const to: EntityStatus =
       decision === 'approved' ? 'active' : decision === 'rejected' ? 'rejected' : 'requested';
@@ -572,7 +611,7 @@ export class EntityRequestsService {
       });
       if (decision === 'approved') await this.grantAccess(tx, before, principal, requestIdHeader);
     });
-    return this.get(requestId, principal);
+    return this.getForReview(requestId, principal);
   }
 
   /**

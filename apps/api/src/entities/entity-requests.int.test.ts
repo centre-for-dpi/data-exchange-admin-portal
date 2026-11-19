@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { loadCountryConfig } from '@den/config';
 import {
+  entityRequestListSchema,
   entityRequestSchema,
   type EntityRequest,
   invitationListSchema,
@@ -344,17 +345,33 @@ describe('entity onboarding (M2-01)', () => {
   });
 
   describe('authorization', () => {
-    it('hides a request from other users (404) and shows it to the operator and the regulator', async () => {
+    it('hides a request from other users and from reviewers on the applicant routes (404)', async () => {
       const { request } = await submitted();
-      for (const who of [person('otro'), 'elena.admin', 'sofia.auditora']) {
+      // Reviewers read through /review/entities/:id (second factor enforced), not here (M-01).
+      for (const who of [person('otro'), 'elena.admin', 'sofia.auditora', 'ana.operadora']) {
         expect((await call('GET', `/entity-requests/${request.id}`, who)).statusCode).toBe(404);
         expect(
           (await call('GET', `/entity-requests/${request.id}/designation-document`, who))
             .statusCode,
         ).toBe(404);
       }
+    });
+
+    it('shows the file and the document to the operator and the regulator on the review routes', async () => {
+      const { request } = await submitted();
       for (const who of ['ana.operadora', 'pablo.plataforma', 'marta.regulador']) {
-        expect((await call('GET', `/entity-requests/${request.id}`, who)).statusCode).toBe(200);
+        expect((await call('GET', `/review/entities/${request.id}`, who)).statusCode).toBe(200);
+        expect(
+          (await call('GET', `/review/entities/${request.id}/designation-document`, who))
+            .statusCode,
+        ).toBe(200);
+      }
+      for (const who of ['sofia.auditora', 'elena.admin', person('otro')]) {
+        expect((await call('GET', `/review/entities/${request.id}`, who)).statusCode).toBe(403);
+        expect(
+          (await call('GET', `/review/entities/${request.id}/designation-document`, who))
+            .statusCode,
+        ).toBe(403);
       }
     });
 
@@ -392,8 +409,8 @@ describe('entity onboarding (M2-01)', () => {
         (await call('POST', '/entity-requests', applicant, input(person('d'), person('t')))).json(),
       );
       expect((await upload(created.id, person('intruso'), PDF)).statusCode).toBe(404);
-      // The operator can read the request but it is not theirs to change.
-      expect((await upload(created.id, 'ana.operadora', PDF)).statusCode).toBe(403);
+      // The operator reads it on the review routes but it is not theirs to change.
+      expect((await upload(created.id, 'ana.operadora', PDF)).statusCode).toBe(404);
       expect(
         (await call('POST', `/entity-requests/${created.id}/submit`, person('x'))).statusCode,
       ).toBe(404);
@@ -402,6 +419,9 @@ describe('entity onboarding (M2-01)', () => {
     it('never treats seeded entities as requests', async () => {
       const salud = await prisma.entity.findFirstOrThrow({ where: { slug: 'salud' } });
       expect((await call('GET', `/entity-requests/${salud.id}`, 'ana.operadora')).statusCode).toBe(
+        404,
+      );
+      expect((await call('GET', `/review/entities/${salud.id}`, 'ana.operadora')).statusCode).toBe(
         404,
       );
     });
@@ -549,6 +569,35 @@ describe('entity onboarding (M2-01)', () => {
       expect(mail?.subject).toContain(request.shortName);
       expect(mail?.text).toContain('http://localhost:3000/invitations');
       expect(mail?.text).toContain('responsable de datos');
+    });
+
+    it('lets the applicant keep reading the file only while they belong to the entity (B-23)', async () => {
+      const { applicant, request } = await submitted();
+      await call('POST', `/review/entities/${request.id}/approve`, 'ana.operadora', {});
+      const url = `/entity-requests/${request.id}`;
+      expect((await call('GET', url, applicant)).statusCode).toBe(200);
+      expect((await call('GET', `${url}/designation-document`, applicant)).statusCode).toBe(200);
+      expect(
+        entityRequestListSchema
+          .parse((await call('GET', '/entity-requests', applicant)).json())
+          .items.map((i) => i.id),
+      ).toContain(request.id);
+
+      await prisma.membership.updateMany({
+        where: { entityId: request.id },
+        data: { status: 'revoked' },
+      });
+      expect((await call('GET', url, applicant)).statusCode).toBe(404);
+      expect((await call('GET', `${url}/designation-document`, applicant)).statusCode).toBe(404);
+      expect(
+        entityRequestListSchema
+          .parse((await call('GET', '/entity-requests', applicant)).json())
+          .items.map((i) => i.id),
+      ).not.toContain(request.id);
+      // The operator still reads it for the record.
+      expect(
+        (await call('GET', `/review/entities/${request.id}`, 'ana.operadora')).statusCode,
+      ).toBe(200);
     });
 
     it('merges the applicant’s own designation into their membership instead of inviting them', async () => {

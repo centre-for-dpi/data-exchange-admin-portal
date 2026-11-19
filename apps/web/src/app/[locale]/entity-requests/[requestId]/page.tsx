@@ -21,11 +21,20 @@ interface PageProps {
   params: Promise<{ locale: string; requestId: string }>;
 }
 
+/**
+ * The applicant reads their own file on `/entity-requests/:id`; platform roles that review read any
+ * file on `/review/entities/:id`, where the API demands the second factor (M-01).
+ */
 async function load(requestId: string) {
   try {
-    return await apiGet(`/entity-requests/${requestId}`, entityRequestSchema);
+    try {
+      return await apiGet(`/entity-requests/${requestId}`, entityRequestSchema);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 404) throw error;
+      return await apiGet(`/review/entities/${requestId}`, entityRequestSchema);
+    }
   } catch (error) {
-    if (error instanceof ApiError && [400, 404].includes(error.status)) notFound();
+    if (error instanceof ApiError && [400, 403, 404].includes(error.status)) notFound();
     throw error;
   }
 }

@@ -5,7 +5,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /**
  * Downloads the designation document of an onboarding request. The browser never holds the
  * access token, so the web server fetches the PDF from the API with the user's session; the API
- * decides who may read it (applicant and operator, 404 for anyone else).
+ * decides who may read it (the applicant, or the platform roles that review, 404 for anyone else).
  */
 export async function GET(
   _request: Request,
@@ -15,7 +15,11 @@ export async function GET(
   if (!UUID.test(requestId)) return new Response(null, { status: 404 });
   let res: Response;
   try {
+    // The applicant's own route first; platform roles that review fall back to the review route,
+    // where the API demands the second factor (M-01).
     res = await apiGetRaw(`/entity-requests/${requestId}/designation-document`);
+    if (res.status === 404)
+      res = await apiGetRaw(`/review/entities/${requestId}/designation-document`);
   } catch (error) {
     if (error instanceof ApiError) return new Response(null, { status: error.status });
     throw error;

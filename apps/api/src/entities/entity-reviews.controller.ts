@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, Res } from '@nestjs/common';
 import {
   approveEntitySchema,
   entityDecisionWithReasonSchema,
@@ -8,10 +8,13 @@ import {
   type EntityReviewQueueQuery,
   entityReviewQueueQuerySchema,
 } from '@den/contracts';
+import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { type AuthenticatedRequest, CurrentPrincipal, PlatformAccess } from '../auth/decorators.js';
 import type { Principal } from '../auth/principal.service.js';
 import { ZodValidationPipe } from '../common/zod-validation.pipe.js';
+import { PDF_MIME } from '../documents/documents.service.js';
+import { sendPdf } from '../documents/pdf-reply.js';
 import { ApiOperation } from '../openapi/api-operation.decorator.js';
 import { EntityRequestsService } from './entity-requests.service.js';
 
@@ -34,6 +37,45 @@ export class EntityReviewsController {
   })
   queue(@Query(new ZodValidationPipe(entityReviewQueueQuerySchema)) query: EntityReviewQueueQuery) {
     return this.requests.queue(query.status, query.limit, query.cursor);
+  }
+
+  @Get(':requestId')
+  @PlatformAccess('entity_review.read')
+  @ApiOperation({
+    operationId: 'getEntityReviewRequest',
+    summary: 'Any onboarding request, with the operator’s decisions',
+    description:
+      'Platform roles read the file here, not on `/entity-requests/:id`, so the second factor ' +
+      'applies.',
+    tags: ['review'],
+    params: entityRequestIdParamsSchema,
+    responses: { 200: { description: 'The request', schema: entityRequestSchema } },
+    errors: [401, 403, 404],
+  })
+  get(@Param('requestId', uuid) requestId: string, @CurrentPrincipal() principal: Principal) {
+    return this.requests.getForReview(requestId, principal);
+  }
+
+  @Get(':requestId/designation-document')
+  @PlatformAccess('entity_review.read')
+  @ApiOperation({
+    operationId: 'getEntityReviewDesignationDocument',
+    summary: 'Download the designation document of any onboarding request',
+    tags: ['review'],
+    params: entityRequestIdParamsSchema,
+    responses: { 200: { description: 'The PDF', binary: PDF_MIME } },
+    errors: [401, 403, 404],
+  })
+  async download(
+    @Param('requestId', uuid) requestId: string,
+    @CurrentPrincipal() principal: Principal,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const { document, bytes } = await this.requests.designationDocumentForReview(
+      requestId,
+      principal,
+    );
+    await sendPdf(reply, document, bytes);
   }
 
   @Post(':requestId/approve')

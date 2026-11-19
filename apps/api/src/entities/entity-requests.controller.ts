@@ -21,7 +21,7 @@ const uuid = new ZodValidationPipe(z.uuid());
 
 /**
  * Onboarding requests, from the applicant's side (SPEC.md §4.1). Any signed-in user may file one
- * (ADR-0018); only its applicant and the operator can see it, everyone else gets 404.
+ * (ADR-0018); only its applicant reads it here (and only while they hold a membership once it is approved, B-23); everyone else gets 404. Reviewers read through `/review/entities/:id`, which demands the second factor (M-01).
  */
 @SignedIn()
 @Controller('entity-requests')
@@ -64,7 +64,7 @@ export class EntityRequestsController {
   @Get(':requestId')
   @ApiOperation({
     operationId: 'getEntityRequest',
-    summary: 'An onboarding request, with the operator’s decisions',
+    summary: 'One of the caller’s onboarding requests, with the operator’s decisions',
     tags: ['entity-requests'],
     params: entityRequestIdParamsSchema,
     responses: { 200: { description: 'The request', schema: entityRequestSchema } },
@@ -129,7 +129,7 @@ export class EntityRequestsController {
   @Get(':requestId/designation-document')
   @ApiOperation({
     operationId: 'getEntityDesignationDocument',
-    summary: 'Download the designation document',
+    summary: 'Download the designation document of one of the caller’s requests',
     tags: ['entity-requests'],
     params: entityRequestIdParamsSchema,
     responses: { 200: { description: 'The PDF', binary: PDF_MIME } },
