@@ -43,7 +43,8 @@ const REQ_NEW = 'req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes';
  * Linux and macOS, and Git Bash on Windows. A subshell, so that `umask 077`, the variable and an
  * early `exit` stay in it when pasted. Git Bash (MSYS) turns `/CN=...` into a Windows path before
  * OpenSSL sees it unless MSYS_NO_PATHCONV is set; there umask does not reach the file's ACL, so
- * icacls leaves the key to its owner (guarded: elsewhere the variable and that line do nothing).
+ * icacls leaves the key to its owner (guarded: elsewhere the variable and that line do nothing,
+ * and without USERNAME it would remove inheritance and grant no one, locking the key out).
  */
 function posix(clientId: string, keyExists: string, gitBash: boolean): string {
   const msys = gitBash ? 'MSYS_NO_PATHCONV=1 ' : '';
@@ -56,7 +57,7 @@ function posix(clientId: string, keyExists: string, gitBash: boolean): string {
     '    -keyout "$id.key" -out "$id.csr" -subj "/CN=$id" || { rm -f "$id.key" "$id.csr"; exit 1; }',
     ...(gitBash
       ? [
-          `  if command -v icacls >/dev/null; then ${msys}icacls "$id.key" /inheritance:r /grant:r "$USERNAME:F" >/dev/null; fi`,
+          `  if [ -n "$USERNAME" ] && command -v icacls >/dev/null; then ${msys}icacls "$id.key" /inheritance:r /grant:r "$USERNAME:F" >/dev/null; fi`,
         ]
       : []),
     '  openssl req -in "$id.csr" -noout -subject',

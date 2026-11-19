@@ -29,7 +29,7 @@ describe('CSR commands per shell (P-05)', () => {
       '  MSYS_NO_PATHCONV=1 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \\',
     );
     expect(lines[6]).toBe(
-      '  if command -v icacls >/dev/null; then MSYS_NO_PATHCONV=1 icacls "$id.key" /inheritance:r /grant:r "$USERNAME:F" >/dev/null; fi',
+      '  if [ -n "$USERNAME" ] && command -v icacls >/dev/null; then MSYS_NO_PATHCONV=1 icacls "$id.key" /inheritance:r /grant:r "$USERNAME:F" >/dev/null; fi',
     );
     // Everything else as on Linux.
     expect(lines.filter((_, i) => i !== 4 && i !== 6)).toEqual(

@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, userInfo } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { type CsrShell, csrCommands } from './csr-commands';
@@ -51,7 +51,8 @@ function expectOwnerOnlyAcl(file: string): void {
 }
 
 function bash(code: string, cwd: string, pathFirst?: string) {
-  const env = { ...process.env };
+  // Git Bash always sets USERNAME; a task runner may strip it (turbo's strict env mode).
+  const env = { ...process.env, USERNAME: process.env.USERNAME || userInfo().username };
   if (pathFirst) env.PATH = `${pathFirst}${delimiter}${env.PATH ?? ''}`;
   return spawnSync('bash', [], { cwd, input: code, encoding: 'utf8', env });
 }

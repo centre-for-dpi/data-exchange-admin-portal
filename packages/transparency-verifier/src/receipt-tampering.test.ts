@@ -97,7 +97,10 @@ describe('review: receipt tampering', () => {
   it('rejects a record dated after the stamp even when the operator signed it', async () => {
     const key = (await importJWK(fixture.privateJwk, 'EdDSA')) as CryptoKey;
     const payload = await verifyCheckpoint(fixture.checkpoint, jwks);
-    const late = { ...(fixture.records[0] as AccessRecord), occurredAt: '2031-01-01T00:00:00.000Z' };
+    const late = {
+      ...(fixture.records[0] as AccessRecord),
+      occurredAt: '2031-01-01T00:00:00.000Z',
+    };
     const lateLeaves = [recordLeafHash(late), ...leaves.slice(1)];
     const checkpoint = await signCheckpoint(
       { ...payload, root: toHex(treeRoot(lateLeaves)) },
