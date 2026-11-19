@@ -37,7 +37,7 @@ pnpm dev                 # web en 3000, API en 4000
 
 ## Verificaciones
 
-Ejecútalas antes de abrir un pull request; el CI corre las mismas:
+Ejecútalas antes de abrir un pull request. El CI también las corre, salvo que de las suites de integración corre la del API y `tests/infra/src/keycloak.int.test.ts`, y de las specs e2e `security-headers`, `login` y `accessibility`; además renderiza los overlays de Compose del piloto y los charts de Helm (`.github/workflows/ci.yml`):
 
 ```bash
 pnpm format:check

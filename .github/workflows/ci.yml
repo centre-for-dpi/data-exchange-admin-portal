@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+# Every action is pinned by the full commit of the release in the comment (B-29): a moved or
+# compromised tag cannot change what runs here. To upgrade, resolve the new tag's commit
+# (`gh api repos/<owner>/<action>/commits/<tag> --jq .sha`) and update both.
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -18,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -41,9 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -85,8 +89,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: open-policy-agent/setup-opa@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: open-policy-agent/setup-opa@34a30e8a924d1b03ce2cf7abe97250bbb1f332b5 # v2.2.0
         with:
           version: 1.21.4
       - run: opa check --strict packages/policy
@@ -101,10 +105,101 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
       # The pilot's backup and restore procedure, end to end (M6-06, OPERATIONS.md §6): a lost
       # data volume restored, a point-in-time recovery, and an encrypted repository.
       - run: node scripts/restore-test.mjs
+
+  deploy-config:
+    name: Deploy overlay and Helm charts render
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      # The pilot's Compose files as install.sh combines them, with an .env written the way it
+      # writes one (M-23: a broken overlay, as in A-1, passed CI): plain, behind the bundled
+      # proxy, and with the published images; every profile.
+      - name: Compose config of the pilot
+        env:
+          DEN_PORTAL_HOST: portal.den.example
+          DEN_GATEWAY_HOST: gw.den.example
+          DEN_IMAGE_TAG: 0.0.0-ci
+        run: |
+          node scripts/make-deploy-env.mjs https://portal.den.example --gateway-host gw.den.example --out "$RUNNER_TEMP/deploy.env"
+          for extra in '' infra/compose/docker-compose.edge.yml infra/compose/docker-compose.images.yml; do
+            docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml \
+              ${extra:+-f "$extra"} --env-file "$RUNNER_TEMP/deploy.env" \
+              --profile observability --profile antivirus --profile nodes config --quiet
+            echo "OK: deploy overlay ${extra:-alone}"
+          done
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1 # the same Helm as scripts/helm-kind.mjs (alpine/helm:4.3.1)
+      # The charts (M6-05) render with the values production must give (DEPLOYMENT.md §9); the
+      # dependencies are fetched at the versions of Chart.lock.
+      - name: Helm lint and template
+        working-directory: infra/helm
+        run: |
+          for chart in den-platform den; do helm dependency build "$chart"; done
+          helm lint den-platform
+          helm template den-platform den-platform --namespace den-platform > /dev/null
+          set -- --set postgres.backup.destinationPath=s3://ci/den \
+            --set stepCa.rootFingerprint=0000000000000000000000000000000000000000000000000000000000000000 \
+            --set keycloak.smtp.host=smtp.den.example --set keycloak.smtp.from=den@den.example \
+            --set api.tsa.url=https://tsa.den.example/tsr --set-string api.tsa.trustedRoots=PEM
+          helm lint den "$@"
+          helm template den den --namespace den "$@" > /dev/null
+
+  e2e:
+    name: End-to-end (Playwright) on the Compose stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      # The development stack, as `pnpm infra:up` (M-23). Started now and waited for after the
+      # build, so that both overlap.
+      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability up -d --build
+      # Built once and in order: Playwright's three web servers would otherwise build the shared
+      # packages at the same time (their own builds then hit Turborepo's cache).
+      - run: pnpm exec turbo run build --filter=@den/api --filter=@den/web... --filter=@den/mock-citizen-app...
+      - name: Playwright's browser, cached by version
+        id: playwright
+        run: echo "version=$(pnpm --filter @den/web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm --filter @den/web exec playwright install --with-deps chromium
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm --filter @den/web exec playwright install-deps chromium
+      - run: docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability up -d --wait --wait-timeout 300
+      # The realms as imported, against the live Keycloak: logins, second factor, citizens' realm.
+      - run: pnpm --filter @den/infra-tests exec vitest run --config vitest.integration.config.ts src/keycloak.int.test.ts
+      # The specs that guard what a change most easily breaks unnoticed: the CSP and the cookies,
+      # sign-in and sign-out, and axe on every screen (M6-02). The rest run locally (pnpm test:e2e).
+      - run: pnpm --filter @den/web exec playwright test e2e/security-headers.spec.ts e2e/login.spec.ts e2e/accessibility.spec.ts
+      - name: Logs of the stack when the tests fail
+        if: failure()
+        run: docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability logs --tail 80 keycloak apisix opa tsa contract-runner
+      - name: Playwright traces when the tests fail
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-traces
+          path: apps/web/test-results/
+          retention-days: 7

@@ -37,7 +37,7 @@ pnpm dev                 # web on 3000, API on 4000
 
 ## Checks
 
-Run these before opening a pull request; CI runs the same ones:
+Run these before opening a pull request. CI runs them too, except that of the integration suites it runs the API's and `tests/infra/src/keycloak.int.test.ts`, and of the e2e specs `security-headers`, `login` and `accessibility`; it also renders the pilot's Compose overlays and the Helm charts (`.github/workflows/ci.yml`):
 
 ```bash
 pnpm format:check
