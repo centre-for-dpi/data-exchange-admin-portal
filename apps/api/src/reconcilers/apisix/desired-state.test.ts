@@ -176,6 +176,15 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
     }
   });
 
+  it("removes the consumer's credentials before the upstream (M-11)", () => {
+    const plugins = desiredGateway(version(), settings).route.plugins as Plugins;
+    // openid-connect (bearer_only) validates the token and leaves it in place; OPA reads it and
+    // never returns it, so the opa plugin removes it: the provider never gets a replayable token.
+    const decided = (plugins.opa?.send_headers_upstream as string[]).map((h) => h.toLowerCase());
+    expect(decided).toContain('authorization');
+    expect(decided).toContain('x-access-token');
+  });
+
   it('logs metadata only: never the real path, query or body (ARCHITECTURE.md §8)', () => {
     const logger = (desiredGateway(version(), settings).route.plugins as Plugins)['http-logger'];
     expect(logger).toMatchObject({ include_req_body: false, include_resp_body: false });
@@ -267,7 +276,8 @@ describe('desired APISIX state (ARCHITECTURE.md §4.1)', () => {
         headers: { set: { 'X-Road-Client': 'CO/GOV/1/DEN' } },
       });
       expect((plugins.opa as { send_headers_upstream: string[] }).send_headers_upstream).toEqual(
-        expect.arrayContaining(['X-Road-UserId', 'X-Road-Issue']),
+        // The Security Server never gets the consumer's token either (M-11).
+        expect.arrayContaining(['X-Road-UserId', 'X-Road-Issue', 'Authorization']),
       );
     });
 

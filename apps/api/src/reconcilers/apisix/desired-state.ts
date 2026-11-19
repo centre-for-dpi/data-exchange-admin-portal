@@ -163,6 +163,12 @@ export const OPA_UPSTREAM_HEADERS = [
   // Legacy consumer-declared header (before ADR-0017): never forwarded either.
   'X-DEN-Data-Subject',
   'X-Request-Id',
+  // The consumer's credentials (M-11): openid-connect validated the token and OPA read it; the
+  // policy never returns them, so the provider (or the X-Road Security Server) never gets a token
+  // it could replay against the application's other subscriptions. X-Access-Token is the header
+  // openid-connect also accepts the token in.
+  'Authorization',
+  'X-Access-Token',
 ];
 
 /**

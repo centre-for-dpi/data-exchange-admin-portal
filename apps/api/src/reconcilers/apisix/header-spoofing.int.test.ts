@@ -243,6 +243,14 @@ describe('a consumer cannot forge the X-DEN-* headers the provider receives (M3-
     }
   });
 
+  it("the consumer's access token never reaches the provider (M-11)", async () => {
+    const { status, seen } = await call({ 'X-Access-Token': token(CLIENT) });
+    expect(status).toBe(200);
+    expect(seen).not.toHaveProperty('authorization');
+    expect(seen).not.toHaveProperty('x-access-token');
+    expect(JSON.stringify(seen)).not.toContain(token(CLIENT));
+  });
+
   it('header spelling tricks do not get a forged value through', async () => {
     const { status, seen } = await call({
       'x-DeN-sUbScRiPtIoN': 'sub-falsa',
