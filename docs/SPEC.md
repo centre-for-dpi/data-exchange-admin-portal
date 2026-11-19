@@ -78,7 +78,7 @@ The names are the ones used in the code. Every record has `id` (UUIDv7), `create
 `entityId` (provider), `slug` (unique per entity), `name`, `summary`, `description` (markdown), `sector`, `tags[]`, `classification` (`public` | `internal` | `personal` | `sensitive`), `status` (derived from its versions: `draft` | `published` | `deprecated` | `retired`), `ownerContact`.
 
 ### ApiVersion
-`apiId`, `version` (semver major.minor), `status` (§4.2), `openapiSpec` (stored JSON + hash), `lintReport`, `upstream` (§3.1), `basePath` (computed: `/{entitySlug}/{apiSlug}/v{major}`), `exposedFields[]` (data attributes flagged `personal: bool`, `sensitive: bool`), `legalBasis` (text + legal references), `allowedPurposes[]` (codes from the purpose catalog), `sla` (`availabilityTarget`, `maxLatencyMs`, `supportHours`), `defaultRateLimit` (requests/minute), `deprecatedAt?`, `sunsetAt?`, `serviceSheet` (the "service sheet": owner, description, schema, service level — generated from these fields).
+`apiId`, `version` (semver major.minor), `status` (§4.2), `openapiSpec` (stored JSON + hash), `lintReport`, `upstream` (§3.1), `basePath` (computed: `/{entitySlug}/{apiSlug}/v{major}`), `exposedFields[]` (data attributes flagged `personal: bool`, `sensitive: bool`), `legalBasis` (text + legal references), `allowedPurposes[]` (codes from the purpose catalog), `sla` (`availabilityTarget`, `maxLatencyMs`, `supportHours`; reserved, not captured or shown yet), `defaultRateLimit` (requests/minute), `deprecatedAt?`, `sunsetAt?`, `serviceSheet` (the "service sheet": owner, description, schema, service level — generated from these fields).
 
 ### 3.1 Upstream (where the service lives)
 One of:
@@ -90,7 +90,7 @@ One of:
 The node is the default channel (ADR-0029): the country lists the types new versions may use in `features.upstreams`, `[node, xroad]` if omitted. `direct` is opt-in, and `xroad` is offered only where the deployment has the operator's Security Server. The API refuses another type, as upstream or sandbox, when a version is created, revised, edited or submitted (400, `upstream_type_not_allowed` or `xroad_not_configured`). The version form offers only the allowed types, and with a single one it does not ask. A version that already has a type the country no longer accepts keeps working; its sheet and the operator's sync console flag it, and the operator decides.
 
 ### Application (consumer application)
-`entityId` (consumer), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (deterministic), `status` (`active` | `suspended` | `deleted`), `technicalContact`.
+`entityId` (consumer), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (deterministic), `status` (`active` | `suspended` | `deleted`; the portal only ever writes `active`: there is no operation to suspend or delete an application, which stops working when its credentials or subscriptions are revoked or its entity is suspended, and `deleted` and `suspended` are reserved: the policy already denies a client that is not `active` with `app_suspended`), `technicalContact`.
 
 ### Credential
 `applicationId`, `kind` (`client_secret` | `mtls_certificate`), `status` (`active` | `rotating` | `revoked` | `expired`), `fingerprint` / `serial`, `notAfter`, `lastUsedAt?`. The secret is shown only once, when it is created; it is never stored in clear text in the portal.
@@ -108,7 +108,7 @@ The node is the default channel (ADR-0029): the country lists the types new vers
 Attached files (agreements, minutes). `ownerEntityId`, `kind` (`agreement` | `annex` | `other`), `sha256`, `size`, `mimeType`, `storageKey`. PDF only in the MVP.
 
 ### AuditEvent
-`seq` (sequential), `occurredAt`, `actor` (user, system or application), `actorEntityId?`, `action` (e.g. `subscription.approved`), `targetType`, `targetId`, `before?`, `after?` (domain fields only, never secrets), `ip?`, `prevHash`, `hash`. Immutable.
+`seq` (sequential), `occurredAt`, `actor` (user, system or application), `actorEntityId?`, `action` (e.g. `subscription.approved`), `targetType`, `targetId`, `before?`, `after?` (domain fields only, never secrets), `ip?` (the caller's address, the one the API trusts, ARCHITECTURE §12: set for people and applications; null for events of background jobs; part of the hash and of the exports), `prevHash`, `hash`. Immutable.
 
 ### Notification
 `userId`, `kind`, `payload`, `readAt?`, `emailSentAt?`.
@@ -137,13 +137,15 @@ active → offboarded
 
 ```
 draft → in_review → approved_operator → [approved_regulator] → published
-          ↘ changes_requested → draft
+          ↘ changes_requested → in_review (after correcting)
 published → deprecated → retired
 ```
 
-1. `api_publisher` creates the API and the version: uploads OpenAPI 3.x, chooses the upstream among the types the country accepts (§3.1), fills in the exposed fields, legal basis, allowed purposes and SLA.
+Two transitions of the diagram are not stored as states. `approved_regulator` exists in the enum and in the state machine, but the regulator's approval takes the row from `approved_operator` straight to `published` in one transaction; the audit log records `api_version.approved_regulator` (with `status: approved_regulator`) and then `api_version.published`, so the log shows a state the row never holds. A version returned for changes stays in `changes_requested` while the provider corrects it (`PUT` of the version) and goes back to `in_review` when resubmitted; `changes_requested → draft` is allowed by the state machine and never used.
+
+1. `api_publisher` creates the API and the version: uploads OpenAPI 3.x, chooses the upstream among the types the country accepts (§3.1), fills in the exposed fields, legal basis and allowed purposes. The service level (`sla`) is not captured in this release: the column exists and nothing writes it.
 2. Automatic validations when submitting for review (blocking):
-   - OpenAPI lint with the DEN ruleset (Spectral): `operationId` on every operation, response schemas, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), no two paths that can match the same request with neither more specific (a literal path next to a parameterised one is fine: the literal wins, `ARCHITECTURE.md §4.2`), descriptions in Spanish.
+   - OpenAPI lint with the DEN ruleset (Spectral): `operationId` on every operation (unique), a success response on every operation, parameters and path parameters that agree with the path, local references only, a data subject declared (`x-den-data-subject`) on every operation of a `personal` or `sensitive` API, no identification parameters in the query if `features.lint.noIdInQuery` (they are recommended in the path or in a POST body), no two paths that can match the same request with neither more specific (a literal path next to a parameterised one is fine: the literal wins, `ARCHITECTURE.md §4.2`). The ruleset does not check the schema of the responses or the language of the descriptions.
    - Connectivity: the portal asks the node/URL for a `healthcheck` through the gateway in test mode (GET to the service root; it passes with any response that is not a 5xx).
    - Contract test (Schemathesis) against the sandbox, with a time limit. The sandbox is the test service with synthetic data that the version declares; without a sandbox, the test is skipped and does not block. Because it fires many requests at a host the provider names before anyone has reviewed it, a `direct` sandbox must prove the provider controls the host: it serves, at `/.well-known/den-validation`, the token the portal shows for that entity and host (otherwise the contract test fails with "host control not proven"). Asking again is limited: a cooldown per version (5 minutes) and a cap per entity (10 an hour), a 429 beyond them (ADR-0036).
 
@@ -152,7 +154,7 @@ published → deprecated → retired
 4. On publication: the route is created in the gateway in "closed" mode (without subscriptions nobody gets in) and the API appears in the catalog.
 5. A new major version coexists with the previous one. `deprecated` shows a notice and the retirement date; `retired` removes the route, revokes the subscriptions and rejects the pending requests, those waiting for information included (with configurable advance notice, 90 days by default).
 
-Changes to a published version: only compatible changes are allowed (descriptions, SLA, new optional operations). An incompatible change requires a new major version. The compatibility check compares the revision against the published document recursively (nested properties, array items, parameters, request body and responses) and blocks incompatibilities; what it cannot compare (composed schemas that differ, schemas too intricate) counts as incompatible (ADR-0019).
+Changes to a published version: only compatible changes are allowed (descriptions, new optional operations and parameters, new response properties). An incompatible change requires a new major version. The compatibility check compares the revision against the published document recursively (nested properties, array items, parameters, request body and responses) and blocks incompatibilities; what it cannot compare (composed schemas that differ, schemas too intricate) counts as incompatible (ADR-0019). The operator does not review what a compatible revision adds (new operations, optional parameters, response properties): the declared fields, purposes and every subscription's operations stay as approved, and a new operation reaches a consumer only through a new access request (ADR-0039).
 
 A version in `draft` or `changes_requested` can be corrected in full: the exposed fields, the legal basis, the allowed purposes, the upstreams and the OpenAPI document (`PUT` of the version), with the validation of creating it. A version in review or beyond cannot be edited (M-19).
 
@@ -180,7 +182,7 @@ pending_provider → info_requested → pending_provider (question from the stew
 2. The provider entity's `data_steward`s are notified. The steward can approve (optionally reducing operations, limit or validity), reject with a reason, or ask for information (a comment; it goes back to the requester).
 3. If the API is `sensitive` and policy requires it, it also goes through `regulator`.
 4. `approved → active` happens when the reconcilers confirm that the gateway already has the policy data. The portal shows "activating" in the meantime. Target: under 60 seconds.
-5. Suspending or revoking (by the provider, the operator or the regulator) is reflected in the gateway in under 60 seconds.
+5. Suspending or revoking (by the provider, the operator or the regulator) is reflected in the gateway in under 60 seconds. This holds for what OPA reads from the bundle (subscriptions, certificates), as long as the portal is up; a token already issued for a revoked secret stays valid until it expires (5 minutes) unless mTLS is required (ADR-0039).
 6. Renewal: 30 days before `validUntil` the consumer is notified; renewal is a new, prefilled request. It lives next to the active subscription it renews and may be decided after that one expires (a renewal asked for in time must not be lost to a slow decision; it then starts at the decision); it can not be granted if the original was suspended or revoked, and suspending or revoking the original closes it. Only one request per application, version and purpose can be waiting for a decision at a time, renewal or not.
 
 **Rules**
@@ -312,11 +314,11 @@ branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/log
 
 - **Availability:** the portal can go down without affecting traffic; the gateway keeps operating with the last configuration and the last OPA bundle.
 - **Latency added by the gateway:** p95 < 50 ms (not counting the upstream) with a local OPA.
-- **Propagation:** approval or revocation reflected in the gateway in < 60 s.
+- **Propagation:** approval or revocation reflected in the gateway in < 60 s (with the exceptions of §4.4 step 5).
 - **Initial scale:** 200 entities, 1,000 APIs, 5,000 subscriptions, 500 sustained requests/s at the gateway.
 - **Security:** OWASP ASVS L2; mandatory MFA for platform roles, `data_steward` and `entity_admin` (Keycloak asks for the code; the API requires it on every request, ADR-0021 and ADR-0035). Sessions without it read only their own resources: platform roles read other people's onboarding files through the review routes, which demand the factor.
 - **Privacy:** no bodies in logs; identifiers in paths masked; `X-DEN-End-User` stored as a hash with a per-deployment salt.
-- **Retention:** audit log 5 years (configurable); access logs 1 year (configurable).
+- **Retention:** access logs 1 year (`retention.accessLogMonths`, applied to the OpenSearch indices); the transparency register 5 years (`retention.subjectAccessMonths`, purged every 6 h). The audit log is never purged: it is insert-only and hash-chained, and deleting rows would break the chain. `retention.auditYears` (5 by default) is in the configuration and no code reads it; it states how long the operator must keep the audit log (and its exports), not a deletion.
 - **Accessibility:** WCAG 2.1 AA.
 - **Languages:** Spanish (default) and English.
 - **Deployment:** Docker Compose for development and pilots; Helm/Kubernetes for production (milestone M6).

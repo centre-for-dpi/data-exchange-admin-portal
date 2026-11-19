@@ -78,7 +78,7 @@ Los nombres son los del código. Todos los registros tienen `id` (UUIDv7), `crea
 `entityId` (proveedora), `slug` (único por entidad), `name`, `summary`, `description` (markdown), `sector`, `tags[]`, `classification` (`public` | `internal` | `personal` | `sensitive`), `status` (derivado de sus versiones: `draft` | `published` | `deprecated` | `retired`), `ownerContact`.
 
 ### ApiVersion
-`apiId`, `version` (semver mayor.menor), `status` (§4.2), `openapiSpec` (JSON almacenado + hash), `lintReport`, `upstream` (§3.1), `basePath` (calculado: `/{entitySlug}/{apiSlug}/v{major}`), `exposedFields[]` (atributos de datos con marca `personal: bool`, `sensitive: bool`), `legalBasis` (texto + referencias normativas), `allowedPurposes[]` (códigos del catálogo de finalidades), `sla` (`availabilityTarget`, `maxLatencyMs`, `supportHours`), `defaultRateLimit` (peticiones/minuto), `deprecatedAt?`, `sunsetAt?`, `serviceSheet` (la "ficha del servicio": responsable, descripción, esquema, nivel de servicio — se genera de estos campos).
+`apiId`, `version` (semver mayor.menor), `status` (§4.2), `openapiSpec` (JSON almacenado + hash), `lintReport`, `upstream` (§3.1), `basePath` (calculado: `/{entitySlug}/{apiSlug}/v{major}`), `exposedFields[]` (atributos de datos con marca `personal: bool`, `sensitive: bool`), `legalBasis` (texto + referencias normativas), `allowedPurposes[]` (códigos del catálogo de finalidades), `sla` (`availabilityTarget`, `maxLatencyMs`, `supportHours`; reservado, todavía no se captura ni se muestra), `defaultRateLimit` (peticiones/minuto), `deprecatedAt?`, `sunsetAt?`, `serviceSheet` (la "ficha del servicio": responsable, descripción, esquema, nivel de servicio — se genera de estos campos).
 
 ### 3.1 Upstream (dónde vive el servicio)
 Uno de:
@@ -90,7 +90,7 @@ Uno de:
 El nodo es el canal por defecto (ADR-0029): el país lista en `features.upstreams` los tipos que pueden usar las versiones nuevas, `[node, xroad]` si se omite. `direct` es opcional, y `xroad` solo se ofrece donde el despliegue tiene el Security Server del operador. El API rechaza otro tipo, como upstream o como sandbox, al crear, revisar, editar o enviar una versión (400, `upstream_type_not_allowed` o `xroad_not_configured`). El formulario de versión ofrece solo los tipos permitidos y, si hay uno solo, no pregunta. Una versión que ya tiene un tipo que el país dejó de aceptar sigue funcionando; su ficha y la consola de sincronización del operador la señalan, y el operador decide.
 
 ### Application (aplicación consumidora)
-`entityId` (consumidora), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (determinista), `status` (`active` | `suspended` | `deleted`), `technicalContact`.
+`entityId` (consumidora), `name`, `description`, `environment` (`sandbox` | `production`), `keycloakClientId` (determinista), `status` (`active` | `suspended` | `deleted`; el portal solo escribe `active`: no hay operación para suspender ni borrar una aplicación, que deja de funcionar cuando se revocan sus credenciales o sus suscripciones o se suspende su entidad; `suspended` y `deleted` están reservados: la política ya niega a un cliente que no esté `active` con `app_suspended`), `technicalContact`.
 
 ### Credential
 `applicationId`, `kind` (`client_secret` | `mtls_certificate`), `status` (`active` | `rotating` | `revoked` | `expired`), `fingerprint` / `serial`, `notAfter`, `lastUsedAt?`. El secreto se muestra una sola vez al crearlo; nunca se almacena en claro en el portal.
@@ -108,7 +108,7 @@ El nodo es el canal por defecto (ADR-0029): el país lista en `features.upstream
 Archivos adjuntos (acuerdos, actas). `ownerEntityId`, `kind` (`agreement` | `annex` | `other`), `sha256`, `size`, `mimeType`, `storageKey`. Solo PDF en el MVP.
 
 ### AuditEvent
-`seq` (secuencial), `occurredAt`, `actor` (usuario, sistema o aplicación), `actorEntityId?`, `action` (p. ej. `subscription.approved`), `targetType`, `targetId`, `before?`, `after?` (solo campos de dominio, nunca secretos), `ip?`, `prevHash`, `hash`. Inmutable.
+`seq` (secuencial), `occurredAt`, `actor` (usuario, sistema o aplicación), `actorEntityId?`, `action` (p. ej. `subscription.approved`), `targetType`, `targetId`, `before?`, `after?` (solo campos de dominio, nunca secretos), `ip?` (la dirección del llamante, la que el API considera fiable, ARCHITECTURE §12: se llena para personas y aplicaciones; es nula en los eventos de trabajos en segundo plano; entra en el hash y en las exportaciones), `prevHash`, `hash`. Inmutable.
 
 ### Notification
 `userId`, `kind`, `payload`, `readAt?`, `emailSentAt?`.
@@ -137,13 +137,15 @@ active → offboarded
 
 ```
 draft → in_review → approved_operator → [approved_regulator] → published
-          ↘ changes_requested → draft
+          ↘ changes_requested → in_review (tras corregir)
 published → deprecated → retired
 ```
 
-1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige el upstream entre los tipos que acepta el país (§3.1), completa campos expuestos, base legal, finalidades permitidas, SLA.
+Dos transiciones del diagrama no se guardan como estados. `approved_regulator` existe en el enum y en la máquina de estados, pero la aprobación del regulador lleva la fila de `approved_operator` directamente a `published` en una sola transacción; la bitácora registra `api_version.approved_regulator` (con `status: approved_regulator`) y luego `api_version.published`, así que muestra un estado que la fila nunca tiene. Una versión devuelta con cambios sigue en `changes_requested` mientras el proveedor la corrige (`PUT` de la versión) y vuelve a `in_review` al reenviarla; `changes_requested → draft` lo permite la máquina de estados y nunca se usa.
+
+1. `api_publisher` crea la API y la versión: sube OpenAPI 3.x, elige el upstream entre los tipos que acepta el país (§3.1), completa campos expuestos, base legal y finalidades permitidas. El nivel de servicio (`sla`) no se captura en esta versión: la columna existe y nada la escribe.
 2. Validaciones automáticas al enviar a revisión (bloqueantes):
-   - Lint del OpenAPI con el conjunto de reglas DEN (Spectral): `operationId` en todas las operaciones, esquemas de respuesta, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), sin dos rutas que puedan coincidir con la misma petición sin que una sea más específica (una ruta literal junto a una con parámetro sí se acepta: gana la literal, `ARCHITECTURE.md §4.2`), descripciones en español.
+   - Lint del OpenAPI con el conjunto de reglas DEN (Spectral): `operationId` en todas las operaciones (único), una respuesta de éxito en cada operación, parámetros y parámetros de ruta que coinciden con la ruta, solo referencias locales, un titular declarado (`x-den-data-subject`) en cada operación de una API `personal` o `sensitive`, sin parámetros de identificación en query si `features.lint.noIdInQuery` (se recomiendan en path o en cuerpo de POST), sin dos rutas que puedan coincidir con la misma petición sin que una sea más específica (una ruta literal junto a una con parámetro sí se acepta: gana la literal, `ARCHITECTURE.md §4.2`). El conjunto de reglas no revisa el esquema de las respuestas ni el idioma de las descripciones.
    - Conectividad: el portal pide al nodo/URL un `healthcheck` a través del gateway en modo prueba (GET a la raíz del servicio; pasa con cualquier respuesta que no sea 5xx).
    - Prueba de contrato (Schemathesis) contra el sandbox, con un límite de tiempo. El sandbox es el servicio de pruebas con datos sintéticos que la versión declara; sin sandbox, la prueba se omite y no bloquea. Como lanza muchas peticiones contra un host que el proveedor nombra antes de que nadie lo revise, un sandbox `direct` debe probar que el proveedor controla el host: sirve, en `/.well-known/den-validation`, el token que el portal muestra para esa entidad y ese host (si no, la prueba de contrato falla con "host control not proven"). Pedirla de nuevo tiene límites: un enfriamiento por versión (5 minutos) y un tope por entidad (10 por hora), con un 429 más allá (ADR-0036).
 
@@ -152,7 +154,7 @@ published → deprecated → retired
 4. Al publicar: se crea la ruta en el gateway en modo "cerrado" (sin suscripciones nadie entra) y la API aparece en el catálogo.
 5. Una versión nueva mayor convive con la anterior. `deprecated` muestra aviso y fecha de retiro; `retired` elimina la ruta, revoca las suscripciones y rechaza las solicitudes pendientes, también las que esperan información (con aviso previo configurable, por defecto 90 días).
 
-Cambios en una versión publicada: solo se permiten cambios compatibles (descripciones, SLA, nuevas operaciones opcionales). Un cambio incompatible exige versión mayor nueva. La comprobación de compatibilidad compara la revisión con el documento publicado de forma recursiva (propiedades anidadas, `items` de arreglos, parámetros, cuerpo de la petición y respuestas) y bloquea las incompatibilidades; lo que no puede comparar (esquemas compuestos que difieren, esquemas demasiado enredados) cuenta como incompatible (ADR-0019).
+Cambios en una versión publicada: solo se permiten cambios compatibles (descripciones, nuevas operaciones y parámetros opcionales, nuevas propiedades de respuesta). Un cambio incompatible exige versión mayor nueva. La comprobación de compatibilidad compara la revisión con el documento publicado de forma recursiva (propiedades anidadas, `items` de arreglos, parámetros, cuerpo de la petición y respuestas) y bloquea las incompatibilidades; lo que no puede comparar (esquemas compuestos que difieren, esquemas demasiado enredados) cuenta como incompatible (ADR-0019). El operador no revisa lo que agrega una revisión compatible (operaciones nuevas, parámetros opcionales, propiedades de respuesta): los campos declarados, las finalidades y las operaciones de cada suscripción siguen como se aprobaron, y una operación nueva llega a un consumidor solo con una nueva solicitud de acceso (ADR-0039).
 
 Una versión en `draft` o `changes_requested` puede corregirse por completo: los campos expuestos, la base legal, las finalidades permitidas, los upstreams y el documento OpenAPI (`PUT` de la versión), con la validación de crearla. Una versión en revisión o más allá no se edita (M-19).
 
@@ -180,7 +182,7 @@ pending_provider → info_requested → pending_provider (pregunta del responsab
 2. Se notifica a los `data_steward` de la entidad proveedora. El responsable puede aprobar (opcionalmente reduciendo operaciones, límite o vigencia), rechazar con motivo o pedir información (comentario; vuelve al solicitante).
 3. Si la API es `sensitive` y la política lo exige, pasa además por `regulator`.
 4. `approved → active` ocurre cuando los reconciliadores confirman que el gateway ya tiene los datos de política. El portal muestra "activándose" mientras tanto. Objetivo: menos de 60 segundos.
-5. Suspender o revocar (proveedor, operador o regulador) se refleja en el gateway en menos de 60 segundos.
+5. Suspender o revocar (proveedor, operador o regulador) se refleja en el gateway en menos de 60 segundos. Esto vale para lo que OPA lee del bundle (suscripciones, certificados), mientras el portal esté arriba; un token ya emitido para un secreto revocado sigue vigente hasta que vence (5 minutos) salvo que se exija mTLS (ADR-0039).
 6. Renovación: 30 días antes de `validUntil` se notifica al consumidor; la renovación es una nueva solicitud prellenada. Vive junto a la suscripción activa que renueva y puede decidirse después de que esta expire (una renovación pedida a tiempo no debe perderse por una decisión lenta; entonces empieza en la decisión); no se puede conceder si la original fue suspendida o revocada, y suspender o revocar la original la cierra. Solo puede haber una solicitud por aplicación, versión y finalidad esperando decisión a la vez, sea renovación o no.
 
 **Reglas**
@@ -312,11 +314,11 @@ branding: { productName: "Red de Intercambio de Datos", logo: "./branding/co/log
 
 - **Disponibilidad:** el portal puede caer sin afectar el tráfico; el gateway sigue operando con la última configuración y el último bundle de OPA.
 - **Latencia agregada por el gateway:** p95 < 50 ms (sin contar el upstream) con OPA local.
-- **Propagación:** aprobación o revocación reflejada en el gateway en < 60 s.
+- **Propagación:** aprobación o revocación reflejada en el gateway en < 60 s (con las excepciones del paso 5 de §4.4).
 - **Escala inicial:** 200 entidades, 1.000 APIs, 5.000 suscripciones, 500 peticiones/s sostenidas en el gateway.
 - **Seguridad:** OWASP ASVS L2; MFA obligatorio para roles de plataforma, `data_steward` y `entity_admin` (Keycloak pide el código; el API lo exige en cada petición, ADR-0021 y ADR-0035). Las sesiones sin él leen solo sus propios recursos: los roles de plataforma leen los expedientes de alta de otras personas por las rutas de revisión, que exigen el factor.
 - **Privacidad:** sin cuerpos en logs; identificadores en rutas enmascarados; `X-DEN-End-User` guardado como hash con sal por despliegue.
-- **Retención:** bitácora de auditoría 5 años (configurable); logs de acceso 1 año (configurable).
+- **Retención:** logs de acceso 1 año (`retention.accessLogMonths`, aplicado a los índices de OpenSearch); registro de transparencia 5 años (`retention.subjectAccessMonths`, se purga cada 6 h). La bitácora de auditoría nunca se purga: es de solo inserción y está encadenada por hash, y borrar filas rompería la cadena. `retention.auditYears` (5 por defecto) está en la configuración y ningún código lo lee; indica cuánto tiempo debe conservar el operador la bitácora (y sus exportaciones), no un borrado.
 - **Accesibilidad:** WCAG 2.1 AA.
 - **Idiomas:** español (por defecto) e inglés.
 - **Despliegue:** Docker Compose para desarrollo y pilotos; Helm/Kubernetes para producción (hito M6).
