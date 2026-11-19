@@ -190,9 +190,23 @@ describe('catalogue (M1-05)', () => {
     );
   });
 
-  it('is visible to every authenticated user, and closed to anonymous visitors without publicCatalog', async () => {
+  it('is visible to every user with a role or a membership, and closed to anonymous visitors without publicCatalog', async () => {
     for (const user of ['carlos.dev', 'pedro.publicador', 'ana.operadora', 'sofia.auditora']) {
       expect((await call('/api/v1/catalog/apis', user)).statusCode, user).toBe(200);
+    }
+    // A self-registered user with no membership and no platform role is not a member (ADR-0014).
+    const newcomer = {
+      authorization: `Bearer ${await issuer.token(`sub-newcomer-${run}`, { email: `n-${run}@example.org`, name: 'Newcomer' })}`,
+    };
+    for (const url of [
+      '/api/v1/catalog/apis',
+      `/api/v1/catalog/apis/${published.apiId}`,
+      '/api/v1/catalog/entities',
+      `/api/v1/catalog/apis/${published.apiId}/versions/${published.versionId}/openapi`,
+    ]) {
+      expect((await app.inject({ method: 'GET', url, headers: newcomer })).statusCode, url).toBe(
+        403,
+      );
     }
     // co.yaml: features.publicCatalog = false
     expect((await call('/api/v1/catalog/apis')).statusCode).toBe(401);

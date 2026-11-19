@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, Req, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Query,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { getCountryConfig } from '@den/config';
 import {
   catalogApiParamsSchema,
@@ -19,10 +27,22 @@ const uuid = new ZodValidationPipe(z.uuid());
 
 /**
  * Anonymous visitors may browse only when the country enables the public catalogue, and then only
- * public APIs (SPEC.md §2.3). Otherwise the catalogue requires authentication.
+ * public APIs (SPEC.md §2.3). Beyond public APIs the catalogue needs an active membership or a
+ * platform role (ADR-0014): anyone can self-register, so being authenticated says nothing. A user
+ * with neither sees what an anonymous visitor would, and gets 403 when the country has no public
+ * catalogue.
  */
 function viewerOf(request: AuthenticatedRequest): CatalogViewer {
-  if (request.principal) return { anonymous: false };
+  const principal = request.principal;
+  if (principal) {
+    if (principal.platformRoles.length > 0 || principal.memberships.length > 0) {
+      return { anonymous: false };
+    }
+    if (!getCountryConfig().features.publicCatalog) {
+      throw new ForbiddenException('The catalogue is for members of an entity and platform roles');
+    }
+    return { anonymous: true };
+  }
   if (!getCountryConfig().features.publicCatalog) {
     throw new UnauthorizedException('Sign in to browse the catalogue');
   }
@@ -44,7 +64,7 @@ export class CatalogController {
     tags: ['catalog'],
     query: catalogQuerySchema,
     responses: { 200: { description: 'A page of APIs', schema: catalogPageSchema } },
-    errors: [400, 401],
+    errors: [400, 401, 403],
     authenticated: false,
   })
   search(
@@ -61,7 +81,7 @@ export class CatalogController {
     summary: 'Provider entities with published APIs',
     tags: ['catalog'],
     responses: { 200: { description: 'Entities', schema: catalogEntitiesSchema } },
-    errors: [401],
+    errors: [401, 403],
     authenticated: false,
   })
   entities(@Req() request: AuthenticatedRequest) {
@@ -76,7 +96,7 @@ export class CatalogController {
     tags: ['catalog'],
     params: catalogApiParamsSchema,
     responses: { 200: { description: 'The API', schema: catalogDetailSchema } },
-    errors: [401, 404],
+    errors: [401, 403, 404],
     authenticated: false,
   })
   detail(@Param('apiId', uuid) apiId: string, @Req() request: AuthenticatedRequest) {
@@ -93,7 +113,7 @@ export class CatalogController {
     responses: {
       200: { description: 'OpenAPI 3.x document', schema: z.record(z.string(), z.unknown()) },
     },
-    errors: [401, 404],
+    errors: [401, 403, 404],
     authenticated: false,
   })
   openapi(

@@ -121,6 +121,29 @@ describe('public catalogue (M6-08)', () => {
     expect((await call(versionDoc)).statusCode).toBe(404);
   });
 
+  it('treats a signed-in user with no membership and no role as an anonymous visitor (M-17)', async () => {
+    const headers = {
+      authorization: `Bearer ${await issuer.token(`sub-newcomer-${run}`, { email: `n-${run}@example.org`, name: 'Newcomer' })}`,
+    };
+    const list = await app.inject({ method: 'GET', url: `/api/v1/catalog/apis?q=${run}`, headers });
+    expect(list.statusCode, list.body).toBe(200);
+    const ids = catalogPageSchema.parse(list.json()).items.map((i) => i.api.id);
+    expect(ids).toContain(open.apiId);
+    expect(ids).not.toContain(personal.apiId);
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/catalog/apis/${open.apiId}`,
+      headers,
+    });
+    expect(catalogDetailSchema.parse(detail.json()).api.ownerContact).toBeNull();
+    const hidden = await app.inject({
+      method: 'GET',
+      url: `/api/v1/catalog/apis/${personal.apiId}`,
+      headers,
+    });
+    expect(hidden.statusCode).toBe(404);
+  });
+
   it('shows a public API without its contact nor the node state', async () => {
     const anonymous = catalogDetailSchema.parse(
       (await call(`/api/v1/catalog/apis/${open.apiId}`)).json(),
