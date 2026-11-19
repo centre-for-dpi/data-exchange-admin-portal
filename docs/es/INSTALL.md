@@ -138,7 +138,10 @@ El piloto **siempre** carga el seed: tres entidades ficticias (operador, una de 
 | `sudo ./install.sh backup` | Respaldo completo de pgBackRest y copia en `backups/<fecha>/`: volcados de `den` y `keycloak`, el repositorio de respaldos (cifrado), los volúmenes de la CA, la TSA, documentos y app ciudadana; no `.env`, que guardas aparte (M-30). Conserva los `DEN_BACKUP_KEEP` más recientes (5). Los respaldos diarios ya corren solos (`OPERATIONS.md §6`) |
 | `sudo ./install.sh restore [instante]` | Restaura la base al último estado archivado, o al instante dado (`"2026-11-20 14:30:00-05"`). Detiene y arranca todo |
 | `sudo ./install.sh restore-volumes <carpeta>` | Se perdió el servidor: en uno nuevo con el `.env` guardado, recrea todos los volúmenes desde una carpeta de respaldo y arranca (`OPERATIONS.md §6.1`) |
-| `sudo ./install.sh update` | Respaldo, `git pull --ff-only`, recompilación, reinicio y la configuración de los realms en Keycloak (`realms`) |
+| `sudo ./install.sh update` | Respaldo, `git pull --ff-only`; luego el instalador **se vuelve a ejecutar desde los archivos recién bajados** (así el código nuevo agrega a `.env` las variables y secretos de la versión nueva), rechaza los secretos de ejemplo, recompila, reinicia y aplica la configuración de los realms (`realms`). Un piloto que ya existe y sube a través de los cambios de la revisión sigue `DEPLOYMENT.md §5.5` |
+| `sudo ./install.sh images <etiqueta>` / `images build` | Usa las imágenes publicadas en ghcr.io (`0.2.0`, `sha-<commit>`) en lugar de compilar el API, la web, el hub y el ejecutor de contratos en el servidor, o vuelve a compilar. Solo x86-64; los paquetes deben ser públicos, o la descarga falla y sigue compilando (`DEPLOYMENT.md §9.6`) |
+| `sudo ./install.sh platform-role grant\|revoke <correo> <rol>` / `list` | Roles de plataforma desde el servidor, para el primer administrador y para recuperación; después lo hace la consola (`OPERATIONS.md §2.3`) |
+| `sudo ./install.sh relink-identity <correo> [--sub <id>] [--new-email <dirección>] --reason "..."` | Apunta una cuenta del portal a un usuario o dirección nuevos de Keycloak cuando la persona perdió el suyo; las membresías y los roles se quedan, auditado (`OPERATIONS.md §2.3`) |
 | `sudo ./install.sh realms` | Aplica la configuración de `infra/keycloak/*-realm.json` a los realms que Keycloak ya importó: flujo de login, políticas, el enlace de verificación de 60 minutos. Idempotente (`OPERATIONS.md §5.3`) |
 | `sudo ./install.sh demo-users list` / `disable` | El estado de los usuarios de demo; `disable` les impide entrar y les quita los roles de plataforma, auditado, cuando la gente del operador ya tiene los suyos (§6) |
 | `sudo ./install.sh stop` / `start` | Detiene o arranca todo, sin perder datos |
@@ -150,7 +153,7 @@ alias dc='docker compose -f infra/compose/docker-compose.yml -f infra/compose/do
   -f infra/compose/docker-compose.edge.yml --env-file .env --profile observability'
 ```
 
-Sin observabilidad, quita `--profile observability`; con el antivirus, agrega `--profile antivirus`; con un Traefik propio, quita `-f infra/compose/docker-compose.edge.yml`.
+Sin observabilidad, quita `--profile observability`; con el antivirus, agrega `--profile antivirus`; con imágenes publicadas (`images <etiqueta>`), agrega `-f infra/compose/docker-compose.images.yml` después del archivo de despliegue; con un Traefik propio, quita `-f infra/compose/docker-compose.edge.yml`.
 
 Un `.env` escrito a mano o por `make-deploy-env.mjs` (como el del piloto de demo) no tiene las respuestas del instalador. Agrégale `DEN_PORTAL_HOST`, `DEN_GATEWAY_HOST`, `DEN_INSTALL_PROXY` (`bundled` o `external`), `DEN_INSTALL_TLS`, `DEN_INSTALL_OBSERVABILITY` y `DEN_INSTALL_ANTIVIRUS` (`true` o `false`; con el antivirus, también `DEN_CLAMAV_URL=tcp://clamav:3310`), o sigue usando Compose directamente.
 

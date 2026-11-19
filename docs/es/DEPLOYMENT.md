@@ -77,7 +77,7 @@ Cada subsección empieza por la **función** del componente en el despliegue y s
 | `web` | `den/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (en dev corre en el host) | — | solo piloto | `GET /api/auth/providers` |
 | `citizen-app` | `den/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (en dev corre en el host) | `citizen-app-data` | solo piloto | — |
 
-Prometheus, Alertmanager y Grafana **no** están en el Compose todavía (M5-06).
+Prometheus, Alertmanager y Grafana están en el Compose con el perfil `observability` (§3.8.1).
 
 ### 3.2 PostgreSQL
 
@@ -281,7 +281,7 @@ Además sirve la API del titular que consume la app ciudadana.
 - Variables: `AUTH_URL`, `AUTH_SECRET`, `KEYCLOAK_URL`, `DEN_PORTAL_WEB_CLIENT_ID`, `DEN_PORTAL_WEB_CLIENT_SECRET`, `DEN_API_URL` (interno, `http://api:4000`), `DEN_WEB_URL`, `DEN_GATEWAY_PUBLIC_URL`, opcional `DEN_AUTH_REFRESH_BEFORE_SECONDS` y `DEN_SESSION_IDLE_SECONDS` (el `ssoSessionIdleTimeout` del realm, 1800 por omisión: la web avisa dos minutos antes de que la sesión termine por inactividad y ofrece seguir, WCAG 2.2.1; si se cambia uno, se cambia el otro). En el piloto, `AUTH_TRUST_HOST=true` (está detrás del proxy) y nada más de `.env` (A-2).
 - Desplegada (`next start` en una dirección que no es de loopback) no arranca mientras `AUTH_SECRET` o `DEN_PORTAL_WEB_CLIENT_SECRET` tenga el valor de `.env.example` (M-25).
 - **La dirección del visitante (M-27).** En cada llamada al API reenvía la última entrada del `X-Forwarded-For` que puso el proxy, y solo para una petición que trae `X-DEN-Proxy-Token` igual a `DEN_WEB_PROXY_TOKEN`: Next.js no le dice a la web quién es su par directo, así que el proxy prueba el salto con esa cabecera, que pone en todo lo que manda a la web, sobrescribiendo lo que haya enviado un cliente (§5.2). Una petición que llegó a la web por otro camino, o una web sin el token (desarrollo), no reenvía nada, y el API ve la dirección de la propia web. El API cree la cabecera porque `web` está en `DEN_TRUST_PROXY` (§4.1).
-- **Idiomas de la interfaz (B-27).** Salen de `country.ui` del archivo del pa�s (por defecto espa�ol, ingl�s como el otro) y quedan fijos al compilar la imagen, porque el bundle del navegador los necesita: `docker build --build-arg DEN_COUNTRY=<c�digo>`. Sin el argumento rigen los valores por defecto. Un servidor cuyo archivo de `DEN_COUNTRY` pida otros idiomas que los de la imagen no arranca y lo dice. Las fechas se muestran en `country.timezone`, que se lee en tiempo de ejecuci�n.
+- **Idiomas de la interfaz (B-27).** Salen de `country.ui` del archivo del país (por defecto español, inglés como el otro) y quedan fijos al compilar la imagen, porque el bundle del navegador los necesita: `docker build --build-arg DEN_COUNTRY=<código>`. Sin el argumento rigen los valores por defecto. Un servidor cuyo archivo de `DEN_COUNTRY` pida otros idiomas que los de la imagen no arranca y lo dice. Las fechas se muestran en `country.timezone`, que se lee en tiempo de ejecución.
 - Corre con `next start` en 3000.
 - **Cabeceras de seguridad (M3-09).** La web pone ella misma la CSP con nonce, HSTS y el resto de las cabeceras (`ARCHITECTURE.md §12`). El proxy de delante no debe quitarlas ni reemplazarlas; tampoco debe agregar otra `Content-Security-Policy`, porque el navegador aplicaría las dos.
   - HSTS va siempre, con `includeSubDomains`: publica la web en un nombre cuyos subdominios también se sirvan por HTTPS.
@@ -615,9 +615,12 @@ En desarrollo OPA y `fluent-bit-transparency` llegan al API del host por `host.d
 
 | Trabajo | Qué corre |
 | :-- | :-- |
-| Lint, typecheck, test, licencias | `pnpm format:check`, `typecheck`, `lint`, `test`, `license:check` |
-| Integración del API | `docker compose up -d --wait postgres etcd apisix tsa step-ca` y `pnpm --filter @den/api test:integration`; luego `test:dist` sobre el build |
+| Lint, typecheck, test, licencias | `pnpm format:check`, `typecheck`, `lint`, `test`, `license:check`, `pnpm audit --audit-level high` (vulnerabilidades conocidas de las dependencias) y `promtool test rules` sobre las alertas (`infra/prometheus/tests`) |
+| Integración del API | `docker compose up -d --wait postgres etcd apisix tsa step-ca opa mock-salud opensearch fluent-bit keycloak`, una comprobación de que la TSA responde a una consulta de sello y `pnpm --filter @den/api test:integration`; luego `test:dist` sobre el build |
 | Políticas OPA | `opa check --strict`, `opa test`, cobertura ≥ 90 % |
+| Respaldo y restauración | `node scripts/restore-test.mjs`: el respaldo y la restauración del piloto de punta a punta (un volumen de datos perdido, una recuperación a un instante, el repositorio cifrado; `OPERATIONS.md §6`) |
+| Render del overlay de despliegue y de los charts de Helm | `docker compose config` de los archivos del piloto como los combina `install.sh` (solos, con el proxy incluido, con las imágenes publicadas; todos los perfiles) y `helm lint` y `helm template` de los dos charts con los valores que producción debe dar (§9) |
+| Extremo a extremo (Playwright) | El stack de Compose con el perfil `observability`; los realms contra el Keycloak en vivo (`tests/infra`, `keycloak.int.test.ts`) y los specs de Playwright `security-headers`, `login` y `accessibility` (axe en cada pantalla). Los demás specs e2e corren en local (`pnpm test:e2e`) |
 
 `.github/workflows/pages.yml` publica las guías HTML en GitHub Pages (https://centre-for-dpi.github.io/data-exchange-admin-portal/) cuando cambian. `scripts/docs-site.sh` arma el sitio: envuelve cada guía en un documento completo con su idioma y agrega la portada `docs/site/index.html`. En la configuración del repositorio, Pages debe estar puesto para desplegar desde GitHub Actions.
 
@@ -715,9 +718,9 @@ Además de `country`, `publicUrl`, `gatewayHost` y `gatewayPublicUrl`:
 - **Publicación.** Con una etiqueta `vX.Y.Z` publica en `ghcr.io/centre-for-dpi/<imagen>:X.Y.Z` (el `appVersion` del chart), con las atestaciones de SBOM y de procedencia de BuildKit. A mano (`workflow_dispatch`) solo construye y escanea, salvo que se marque `publish`.
 - **Acciones fijadas.** Las acciones de terceros están fijadas por commit.
 
-**v0.2.0 (2026-11-19).** Las primeras imágenes `den-*`: `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.2.0`, x86_64, con los seguimientos del piloto P-01 a P-08 (`BACKLOG.md`). Un piloto las usa con `sudo ./install.sh images 0.2.0`, una vez que un dueño de la organización hizo públicos los cuatro paquetes.
+**v0.1.0 (2026-11-17).** Primera publicación, desde el repositorio antes de hacerse público y antes del cambio de nombre a DEN (ADR-0028): `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, privadas. Esas imágenes leen las variables `RID_*` antiguas y no funcionan con este código; entonces no había imágenes `den-*`.
 
-**v0.1.0 (2026-11-17).** Primera publicación, desde el repositorio antes de hacerse público y antes del cambio de nombre a DEN (ADR-0028): `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, privadas. Esas imágenes leen las variables `RID_*` antiguas y no funcionan con este código; todavía no hay imágenes `den-*`. La próxima versión las publica desde este repositorio, y un dueño de la organización hace público cada paquete (configuración del paquete → Change visibility) para que clústeres y pilotos las bajen sin credenciales.
+**v0.2.0 (2026-11-19).** Las primeras imágenes `den-*`, `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.2.0`, construidas desde este repositorio (`install.sh images 0.2.0`, `INSTALL.md §7`). Son privadas hasta que un dueño de la organización haga público cada paquete (configuración del paquete → Change visibility); mientras tanto un servidor no puede bajarlas sin credenciales e `install.sh images` vuelve a compilar. La primera ejecución del flujo publicó un nginx vulnerable en `den-wg-hub` por una capa vieja en la caché; se corrigió borrando la caché y repitiendo, y ahora las etiquetas se construyen sin caché.
 
 Las imágenes del API y de la web son de varias etapas. La de ejecución lleva solo las dependencias de producción (`pnpm deploy --prod`) y los archivos del repositorio que lee el proceso: la configuración del país y, en el API, las políticas de OPA y el realm del seed del piloto. No lleva gestor de paquetes. El contenedor de migraciones corre `node_modules/.bin/prisma migrate deploy`.
 

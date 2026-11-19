@@ -14,6 +14,8 @@ En el piloto todos los comandos se corren en la raíz del clon, con este atajo:
 alias dc='docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.deploy.yml --env-file .env --profile observability'
 ```
 
+Con el proxy incluido (lo que el instalador usa por defecto) agrega `-f infra/compose/docker-compose.edge.yml` después del archivo de despliegue, y `--profile antivirus` cuando ClamAV está activo; sin ellos `dc ps` y `dc up` no ven `edge` ni `clamav`. `docker-compose.images.yml` también se agrega cuando el servidor usa imágenes publicadas (`install.sh images <etiqueta>`). El alias completo para el caso por defecto del instalador está en `INSTALL.md §7`; `sudo ./install.sh status` y `logs` usan la combinación correcta por sí solos.
+
 En desarrollo, el equivalente es `docker compose -f infra/compose/docker-compose.yml --env-file .env --profile observability` (o `pnpm infra:ps` / `pnpm infra:logs`), y el API corre en el host (`pnpm dev`), así que los comandos `dc exec api ...` se reemplazan por llamadas a `localhost`.
 
 Los servicios internos no tienen puertos publicados en el piloto. Para hablar con ellos se usa el contenedor `api`, que tiene `wget` y está en la misma red:

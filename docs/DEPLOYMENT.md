@@ -77,7 +77,7 @@ Each subsection starts with the component's **role** in the deployment and conti
 | `web` | `den/portal-web:deploy` (`apps/web/Dockerfile`) | 3000 | — (runs on the host in dev) | — | pilot only | `GET /api/auth/providers` |
 | `citizen-app` | `den/mock-citizen-app:deploy` (`infra/mock-citizen-app/Dockerfile`) | 3100 | — (runs on the host in dev) | `citizen-app-data` | pilot only | — |
 
-Prometheus, Alertmanager and Grafana are **not** in the Compose file yet (M5-06).
+Prometheus, Alertmanager and Grafana are in the Compose file under the `observability` profile (§3.8.1).
 
 ### 3.2 PostgreSQL
 
@@ -614,9 +614,12 @@ In development OPA and `fluent-bit-transparency` reach the API on the host throu
 
 | Job | What it runs |
 | :-- | :-- |
-| Lint, typecheck, test, licenses | `pnpm format:check`, `typecheck`, `lint`, `test`, `license:check` |
-| API integration | `docker compose up -d --wait postgres etcd apisix tsa step-ca` and `pnpm --filter @den/api test:integration`; then `test:dist` on the build |
+| Lint, typecheck, test, licenses | `pnpm format:check`, `typecheck`, `lint`, `test`, `license:check`, `pnpm audit --audit-level high` (known vulnerabilities of the dependencies) and `promtool test rules` on the alerts (`infra/prometheus/tests`) |
+| API integration | `docker compose up -d --wait postgres etcd apisix tsa step-ca opa mock-salud opensearch fluent-bit keycloak`, a check that the TSA answers a timestamp query, and `pnpm --filter @den/api test:integration`; then `test:dist` on the build |
 | OPA policies | `opa check --strict`, `opa test`, coverage ≥ 90 % |
+| Backup and restore | `node scripts/restore-test.mjs`: the pilot's backup and restore end to end (a lost data volume, a point-in-time recovery, the encrypted repository; `OPERATIONS.md §6`) |
+| Deploy overlay and Helm charts render | `docker compose config` of the pilot's files as `install.sh` combines them (alone, behind the bundled proxy, with the published images; every profile) and `helm lint` and `helm template` of both charts with the values production must give (§9) |
+| End-to-end (Playwright) | The Compose stack with the `observability` profile; the realms against the live Keycloak (`tests/infra`, `keycloak.int.test.ts`) and the Playwright specs `security-headers`, `login` and `accessibility` (axe on every screen). The rest of the e2e specs run locally (`pnpm test:e2e`) |
 
 `.github/workflows/pages.yml` publishes the HTML guides to GitHub Pages (https://centre-for-dpi.github.io/data-exchange-admin-portal/) when they change. `scripts/docs-site.sh` builds the site: it wraps each guide in a full document with its language and adds the landing page `docs/site/index.html`. Pages must be set to deploy from GitHub Actions in the repository's settings.
 
@@ -711,12 +714,12 @@ Besides `country`, `publicUrl`, `gatewayHost` and `gatewayPublicUrl`:
 `.github/workflows/images.yml` builds the chart's four own images: `den-portal-api`, `den-portal-web`, `den-wg-hub` and `den-contract-runner`.
 - **SBOM.** It keeps a CycloneDX SBOM of each one as a run artifact, for 90 days.
 - **Scanning.** It scans them with Trivy (0.76.1, pinned by digest). A high or critical vulnerability with a fix available stops the release. An accepted exception goes in `.trivyignore`, with its reason and expiry date.
-- **Publishing.** With a `vX.Y.Z` tag it publishes to `ghcr.io/centre-for-dpi/<image>:X.Y.Z` (the chart's `appVersion`), with BuildKit's SBOM and provenance attestations. Run by hand (`workflow_dispatch`) it only builds and scans, unless `publish` is checked.
+- **Publishing.** With a `vX.Y.Z` tag it publishes to `ghcr.io/centre-for-dpi/<image>:X.Y.Z` (the chart's `appVersion`), with BuildKit's SBOM and provenance attestations. Run by hand (`workflow_dispatch`) it only builds and scans, unless `publish` is checked. A tag is built **without the layer cache** (a stale cached layer shipped a vulnerable nginx in `den-wg-hub` in v0.2.0); a manual run keeps it.
 - **Pinned actions.** Third-party actions are pinned by commit.
 
-**v0.2.0 (2026-11-19).** The first `den-*` images: `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.2.0`, x86_64, with the pilot follow-ups P-01 to P-08 (`BACKLOG.md`). A pilot uses them with `sudo ./install.sh images 0.2.0`, once an organization owner has made the four packages public.
+**v0.1.0 (2026-11-17).** First release, from the repository before it was published and before the rename to DEN (ADR-0028): `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, private. Those images read the old `RID_*` variables and do not run with this code; there were no `den-*` images then.
 
-**v0.1.0 (2026-11-17).** First release, from the repository before it was published and before the rename to DEN (ADR-0028): `ghcr.io/centre-for-dpi/{rid-portal-api,rid-portal-web,rid-wg-hub,rid-contract-runner}:0.1.0`, private. Those images read the old `RID_*` variables and do not run with this code; there are no `den-*` images yet. The next release publishes them from this repository, and an organization owner makes each package public (the package's settings → Change visibility) so that clusters and pilots pull them without credentials.
+**v0.2.0 (2026-11-19).** The first `den-*` images, `ghcr.io/centre-for-dpi/{den-portal-api,den-portal-web,den-wg-hub,den-contract-runner}:0.2.0`, built from this repository (`install.sh images 0.2.0`, `INSTALL.md §7`). They are private until an organization owner makes each package public (the package's settings → Change visibility); until then a server cannot pull them without credentials and `install.sh images` falls back to building. The first run of the workflow shipped a vulnerable nginx in `den-wg-hub` from a stale cached layer; it was fixed by deleting the cache and rerunning, and tags are now built without the cache.
 
 The API and web images are multi-stage. The runtime stage carries only the production dependencies (`pnpm deploy --prod`) and the repository files that the process reads: the country configuration and, in the API, the OPA policies and the pilot's seed realm. It has no package manager. The migrations container runs `node_modules/.bin/prisma migrate deploy`.
 
