@@ -2,7 +2,7 @@
 
 > English version: [docs/guides/walkthrough.md](../../guides/walkthrough.md)
 
-Esta guía recorre, paso a paso y en orden, todo lo que hacen las personas reales para que una entidad publique una API en la red y otra la consulte: crear las cuentas, dar de alta las entidades, instalar el nodo, publicar, aprobar, pedir acceso y hacer la primera consulta. Sale de un ensayo completo hecho a mano sobre una red de prueba, con cuentas creadas desde cero (2026-11-18).
+Esta guía recorre, paso a paso y en orden, todo lo que hacen las personas reales para que una entidad publique una API en la red y otra la consulte: crear las cuentas, dar de alta las entidades, instalar el nodo, publicar, aprobar, pedir acceso y hacer la primera consulta. Sale de un ensayo completo hecho a mano sobre una red de prueba, con cuentas creadas desde cero (2026-11-18). Para el mismo camino con una captura de cada paso, abre el [manual de usuario](user-manual.md).
 
 Usa estos valores de ejemplo; cámbialos por los tuyos:
 

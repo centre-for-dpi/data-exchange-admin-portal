@@ -41,7 +41,7 @@ export const peopleOf = (language: Lang, suffix = ''): Record<Person['key'], Per
 
 /** A browser context of its own per person, in the run's language. */
 export async function newPersonPage(browser: Browser, language: Lang): Promise<Page> {
-  const context = await browser.newContext({ locale: language === 'en' ? 'en-US' : 'es-CO' });
+  const context = await browser.newContext({ locale: language === 'en' ? 'en-US' : 'es' });
   return context.newPage();
 }
 

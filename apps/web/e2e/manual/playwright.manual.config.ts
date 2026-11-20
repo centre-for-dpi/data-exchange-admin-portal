@@ -33,7 +33,7 @@ export default defineConfig({
       timeout: 1_800_000,
       use: {
         ...desktop,
-        locale: process.env.MANUAL_LANG === 'en' ? 'en-US' : 'es-CO',
+        locale: process.env.MANUAL_LANG === 'en' ? 'en-US' : 'es',
         // Native widgets (the file picker) follow the browser's own language, not the locale.
         launchOptions: { args: [`--lang=${process.env.MANUAL_LANG === 'en' ? 'en-US' : 'es'}`] },
       },

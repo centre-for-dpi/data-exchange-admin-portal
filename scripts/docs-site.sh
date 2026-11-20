@@ -17,6 +17,14 @@ wrap() { # wrap <lang> <source> <target>
 
 for f in docs/guides/*.html; do wrap en "$f" "$out/guides/$(basename "$f")"; done
 for f in docs/es/guides/*.html; do wrap es "$f" "$out/es/guides/$(basename "$f")"; done
+# Screenshots of the user manual (its manifest is only for the generator).
+for dir in docs/guides/img docs/es/guides/img; do
+  [ -d "$dir" ] || continue
+  target="$out/${dir#docs/}"
+  mkdir -p "$target"
+  cp -R "$dir/." "$target/"
+  find "$target" -name manifest.json -delete
+done
 cp -R docs/site/. "$out/"
 touch "$out/.nojekyll"
 

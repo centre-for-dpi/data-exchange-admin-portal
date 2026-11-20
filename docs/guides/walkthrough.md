@@ -2,7 +2,7 @@
 
 > Versión en español: [docs/es/guides/walkthrough.md](../es/guides/walkthrough.md)
 
-This guide goes, step by step and in order, through everything real people do so that one entity publishes an API on the network and another one consults it: creating the accounts, onboarding the entities, installing the node, publishing, approving, requesting access and making the first lookup. It comes from a complete rehearsal done by hand on a test network, with accounts created from scratch (2026-11-18). The portal's screens are in Spanish by default; their names are given in English here (switch the language at the top of the portal).
+This guide goes, step by step and in order, through everything real people do so that one entity publishes an API on the network and another one consults it: creating the accounts, onboarding the entities, installing the node, publishing, approving, requesting access and making the first lookup. It comes from a complete rehearsal done by hand on a test network, with accounts created from scratch (2026-11-18). The portal's screens are in Spanish by default; their names are given in English here (switch the language at the top of the portal). For the same path with a screenshot of every step, open the [user manual](user-manual.md).
 
 Example values; replace them with yours:
 

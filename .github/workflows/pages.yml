@@ -7,6 +7,8 @@ on:
     paths:
       - docs/guides/*.html
       - docs/es/guides/*.html
+      - docs/guides/img/**
+      - docs/es/guides/img/**
       - docs/site/**
       - scripts/docs-site.sh
       - .github/workflows/pages.yml
