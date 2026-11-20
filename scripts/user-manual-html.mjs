@@ -346,15 +346,13 @@ export function renderManual(md, manifest, lang) {
   return `${journeyHtml(sections, t)}\n\n${sections.map((s) => sectionHtml(s, t)).join('\n\n')}`;
 }
 
-/** Writes docs/<es/>guides/user-manual.html for a language. */
-export function build(lang) {
+const readManifest = (file, lang) =>
+  existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { lang, shots: {} };
+
+/** The whole page (an HTML fragment, like the other guides) from the Markdown and the manifest. */
+export function renderPage(md, manifest, lang) {
   const t = TEXT[lang];
   const dir = resolve(root, t.dir);
-  const md = readFileSync(resolve(dir, 'user-manual.md'), 'utf8');
-  const manifestFile = resolve(dir, 'img/user-manual/manifest.json');
-  const manifest = existsSync(manifestFile)
-    ? JSON.parse(readFileSync(manifestFile, 'utf8'))
-    : { lang, shots: {} };
   const { h1, lede, sections } = parseManual(md, manifest, lang);
   const shell = readFileSync(resolve(dir, 'entities.html'), 'utf8');
   const head = shell
@@ -445,15 +443,34 @@ ${script}
 <script>
 ${MANUAL_JS}
 </script>`;
-  const out = resolve(dir, 'user-manual.html');
-  writeFileSync(out, html.endsWith('\n') ? html : `${html}\n`);
-  return { out, sections: sections.length, bytes: Buffer.byteLength(html) };
+  return { html: html.endsWith('\n') ? html : `${html}\n`, sections: sections.length };
+}
+
+/** Writes an HTML file; returns what the CLI prints. */
+function write(out, page) {
+  writeFileSync(out, page.html);
+  return `${out}: ${page.sections} sections, ${Buffer.byteLength(page.html)} bytes`;
+}
+
+/** Writes docs/<es/>guides/user-manual.html for a language. */
+export function build(lang) {
+  const dir = resolve(root, TEXT[lang].dir);
+  const md = readFileSync(resolve(dir, 'user-manual.md'), 'utf8');
+  const manifest = readManifest(resolve(dir, 'img/user-manual/manifest.json'), lang);
+  return write(resolve(dir, 'user-manual.html'), renderPage(md, manifest, lang));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const langs = process.argv.slice(2).length ? process.argv.slice(2) : ['es', 'en'];
-  for (const lang of langs) {
-    const r = build(lang);
-    console.log(`${r.out}: ${r.sections} sections, ${r.bytes} bytes`);
+  const argv = process.argv.slice(2);
+  const option = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined);
+  if (option('--md')) {
+    // Any Markdown and manifest (the page's own tests):
+    //   --md <file> --manifest <file> --lang es|en --out <file>
+    const lang = option('--lang') ?? 'es';
+    const md = readFileSync(option('--md'), 'utf8');
+    const manifest = readManifest(option('--manifest') ?? '', lang);
+    console.log(write(option('--out'), renderPage(md, manifest, lang)));
+  } else {
+    for (const lang of argv.length ? argv : ['es', 'en']) console.log(build(lang));
   }
 }
