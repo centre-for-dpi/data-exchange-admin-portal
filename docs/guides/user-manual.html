@@ -1053,6 +1053,8 @@ cat &lt;CLIENT_ID&gt;.csr</code></pre></div>
 <figcaption>Active: the gateway knows the application, its certificate and what it may consult.</figcaption>
 </figure>
 
+<aside class="callout info tip"><b>Tip</b><p>To build the lookup into your system, open the application under <b>My applications</b>: its <b>Integration guide</b> has the full program in <b>curl, Python, Node.js, Java and C#</b>, with the application's Client ID already in it. Each one gets the token with the certificate and makes the lookup with the purpose and the official; it reads the secret from the <code>DEN_CLIENT_SECRET</code> variable.</p></aside>
+<p>For a first test from the terminal:</p>
 <div class="tabs" data-tabs>
 <div role="tablist"><button role="tab" type="button" id="tabs-1-tab-0" aria-controls="tabs-1-panel-0" aria-selected="true" tabindex="0" data-label="Script (Linux, macOS or Git Bash)">Script (Linux, macOS or Git Bash)</button><button role="tab" type="button" id="tabs-1-tab-1" aria-controls="tabs-1-panel-1" aria-selected="false" tabindex="-1" data-label="curl (Linux or macOS)">curl (Linux or macOS)</button></div>
 <div role="tabpanel" id="tabs-1-panel-0" aria-labelledby="tabs-1-tab-0"><div class="code"><button class="copy" type="button">Copy</button><pre tabindex="0"><code>./entity-check.sh check portal.example.org gateway.example.org        # reaches the network and keeps its root

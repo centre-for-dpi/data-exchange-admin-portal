@@ -436,6 +436,10 @@ Revisa quién pide, con qué aplicación, para qué, con qué base legal y qué 
 
 ![Solicitud de acceso en estado Activa](img/user-manual/31-request-active.jpg "Activa: el gateway ya conoce la aplicación, su certificado y lo que puede consultar.")
 
+> **Consejo:** para integrar la consulta en tu sistema, abre la aplicación en **Mis aplicaciones**: su **Guía de integración** trae el programa completo en **curl, Python, Node.js, Java y C#**, ya con el Client ID de la aplicación. Cada uno pide el token con el certificado y hace la consulta con la finalidad y el funcionario; el secreto lo lee de la variable `DEN_CLIENT_SECRET`.
+
+Para una primera prueba desde la terminal:
+
 ```bash tab="Script (Linux, macOS o Git Bash)"
 ./entity-check.sh check portal.example.org gateway.example.org        # llega a la red y guarda su raíz
 ./entity-check.sh call portal.example.org gateway.example.org <CLIENT_ID> \

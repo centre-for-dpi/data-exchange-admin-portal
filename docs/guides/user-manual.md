@@ -436,6 +436,10 @@ Check who asks, with which application, what for, on what legal basis and which 
 
 ![Access request Active](img/user-manual/31-request-active.jpg "Active: the gateway knows the application, its certificate and what it may consult.")
 
+> **Tip:** to build the lookup into your system, open the application under **My applications**: its **Integration guide** has the full program in **curl, Python, Node.js, Java and C#**, with the application's Client ID already in it. Each one gets the token with the certificate and makes the lookup with the purpose and the official; it reads the secret from the `DEN_CLIENT_SECRET` variable.
+
+For a first test from the terminal:
+
 ```bash tab="Script (Linux, macOS or Git Bash)"
 ./entity-check.sh check portal.example.org gateway.example.org        # reaches the network and keeps its root
 ./entity-check.sh call portal.example.org gateway.example.org <CLIENT_ID> \
