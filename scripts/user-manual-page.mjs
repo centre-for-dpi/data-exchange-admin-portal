@@ -105,7 +105,7 @@ ol.steps > li:focus { outline: 2px solid var(--spot); outline-offset: 4px; }
 .shot-dialog-body img { display: block; max-width: 100%; height: auto; border-radius: 10px; }
 
 /* Tabs per operating system. */
-.tabs { display: grid; gap: 0; }
+.tabs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 .tabs [role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; }
 .tabs [role="tab"] { padding: 6px 12px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--bg); color: var(--muted); font: inherit; font-size: .88rem; cursor: pointer; }
 .tabs [role="tab"][aria-selected="true"] { background: var(--code-bg); color: var(--ink); font-weight: 600; }
@@ -278,19 +278,21 @@ export const MANUAL_JS = String.raw`
   if (savedTab) selectLabel(savedTab);
 
   // Search: keeps the sections (and table rows) that mention the words.
+  // Accent-insensitive: "atencion" finds "Atención".
+  function fold(s) { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
   var search = document.getElementById('manual-search');
   if (search) search.addEventListener('input', function () {
-    var q = search.value.trim().toLowerCase();
+    var q = fold(search.value.trim());
     var shown = 0;
     sections.forEach(function (s) {
       var rows = Array.prototype.slice.call(s.querySelectorAll('tbody tr'));
       rows.forEach(function (r) { r.hidden = false; });
       if (!q) { s.hidden = false; return; }
-      var match = s.textContent.toLowerCase().indexOf(q) >= 0;
+      var match = fold(s.textContent).indexOf(q) >= 0;
       s.hidden = !match;
       if (match) {
         shown += 1;
-        var hits = rows.filter(function (r) { return r.textContent.toLowerCase().indexOf(q) >= 0; });
+        var hits = rows.filter(function (r) { return fold(r.textContent).indexOf(q) >= 0; });
         if (hits.length) rows.forEach(function (r) { r.hidden = hits.indexOf(r) < 0; });
       }
     });

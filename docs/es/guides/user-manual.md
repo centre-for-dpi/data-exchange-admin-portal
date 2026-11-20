@@ -57,7 +57,7 @@ Una persona puede tener varios papeles en su entidad. Lo que el portal nunca per
 
 Todas las personas, del operador o de una entidad, crean su cuenta igual:
 
-1. En el formulario de registro, escribe tu **correo** institucional.
+1. En el formulario de registro, elige un **usuario** y escribe tu **correo** institucional.
 2. Escribe tu **nombre y apellido** tal como aparecerán en el portal.
 3. Pulsa **Registrarse**, abre el correo de verificación y define tu contraseña.
 
@@ -218,13 +218,13 @@ Los comandos de la versión vigente, con su huella y la dirección del portal ya
 
 ![Kit para instalar: versión, huella y comandos con el botón Copiar](img/user-manual/13-node-kit.jpg "Compara la huella con la que publica el operador por su propio canal antes de abrir el paquete.")
 
-Se ven así (versión 0.2.0):
+Tienen esta forma (la huella y el enlace son los de la versión vigente):
 
 ```bash
 curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
-curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz.sha256
-sha256sum -c den-node-kit-0.2.0.tar.gz.sha256      # debe decir: OK
-tar -xzf den-node-kit-0.2.0.tar.gz && cd den-node-kit-0.2.0
+echo "<huella SHA-256>  den-node-kit-0.2.0.tar.gz" | sha256sum -c -     # debe decir: OK
+tar -xzf den-node-kit-0.2.0.tar.gz
+cd den-node-kit-0.2.0
 sudo DEN_LANG=es ./install.sh
 ```
 
@@ -349,7 +349,7 @@ En **Mis aplicaciones → Crear aplicación**:
 1. El **nombre de la aplicación**.
 2. **Para qué la usará** tu entidad.
 3. El **entorno** (`Producción` para consultas reales).
-4. Pulsa **Crear aplicación** (con el correo del contacto técnico ya escrito).
+4. Escribe el **correo del contacto técnico** y pulsa **Crear aplicación**.
 
 ![Formulario Crear aplicación con nombre, finalidad, entorno y el botón Crear aplicación](img/user-manual/21-app-create.jpg "La aplicación es quien hace las llamadas: tendrá su propio certificado.")
 

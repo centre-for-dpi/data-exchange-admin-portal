@@ -331,7 +331,7 @@ ${items}
 
 function sectionHtml(s, t) {
   const done = s.roles.length
-    ? `<label class="done"><input type="checkbox" data-done="${s.id}"> ${t.done}</label>`
+    ? `<label class="done"><input type="checkbox" data-done="${s.id}" aria-label="${attr(`${t.done}: ${stripTags(inline(s.title))}`)}"> ${t.done}</label>`
     : '';
   return `<section id="${s.id}" class="manual-section" data-roles="${s.roles.join(' ')}">
 <div class="section-head">
@@ -345,7 +345,9 @@ ${s.html}
 /** The manual's main content: the journey map and every section. */
 export function renderManual(md, manifest, lang) {
   const { t, sections } = parseManual(md, manifest, lang);
-  return `${journeyHtml(sections, t)}\n\n${sections.map((s) => sectionHtml(s, t)).join('\n\n')}`;
+  const html = `${journeyHtml(sections, t)}\n\n${sections.map((s) => sectionHtml(s, t)).join('\n\n')}`;
+  // A long command scrolls inside its block: keyboard users must be able to reach it.
+  return html.replaceAll('<pre><code>', '<pre tabindex="0"><code>');
 }
 
 const readManifest = (file, lang) =>

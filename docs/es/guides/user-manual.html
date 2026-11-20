@@ -382,7 +382,7 @@ ol.steps > li:focus { outline: 2px solid var(--spot); outline-offset: 4px; }
 .shot-dialog-body img { display: block; max-width: 100%; height: auto; border-radius: 10px; }
 
 /* Tabs per operating system. */
-.tabs { display: grid; gap: 0; }
+.tabs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 .tabs [role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; }
 .tabs [role="tab"] { padding: 6px 12px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--bg); color: var(--muted); font: inherit; font-size: .88rem; cursor: pointer; }
 .tabs [role="tab"][aria-selected="true"] { background: var(--code-bg); color: var(--ink); font-weight: 600; }
@@ -566,26 +566,26 @@ ol.steps > li:focus { outline: 2px solid var(--spot); outline-offset: 4px; }
 <section id="1-el-equipo-del-operador" class="manual-section" data-roles="operator server">
 <div class="section-head">
 <h2><span class="num">1</span>El equipo del operador <button class="copy-link" type="button" data-copy-link="#1-el-equipo-del-operador" aria-label="Copiar el enlace a 1. El equipo del operador">#</button></h2>
-<span class="role-chips"><span class="role-chip role-operator">Operador</span><span class="role-chip role-server">Servidor del portal</span></span><label class="done"><input type="checkbox" data-done="1-el-equipo-del-operador"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-operator">Operador</span><span class="role-chip role-server">Servidor del portal</span></span><label class="done"><input type="checkbox" data-done="1-el-equipo-del-operador" aria-label="Hecho: 1. El equipo del operador"> Hecho</label>
 </div>
 <p><b>Quién:</b> cada persona del operador y quien administra el servidor del portal. <b>Necesitas:</b> el correo institucional de cada persona.</p>
 <h3 id="1-1-crear-la-cuenta">1.1 Crear la cuenta <button class="copy-link" type="button" data-copy-link="#1-1-crear-la-cuenta" aria-label="Copiar el enlace a 1.1 Crear la cuenta">#</button></h3>
 <p>Todas las personas, del operador o de una entidad, crean su cuenta igual:</p>
 <ol class="steps">
-<li id="1-el-equipo-del-operador-1-1"><span>En el formulario de registro, escribe tu <b>correo</b> institucional.</span></li>
+<li id="1-el-equipo-del-operador-1-1"><span>En el formulario de registro, elige un <b>usuario</b> y escribe tu <b>correo</b> institucional.</span></li>
 <li id="1-el-equipo-del-operador-1-2"><span>Escribe tu <b>nombre y apellido</b> tal como aparecerán en el portal.</span></li>
 <li id="1-el-equipo-del-operador-1-3"><span>Pulsa <b>Registrarse</b>, abre el correo de verificación y define tu contraseña.</span></li>
 </ol>
 <figure class="shot" id="shot-01-register">
 <div class="shot-frame">
-<button class="shot-open" type="button" aria-label="Ampliar la captura: Formulario de registro de Keycloak con el correo, el nombre y el botón Registrarse"><img src="img/user-manual/01-register.jpg" alt="Formulario de registro de Keycloak con el correo, el nombre y el botón Registrarse" width="592" height="687" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#1-el-equipo-del-operador-1-1" style="left:12.16%;top:41.5%;width:75.68%;height:5.24%" aria-label="1. En el formulario de registro, escribe tu correo institucional."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#1-el-equipo-del-operador-1-2" style="left:12.16%;top:54.31%;width:75.68%;height:5.24%" aria-label="2. Escribe tu nombre y apellido tal como aparecerán en el portal."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#1-el-equipo-del-operador-1-3" style="left:12.16%;top:75.85%;width:75.68%;height:5.24%" aria-label="3. Pulsa Registrarse , abre el correo de verificación y define tu contraseña."><span>3</span></button>
+<button class="shot-open" type="button" aria-label="Ampliar la captura: Formulario de registro de Keycloak con el correo, el nombre y el botón Registrarse"><img src="img/user-manual/01-register.jpg" alt="Formulario de registro de Keycloak con el correo, el nombre y el botón Registrarse" width="592" height="687" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#1-el-equipo-del-operador-1-1" style="left:12.16%;top:41.5%;width:75.68%;height:5.24%" aria-label="1. En el formulario de registro, elige un usuario y escribe tu correo institucional."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#1-el-equipo-del-operador-1-2" style="left:12.16%;top:54.31%;width:75.68%;height:5.24%" aria-label="2. Escribe tu nombre y apellido tal como aparecerán en el portal."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#1-el-equipo-del-operador-1-3" style="left:12.16%;top:75.85%;width:75.68%;height:5.24%" aria-label="3. Pulsa Registrarse , abre el correo de verificación y define tu contraseña."><span>3</span></button>
 </div>
 <figcaption>El registro: el portal te lleva a este formulario desde Iniciar sesión → Registrarse.</figcaption>
 </figure>
 <p>Al entrar por primera vez, el portal dice que todavía no tienes roles: es lo esperado. Entrar una vez es lo que crea tu cuenta en el portal.</p>
 <h3 id="1-2-el-primer-rol-de-plataforma-desde-el-servidor">1.2 El primer rol de plataforma, desde el servidor <button class="copy-link" type="button" data-copy-link="#1-2-el-primer-rol-de-plataforma-desde-el-servidor" aria-label="Copiar el enlace a 1.2 El primer rol de plataforma, desde el servidor">#</button></h3>
 <p>El primer <code>platform_admin</code> (y la recuperación, si algún día no queda ninguno) se da en el servidor del portal:</p>
-<div class="code"><button class="copy" type="button">Copiar</button><pre><code>sudo ./install.sh platform-role grant &lt;correo&gt; platform_admin --reason "Equipo técnico"
+<div class="code"><button class="copy" type="button">Copiar</button><pre tabindex="0"><code>sudo ./install.sh platform-role grant &lt;correo&gt; platform_admin --reason "Equipo técnico"
 sudo ./install.sh platform-role list</code></pre></div>
 <h3 id="1-3-los-demas-roles-desde-la-consola">1.3 Los demás roles, desde la consola <button class="copy-link" type="button" data-copy-link="#1-3-los-demas-roles-desde-la-consola" aria-label="Copiar el enlace a 1.3 Los demás roles, desde la consola">#</button></h3>
 <p>Con su segundo factor registrado, el <code>platform_admin</code> da los demás roles en <b>Consola del operador → Roles de plataforma y cuentas → Dar un rol</b>:</p>
@@ -604,7 +604,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <p>La persona vuelve a entrar: Keycloak le pide registrar la app autenticadora (como en el paso 4.1) y desde ahí ve la <b>Consola del operador</b>.</p>
 <h3 id="1-4-desactivar-las-cuentas-de-demostracion">1.4 Desactivar las cuentas de demostración <button class="copy-link" type="button" data-copy-link="#1-4-desactivar-las-cuentas-de-demostracion" aria-label="Copiar el enlace a 1.4 Desactivar las cuentas de demostración">#</button></h3>
 <p>Cuando el equipo del operador ya tiene sus roles, quien administra el servidor desactiva las cuentas de demostración del piloto:</p>
-<div class="code"><button class="copy" type="button">Copiar</button><pre><code>sudo ./install.sh demo-users disable --reason "El equipo del operador ya tiene sus roles"</code></pre></div>
+<div class="code"><button class="copy" type="button">Copiar</button><pre tabindex="0"><code>sudo ./install.sh demo-users disable --reason "El equipo del operador ya tiene sus roles"</code></pre></div>
 <aside class="callout warn"><b>Atención</b><p>No se puede deshacer desde el instalador. El comando se niega si no queda un <code>platform_admin</code> propio activo.</p></aside>
 
 </section>
@@ -612,7 +612,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <section id="2-la-entidad-proveedora-pide-su-alta" class="manual-section" data-roles="provider">
 <div class="section-head">
 <h2><span class="num">2</span>La entidad proveedora pide su alta <button class="copy-link" type="button" data-copy-link="#2-la-entidad-proveedora-pide-su-alta" aria-label="Copiar el enlace a 2. La entidad proveedora pide su alta">#</button></h2>
-<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="2-la-entidad-proveedora-pide-su-alta"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="2-la-entidad-proveedora-pide-su-alta" aria-label="Hecho: 2. La entidad proveedora pide su alta"> Hecho</label>
 </div>
 <p><b>Quién:</b> la persona que será administradora de la entidad (Rosa). <b>Necesitas:</b> los datos de la entidad, el nombre y correo exacto de sus dos responsables, y el documento de designación en PDF.</p>
 <h3 id="2-1-abrir-el-alta-de-entidades">2.1 Abrir el alta de entidades <button class="copy-link" type="button" data-copy-link="#2-1-abrir-el-alta-de-entidades" aria-label="Copiar el enlace a 2.1 Abrir el alta de entidades">#</button></h3>
@@ -663,7 +663,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <section id="3-el-operador-aprueba-el-alta" class="manual-section" data-roles="operator">
 <div class="section-head">
 <h2><span class="num">3</span>El operador aprueba el alta <button class="copy-link" type="button" data-copy-link="#3-el-operador-aprueba-el-alta" aria-label="Copiar el enlace a 3. El operador aprueba el alta">#</button></h2>
-<span class="role-chips"><span class="role-chip role-operator">Operador</span></span><label class="done"><input type="checkbox" data-done="3-el-operador-aprueba-el-alta"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-operator">Operador</span></span><label class="done"><input type="checkbox" data-done="3-el-operador-aprueba-el-alta" aria-label="Hecho: 3. El operador aprueba el alta"> Hecho</label>
 </div>
 <p><b>Quién:</b> una persona con rol de revisión o de administración de la plataforma, que no sea quien pidió el alta (Ana).</p>
 <ol class="steps">
@@ -691,7 +691,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <section id="4-los-responsables-entran-a-la-entidad" class="manual-section" data-roles="provider">
 <div class="section-head">
 <h2><span class="num">4</span>Los responsables entran a la entidad <button class="copy-link" type="button" data-copy-link="#4-los-responsables-entran-a-la-entidad" aria-label="Copiar el enlace a 4. Los responsables entran a la entidad">#</button></h2>
-<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="4-los-responsables-entran-a-la-entidad"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="4-los-responsables-entran-a-la-entidad" aria-label="Hecho: 4. Los responsables entran a la entidad"> Hecho</label>
 </div>
 <p><b>Quién:</b> la administradora (Rosa), el responsable de datos (Diego) y el responsable técnico (Tomás).</p>
 <h3 id="4-1-la-administradora-registra-su-segundo-factor">4.1 La administradora registra su segundo factor <button class="copy-link" type="button" data-copy-link="#4-1-la-administradora-registra-su-segundo-factor" aria-label="Copiar el enlace a 4.1 La administradora registra su segundo factor">#</button></h3>
@@ -727,7 +727,7 @@ sudo ./install.sh platform-role list</code></pre></div>
 <section id="5-el-nodo-de-la-entidad" class="manual-section" data-roles="provider">
 <div class="section-head">
 <h2><span class="num">5</span>El nodo de la entidad <button class="copy-link" type="button" data-copy-link="#5-el-nodo-de-la-entidad" aria-label="Copiar el enlace a 5. El nodo de la entidad">#</button></h2>
-<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="5-el-nodo-de-la-entidad"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="5-el-nodo-de-la-entidad" aria-label="Hecho: 5. El nodo de la entidad"> Hecho</label>
 </div>
 <p>El nodo es el canal seguro entre el gateway de la red y la entidad: abre un túnel <b>hacia afuera</b>, sin puertos de entrada, y solo acepta al gateway. Toda entidad proveedora entra por su nodo.</p>
 <p><b>Quién:</b> la administradora registra el nodo; infraestructura lo instala. <b>Necesitas:</b> un servidor Ubuntu Server 22.04 o 24.04 (amd64 o arm64) con salida a internet por UDP 51820 y TCP 443, y la hora sincronizada.</p>
@@ -772,11 +772,11 @@ sudo ./install.sh platform-role list</code></pre></div>
 </div>
 <figcaption>Compara la huella con la que publica el operador por su propio canal antes de abrir el paquete.</figcaption>
 </figure>
-<p>Se ven así (versión 0.2.0):</p>
-<div class="code"><button class="copy" type="button">Copiar</button><pre><code>curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
-curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz.sha256
-sha256sum -c den-node-kit-0.2.0.tar.gz.sha256      # debe decir: OK
-tar -xzf den-node-kit-0.2.0.tar.gz &amp;&amp; cd den-node-kit-0.2.0
+<p>Tienen esta forma (la huella y el enlace son los de la versión vigente):</p>
+<div class="code"><button class="copy" type="button">Copiar</button><pre tabindex="0"><code>curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
+echo "&lt;huella SHA-256&gt;  den-node-kit-0.2.0.tar.gz" | sha256sum -c -     # debe decir: OK
+tar -xzf den-node-kit-0.2.0.tar.gz
+cd den-node-kit-0.2.0
 sudo DEN_LANG=es ./install.sh</code></pre></div>
 <div class="tablewrap"><table class="t"><thead><tr><th>Pregunta del instalador</th><th>Respuesta</th></tr></thead><tbody>
 <tr><td>Modo</td><td class="wrap"><code>canal</code> si la entidad ya tiene su API; <code>completo</code> para APIs instantáneas sobre su base de datos</td></tr>
@@ -787,7 +787,7 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <p>El instalador revisa el sistema, instala Docker si falta y termina con <b>"El nodo está en línea"</b>.</p>
 <h3 id="5-3-conectar-la-api-al-nodo">5.3 Conectar la API al nodo <button class="copy-link" type="button" data-copy-link="#5-3-conectar-la-api-al-nodo" aria-label="Copiar el enlace a 5.3 Conectar la API al nodo">#</button></h3>
 <p>Si la entidad ya tiene su API (modo canal):</p>
-<div class="code"><button class="copy" type="button">Copiar</button><pre><code>sudo /opt/den-node/install.sh service</code></pre></div>
+<div class="code"><button class="copy" type="button">Copiar</button><pre tabindex="0"><code>sudo /opt/den-node/install.sh service</code></pre></div>
 <div class="tablewrap"><table class="t"><thead><tr><th>Pregunta</th><th>Ejemplo</th></tr></thead><tbody>
 <tr><td>Tipo</td><td class="wrap"><code>proxy</code></td></tr>
 <tr><td>Nombre del servicio</td><td class="wrap"><code>afiliacion</code></td></tr>
@@ -814,7 +814,7 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <section id="6-el-responsable-tecnico-publica-la-api" class="manual-section" data-roles="provider">
 <div class="section-head">
 <h2><span class="num">6</span>El responsable técnico publica la API <button class="copy-link" type="button" data-copy-link="#6-el-responsable-tecnico-publica-la-api" aria-label="Copiar el enlace a 6. El responsable técnico publica la API">#</button></h2>
-<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="6-el-responsable-tecnico-publica-la-api"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="6-el-responsable-tecnico-publica-la-api" aria-label="Hecho: 6. El responsable técnico publica la API"> Hecho</label>
 </div>
 <p><b>Quién:</b> el responsable técnico (Tomás). <b>Necesitas:</b> el archivo OpenAPI que se configuró en el nodo, la norma que permite compartir los datos y la lista de datos que expone la API.</p>
 <h3 id="6-1-registrar-la-api">6.1 Registrar la API <button class="copy-link" type="button" data-copy-link="#6-1-registrar-la-api" aria-label="Copiar el enlace a 6.1 Registrar la API">#</button></h3>
@@ -884,7 +884,7 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <section id="7-el-operador-aprueba-la-api" class="manual-section" data-roles="operator">
 <div class="section-head">
 <h2><span class="num">7</span>El operador aprueba la API <button class="copy-link" type="button" data-copy-link="#7-el-operador-aprueba-la-api" aria-label="Copiar el enlace a 7. El operador aprueba la API">#</button></h2>
-<span class="role-chips"><span class="role-chip role-operator">Operador</span></span><label class="done"><input type="checkbox" data-done="7-el-operador-aprueba-la-api"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-operator">Operador</span></span><label class="done"><input type="checkbox" data-done="7-el-operador-aprueba-la-api" aria-label="Hecho: 7. El operador aprueba la API"> Hecho</label>
 </div>
 <p><b>Quién:</b> una persona del operador con rol de revisión (Ana).</p>
 <p>En <b>Consola del operador → Versiones en revisión</b>, abre la versión y revisa el contrato, los datos que expone y las finalidades:</p>
@@ -904,7 +904,7 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <section id="8-la-entidad-consumidora" class="manual-section" data-roles="consumer">
 <div class="section-head">
 <h2><span class="num">8</span>La entidad consumidora <button class="copy-link" type="button" data-copy-link="#8-la-entidad-consumidora" aria-label="Copiar el enlace a 8. La entidad consumidora">#</button></h2>
-<span class="role-chips"><span class="role-chip role-consumer">Entidad consumidora</span></span><label class="done"><input type="checkbox" data-done="8-la-entidad-consumidora"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-consumer">Entidad consumidora</span></span><label class="done"><input type="checkbox" data-done="8-la-entidad-consumidora" aria-label="Hecho: 8. La entidad consumidora"> Hecho</label>
 </div>
 <p><b>Quién:</b> la entidad que va a consultar (Wanda, del <i>Ministerio de Bienestar de Wakanda</i>). <b>Necesitas:</b> el servidor donde correrá la aplicación, con OpenSSL.</p>
 <h3 id="8-1-alta">8.1 Alta <button class="copy-link" type="button" data-copy-link="#8-1-alta" aria-label="Copiar el enlace a 8.1 Alta">#</button></h3>
@@ -916,11 +916,11 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <li id="8-la-entidad-consumidora-1-1"><span>El <b>nombre de la aplicación</b>.</span></li>
 <li id="8-la-entidad-consumidora-1-2"><span><b>Para qué la usará</b> tu entidad.</span></li>
 <li id="8-la-entidad-consumidora-1-3"><span>El <b>entorno</b> (<code>Producción</code> para consultas reales).</span></li>
-<li id="8-la-entidad-consumidora-1-4"><span>Pulsa <b>Crear aplicación</b> (con el correo del contacto técnico ya escrito).</span></li>
+<li id="8-la-entidad-consumidora-1-4"><span>Escribe el <b>correo del contacto técnico</b> y pulsa <b>Crear aplicación</b>.</span></li>
 </ol>
 <figure class="shot" id="shot-21-app-create">
 <div class="shot-frame">
-<button class="shot-open" type="button" aria-label="Ampliar la captura: Formulario Crear aplicación con nombre, finalidad, entorno y el botón Crear aplicación"><img src="img/user-manual/21-app-create.jpg" alt="Formulario Crear aplicación con nombre, finalidad, entorno y el botón Crear aplicación" width="767" height="578" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-la-entidad-consumidora-1-1" style="left:6.39%;top:26.3%;width:91.53%;height:7.27%" aria-label="1. El nombre de la aplicación ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#8-la-entidad-consumidora-1-2" style="left:6.39%;top:41.52%;width:91.53%;height:14.19%" aria-label="2. Para qué la usará tu entidad."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#8-la-entidad-consumidora-1-3" style="left:6.39%;top:63.67%;width:91.53%;height:7.27%" aria-label="3. El entorno ( Producción para consultas reales)."><span>3</span></button><button class="hotspot" type="button" data-n="4" data-target="#8-la-entidad-consumidora-1-4" style="left:6.39%;top:89.62%;width:18.6%;height:7.61%" aria-label="4. Pulsa Crear aplicación (con el correo del contacto técnico ya escrito)."><span>4</span></button>
+<button class="shot-open" type="button" aria-label="Ampliar la captura: Formulario Crear aplicación con nombre, finalidad, entorno y el botón Crear aplicación"><img src="img/user-manual/21-app-create.jpg" alt="Formulario Crear aplicación con nombre, finalidad, entorno y el botón Crear aplicación" width="767" height="578" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-la-entidad-consumidora-1-1" style="left:6.39%;top:26.3%;width:91.53%;height:7.27%" aria-label="1. El nombre de la aplicación ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#8-la-entidad-consumidora-1-2" style="left:6.39%;top:41.52%;width:91.53%;height:14.19%" aria-label="2. Para qué la usará tu entidad."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#8-la-entidad-consumidora-1-3" style="left:6.39%;top:63.67%;width:91.53%;height:7.27%" aria-label="3. El entorno ( Producción para consultas reales)."><span>3</span></button><button class="hotspot" type="button" data-n="4" data-target="#8-la-entidad-consumidora-1-4" style="left:6.39%;top:89.62%;width:18.6%;height:7.61%" aria-label="4. Escribe el correo del contacto técnico y pulsa Crear aplicación ."><span>4</span></button>
 </div>
 <figcaption>La aplicación es quien hace las llamadas: tendrá su propio certificado.</figcaption>
 </figure>
@@ -949,7 +949,7 @@ sudo DEN_LANG=es ./install.sh</code></pre></div>
 <figcaption>Las pestañas traen comandos para Linux o macOS, Git Bash y PowerShell.</figcaption>
 </figure>
 <p>Otra opción es el script <code>entity-check.sh</code>, que se descarga desde esa misma página:</p>
-<div class="code"><button class="copy" type="button">Copiar</button><pre><code>bash entity-check.sh csr &lt;CLIENT_ID&gt;   # crea &lt;CLIENT_ID&gt;.key (solo legible por su dueño) y &lt;CLIENT_ID&gt;.csr
+<div class="code"><button class="copy" type="button">Copiar</button><pre tabindex="0"><code>bash entity-check.sh csr &lt;CLIENT_ID&gt;   # crea &lt;CLIENT_ID&gt;.key (solo legible por su dueño) y &lt;CLIENT_ID&gt;.csr
 cat &lt;CLIENT_ID&gt;.csr</code></pre></div>
 <ol class="steps">
 <li id="8-la-entidad-consumidora-4-1"><span>Pulsa <b>Descargar</b>: se descarga como <code>&lt;CLIENT_ID&gt;.pem</code>. Déjalo con ese nombre junto a la clave.</span></li>
@@ -1011,7 +1011,7 @@ cat &lt;CLIENT_ID&gt;.csr</code></pre></div>
 <section id="9-la-entidad-proveedora-decide" class="manual-section" data-roles="provider">
 <div class="section-head">
 <h2><span class="num">9</span>La entidad proveedora decide <button class="copy-link" type="button" data-copy-link="#9-la-entidad-proveedora-decide" aria-label="Copiar el enlace a 9. La entidad proveedora decide">#</button></h2>
-<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="9-la-entidad-proveedora-decide"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-provider">Entidad proveedora</span></span><label class="done"><input type="checkbox" data-done="9-la-entidad-proveedora-decide" aria-label="Hecho: 9. La entidad proveedora decide"> Hecho</label>
 </div>
 <p><b>Quién:</b> el responsable de datos de la entidad proveedora (Diego), con su segundo factor.</p>
 <ol class="steps">
@@ -1040,7 +1040,7 @@ cat &lt;CLIENT_ID&gt;.csr</code></pre></div>
 <section id="10-la-primera-consulta" class="manual-section" data-roles="consumer">
 <div class="section-head">
 <h2><span class="num">10</span>La primera consulta <button class="copy-link" type="button" data-copy-link="#10-la-primera-consulta" aria-label="Copiar el enlace a 10. La primera consulta">#</button></h2>
-<span class="role-chips"><span class="role-chip role-consumer">Entidad consumidora</span></span><label class="done"><input type="checkbox" data-done="10-la-primera-consulta"> Hecho</label>
+<span class="role-chips"><span class="role-chip role-consumer">Entidad consumidora</span></span><label class="done"><input type="checkbox" data-done="10-la-primera-consulta" aria-label="Hecho: 10. La primera consulta"> Hecho</label>
 </div>
 <p><b>Quién:</b> desarrollo de la entidad consumidora, desde el servidor de la aplicación, en la carpeta con <code>&lt;CLIENT_ID&gt;.key</code> y <code>&lt;CLIENT_ID&gt;.pem</code>.</p>
 <ol class="steps">
@@ -1055,10 +1055,10 @@ cat &lt;CLIENT_ID&gt;.csr</code></pre></div>
 
 <div class="tabs" data-tabs>
 <div role="tablist"><button role="tab" type="button" id="tabs-1-tab-0" aria-controls="tabs-1-panel-0" aria-selected="true" tabindex="0" data-label="Script (Linux, macOS o Git Bash)">Script (Linux, macOS o Git Bash)</button><button role="tab" type="button" id="tabs-1-tab-1" aria-controls="tabs-1-panel-1" aria-selected="false" tabindex="-1" data-label="curl (Linux o macOS)">curl (Linux o macOS)</button></div>
-<div role="tabpanel" id="tabs-1-panel-0" aria-labelledby="tabs-1-tab-0"><div class="code"><button class="copy" type="button">Copiar</button><pre><code>./entity-check.sh check portal.example.org gateway.example.org        # llega a la red y guarda su raíz
+<div role="tabpanel" id="tabs-1-panel-0" aria-labelledby="tabs-1-tab-0"><div class="code"><button class="copy" type="button">Copiar</button><pre tabindex="0"><code>./entity-check.sh check portal.example.org gateway.example.org        # llega a la red y guarda su raíz
 ./entity-check.sh call portal.example.org gateway.example.org &lt;CLIENT_ID&gt; \
   /civil-registry/certificados-afiliacion/v1/afiliados/1000000001 eligibility_check funcionario-123</code></pre></div></div>
-<div role="tabpanel" id="tabs-1-panel-1" aria-labelledby="tabs-1-tab-1" hidden><div class="code"><button class="copy" type="button">Copiar</button><pre><code>curl -fsS https://portal.example.org/api/v1/pki/ca -o red-ca.pem      # la raíz de la red
+<div role="tabpanel" id="tabs-1-panel-1" aria-labelledby="tabs-1-tab-1" hidden><div class="code"><button class="copy" type="button">Copiar</button><pre tabindex="0"><code>curl -fsS https://portal.example.org/api/v1/pki/ca -o red-ca.pem      # la raíz de la red
 read -rs CLIENT_SECRET                                                 # pégalo: no queda en el historial
 TOKEN=$(curl -fsS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt;.key \
   -u "&lt;CLIENT_ID&gt;:$CLIENT_SECRET" -d grant_type=client_credentials \
@@ -1289,19 +1289,21 @@ curl -sS --cacert red-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt
   if (savedTab) selectLabel(savedTab);
 
   // Search: keeps the sections (and table rows) that mention the words.
+  // Accent-insensitive: "atencion" finds "Atención".
+  function fold(s) { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
   var search = document.getElementById('manual-search');
   if (search) search.addEventListener('input', function () {
-    var q = search.value.trim().toLowerCase();
+    var q = fold(search.value.trim());
     var shown = 0;
     sections.forEach(function (s) {
       var rows = Array.prototype.slice.call(s.querySelectorAll('tbody tr'));
       rows.forEach(function (r) { r.hidden = false; });
       if (!q) { s.hidden = false; return; }
-      var match = s.textContent.toLowerCase().indexOf(q) >= 0;
+      var match = fold(s.textContent).indexOf(q) >= 0;
       s.hidden = !match;
       if (match) {
         shown += 1;
-        var hits = rows.filter(function (r) { return r.textContent.toLowerCase().indexOf(q) >= 0; });
+        var hits = rows.filter(function (r) { return fold(r.textContent).indexOf(q) >= 0; });
         if (hits.length) rows.forEach(function (r) { r.hidden = hits.indexOf(r) < 0; });
       }
     });

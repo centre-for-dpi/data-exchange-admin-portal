@@ -57,7 +57,7 @@ One person can hold several roles in their entity. What the portal never allows 
 
 Everyone, of the operator or of an entity, creates their account the same way:
 
-1. In the registration form, type your institutional **e-mail**.
+1. In the registration form, choose a **username** and type your institutional **e-mail**.
 2. Type your **first and last name** as they will appear in the portal.
 3. Select **Register**, open the verification e-mail and set your password.
 
@@ -218,13 +218,13 @@ The commands of the current version, with its checksum and the portal's address 
 
 ![Kit to install: version, checksum and commands with the Copy button](img/user-manual/13-node-kit.jpg "Compare the checksum with the one the operator publishes through its own channel before opening the bundle.")
 
-They look like this (version 0.2.0):
+They have this shape (the checksum and the link are the current version's):
 
 ```bash
 curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
-curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz.sha256
-sha256sum -c den-node-kit-0.2.0.tar.gz.sha256      # must say: OK
-tar -xzf den-node-kit-0.2.0.tar.gz && cd den-node-kit-0.2.0
+echo "<SHA-256 checksum>  den-node-kit-0.2.0.tar.gz" | sha256sum -c -     # must say: OK
+tar -xzf den-node-kit-0.2.0.tar.gz
+cd den-node-kit-0.2.0
 sudo ./install.sh
 ```
 
@@ -349,7 +349,7 @@ In **My applications → Create application**:
 1. The **application name**.
 2. **What your entity will use it for**.
 3. The **environment** (`Production` for real lookups).
-4. Select **Create application** (with the technical contact e-mail already filled in).
+4. Type the **technical contact e-mail** and select **Create application**.
 
 ![Create application form with name, purpose, environment and the Create application button](img/user-manual/21-app-create.jpg "The application is what makes the calls: it gets its own certificate.")
 

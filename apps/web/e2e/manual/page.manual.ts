@@ -39,6 +39,7 @@ Lede del manual.
 
 ${FENCE}bash tab="Linux o macOS"
 ls -la
+curl -sS --cacert red-ca.pem --cert app.pem --key app.key -H "Authorization: Bearer $TOKEN" -H "X-DEN-Purpose: eligibility_check" https://gateway.example.org/civil-registry/certificados-afiliacion/v1/afiliados/1000000001
 ${FENCE}
 
 ${FENCE}powershell tab="Windows: PowerShell"
@@ -50,6 +51,8 @@ ${FENCE}
 <!-- roles: consumer -->
 
 > **Consejo:** usa la palabra zanahoria.
+
+Atención al titular de los datos.
 
 ## Si algo falla
 
@@ -122,6 +125,11 @@ test('role filter dims other roles and survives a reload', async ({ page }) => {
   await expect(page.locator('[id="2-revision"]')).not.toHaveAttribute('data-dimmed');
 });
 
+test('each Done checkbox names its step', async ({ page }) => {
+  await open(page);
+  await expect(page.getByRole('checkbox', { name: 'Hecho: 2. Revisión' })).toBeVisible();
+});
+
 test('progress counts done steps', async ({ page }) => {
   await open(page);
   const progress = page.locator('[data-progress]');
@@ -174,6 +182,13 @@ test('keyboard-only use', async ({ page }) => {
     'aria-selected',
     'true',
   );
+});
+
+test('search ignores accents', async ({ page }) => {
+  await open(page);
+  await page.getByLabel('Buscar en el manual').fill('atencion al titular');
+  await expect(page.locator('[id="3-consulta"]')).toBeVisible();
+  await expect(page.locator('[id="1-alta"]')).toBeHidden();
 });
 
 test('search filters sections and announces the count', async ({ page }) => {
