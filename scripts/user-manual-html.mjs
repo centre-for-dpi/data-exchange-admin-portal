@@ -201,7 +201,9 @@ ${caption ? `<figcaption>${inline(caption)}</figcaption>` : ''}
       const text = quote.join('\n').trim();
       const marker = /^\*\*([^*:]+):\*\*\s*/.exec(text);
       const kind = marker ? (t.callouts[marker[1]] ?? 'note') : 'note';
-      const body = marker ? text.slice(marker[0].length) : text;
+      const rest = marker ? text.slice(marker[0].length) : text;
+      // The label sits on its own line: the text after it starts a sentence.
+      const body = rest.charAt(0).toUpperCase() + rest.slice(1);
       const paragraphs = body
         .split(/\n\s*\n/)
         .map((p) => `<p>${inline(p.replace(/\n/g, ' '))}</p>`)

@@ -85,6 +85,8 @@ describe('user manual generator', () => {
     );
     expect(es).toMatch(/<aside class="callout info tip">[\s\S]*Consejo[\s\S]*ventana privada/);
     expect(es).toMatch(/<aside class="callout warn">[\s\S]*Atención[\s\S]*una vez/);
+    // The label sits on its own line, so the text after it starts with a capital.
+    expect(es).toContain('<p>Usa una ventana privada.</p>');
     const en = renderManual(
       doc('> **Tip:** use a private window.\n\n> **Attention:** shown once.'),
       manifest({}),

@@ -207,7 +207,9 @@ async function requestOnboarding(
     await shot(page, lang, '05-entity-request-submit', { hotspots: [document, submit] });
   }
   await submit.click();
-  await expect(page.getByText(L('En revisión'), { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText(t(lang, 'entityStatus.under_review'), { exact: true }).first(),
+  ).toBeVisible();
   return requestUrl;
 }
 
@@ -263,13 +265,13 @@ test('the user manual, step by step', async ({ browser }) => {
   await test.step('1. platform roles from the operator console', async () => {
     const admin = await seedUserPage(browser, 'pablo.plataforma', '/operator/platform-users');
     const grant = admin.getByRole('form', { name: L('Dar un rol') });
-    await grant.getByLabel(L('Correo electrónico')).fill('revision@operador.example');
+    await grant.getByLabel(t(lang, 'platformUsers.email')).fill('revision@operador.example');
     await grant.getByLabel(L('Rol')).selectOption('platform_reviewer');
     await grant.getByLabel(L('Motivo')).fill(EXAMPLES.reason);
     await shot(admin, lang, '03-platform-roles', {
       region: grant,
       hotspots: [
-        grant.getByLabel(L('Correo electrónico')),
+        grant.getByLabel(t(lang, 'platformUsers.email')),
         grant.getByLabel(L('Rol')),
         grant.getByLabel(L('Motivo')),
         button(grant, 'Dar el rol'),
@@ -418,7 +420,7 @@ test('the user manual, step by step', async ({ browser }) => {
       hotspots: [submit],
     });
     await submit.click();
-    await expect(page.getByTestId('version-status')).toHaveText(L('En revisión'));
+    await expect(page.getByTestId('version-status')).toHaveText(t(lang, 'versionStatus.in_review'));
     const validation = page.getByTestId('version-validation');
     await until(page, () => expect(validation).toContainText(L('Superadas'), { timeout: 2_000 }));
     await shot(page, lang, '19-version-validations', {

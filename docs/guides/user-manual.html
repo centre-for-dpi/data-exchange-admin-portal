@@ -1,0 +1,1312 @@
+<meta charset="utf-8">
+<title>DEN user manual</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a sticky contents rail beside one reading column; the two planes of the network carry
+   their own hue (governance = indigo, data = teal) through every diagram, chip and card. */
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --ink: #15202b;
+  --muted: #586575;
+  --line: #d8dee6;
+  --gov: #3a4cc0;
+  --gov-tint: #eceffd;
+  --data: #0a7569;
+  --data-tint: #e2f3f0;
+  --ok: #1d7139;
+  --ok-tint: #e5f4ea;
+  --warn: #9a5200;
+  --warn-tint: #fdf1e1;
+  --bad: #b0222b;
+  --bad-tint: #fcebed;
+  --code-bg: #edf0f4;
+  --font-display: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --step: 1rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1319; --surface: #151c24; --ink: #e5eaf0; --muted: #9ba8b6; --line: #2a3541;
+    --gov: #95a3f7; --gov-tint: #1b2142; --data: #52cfbd; --data-tint: #0d2925;
+    --ok: #6fd18e; --ok-tint: #11291a; --warn: #f1b45c; --warn-tint: #2d210f;
+    --bad: #ff8c92; --bad-tint: #321619; --code-bg: #1c2530; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1319; --surface: #151c24; --ink: #e5eaf0; --muted: #9ba8b6; --line: #2a3541;
+  --gov: #95a3f7; --gov-tint: #1b2142; --data: #52cfbd; --data-tint: #0d2925;
+  --ok: #6fd18e; --ok-tint: #11291a; --warn: #f1b45c; --warn-tint: #2d210f;
+  --bad: #ff8c92; --bad-tint: #321619; --code-bg: #1c2530; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { font-size: 16px; scroll-padding-top: 72px; }
+html.big { font-size: 19px; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 1rem; line-height: 1.6; margin: 0;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+table { font-size: inherit; }
+a { color: var(--gov); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible { outline: 3px solid var(--gov); outline-offset: 2px; border-radius: 4px; }
+code, kbd, pre { font-family: var(--font-mono); font-size: 0.88em; }
+:not(pre) > code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.topbar-inner { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 12px; min-height: 56px; }
+.brand { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.01em; display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 26px; height: 26px; flex: none; }
+.brand small { font-weight: 500; color: var(--muted); font-family: var(--font-body); }
+.topbar .spacer { flex: 1; }
+.tool {
+  font: inherit; font-size: 0.85rem; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer;
+}
+.tool[aria-pressed="true"] { background: var(--gov); border-color: var(--gov); color: var(--surface); }
+
+.hero {
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 28px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.hero-inner { max-width: 1180px; margin: 0 auto; display: grid; gap: 14px; }
+.eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.7rem); font-weight: 700; max-width: 22ch; }
+.lede { font-size: 1.12rem; max-width: 64ch; color: var(--muted); margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.9rem; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 600; }
+
+.shell {
+  max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 80px;
+}
+.toc { position: sticky; top: 76px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; font-size: 0.9rem; }
+.toc p { margin: 18px 0 6px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+.toc p:first-child { margin-top: 0; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.toc a { display: block; padding: 4px 10px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; }
+.toc a:hover { color: var(--ink); }
+.toc a.active { color: var(--ink); border-left-color: var(--gov); font-weight: 600; }
+.toc-mobile { display: none; }
+
+main { min-width: 0; display: grid; gap: 64px; }
+section { display: grid; gap: 18px; min-width: 0; }
+section > p, section > ul, .prose { max-width: 70ch; margin: 0; }
+.part {
+  font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--muted); border-top: 2px solid var(--ink); padding-top: 10px; font-weight: 600;
+}
+h2 { font-size: 1.65rem; font-weight: 700; }
+h2 .num { color: var(--muted); font-weight: 500; margin-right: 0.35em; font-variant-numeric: tabular-nums; }
+h3 { font-size: 1.2rem; font-weight: 600; }
+ul.ticks { padding-left: 1.2em; display: grid; gap: 8px; }
+
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.principle { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.principle b { font-family: var(--font-display); font-size: 1.02rem; }
+.principle span { color: var(--muted); font-size: 0.93rem; }
+
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.figscroll { overflow-x: auto; }
+figure svg { display: block; width: 100%; height: auto; min-width: 640px; color: var(--ink); }
+figcaption { font-size: 0.9rem; color: var(--muted); max-width: 80ch; }
+
+/* SVG classes, themed through the page tokens */
+.d-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.2; }
+.d-gov { fill: var(--gov-tint); stroke: var(--gov); stroke-width: 1.2; }
+.d-data { fill: var(--data-tint); stroke: var(--data); stroke-width: 1.2; }
+.d-panel-gov { fill: var(--gov-tint); fill-opacity: 0.45; stroke: var(--gov); stroke-dasharray: 5 4; }
+.d-panel-data { fill: var(--data-tint); fill-opacity: 0.45; stroke: var(--data); stroke-dasharray: 5 4; }
+.d-edge { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+.d-ent { fill: var(--bg); stroke: var(--muted); stroke-dasharray: 3 3; }
+.d-line { stroke: var(--ink); stroke-width: 1.3; fill: none; }
+.d-thin { stroke: var(--muted); stroke-width: 1; fill: none; }
+.d-dash { stroke: var(--ink); stroke-width: 1.3; fill: none; stroke-dasharray: 5 4; }
+.d-strong { stroke: var(--data); stroke-width: 2.6; fill: none; }
+.d-life { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 4; }
+.d-t { fill: var(--ink); font-family: var(--font-body); font-size: 13px; }
+.d-tb { fill: var(--ink); font-family: var(--font-display); font-size: 14px; font-weight: 600; }
+.d-ts { fill: var(--muted); font-family: var(--font-body); font-size: 11.5px; }
+.d-lab { fill: var(--ink); font-family: var(--font-mono); font-size: 11.5px; }
+.d-cap { fill: var(--muted); font-family: var(--font-display); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; }
+.d-capgov { fill: var(--gov); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.d-capdata { fill: var(--data); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.d-ah { fill: var(--ink); }
+.d-ahd { fill: var(--data); }
+.d-ahm { fill: var(--muted); }
+
+/* Tables */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table.t { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+table.t th, table.t td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+table.t tr:last-child td { border-bottom: 0; }
+table.t th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; background: var(--bg); }
+table.t td:first-child { font-weight: 600; white-space: nowrap; }
+table.t td.wrap { white-space: normal; }
+
+/* Role cards */
+.roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.role { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.role header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; justify-content: space-between; }
+.role code { font-weight: 500; }
+.role .who { font-size: 0.82rem; color: var(--muted); }
+.role p { margin: 0; font-size: 0.93rem; }
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 0.74rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.tag.mfa { background: var(--warn-tint); color: var(--warn); }
+.tag.gov { background: var(--gov-tint); color: var(--gov); }
+.tag.data { background: var(--data-tint); color: var(--data); }
+.tag.ok { background: var(--ok-tint); color: var(--ok); }
+.tag.warn { background: var(--warn-tint); color: var(--warn); }
+.tag.bad { background: var(--bad-tint); color: var(--bad); }
+.tag.plain { background: var(--code-bg); color: var(--muted); }
+
+/* Component cards */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.85rem; color: var(--muted); align-items: center; }
+.comps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.comp {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid;
+  gap: 10px; align-content: start; min-width: 0;
+}
+.comp.g { border-top: 3px solid var(--gov); }
+.comp.d { border-top: 3px solid var(--data); }
+.comp.e { border-top: 3px solid var(--ink); }
+.comp h4 { font-size: 1.08rem; }
+.comp .tech { font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono); }
+.comp p { margin: 0; font-size: 0.93rem; }
+.comp dl { margin: 0; display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: 6px 10px; font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 10px; }
+.comp dt { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 2px; }
+.comp dd { margin: 0; display: grid; gap: 4px; justify-items: start; }
+
+.comp ul.ticks { margin: 0; font-size: 0.93rem; gap: 4px; }
+/* State pipelines */
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.st { font-family: var(--font-mono); font-size: 0.84rem; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); white-space: nowrap; }
+.st.opt { border-style: dashed; color: var(--muted); }
+.st.goal { border-color: var(--ok); color: var(--ok); background: var(--ok-tint); font-weight: 500; }
+.st.end { border-color: var(--muted); color: var(--muted); }
+.arrow { color: var(--muted); font-size: 0.9rem; }
+.flowcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 14px; }
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 10px; max-width: 72ch; }
+ol.steps > li::before {
+  content: counter(s); font-family: var(--font-display); font-weight: 700; width: 1.75rem; height: 1.75rem;
+  border-radius: 50%; display: grid; place-items: center; background: var(--code-bg); font-size: 0.88rem;
+}
+
+/* Guarantees */
+.guar { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.guar div { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--ok); border-radius: 6px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.guar b { font-family: var(--font-display); }
+.guar span { font-size: 0.92rem; color: var(--muted); }
+
+/* Spec sheet */
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.spec div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.spec .k { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.spec .v { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.spec .s { font-size: 0.85rem; color: var(--muted); }
+.ports { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.port { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.port .pn { font-family: var(--font-mono); font-size: 1.15rem; font-weight: 500; }
+.port span { font-size: 0.9rem; color: var(--muted); }
+
+/* Checklist */
+.check { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; display: grid; }
+.check label { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); gap: 10px; padding: 8px 16px; cursor: pointer; align-items: start; }
+.check input { width: 1.05rem; height: 1.05rem; margin-top: 0.25em; accent-color: var(--ok); }
+.check input:checked + span { color: var(--muted); text-decoration: line-through; }
+
+/* Code */
+.code { position: relative; background: var(--code-bg); border-radius: 8px; border: 1px solid var(--line); min-width: 0; }
+.code pre { margin: 0; padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.code .copy { position: absolute; top: 8px; right: 8px; }
+.copy { font: inherit; font-size: 0.75rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 3px 9px; border-radius: 5px; cursor: pointer; }
+.cmds { display: grid; gap: 8px; }
+.cmd { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.cmd code { background: none; padding: 0; font-size: 0.9rem; font-weight: 500; }
+.cmd span { grid-column: 1 / -1; font-size: 0.9rem; color: var(--muted); }
+
+/* Install stepper */
+.qs { display: grid; gap: 10px; counter-reset: q; }
+.q { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.q .qn { font-family: var(--font-display); font-weight: 700; font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; display: grid; align-content: start; gap: 2px; }
+.q .qn b { font-size: 1.6rem; color: var(--ink); line-height: 1; }
+.q h4 { font-size: 1.02rem; margin-bottom: 4px; }
+.q p { margin: 0; font-size: 0.93rem; }
+.q .auto { color: var(--muted); }
+.opts { display: grid; gap: 6px; margin-top: 8px; }
+.opts div { font-size: 0.9rem; display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: 6px; }
+.opts kbd { font-weight: 600; background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; text-align: center; height: 1.5rem; line-height: 1.45rem; }
+
+.callout { border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; max-width: 80ch; }
+.callout.warn { background: var(--warn-tint); border: 1px solid var(--warn); }
+.callout.info { background: var(--gov-tint); border: 1px solid var(--gov); }
+.callout b { font-family: var(--font-display); }
+.callout p { margin: 0; }
+
+details.faq { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+details.faq + details.faq { margin-top: -8px; }
+details.faq summary { cursor: pointer; padding: 12px 16px; font-weight: 600; list-style-position: outside; }
+details.faq p { margin: 0; padding: 0 16px 14px; max-width: 72ch; color: var(--muted); }
+details.faq[open] summary { color: var(--gov); }
+
+.vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 18px; }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .toc { display: none; }
+  .toc-mobile { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  .toc-mobile summary { cursor: pointer; font-weight: 600; }
+  .toc-mobile ol { margin: 8px 0 0; padding-left: 1.2em; display: grid; gap: 4px; }
+  .brand small { display: none; }
+}
+@media (max-width: 520px) {
+  .q { grid-template-columns: minmax(0, 1fr); }
+  .q .qn { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 8px; }
+  .comp dl { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+<style>
+
+:root {
+  --role-operator: #3a4cc0; --role-operator-tint: #eceffd;
+  --role-provider: #0a7569; --role-provider-tint: #e2f3f0;
+  --role-consumer: #8a3f9e; --role-consumer-tint: #f5e9f8;
+  --role-server: #586575; --role-server-tint: #edf0f4;
+  --spot: #d4237a; --spot-ink: #ffffff; --flash: #fff4c2;
+  --shot-shadow: 0 1px 2px rgba(21, 32, 43, .08), 0 8px 24px rgba(21, 32, 43, .08);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --role-operator: #95a3f7; --role-operator-tint: #1b2142;
+    --role-provider: #52cfbd; --role-provider-tint: #0d2925;
+    --role-consumer: #e3a3f2; --role-consumer-tint: #2c1733;
+    --role-server: #9ba8b6; --role-server-tint: #1c2530;
+    --spot: #ff6fb1; --spot-ink: #1a0a12; --flash: #3a3110;
+    --shot-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}
+:root[data-theme="dark"] {
+  --role-operator: #95a3f7; --role-operator-tint: #1b2142;
+  --role-provider: #52cfbd; --role-provider-tint: #0d2925;
+  --role-consumer: #e3a3f2; --role-consumer-tint: #2c1733;
+  --role-server: #9ba8b6; --role-server-tint: #1c2530;
+  --spot: #ff6fb1; --spot-ink: #1a0a12; --flash: #3a3110;
+  --shot-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+/* Role chips: one hue per role, everywhere (journey map, section heads, filter). */
+.role-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.role-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; letter-spacing: .01em; border: 1px solid currentColor; }
+.role-chip.role-operator { color: var(--role-operator); background: var(--role-operator-tint); }
+.role-chip.role-provider { color: var(--role-provider); background: var(--role-provider-tint); }
+.role-chip.role-consumer { color: var(--role-consumer); background: var(--role-consumer-tint); }
+.role-chip.role-server { color: var(--role-server); background: var(--role-server-tint); }
+
+/* Tools: who am I, search. */
+.manual-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); gap: 14px 24px; align-items: end; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.role-filter { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.role-filter legend { font-family: var(--font-display); font-weight: 600; margin-bottom: 8px; padding: 0; }
+.role-filter label { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; font-size: .9rem; background: var(--bg); }
+.role-filter label:has(input:checked) { border-color: var(--gov); background: var(--gov-tint); font-weight: 600; }
+.role-filter input { accent-color: var(--gov); margin: 0; }
+.manual-search label { display: block; font-family: var(--font-display); font-weight: 600; margin-bottom: 6px; }
+.manual-search input { width: 100%; box-sizing: border-box; padding: 8px 12px; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--muted); border-radius: 8px; }
+.search-status { grid-column: 1 / -1; margin: 0; min-height: 1.2em; font-size: .9rem; color: var(--muted); }
+.search-status:empty { display: none; }
+
+/* The journey map: the walkthrough on one card. */
+.journey-map { padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.journey-map h2 { margin: 0 0 12px; font-size: 1.15rem; }
+.journey { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 10px; }
+.journey li { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.journey li a { color: var(--ink); text-decoration: none; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+.journey li a:hover, .journey li a:focus-visible { text-decoration: underline; }
+.journey .num { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--gov); color: var(--surface); font-size: .8rem; font-family: var(--font-display); }
+.journey .and-mark { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.journey li[data-dimmed] { border-style: dashed; }
+.journey li[data-dimmed] a { color: var(--muted); font-weight: 500; }
+
+/* Sections. */
+.manual-section { scroll-margin-top: 84px; }
+.manual-section[hidden], .manual-section tr[hidden] { display: none !important; }
+.section-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.section-head h2 { margin: 0; flex: 1 1 100%; }
+.copy-link { margin-left: 6px; padding: 0 6px; border: 0; background: none; font: inherit; font-size: .8em; color: var(--muted); cursor: pointer; border-radius: 6px; vertical-align: middle; }
+.copy-link:hover, .copy-link:focus-visible { color: var(--gov); background: var(--gov-tint); }
+.done { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: .88rem; cursor: pointer; }
+.done:has(input:checked) { border-color: var(--ok); background: var(--ok-tint); color: var(--ok); font-weight: 600; }
+.done input { accent-color: var(--ok); margin: 0; }
+.manual-section[data-dimmed] h2, .manual-section[data-dimmed] h3 { color: var(--muted); }
+.manual-section[data-dimmed] .shot img { filter: grayscale(1); opacity: .55; }
+.manual-section[data-dimmed] .shot-frame { box-shadow: none; }
+ol.steps > li[id] { scroll-margin-top: 96px; border-radius: 8px; transition: background-color .6s; }
+ol.steps > li.flash { background: var(--flash); outline: 2px solid var(--spot); outline-offset: 4px; }
+ol.steps > li:focus { outline: 2px solid var(--spot); outline-offset: 4px; }
+
+/* Screenshots with numbered hotspots (buttons over a clean image). */
+.shot { margin: 4px 0 0; display: grid; gap: 8px; max-width: 100%; }
+.shot-frame { position: relative; justify-self: start; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shot-shadow); }
+.shot-open { display: block; padding: 0; margin: 0; border: 0; background: none; cursor: zoom-in; border-radius: 10px; overflow: hidden; }
+.shot-open img { display: block; max-width: 100%; height: auto; }
+.shot-open:focus-visible { outline: 3px solid var(--gov); outline-offset: 3px; }
+.hotspot { position: absolute; padding: 0; margin: 0; border: 2px solid var(--spot); border-radius: 6px; background: transparent; cursor: pointer; box-shadow: 0 0 0 2px rgba(255, 255, 255, .7); }
+.hotspot span { position: absolute; top: -13px; left: -13px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--spot); color: var(--spot-ink); font: 700 .78rem/1 var(--font-display); box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
+.hotspot:hover, .hotspot:focus-visible { background: rgba(212, 35, 122, .12); outline: 3px solid var(--gov); outline-offset: 2px; }
+.shot figcaption { font-size: .9rem; color: var(--muted); max-width: 80ch; }
+@media (max-width: 640px) {
+  .hotspot span { width: 18px; height: 18px; top: -9px; left: -9px; font-size: .65rem; }
+  .manual-tools { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Lightbox. */
+.shot-dialog { width: min(96vw, 1500px); max-height: 94vh; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); }
+.shot-dialog::backdrop { background: rgba(10, 14, 20, .72); }
+.shot-dialog-bar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.shot-dialog-bar p { margin: 0; flex: 1; font-weight: 600; }
+.shot-dialog-close { padding: 6px 14px; border: 1px solid var(--muted); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; cursor: pointer; }
+.shot-dialog-body { padding: 18px; }
+.shot-dialog-body .shot-frame { margin: 0 auto; }
+.shot-dialog-body img { display: block; max-width: 100%; height: auto; border-radius: 10px; }
+
+/* Tabs per operating system. */
+.tabs { display: grid; gap: 0; }
+.tabs [role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; }
+.tabs [role="tab"] { padding: 6px 12px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--bg); color: var(--muted); font: inherit; font-size: .88rem; cursor: pointer; }
+.tabs [role="tab"][aria-selected="true"] { background: var(--code-bg); color: var(--ink); font-weight: 600; }
+.tabs [role="tab"]:focus-visible { outline: 3px solid var(--gov); outline-offset: 1px; }
+.tabs [role="tabpanel"] .code { border-top-left-radius: 0; }
+
+/* Progress in the contents rail. */
+.manual-progress { display: grid; gap: 6px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.toc .manual-progress p { margin: 0; text-transform: none; letter-spacing: 0; font-size: .88rem; color: var(--ink); font-weight: 600; }
+.reset-progress { justify-self: start; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: .8rem; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  ol.steps > li[id] { transition: none; }
+}
+
+@media print {
+  .topbar, .toc, .toc-mobile, .manual-tools, .copy-link, .done, .manual-progress, .shot-dialog, .copy { display: none !important; }
+  .shell { display: block; }
+  .manual-section[data-dimmed] h2, .manual-section[data-dimmed] h3 { color: inherit; }
+  .manual-section[data-dimmed] .shot img { filter: none; opacity: 1; }
+  .manual-section, .journey li { opacity: 1 !important; }
+  .manual-section[hidden], ol.steps > li[hidden], tr[hidden] { display: revert !important; }
+  .tabs [role="tablist"] { display: none; }
+  .tabs [role="tabpanel"][hidden] { display: block !important; }
+  .tabs [role="tabpanel"]::before { content: attr(data-print-label); display: block; font-weight: 600; margin: 8px 0 4px; }
+  .shot, .shot-frame { break-inside: avoid; box-shadow: none; }
+  .hotspot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 26 26" aria-hidden="true">
+        <circle cx="5" cy="13" r="3.2" fill="var(--gov)"></circle>
+        <circle cx="21" cy="5.5" r="3.2" fill="var(--data)"></circle>
+        <circle cx="21" cy="20.5" r="3.2" fill="var(--data)"></circle>
+        <path d="M8 13 H13 M13 13 L18 7 M13 13 L18 19" stroke="var(--ink)" stroke-width="1.6" fill="none"></path>
+      </svg>
+      <span>Data Exchange Network <small>· user manual</small></span>
+    </div>
+    <span class="spacer"></span>
+    <button class="tool" id="bigtext" type="button" aria-pressed="false" title="Larger text for projecting">Presentation mode</button>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">User manual · Step by step, with screenshots</span>
+    <h1>User manual: from the first account to the first lookup</h1>
+    <p class="lede">This manual takes the people who make one entity publish an API on the network, and another one consult it, through every step: creating the accounts, onboarding the entities, installing the node, publishing, approving, requesting access and making the first lookup. Every step has a screenshot of the portal with numbers on what to click or fill: select a number to jump to its instruction, or the screenshot to see it larger.</p>
+    <div class="meta">
+      <span><b>For</b> the operator, provider entities and consumer entities</span>
+      <span><b>Version</b> 1.0 · November 2026</span>
+      <span><a href="../es/guides/user-manual.html" hreflang="es" lang="es">Versión en español</a></span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <div class="manual-progress"><p data-progress>0 of 10 steps done</p><button type="button" class="reset-progress" data-reset-progress>Reset progress</button></div>
+    <ol>
+      <li><a href="#example-values">Example values</a></li>
+      <li><a href="#who-does-what">Who does what</a></li>
+      <li><a href="#before-you-start">Before you start</a></li>
+      <li><a href="#1-the-operator-s-team">1. The operator's team</a></li>
+      <li><a href="#2-the-provider-entity-requests-its-onboarding">2. The provider entity requests its onboarding</a></li>
+      <li><a href="#3-the-operator-approves-the-onboarding">3. The operator approves the onboarding</a></li>
+      <li><a href="#4-the-officers-join-the-entity">4. The officers join the entity</a></li>
+      <li><a href="#5-the-entity-s-node">5. The entity's node</a></li>
+      <li><a href="#6-the-technical-lead-publishes-the-api">6. The technical lead publishes the API</a></li>
+      <li><a href="#7-the-operator-approves-the-api">7. The operator approves the API</a></li>
+      <li><a href="#8-the-consumer-entity">8. The consumer entity</a></li>
+      <li><a href="#9-the-provider-entity-decides">9. The provider entity decides</a></li>
+      <li><a href="#10-the-first-lookup">10. The first lookup</a></li>
+      <li><a href="#when-something-fails">When something fails</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <details class="toc-mobile">
+      <summary>Contents</summary>
+      <ol>
+      <li><a href="#example-values">Example values</a></li>
+      <li><a href="#who-does-what">Who does what</a></li>
+      <li><a href="#before-you-start">Before you start</a></li>
+      <li><a href="#1-the-operator-s-team">1. The operator's team</a></li>
+      <li><a href="#2-the-provider-entity-requests-its-onboarding">2. The provider entity requests its onboarding</a></li>
+      <li><a href="#3-the-operator-approves-the-onboarding">3. The operator approves the onboarding</a></li>
+      <li><a href="#4-the-officers-join-the-entity">4. The officers join the entity</a></li>
+      <li><a href="#5-the-entity-s-node">5. The entity's node</a></li>
+      <li><a href="#6-the-technical-lead-publishes-the-api">6. The technical lead publishes the API</a></li>
+      <li><a href="#7-the-operator-approves-the-api">7. The operator approves the API</a></li>
+      <li><a href="#8-the-consumer-entity">8. The consumer entity</a></li>
+      <li><a href="#9-the-provider-entity-decides">9. The provider entity decides</a></li>
+      <li><a href="#10-the-first-lookup">10. The first lookup</a></li>
+      <li><a href="#when-something-fails">When something fails</a></li>
+      </ol>
+    </details>
+
+    <div class="manual-tools" role="search" aria-label="Manual tools">
+      <fieldset class="role-filter">
+        <legend>Who are you?</legend>
+<label><input type="radio" name="manual-role" value="all" checked> Everyone</label>
+<label><input type="radio" name="manual-role" value="operator"> Operator</label>
+<label><input type="radio" name="manual-role" value="provider"> Provider entity</label>
+<label><input type="radio" name="manual-role" value="consumer"> Consumer entity</label>
+      </fieldset>
+      <div class="manual-search">
+        <label for="manual-search">Search the manual</label>
+        <input type="search" id="manual-search" autocomplete="off">
+      </div>
+      <p class="search-status" role="status" aria-live="polite"></p>
+    </div>
+
+<nav class="journey-map" aria-labelledby="journey-title">
+<h2 id="journey-title">The journey</h2>
+<ol class="journey">
+<li data-roles="operator server"><a href="#1-the-operator-s-team"><span class="num">1</span>The operator's team</a><span class="role-chips"><span class="role-chip role-operator">Operator</span><span class="role-chip role-server">Portal server</span></span></li>
+<li data-roles="provider"><a href="#2-the-provider-entity-requests-its-onboarding"><span class="num">2</span>The provider entity requests its onboarding</a><span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span></li>
+<li data-roles="operator"><a href="#3-the-operator-approves-the-onboarding"><span class="num">3</span>The operator approves the onboarding</a><span class="role-chips"><span class="role-chip role-operator">Operator</span></span></li>
+<li data-roles="provider"><a href="#4-the-officers-join-the-entity"><span class="num">4</span>The officers join the entity</a><span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span></li>
+<li data-roles="provider"><a href="#5-the-entity-s-node"><span class="num">5</span>The entity's node</a><span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span></li>
+<li data-roles="provider"><a href="#6-the-technical-lead-publishes-the-api"><span class="num">6</span>The technical lead publishes the API</a><span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span></li>
+<li data-roles="operator"><a href="#7-the-operator-approves-the-api"><span class="num">7</span>The operator approves the API</a><span class="role-chips"><span class="role-chip role-operator">Operator</span></span></li>
+<li data-roles="consumer"><a href="#8-the-consumer-entity"><span class="num">8</span>The consumer entity</a><span class="role-chips"><span class="role-chip role-consumer">Consumer entity</span></span></li>
+<li data-roles="provider"><a href="#9-the-provider-entity-decides"><span class="num">9</span>The provider entity decides</a><span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span></li>
+<li data-roles="consumer"><a href="#10-the-first-lookup"><span class="num">10</span>The first lookup</a><span class="role-chips"><span class="role-chip role-consumer">Consumer entity</span></span></li>
+</ol>
+</nav>
+
+<section id="example-values" class="manual-section" data-roles="">
+<div class="section-head">
+<h2>Example values <button class="copy-link" type="button" data-copy-link="#example-values" aria-label="Copy the link to Example values">#</button></h2>
+
+</div>
+<p>The screenshots were taken on a test network with synthetic data. Use these example values and replace them with yours:</p>
+<div class="tablewrap"><table class="t"><thead><tr><th>What</th><th>Example</th></tr></thead><tbody>
+<tr><td>Portal</td><td class="wrap"><code>https://portal.example.org</code></td></tr>
+<tr><td>Gateway (its own name, for mTLS)</td><td class="wrap"><code>https://gateway.example.org</code></td></tr>
+<tr><td>Provider entity</td><td class="wrap"><i>Civil Registry</i>, identifier <code>civil-registry</code>, NIT <code>900000100</code></td></tr>
+<tr><td>Consumer entity</td><td class="wrap"><i>Ministry of Welfare of Wakanda</i>, identifier <code>bienestar-wakanda</code>, NIT <code>900000200</code></td></tr>
+<tr><td>API</td><td class="wrap"><i>Affiliation certificate</i>, identifier <code>certificados-afiliacion</code></td></tr>
+<tr><td>Node and service</td><td class="wrap">Node <code>nodo-principal</code>, service on the node's path <code>/salud</code></td></tr>
+<tr><td>Test record</td><td class="wrap">Document <code>1000000001</code></td></tr>
+</tbody></table></div>
+</section>
+
+<section id="who-does-what" class="manual-section" data-roles="">
+<div class="section-head">
+<h2>Who does what <button class="copy-link" type="button" data-copy-link="#who-does-what" aria-label="Copy the link to Who does what">#</button></h2>
+
+</div>
+<div class="tablewrap"><table class="t"><thead><tr><th>Role</th><th>In the screenshots</th><th>What they do</th></tr></thead><tbody>
+<tr><td><b>Network operator</b></td><td class="wrap">Ana (review) and Pablo (platform administration)</td><td class="wrap">Approves entity onboarding and API publications; grants the platform roles</td></tr>
+<tr><td><b>Portal server</b></td><td class="wrap">Whoever administers the server</td><td class="wrap">Grants the first platform role with a command</td></tr>
+<tr><td><b>Entity administrator</b></td><td class="wrap">Rosa Registro, of <i>Civil Registry</i></td><td class="wrap">Requests the onboarding, registers the node and hands over its token</td></tr>
+<tr><td><b>Data steward</b></td><td class="wrap">Diego Datos, of <i>Civil Registry</i></td><td class="wrap">Approves or rejects each access request to the entity's APIs</td></tr>
+<tr><td><b>Technical lead</b></td><td class="wrap">Tomás Técnico, of <i>Civil Registry</i></td><td class="wrap">Publishes the entity's APIs</td></tr>
+<tr><td><b>Infrastructure</b> of the provider</td><td class="wrap">The team that runs its servers</td><td class="wrap">Installs the node and connects the API</td></tr>
+<tr><td><b>Consumer entity</b></td><td class="wrap">Wanda Bienestar, of the <i>Ministry of Welfare of Wakanda</i></td><td class="wrap">One person with every role: creates the application, its certificate and requests access</td></tr>
+</tbody></table></div>
+<p>One person can hold several roles in their entity. What the portal never allows is approving what you yourself requested.</p>
+</section>
+
+<section id="before-you-start" class="manual-section" data-roles="">
+<div class="section-head">
+<h2>Before you start <button class="copy-link" type="button" data-copy-link="#before-you-start" aria-label="Copy the link to Before you start">#</button></h2>
+
+</div>
+<ul class="ticks">
+<li><b>An authenticator app</b> on a phone (Google Authenticator, Microsoft Authenticator or any TOTP app). Critical roles need it: the platform roles, the entity administrator and the data steward.</li>
+<li><b>Password:</b> at least 12 characters, different from the username and the e-mail, not one of the last 5.</li>
+<li><b>The verification link lasts 60 minutes.</b> Have your mailbox open before registering. On a test network the portal's e-mails go to the test mailbox (<code>/mail</code>).</li>
+<li><b>One private window per person</b> when playing several roles from the same computer, so sessions do not mix.</li>
+</ul>
+</section>
+
+<section id="1-the-operator-s-team" class="manual-section" data-roles="operator server">
+<div class="section-head">
+<h2><span class="num">1</span>The operator's team <button class="copy-link" type="button" data-copy-link="#1-the-operator-s-team" aria-label="Copy the link to 1. The operator's team">#</button></h2>
+<span class="role-chips"><span class="role-chip role-operator">Operator</span><span class="role-chip role-server">Portal server</span></span><label class="done"><input type="checkbox" data-done="1-the-operator-s-team"> Done</label>
+</div>
+<p><b>Who:</b> each person of the operator, and whoever administers the portal's server. <b>You need:</b> each person's institutional e-mail.</p>
+<h3 id="1-1-create-the-account">1.1 Create the account <button class="copy-link" type="button" data-copy-link="#1-1-create-the-account" aria-label="Copy the link to 1.1 Create the account">#</button></h3>
+<p>Everyone, of the operator or of an entity, creates their account the same way:</p>
+<ol class="steps">
+<li id="1-the-operator-s-team-1-1"><span>In the registration form, type your institutional <b>e-mail</b>.</span></li>
+<li id="1-the-operator-s-team-1-2"><span>Type your <b>first and last name</b> as they will appear in the portal.</span></li>
+<li id="1-the-operator-s-team-1-3"><span>Select <b>Register</b>, open the verification e-mail and set your password.</span></li>
+</ol>
+<figure class="shot" id="shot-01-register">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Keycloak registration form with the e-mail, the name and the Register button"><img src="img/user-manual/01-register.jpg" alt="Keycloak registration form with the e-mail, the name and the Register button" width="592" height="687" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#1-the-operator-s-team-1-1" style="left:12.16%;top:41.5%;width:75.68%;height:5.24%" aria-label="1. In the registration form, type your institutional e-mail ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#1-the-operator-s-team-1-2" style="left:12.16%;top:54.31%;width:75.68%;height:5.24%" aria-label="2. Type your first and last name as they will appear in the portal."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#1-the-operator-s-team-1-3" style="left:12.16%;top:75.85%;width:75.68%;height:5.24%" aria-label="3. Select Register , open the verification e-mail and set your password."><span>3</span></button>
+</div>
+<figcaption>Registration: the portal takes you to this form from Sign in → Register.</figcaption>
+</figure>
+<p>The first time you sign in, the portal says you have no roles yet: that is expected. Signing in once is what creates your account in the portal.</p>
+<h3 id="1-2-the-first-platform-role-from-the-server">1.2 The first platform role, from the server <button class="copy-link" type="button" data-copy-link="#1-2-the-first-platform-role-from-the-server" aria-label="Copy the link to 1.2 The first platform role, from the server">#</button></h3>
+<p>The first <code>platform_admin</code> (and recovery, if one day none is left) is granted on the portal's server:</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo ./install.sh platform-role grant &lt;email&gt; platform_admin --reason "Technical team"
+sudo ./install.sh platform-role list</code></pre></div>
+<h3 id="1-3-the-other-roles-from-the-console">1.3 The other roles, from the console <button class="copy-link" type="button" data-copy-link="#1-3-the-other-roles-from-the-console" aria-label="Copy the link to 1.3 The other roles, from the console">#</button></h3>
+<p>With their second factor set up, the <code>platform_admin</code> grants the other roles in <b>Operator console → Platform roles and accounts → Grant a role</b>:</p>
+<ol class="steps">
+<li id="1-the-operator-s-team-2-1"><span>The <b>e-mail</b> the person registered with.</span></li>
+<li id="1-the-operator-s-team-2-2"><span>The <b>role</b>: <code>Operator reviewer</code> (approves onboarding and APIs), <code>Platform administrator</code>, <code>Regulator</code> or <code>Auditor</code>.</span></li>
+<li id="1-the-operator-s-team-2-3"><span>The <b>reason</b>, for the audit log: who asked for it and on what grounds.</span></li>
+<li id="1-the-operator-s-team-2-4"><span>Select <b>Grant the role</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-03-platform-roles">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Grant a role form with e-mail, role, reason and the Grant the role button"><img src="img/user-manual/03-platform-roles.jpg" alt="Grant a role form with e-mail, role, reason and the Grant the role button" width="1136" height="359" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#1-the-operator-s-team-2-1" style="left:3.61%;top:24.93%;width:45.69%;height:11.7%" aria-label="1. The e-mail the person registered with."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#1-the-operator-s-team-2-2" style="left:50.7%;top:18.8%;width:45.69%;height:11.7%" aria-label="2. The role : Operator reviewer (approves onboarding and APIs), Platform administrator , Regulator or Auditor ."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#1-the-operator-s-team-2-3" style="left:3.61%;top:54.46%;width:92.78%;height:17.27%" aria-label="3. The reason , for the audit log: who asked for it and on what grounds."><span>3</span></button><button class="hotspot" type="button" data-n="4" data-target="#1-the-operator-s-team-2-4" style="left:3.61%;top:76.18%;width:11.23%;height:12.26%" aria-label="4. Select Grant the role ."><span>4</span></button>
+</div>
+<figcaption>Every role granted or taken away goes to the audit log with who did it and why.</figcaption>
+</figure>
+<p>The person signs in again: Keycloak asks them to register the authenticator app (as in step 4.1), and from then on they see the <b>Operator console</b>.</p>
+<h3 id="1-4-disable-the-demo-accounts">1.4 Disable the demo accounts <button class="copy-link" type="button" data-copy-link="#1-4-disable-the-demo-accounts" aria-label="Copy the link to 1.4 Disable the demo accounts">#</button></h3>
+<p>Once the operator's own team has its roles, whoever runs the server disables the pilot's demo accounts:</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo ./install.sh demo-users disable --reason "The operator's team has its roles"</code></pre></div>
+<aside class="callout warn"><b>Attention</b><p>This cannot be undone from the installer. The command refuses if no <code>platform_admin</code> of your own is left active.</p></aside>
+
+</section>
+
+<section id="2-the-provider-entity-requests-its-onboarding" class="manual-section" data-roles="provider">
+<div class="section-head">
+<h2><span class="num">2</span>The provider entity requests its onboarding <button class="copy-link" type="button" data-copy-link="#2-the-provider-entity-requests-its-onboarding" aria-label="Copy the link to 2. The provider entity requests its onboarding">#</button></h2>
+<span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span><label class="done"><input type="checkbox" data-done="2-the-provider-entity-requests-its-onboarding"> Done</label>
+</div>
+<p><b>Who:</b> the person who will be the entity's administrator (Rosa). <b>You need:</b> the entity's details, the name and exact e-mail of its two officers, and the designation document as a PDF.</p>
+<h3 id="2-1-open-entity-onboarding">2.1 Open entity onboarding <button class="copy-link" type="button" data-copy-link="#2-1-open-entity-onboarding" aria-label="Copy the link to 2.1 Open entity onboarding">#</button></h3>
+<ol class="steps">
+<li id="2-the-provider-entity-requests-its-onboarding-1-1"><span>Create your account as in step 1.1 and, on the home page, select <b>Entity onboarding</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-02-no-roles">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Home page with no roles, with the Entity onboarding link"><img src="img/user-manual/02-no-roles.jpg" alt="Home page with no roles, with the Entity onboarding link" width="1440" height="732" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#2-the-provider-entity-requests-its-onboarding-1-1" style="left:63.52%;top:79.47%;width:24.82%;height:13.93%" aria-label="1. Create your account as in step 1.1 and, on the home page, select Entity onboarding ."><span>1</span></button>
+</div>
+<figcaption>No roles yet: the home page offers to request your entity's onboarding.</figcaption>
+</figure>
+<h3 id="2-2-fill-in-the-request">2.2 Fill in the request <button class="copy-link" type="button" data-copy-link="#2-2-fill-in-the-request" aria-label="Copy the link to 2.2 Fill in the request">#</button></h3>
+<ol class="steps">
+<li id="2-the-provider-entity-requests-its-onboarding-2-1"><span>The entity's <b>identifier</b>: it is the first segment of its routes on the gateway (<code>civil-registry</code>) and does not change later.</span></li>
+<li id="2-the-provider-entity-requests-its-onboarding-2-2"><span>The <b>data steward's exact e-mail</b>: their invitation goes to that address.</span></li>
+<li id="2-the-provider-entity-requests-its-onboarding-2-3"><span>The <b>technical lead's exact e-mail</b>.</span></li>
+<li id="2-the-provider-entity-requests-its-onboarding-2-4"><span>Select <b>Create the request</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-04-entity-request-form">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Onboarding form with the identifier, the officers and the Create the request button"><img src="img/user-manual/04-entity-request-form.jpg" alt="Onboarding form with the identifier, the officers and the Create the request button" width="800" height="1381" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#2-the-provider-entity-requests-its-onboarding-2-1" style="left:51.25%;top:28.71%;width:42.63%;height:3.04%" aria-label="1. The entity's identifier : it is the first segment of its routes on the gateway ( civil-registry ) and does not change later."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#2-the-provider-entity-requests-its-onboarding-2-2" style="left:51.25%;top:76.65%;width:42.63%;height:3.04%" aria-label="2. The data steward's exact e-mail : their invitation goes to that address."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#2-the-provider-entity-requests-its-onboarding-2-3" style="left:51.25%;top:90.26%;width:42.63%;height:3.04%" aria-label="3. The technical lead's exact e-mail ."><span>3</span></button><button class="hotspot" type="button" data-n="4" data-target="#2-the-provider-entity-requests-its-onboarding-2-4" style="left:6.13%;top:95.62%;width:19.56%;height:3.19%" aria-label="4. Select Create the request ."><span>4</span></button>
+</div>
+<figcaption>The full request: the entity's details, its data protection officer and its two officers.</figcaption>
+</figure>
+<div class="tablewrap"><table class="t"><thead><tr><th>Field</th><th>Example</th></tr></thead><tbody>
+<tr><td>Legal name / Short name</td><td class="wrap"><code>Civil Registry</code></td></tr>
+<tr><td>Identification type and number</td><td class="wrap"><code>NIT</code> · <code>900000100</code></td></tr>
+<tr><td>Kind / Sector</td><td class="wrap"><code>National entity</code> · <code>Identity</code></td></tr>
+<tr><td>Contact e-mail, website</td><td class="wrap">The institutional ones</td></tr>
+<tr><td>Data protection officer</td><td class="wrap">Name and e-mail</td></tr>
+</tbody></table></div>
+<aside class="callout info tip"><b>Tip</b><p>If one person will hold several roles, put their own e-mail in those fields: when the onboarding is approved they get the roles directly, with no invitations.</p></aside>
+<h3 id="2-3-upload-the-document-and-send">2.3 Upload the document and send <button class="copy-link" type="button" data-copy-link="#2-3-upload-the-document-and-send" aria-label="Copy the link to 2.3 Upload the document and send">#</button></h3>
+<ol class="steps">
+<li id="2-the-provider-entity-requests-its-onboarding-3-1"><span>Upload the <b>designation document</b> (PDF, at most 10 MB): the act or letter that designates the officers, with the same names and e-mails, signed by whoever has the authority.</span></li>
+<li id="2-the-provider-entity-requests-its-onboarding-3-2"><span>Select <b>Send for review</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-05-entity-request-submit">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Request with the document uploaded and the Send for review button"><img src="img/user-manual/05-entity-request-submit.jpg" alt="Request with the document uploaded and the Send for review button" width="1440" height="1113" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#2-the-provider-entity-requests-its-onboarding-3-1" style="left:63.4%;top:51.48%;width:6.97%;height:1.62%" aria-label="1. Upload the designation document (PDF, at most 10 MB): the act or letter that designates the officers, with the same names and e-mails, sign…"><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#2-the-provider-entity-requests-its-onboarding-3-2" style="left:11.67%;top:91.73%;width:9.51%;height:3.95%" aria-label="2. Select Send for review ."><span>2</span></button>
+</div>
+<figcaption>The document stays in the request with its SHA-256 fingerprint; a person of the operator reviews it.</figcaption>
+</figure>
+<p>Once sent it can no longer be edited, unless the operator asks for corrections.</p>
+</section>
+
+<section id="3-the-operator-approves-the-onboarding" class="manual-section" data-roles="operator">
+<div class="section-head">
+<h2><span class="num">3</span>The operator approves the onboarding <button class="copy-link" type="button" data-copy-link="#3-the-operator-approves-the-onboarding" aria-label="Copy the link to 3. The operator approves the onboarding">#</button></h2>
+<span class="role-chips"><span class="role-chip role-operator">Operator</span></span><label class="done"><input type="checkbox" data-done="3-the-operator-approves-the-onboarding"> Done</label>
+</div>
+<p><b>Who:</b> a person with the reviewer or platform administrator role, who is not the one who requested the onboarding (Ana).</p>
+<ol class="steps">
+<li id="3-the-operator-approves-the-onboarding-1-1"><span>In the <b>Operator console</b>, open the request under <b>Entity onboarding to review</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-06-operator-onboarding-list">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Operator console with Civil Registry's request to review"><img src="img/user-manual/06-operator-onboarding-list.jpg" alt="Operator console with Civil Registry's request to review" width="1136" height="175" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#3-the-operator-approves-the-onboarding-1-1" style="left:2.9%;top:70.29%;width:7.1%;height:10.29%" aria-label="1. In the Operator console , open the request under Entity onboarding to review ."><span>1</span></button>
+</div>
+<figcaption>Requests wait here, oldest first.</figcaption>
+</figure>
+<p>Check the details, the document and that the e-mails are institutional. Then decide:</p>
+<ol class="steps">
+<li id="3-the-operator-approves-the-onboarding-2-1"><span><b>Approve the onboarding</b>. The other options are <b>Request corrections</b> (the applicant reads your comment) or <b>Reject</b> (final; frees the identifier).</span></li>
+</ol>
+<figure class="shot" id="shot-07-operator-onboarding-decision">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Operator's decision with the Approve the onboarding button"><img src="img/user-manual/07-operator-onboarding-decision.jpg" alt="Operator's decision with the Approve the onboarding button" width="1136" height="315" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#3-the-operator-approves-the-onboarding-2-1" style="left:4.31%;top:70.24%;width:16.91%;height:13.97%" aria-label="1. Approve the onboarding . The other options are Request corrections (the applicant reads your comment) or Reject (final; frees the identifie…"><span>1</span></button>
+</div>
+<figcaption>The operator's decision, with an optional comment.</figcaption>
+</figure>
+<p>When approved, whoever requested the onboarding becomes the entity's administrator and each officer gets an invitation by e-mail, valid for 14 days.</p>
+</section>
+
+<section id="4-the-officers-join-the-entity" class="manual-section" data-roles="provider">
+<div class="section-head">
+<h2><span class="num">4</span>The officers join the entity <button class="copy-link" type="button" data-copy-link="#4-the-officers-join-the-entity" aria-label="Copy the link to 4. The officers join the entity">#</button></h2>
+<span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span><label class="done"><input type="checkbox" data-done="4-the-officers-join-the-entity"> Done</label>
+</div>
+<p><b>Who:</b> the administrator (Rosa), the data steward (Diego) and the technical lead (Tomás).</p>
+<h3 id="4-1-the-administrator-sets-up-the-second-factor">4.1 The administrator sets up the second factor <button class="copy-link" type="button" data-copy-link="#4-1-the-administrator-sets-up-the-second-factor" aria-label="Copy the link to 4.1 The administrator sets up the second factor">#</button></h3>
+<p>The next time she signs in, Keycloak asks the administrator to set up her authenticator app:</p>
+<ol class="steps">
+<li id="4-the-officers-join-the-entity-1-1"><span>Scan the <b>QR code</b> with the app.</span></li>
+<li id="4-the-officers-join-the-entity-1-2"><span>Type the <b>6-digit code</b> the app shows.</span></li>
+<li id="4-the-officers-join-the-entity-1-3"><span>Select <b>Submit</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-08-totp-enroll">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Authenticator app setup: blurred QR code, one-time code and Submit"><img src="img/user-manual/08-totp-enroll.jpg" alt="Authenticator app setup: blurred QR code, one-time code and Submit" width="592" height="1062" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#4-the-officers-join-the-entity-1-1" style="left:35.14%;top:39.32%;width:33.78%;height:18.83%" aria-label="1. Scan the QR code with the app."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#4-the-officers-join-the-entity-1-2" style="left:12.16%;top:73.42%;width:75.68%;height:3.39%" aria-label="2. Type the 6-digit code the app shows."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#4-the-officers-join-the-entity-1-3" style="left:12.16%;top:91.33%;width:75.68%;height:3.39%" aria-label="3. Select Submit ."><span>3</span></button>
+</div>
+<figcaption>The QR code is blurred in the screenshot: never share yours.</figcaption>
+</figure>
+<p>Until then she cannot act for the entity. From then on she sees <b>My entity</b>.</p>
+<h3 id="4-2-the-officers-accept-their-invitation">4.2 The officers accept their invitation <button class="copy-link" type="button" data-copy-link="#4-2-the-officers-accept-their-invitation" aria-label="Copy the link to 4.2 The officers accept their invitation">#</button></h3>
+<p>Each officer registers with <b>exactly</b> the e-mail in the request, verifies it and signs in:</p>
+<ol class="steps">
+<li id="4-the-officers-join-the-entity-2-1"><span>In <b>Invitations</b>, select <b>Accept</b> on the entity's invitation.</span></li>
+</ol>
+<figure class="shot" id="shot-10-invitations">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Invitations with Civil Registry's invitation and the Accept button"><img src="img/user-manual/10-invitations.jpg" alt="Invitations with Civil Registry's invitation and the Accept button" width="1440" height="551" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#4-the-officers-join-the-entity-2-1" style="left:13.4%;top:50.68%;width:5.8%;height:7.99%" aria-label="1. In Invitations , select Accept on the entity's invitation."><span>1</span></button>
+</div>
+<figcaption>The invitation shows the entity, the roles and when it expires.</figcaption>
+</figure>
+<p>The data steward registers their authenticator app the first time they work in the entity, as in step 4.1.</p>
+<aside class="callout warn"><b>Attention</b><p>If <b>Invitations</b> is empty, the registration e-mail is not identical to the one in the request, or it is not verified.</p></aside>
+
+</section>
+
+<section id="5-the-entity-s-node" class="manual-section" data-roles="provider">
+<div class="section-head">
+<h2><span class="num">5</span>The entity's node <button class="copy-link" type="button" data-copy-link="#5-the-entity-s-node" aria-label="Copy the link to 5. The entity's node">#</button></h2>
+<span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span><label class="done"><input type="checkbox" data-done="5-the-entity-s-node"> Done</label>
+</div>
+<p>The node is the secure channel between the network's gateway and the entity: it opens a tunnel <b>outwards</b>, with no inbound ports, and only accepts the gateway. Every provider entity comes in through its node.</p>
+<p><b>Who:</b> the administrator registers the node; infrastructure installs it. <b>You need:</b> an Ubuntu Server 22.04 or 24.04 server (amd64 or arm64) with internet access on UDP 51820 and TCP 443, and its clock in sync.</p>
+<h3 id="5-1-register-the-node">5.1 Register the node <button class="copy-link" type="button" data-copy-link="#5-1-register-the-node" aria-label="Copy the link to 5.1 Register the node">#</button></h3>
+<ol class="steps">
+<li id="5-the-entity-s-node-1-1"><span>In <b>My entity</b>, select <b>Kit nodes</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-09-my-entity">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: My entity with the Kit nodes link"><img src="img/user-manual/09-my-entity.jpg" alt="My entity with the Kit nodes link" width="1440" height="540" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#5-the-entity-s-node-1-1" style="left:72.83%;top:24.49%;width:4.6%;height:4.44%" aria-label="1. In My entity , select Kit nodes ."><span>1</span></button>
+</div>
+<figcaption>My entity: its details, its members and the administration's links.</figcaption>
+</figure>
+<p>Under <b>Register a node</b>:</p>
+<ol class="steps">
+<li id="5-the-entity-s-node-2-1"><span>Type a <b>name</b> unique in the entity, for example <code>nodo-principal</code>.</span></li>
+<li id="5-the-entity-s-node-2-2"><span>Select <b>Register and issue token</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-11-node-register">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Register a node form with the name and the Register and issue token button"><img src="img/user-manual/11-node-register.jpg" alt="Register a node form with the name and the Register and issue token button" width="1136" height="345" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#5-the-entity-s-node-2-1" style="left:4.31%;top:54.93%;width:61.8%;height:12.17%" aria-label="1. Type a name unique in the entity, for example nodo-principal ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#5-the-entity-s-node-2-2" style="left:4.31%;top:72.9%;width:16.65%;height:12.75%" aria-label="2. Select Register and issue token ."><span>2</span></button>
+</div>
+<figcaption>The token is for a single node and expires after 72 hours.</figcaption>
+</figure>
+<ol class="steps">
+<li id="5-the-entity-s-node-3-1"><span><b>Copy the token right then</b> and hand it to whoever installs the node.</span></li>
+</ol>
+<figure class="shot" id="shot-12-node-token">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Enrollment token, blurred, with the Copy button"><img src="img/user-manual/12-node-token.jpg" alt="Enrollment token, blurred, with the Copy button" width="734" height="87" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#5-the-entity-s-node-3-1" style="left:4.5%;top:38.51%;width:81.96%;height:22.99%" aria-label="1. Copy the token right then and hand it to whoever installs the node."><span>1</span></button>
+</div>
+<figcaption>The token is shown only once; it is blurred in the screenshot.</figcaption>
+</figure>
+<h3 id="5-2-install-the-node">5.2 Install the node <button class="copy-link" type="button" data-copy-link="#5-2-install-the-node" aria-label="Copy the link to 5.2 Install the node">#</button></h3>
+<p>The commands of the current version, with its checksum and the portal's address already in place, are under <b>Kit to install</b>, on the same page:</p>
+<ol class="steps">
+<li id="5-the-entity-s-node-4-1"><span>Copy the <b>commands</b> and run them on the node's server.</span></li>
+</ol>
+<figure class="shot" id="shot-13-node-kit">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Kit to install: version, checksum and commands with the Copy button"><img src="img/user-manual/13-node-kit.jpg" alt="Kit to install: version, checksum and commands with the Copy button" width="1136" height="881" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#5-the-entity-s-node-4-1" style="left:4.31%;top:68.64%;width:91.37%;height:17.45%" aria-label="1. Copy the commands and run them on the node's server."><span>1</span></button>
+</div>
+<figcaption>Compare the checksum with the one the operator publishes through its own channel before opening the bundle.</figcaption>
+</figure>
+<p>They look like this (version 0.2.0):</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code>curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz
+curl -fLO https://github.com/centre-for-dpi/data-exchange-provider/releases/download/v0.2.0/den-node-kit-0.2.0.tar.gz.sha256
+sha256sum -c den-node-kit-0.2.0.tar.gz.sha256      # must say: OK
+tar -xzf den-node-kit-0.2.0.tar.gz &amp;&amp; cd den-node-kit-0.2.0
+sudo ./install.sh</code></pre></div>
+<div class="tablewrap"><table class="t"><thead><tr><th>Installer question</th><th>Answer</th></tr></thead><tbody>
+<tr><td>Mode</td><td class="wrap"><code>canal</code> if the entity already has its API; <code>completo</code> for instant APIs over its database</td></tr>
+<tr><td>Corporate proxy</td><td class="wrap"><code>n</code>, or the proxy's address</td></tr>
+<tr><td>Portal URL</td><td class="wrap"><code>https://portal.example.org</code></td></tr>
+<tr><td>Token</td><td class="wrap">The one from step 5.1 (it is not shown while pasted)</td></tr>
+</tbody></table></div>
+<p>The installer checks the system, installs Docker if missing and ends with <b>"The node is online"</b>.</p>
+<h3 id="5-3-connect-the-api-to-the-node">5.3 Connect the API to the node <button class="copy-link" type="button" data-copy-link="#5-3-connect-the-api-to-the-node" aria-label="Copy the link to 5.3 Connect the API to the node">#</button></h3>
+<p>If the entity already has its API (<code>canal</code> mode):</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo /opt/den-node/install.sh service</code></pre></div>
+<div class="tablewrap"><table class="t"><thead><tr><th>Question</th><th>Example</th></tr></thead><tbody>
+<tr><td>Type</td><td class="wrap"><code>proxy</code></td></tr>
+<tr><td>Service name</td><td class="wrap"><code>afiliacion</code></td></tr>
+<tr><td>Path on the node</td><td class="wrap"><code>/salud</code> (the portal asks for it in step 6.2)</td></tr>
+<tr><td>Internal URL of the API</td><td class="wrap"><code>http://api-afiliacion:8000</code></td></tr>
+<tr><td>Credential the internal API requires</td><td class="wrap"><code>none</code>, <code>header</code>, <code>basic</code> or <code>certificate</code>; it never leaves the entity</td></tr>
+<tr><td>The API's OpenAPI</td><td class="wrap">The path of the <b>same file</b> uploaded to the portal</td></tr>
+</tbody></table></div>
+<p>If the entity has no API, the node publishes a <b>view</b> of its database as a lookup by key (<code>completo</code> mode, instant APIs). Preparing the view, the read-only user and the service file are in the <a href="walkthrough.html#5-the-entity-s-node">full walkthrough, step 5</a>.</p>
+<p>To finish: <code>sudo /opt/den-node/install.sh doctor</code>, everything ✔.</p>
+<h3 id="5-4-check-it-is-online">5.4 Check it is online <button class="copy-link" type="button" data-copy-link="#5-4-check-it-is-online" aria-label="Copy the link to 5.4 Check it is online">#</button></h3>
+<ol class="steps">
+<li id="5-the-entity-s-node-5-1"><span>Under <b>Kit nodes</b>, the node shows <b>Online</b> and its token <b>Used</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-14-node-online">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Node list with nodo-principal Online"><img src="img/user-manual/14-node-online.jpg" alt="Node list with nodo-principal Online" width="1136" height="147" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#5-the-entity-s-node-5-1" style="left:17.94%;top:52.04%;width:5.88%;height:13.61%" aria-label="1. Under Kit nodes , the node shows Online and its token Used ."><span>1</span></button>
+</div>
+<figcaption>The status follows the node's heartbeat, every few seconds.</figcaption>
+</figure>
+
+</section>
+
+<section id="6-the-technical-lead-publishes-the-api" class="manual-section" data-roles="provider">
+<div class="section-head">
+<h2><span class="num">6</span>The technical lead publishes the API <button class="copy-link" type="button" data-copy-link="#6-the-technical-lead-publishes-the-api" aria-label="Copy the link to 6. The technical lead publishes the API">#</button></h2>
+<span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span><label class="done"><input type="checkbox" data-done="6-the-technical-lead-publishes-the-api"> Done</label>
+</div>
+<p><b>Who:</b> the technical lead (Tomás). <b>You need:</b> the OpenAPI file configured on the node, the regulation that allows sharing the data, and the list of data the API exposes.</p>
+<h3 id="6-1-register-the-api">6.1 Register the API <button class="copy-link" type="button" data-copy-link="#6-1-register-the-api" aria-label="Copy the link to 6.1 Register the API">#</button></h3>
+<p>In <b>My APIs → Register API</b>:</p>
+<ol class="steps">
+<li id="6-the-technical-lead-publishes-the-api-1-1"><span>The <b>identifier in the URL</b>: it forms the public route <code>/civil-registry/certificados-afiliacion/v1</code>.</span></li>
+<li id="6-the-technical-lead-publishes-the-api-1-2"><span>The <b>classification</b>: <code>Public</code>, <code>Internal</code>, <code>Personal data</code> or <code>Sensitive data</code> (sensitive data APIs are also approved by the regulator).</span></li>
+<li id="6-the-technical-lead-publishes-the-api-1-3"><span>Select <b>Register API</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-15-api-register">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Register API form with identifier, classification and the Register API button"><img src="img/user-manual/15-api-register.jpg" alt="Register API form with identifier, classification and the Register API button" width="767" height="1034" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#6-the-technical-lead-publishes-the-api-1-1" style="left:6.39%;top:25.34%;width:91.53%;height:4.06%" aria-label="1. The identifier in the URL : it forms the public route /civil-registry/certificados-afiliacion/v1 ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#6-the-technical-lead-publishes-the-api-1-2" style="left:6.39%;top:69.05%;width:91.53%;height:4.06%" aria-label="2. The classification : Public , Internal , Personal data or Sensitive data (sensitive data APIs are also approved by the regulator)."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#6-the-technical-lead-publishes-the-api-1-3" style="left:6.39%;top:94.2%;width:15.12%;height:4.26%" aria-label="3. Select Register API ."><span>3</span></button>
+</div>
+<figcaption>Name, summary, description, sector and tags are what people see in the catalogue.</figcaption>
+</figure>
+<h3 id="6-2-create-the-version">6.2 Create the version <button class="copy-link" type="button" data-copy-link="#6-2-create-the-version" aria-label="Copy the link to 6.2 Create the version">#</button></h3>
+<p>In the API, select <b>New version</b> and type the version (<code>1.0</code>). Then, where the service lives:</p>
+<ol class="steps">
+<li id="6-the-technical-lead-publishes-the-api-2-1"><span>Upload the <b>OpenAPI file</b>: the same one configured on the node.</span></li>
+<li id="6-the-technical-lead-publishes-the-api-2-2"><span>Choose the <b>kit node</b> from step 5.1.</span></li>
+<li id="6-the-technical-lead-publishes-the-api-2-3"><span>Type the <b>service path on the node</b> (<code>/salud</code>).</span></li>
+</ol>
+<figure class="shot" id="shot-16-version-contract">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: New version: OpenAPI file, kit node and service path on the node"><img src="img/user-manual/16-version-contract.jpg" alt="New version: OpenAPI file, kit node and service path on the node" width="767" height="760" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#6-the-technical-lead-publishes-the-api-2-1" style="left:6.39%;top:34.47%;width:91.53%;height:4.74%" aria-label="1. Upload the OpenAPI file : the same one configured on the node."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#6-the-technical-lead-publishes-the-api-2-2" style="left:6.39%;top:80.79%;width:91.53%;height:5.53%" aria-label="2. Choose the kit node from step 5.1."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#6-the-technical-lead-publishes-the-api-2-3" style="left:6.39%;top:92.37%;width:91.53%;height:5.53%" aria-label="3. Type the service path on the node ( /salud )."><span>3</span></button>
+</div>
+<figcaption>The portal checks the contract when you upload it.</figcaption>
+</figure>
+<p>And what the network needs to know about the data:</p>
+<ol class="steps">
+<li id="6-the-technical-lead-publishes-the-api-3-1"><span>Tick the <b>allowed purposes</b>, for example <i>Eligibility check for a procedure</i>.</span></li>
+<li id="6-the-technical-lead-publishes-the-api-3-2"><span>Type each <b>data field</b> the response exposes, ticking the personal and sensitive ones.</span></li>
+<li id="6-the-technical-lead-publishes-the-api-3-3"><span>Type the <b>legal basis</b>: the regulation that allows sharing the data.</span></li>
+<li id="6-the-technical-lead-publishes-the-api-3-4"><span>Select <b>Create version</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-17-version-data">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Purposes, exposed data, legal basis and the Create version button"><img src="img/user-manual/17-version-data.jpg" alt="Purposes, exposed data, legal basis and the Create version button" width="734" height="954" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#6-the-technical-lead-publishes-the-api-3-1" style="left:2.18%;top:11.95%;width:95.64%;height:6.92%" aria-label="1. Tick the allowed purposes , for example Eligibility check for a procedure ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#6-the-technical-lead-publishes-the-api-3-2" style="left:4.5%;top:51.26%;width:65.32%;height:4.4%" aria-label="2. Type each data field the response exposes, ticking the personal and sensitive ones."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#6-the-technical-lead-publishes-the-api-3-3" style="left:2.18%;top:67.3%;width:95.64%;height:8.6%" aria-label="3. Type the legal basis : the regulation that allows sharing the data."><span>3</span></button><button class="hotspot" type="button" data-n="4" data-target="#6-the-technical-lead-publishes-the-api-3-4" style="left:2.18%;top:93.71%;width:17.83%;height:4.61%" aria-label="4. Select Create version ."><span>4</span></button>
+</div>
+<figcaption>Purposes, exposed data and legal basis are what the operator reviews.</figcaption>
+</figure>
+
+<aside class="callout warn"><b>Attention</b><p>Common contract errors: an identification number in the query (<code>?document=</code>) instead of in the path, repeated <code>operationId</code>s, external references and, in personal data APIs, not declaring whose data it is (<code>x-den-data-subject</code>).</p></aside>
+<h3 id="6-3-send-for-review">6.3 Send for review <button class="copy-link" type="button" data-copy-link="#6-3-send-for-review" aria-label="Copy the link to 6.3 Send for review">#</button></h3>
+<ol class="steps">
+<li id="6-the-technical-lead-publishes-the-api-4-1"><span>Check the version sheet (each operation and where the data subject goes) and select <b>Send for review</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-18-version-sheet">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Version sheet with the operations and the Send for review button"><img src="img/user-manual/18-version-sheet.jpg" alt="Version sheet with the operations and the Send for review button" width="1136" height="1074" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#6-the-technical-lead-publishes-the-api-4-1" style="left:3.61%;top:94.39%;width:12.06%;height:4.1%" aria-label="1. Check the version sheet (each operation and where the data subject goes) and select Send for review ."><span>1</span></button>
+</div>
+<figcaption>The sheet shows the contract as the portal understood it.</figcaption>
+</figure>
+<p>The portal runs the <b>automatic validations</b>: they call the service through the gateway, the tunnel and the node.</p>
+<ol class="steps">
+<li id="6-the-technical-lead-publishes-the-api-5-1"><span>Wait until they say <b>Passed</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-19-version-validations">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Automatic validations Passed"><img src="img/user-manual/19-version-validations.jpg" alt="Automatic validations Passed" width="1136" height="316" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#6-the-technical-lead-publishes-the-api-5-1" style="left:3.61%;top:14.79%;width:6.13%;height:6.33%" aria-label="1. Wait until they say Passed ."><span>1</span></button>
+</div>
+<figcaption>If they fail, the sheet says which one and why: fix it and select Run validations again.</figcaption>
+</figure>
+<p>Validations can be repeated once every 5 minutes per version.</p>
+</section>
+
+<section id="7-the-operator-approves-the-api" class="manual-section" data-roles="operator">
+<div class="section-head">
+<h2><span class="num">7</span>The operator approves the API <button class="copy-link" type="button" data-copy-link="#7-the-operator-approves-the-api" aria-label="Copy the link to 7. The operator approves the API">#</button></h2>
+<span class="role-chips"><span class="role-chip role-operator">Operator</span></span><label class="done"><input type="checkbox" data-done="7-the-operator-approves-the-api"> Done</label>
+</div>
+<p><b>Who:</b> a person of the operator with the reviewer role (Ana).</p>
+<p>In <b>Operator console → Versions in review</b>, open the version and check the contract, the data it exposes and the purposes:</p>
+<ol class="steps">
+<li id="7-the-operator-approves-the-api-1-1"><span>Check the <b>automatic validations</b> passed: with failed validations the portal does not allow approving.</span></li>
+<li id="7-the-operator-approves-the-api-1-2"><span>Select <b>Approve</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-20-operator-review">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Version review with the validations passed and the Approve button"><img src="img/user-manual/20-operator-review.jpg" alt="Version review with the validations passed and the Approve button" width="1136" height="1124" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#7-the-operator-approves-the-api-1-1" style="left:1.41%;top:1.45%;width:97.18%;height:25.2%" aria-label="1. Check the automatic validations passed: with failed validations the portal does not allow approving."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#7-the-operator-approves-the-api-1-2" style="left:4.31%;top:94.6%;width:8.24%;height:3.91%" aria-label="2. Select Approve ."><span>2</span></button>
+</div>
+<figcaption>Once approved, the route is live on the gateway.</figcaption>
+</figure>
+<p>If the operator <b>requests changes</b>, the technical lead reads the comment on the sheet, selects <b>Edit the version</b>, fixes it and sends it again.</p>
+</section>
+
+<section id="8-the-consumer-entity" class="manual-section" data-roles="consumer">
+<div class="section-head">
+<h2><span class="num">8</span>The consumer entity <button class="copy-link" type="button" data-copy-link="#8-the-consumer-entity" aria-label="Copy the link to 8. The consumer entity">#</button></h2>
+<span class="role-chips"><span class="role-chip role-consumer">Consumer entity</span></span><label class="done"><input type="checkbox" data-done="8-the-consumer-entity"> Done</label>
+</div>
+<p><b>Who:</b> the entity that will consult (Wanda, of the <i>Ministry of Welfare of Wakanda</i>). <b>You need:</b> the server where the application will run, with OpenSSL.</p>
+<h3 id="8-1-onboarding">8.1 Onboarding <button class="copy-link" type="button" data-copy-link="#8-1-onboarding" aria-label="Copy the link to 8.1 Onboarding">#</button></h3>
+<p>The same as steps 2 to 4, with the consumer entity's details.</p>
+<aside class="callout info tip"><b>Tip</b><p>Wanda put her own e-mail as data steward and as technical lead: when the onboarding was approved she got every role, with no invitations to accept.</p></aside>
+<h3 id="8-2-create-the-application">8.2 Create the application <button class="copy-link" type="button" data-copy-link="#8-2-create-the-application" aria-label="Copy the link to 8.2 Create the application">#</button></h3>
+<p>In <b>My applications → Create application</b>:</p>
+<ol class="steps">
+<li id="8-the-consumer-entity-1-1"><span>The <b>application name</b>.</span></li>
+<li id="8-the-consumer-entity-1-2"><span><b>What your entity will use it for</b>.</span></li>
+<li id="8-the-consumer-entity-1-3"><span>The <b>environment</b> (<code>Production</code> for real lookups).</span></li>
+<li id="8-the-consumer-entity-1-4"><span>Select <b>Create application</b> (with the technical contact e-mail already filled in).</span></li>
+</ol>
+<figure class="shot" id="shot-21-app-create">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Create application form with name, purpose, environment and the Create application button"><img src="img/user-manual/21-app-create.jpg" alt="Create application form with name, purpose, environment and the Create application button" width="767" height="578" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-1-1" style="left:6.39%;top:26.3%;width:91.53%;height:7.27%" aria-label="1. The application name ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#8-the-consumer-entity-1-2" style="left:6.39%;top:41.52%;width:91.53%;height:14.19%" aria-label="2. What your entity will use it for ."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#8-the-consumer-entity-1-3" style="left:6.39%;top:63.67%;width:91.53%;height:7.27%" aria-label="3. The environment ( Production for real lookups)."><span>3</span></button><button class="hotspot" type="button" data-n="4" data-target="#8-the-consumer-entity-1-4" style="left:6.39%;top:89.62%;width:20.32%;height:7.61%" aria-label="4. Select Create application (with the technical contact e-mail already filled in)."><span>4</span></button>
+</div>
+<figcaption>The application is what makes the calls: it gets its own certificate.</figcaption>
+</figure>
+<p><b>Save the secret now</b> appears:</p>
+<ol class="steps">
+<li id="8-the-consumer-entity-2-1"><span>The <b>Client ID</b> identifies the application.</span></li>
+<li id="8-the-consumer-entity-2-2"><span>The <b>Client secret</b> is shown <b>only once</b>: keep it in the secret manager of the application's server.</span></li>
+</ol>
+<figure class="shot" id="shot-22-app-secret">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Save the secret now: Client ID and the blurred Client secret"><img src="img/user-manual/22-app-secret.jpg" alt="Save the secret now: Client ID and the blurred Client secret" width="1184" height="649" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-2-1" style="left:7.6%;top:54.7%;width:50.81%;height:3.08%" aria-label="1. The Client ID identifies the application."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#8-the-consumer-entity-2-2" style="left:7.6%;top:69.49%;width:50.81%;height:3.08%" aria-label="2. The Client secret is shown only once : keep it in the secret manager of the application's server."><span>2</span></button>
+</div>
+<figcaption>The secret is blurred in the screenshot.</figcaption>
+</figure>
+<h3 id="8-3-the-application-s-certificate-mtls">8.3 The application's certificate (mTLS) <button class="copy-link" type="button" data-copy-link="#8-3-the-application-s-certificate-mtls" aria-label="Copy the link to 8.3 The application's certificate (mTLS)">#</button></h3>
+<p>The private key is generated <b>on the application's server</b> and never leaves it; only the request (CSR) goes to the portal. On the application's page, under <b>Client certificate (mTLS)</b>:</p>
+<ol class="steps">
+<li id="8-the-consumer-entity-3-1"><span>Pick your system's tab and run its <b>commands</b> on the application's server: the Client ID is already in them.</span></li>
+<li id="8-the-consumer-entity-3-2"><span>Paste the whole <b>CSR</b>, from <code>-----BEGIN CERTIFICATE REQUEST-----</code> to <code>-----END CERTIFICATE REQUEST-----</code>.</span></li>
+<li id="8-the-consumer-entity-3-3"><span>Select <b>Request certificate</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-23-app-certificate">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Client certificate: tabs per system, the pasted CSR and Request certificate"><img src="img/user-manual/23-app-certificate.jpg" alt="Client certificate: tabs per system, the pasted CSR and Request certificate" width="1136" height="1040" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-3-1" style="left:1.41%;top:15.91%;width:97.18%;height:3.27%" aria-label="1. Pick your system's tab and run its commands on the application's server: the Client ID is already in them."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#8-the-consumer-entity-3-2" style="left:1.41%;top:77.81%;width:97.18%;height:14.42%" aria-label="2. Paste the whole CSR , from -----BEGIN CERTIFICATE REQUEST----- to -----END CERTIFICATE REQUEST----- ."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#8-the-consumer-entity-3-3" style="left:1.41%;top:94.16%;width:13.81%;height:4.23%" aria-label="3. Select Request certificate ."><span>3</span></button>
+</div>
+<figcaption>The tabs have commands for Linux or macOS, Git Bash and PowerShell.</figcaption>
+</figure>
+<p>Another option is the <code>entity-check.sh</code> script, downloaded from that same page:</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code>bash entity-check.sh csr &lt;CLIENT_ID&gt;   # creates &lt;CLIENT_ID&gt;.key (readable by its owner only) and &lt;CLIENT_ID&gt;.csr
+cat &lt;CLIENT_ID&gt;.csr</code></pre></div>
+<ol class="steps">
+<li id="8-the-consumer-entity-4-1"><span>Select <b>Download</b>: it downloads as <code>&lt;CLIENT_ID&gt;.pem</code>. Keep it with that name next to the key.</span></li>
+</ol>
+<figure class="shot" id="shot-24-app-certificate-ready">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: The certificate is ready, with the Download link"><img src="img/user-manual/24-app-certificate-ready.jpg" alt="The certificate is ready, with the Download link" width="1136" height="914" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-4-1" style="left:2.9%;top:92.81%;width:8.6%;height:3.94%" aria-label="1. Select Download : it downloads as &lt;CLIENT_ID&gt;.pem . Keep it with that name next to the key."><span>1</span></button>
+</div>
+<figcaption>The certificate's CN is exactly the Client ID.</figcaption>
+</figure>
+<h3 id="8-4-request-access">8.4 Request access <button class="copy-link" type="button" data-copy-link="#8-4-request-access" aria-label="Copy the link to 8.4 Request access">#</button></h3>
+<p>In the <b>Catalogue</b>:</p>
+<ol class="steps">
+<li id="8-the-consumer-entity-5-1"><span><b>Search</b> the API by name, summary or tag and select <b>Filter</b>.</span></li>
+<li id="8-the-consumer-entity-5-2"><span>Open the <b>API</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-25-catalog">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Catalogue with the search and the Affiliation certificate result"><img src="img/user-manual/25-catalog.jpg" alt="Catalogue with the search and the Affiliation certificate result" width="1440" height="670" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-5-1" style="left:13.4%;top:36.19%;width:25.47%;height:6.27%" aria-label="1. Search the API by name, summary or tag and select Filter ."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#8-the-consumer-entity-5-2" style="left:13.4%;top:67.99%;width:13.8%;height:3.73%" aria-label="2. Open the API ."><span>2</span></button>
+</div>
+<figcaption>Every API says which personal data it exposes and for which purposes it can be requested.</figcaption>
+</figure>
+<ol class="steps">
+<li id="8-the-consumer-entity-6-1"><span>On the API's sheet, select <b>Request access</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-26-catalog-api">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: API sheet in the catalogue with the Request access button"><img src="img/user-manual/26-catalog-api.jpg" alt="API sheet in the catalogue with the Request access button" width="1440" height="820" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-6-1" style="left:77.55%;top:13.2%;width:10.78%;height:5.85%" aria-label="1. On the API's sheet, select Request access ."><span>1</span></button>
+</div>
+<figcaption>The sheet has the API's documentation, its operations and the state of the entity's node.</figcaption>
+</figure>
+<p>In the request:</p>
+<ol class="steps">
+<li id="8-the-consumer-entity-7-1"><span>The <b>application</b> that will make the calls (the one from step 8.2).</span></li>
+<li id="8-the-consumer-entity-7-2"><span>The <b>purpose</b>: one of those the API allows.</span></li>
+<li id="8-the-consumer-entity-7-3"><span><b>What you will use the data for</b>: the specific procedure or programme; the provider entity reviews it.</span></li>
+<li id="8-the-consumer-entity-7-4"><span>The <b>legal basis</b>: the regulation or agreement that entitles you to process this data.</span></li>
+<li id="8-the-consumer-entity-7-5"><span>The <b>validity in months</b>: up to the classification's maximum (12 for personal data).</span></li>
+<li id="8-the-consumer-entity-7-6"><span>Select <b>Send request</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-27-request-form">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Access request form with application, purpose, use, legal basis, validity and Send request"><img src="img/user-manual/27-request-form.jpg" alt="Access request form with application, purpose, use, legal basis, validity and Send request" width="767" height="1178" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-7-1" style="left:6.39%;top:19.46%;width:91.53%;height:3.57%" aria-label="1. The application that will make the calls (the one from step 8.2)."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#8-the-consumer-entity-7-2" style="left:6.39%;top:26.93%;width:91.53%;height:3.57%" aria-label="2. The purpose : one of those the API allows."><span>2</span></button><button class="hotspot" type="button" data-n="3" data-target="#8-the-consumer-entity-7-3" style="left:6.39%;top:36.27%;width:91.53%;height:6.96%" aria-label="3. What you will use the data for : the specific procedure or programme; the provider entity reviews it."><span>3</span></button><button class="hotspot" type="button" data-n="4" data-target="#8-the-consumer-entity-7-4" style="left:6.39%;top:49%;width:91.53%;height:5.26%" aria-label="4. The legal basis : the regulation or agreement that entitles you to process this data."><span>4</span></button><button class="hotspot" type="button" data-n="5" data-target="#8-the-consumer-entity-7-5" style="left:6.39%;top:82.11%;width:91.53%;height:3.57%" aria-label="5. The validity in months : up to the classification's maximum (12 for personal data)."><span>5</span></button><button class="hotspot" type="button" data-n="6" data-target="#8-the-consumer-entity-7-6" style="left:6.39%;top:94.84%;width:15.77%;height:3.74%" aria-label="6. Select Send request ."><span>6</span></button>
+</div>
+<figcaption>With no operations ticked, every read-only operation is requested.</figcaption>
+</figure>
+<ol class="steps">
+<li id="8-the-consumer-entity-8-1"><span>The request is <b>Waiting for the provider</b>.</span></li>
+</ol>
+<figure class="shot" id="shot-28-request-pending">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Access request Waiting for the provider"><img src="img/user-manual/28-request-pending.jpg" alt="Access request Waiting for the provider" width="1440" height="800" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#8-the-consumer-entity-8-1" style="left:24.48%;top:23.5%;width:11.14%;height:2.5%" aria-label="1. The request is Waiting for the provider ."><span>1</span></button>
+</div>
+<figcaption>The timeline shows every change of state.</figcaption>
+</figure>
+
+</section>
+
+<section id="9-the-provider-entity-decides" class="manual-section" data-roles="provider">
+<div class="section-head">
+<h2><span class="num">9</span>The provider entity decides <button class="copy-link" type="button" data-copy-link="#9-the-provider-entity-decides" aria-label="Copy the link to 9. The provider entity decides">#</button></h2>
+<span class="role-chips"><span class="role-chip role-provider">Provider entity</span></span><label class="done"><input type="checkbox" data-done="9-the-provider-entity-decides"> Done</label>
+</div>
+<p><b>Who:</b> the provider entity's data steward (Diego), with his second factor.</p>
+<ol class="steps">
+<li id="9-the-provider-entity-decides-1-1"><span>In <b>Requests</b>, open the request.</span></li>
+</ol>
+<figure class="shot" id="shot-29-steward-requests">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: The data steward's requests to decide"><img src="img/user-manual/29-steward-requests.jpg" alt="The data steward's requests to decide" width="1440" height="551" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#9-the-provider-entity-decides-1-1" style="left:12.85%;top:51.54%;width:10.66%;height:3.27%" aria-label="1. In Requests , open the request."><span>1</span></button>
+</div>
+<figcaption>Who asks, with which application and what for.</figcaption>
+</figure>
+<p>Check who asks, with which application, what for, on what legal basis and which personal data they will receive. To approve:</p>
+<ol class="steps">
+<li id="9-the-provider-entity-decides-2-1"><span>Adjust the <b>approved validity</b>: you can narrow the operations, the validity or the limit, never widen them.</span></li>
+<li id="9-the-provider-entity-decides-2-2"><span>Select <b>Approve</b> (or reject with a reason).</span></li>
+</ol>
+<figure class="shot" id="shot-30-steward-decision">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Approve form with the approved validity and the Approve button"><img src="img/user-manual/30-steward-decision.jpg" alt="Approve form with the approved validity and the Approve button" width="551" height="471" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#9-the-provider-entity-decides-2-1" style="left:2.9%;top:34.93%;width:88.2%;height:8.92%" aria-label="1. Adjust the approved validity : you can narrow the operations, the validity or the limit, never widen them."><span>1</span></button><button class="hotspot" type="button" data-n="2" data-target="#9-the-provider-entity-decides-2-2" style="left:2.9%;top:87.15%;width:16.99%;height:9.34%" aria-label="2. Select Approve (or reject with a reason)."><span>2</span></button>
+</div>
+<figcaption>Once approved, the agreement goes to the audit log and the gateway enables access in under a minute.</figcaption>
+</figure>
+
+</section>
+
+<section id="10-the-first-lookup" class="manual-section" data-roles="consumer">
+<div class="section-head">
+<h2><span class="num">10</span>The first lookup <button class="copy-link" type="button" data-copy-link="#10-the-first-lookup" aria-label="Copy the link to 10. The first lookup">#</button></h2>
+<span class="role-chips"><span class="role-chip role-consumer">Consumer entity</span></span><label class="done"><input type="checkbox" data-done="10-the-first-lookup"> Done</label>
+</div>
+<p><b>Who:</b> the consumer entity's developers, from the application's server, in the folder with <code>&lt;CLIENT_ID&gt;.key</code> and <code>&lt;CLIENT_ID&gt;.pem</code>.</p>
+<ol class="steps">
+<li id="10-the-first-lookup-1-1"><span>The request becomes <b>Active</b>: lookups can start.</span></li>
+</ol>
+<figure class="shot" id="shot-31-request-active">
+<div class="shot-frame">
+<button class="shot-open" type="button" aria-label="Enlarge the screenshot: Access request Active"><img src="img/user-manual/31-request-active.jpg" alt="Access request Active" width="1440" height="800" loading="lazy" decoding="async"></button><button class="hotspot" type="button" data-n="1" data-target="#10-the-first-lookup-1-1" style="left:24.48%;top:23.5%;width:4.55%;height:2.5%" aria-label="1. The request becomes Active : lookups can start."><span>1</span></button>
+</div>
+<figcaption>Active: the gateway knows the application, its certificate and what it may consult.</figcaption>
+</figure>
+
+<div class="tabs" data-tabs>
+<div role="tablist"><button role="tab" type="button" id="tabs-1-tab-0" aria-controls="tabs-1-panel-0" aria-selected="true" tabindex="0" data-label="Script (Linux, macOS or Git Bash)">Script (Linux, macOS or Git Bash)</button><button role="tab" type="button" id="tabs-1-tab-1" aria-controls="tabs-1-panel-1" aria-selected="false" tabindex="-1" data-label="curl (Linux or macOS)">curl (Linux or macOS)</button></div>
+<div role="tabpanel" id="tabs-1-panel-0" aria-labelledby="tabs-1-tab-0"><div class="code"><button class="copy" type="button">Copy</button><pre><code>./entity-check.sh check portal.example.org gateway.example.org        # reaches the network and keeps its root
+./entity-check.sh call portal.example.org gateway.example.org &lt;CLIENT_ID&gt; \
+  /civil-registry/certificados-afiliacion/v1/afiliados/1000000001 eligibility_check official-123</code></pre></div></div>
+<div role="tabpanel" id="tabs-1-panel-1" aria-labelledby="tabs-1-tab-1" hidden><div class="code"><button class="copy" type="button">Copy</button><pre><code>curl -fsS https://portal.example.org/api/v1/pki/ca -o network-ca.pem   # the network's root
+read -rs CLIENT_SECRET                                                 # paste it: it stays out of the history
+TOKEN=$(curl -fsS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt;.key \
+  -u "&lt;CLIENT_ID&gt;:$CLIENT_SECRET" -d grant_type=client_credentials \
+  https://gateway.example.org/oauth/token | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
+curl -sS --cacert network-ca.pem --cert &lt;CLIENT_ID&gt;.pem --key &lt;CLIENT_ID&gt;.key \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-DEN-Purpose: eligibility_check" \
+  -H "X-DEN-End-User: official-123" \
+  https://gateway.example.org/civil-registry/certificados-afiliacion/v1/afiliados/1000000001</code></pre></div></div>
+</div>
+<ul class="ticks">
+<li><b>Every lookup declares its purpose</b> (<code>X-DEN-Purpose</code>, one of the approved ones) and <b>who makes it</b> inside the entity (<code>X-DEN-End-User</code>; the network keeps only a pseudonym).</li>
+<li>The token lasts a few minutes and is bound to the certificate: ask for another when it expires.</li>
+<li>Answers: <b>200</b> with the data; <b>403</b> with the <code>X-DEN-Deny-Reason</code> header if something is missing (<code>no_subscription</code>: no approved access; <code>end_user_required</code>: who consults is missing); <b>404</b> if the record does not exist.</li>
+</ul>
+<aside class="callout info tip"><b>Tip</b><p>On Windows use <b>Git Bash</b> and the script: Windows' <code>curl</code> cannot use a PEM certificate and key.</p></aside>
+
+</section>
+
+<section id="when-something-fails" class="manual-section" data-roles="">
+<div class="section-head">
+<h2>When something fails <button class="copy-link" type="button" data-copy-link="#when-something-fails" aria-label="Copy the link to When something fails">#</button></h2>
+
+</div>
+<div class="tablewrap"><table class="t"><thead><tr><th>Symptom</th><th>Cause</th><th>What to do</th></tr></thead><tbody>
+<tr><td>The verification link expired</td><td class="wrap">It lasts 60 minutes</td><td class="wrap">Sign in with that account: the verification screen offers to send it again</td></tr>
+<tr><td>"Email already exists" when registering</td><td class="wrap">The account was created; it only needs verifying</td><td class="wrap">Sign in and resend the verification</td></tr>
+<tr><td><b>Invitations</b> is empty</td><td class="wrap">The e-mail is not identical to the one in the request, or not verified</td><td class="wrap">Register the account with the exact e-mail</td></tr>
+<tr><td>A platform role does not show</td><td class="wrap">The person never signed in to the portal</td><td class="wrap">Have them sign in once and grant it again</td></tr>
+<tr><td><b>Approve</b> is disabled</td><td class="wrap">The automatic validations have not passed</td><td class="wrap">The version sheet explains each failure; fix it and <b>Run validations again</b></td></tr>
+<tr><td>Validation with <b>504</b></td><td class="wrap">The gateway cannot reach the node through the tunnel</td><td class="wrap">On the node: <code>sudo /opt/den-node/install.sh status</code>; if the network changed address, <code>stop</code> and <code>start</code></td></tr>
+<tr><td>The portal rejects the CSR</td><td class="wrap">The <code>CN</code> is not the Client ID, or the key is not ECDSA P-256/P-384 nor RSA 2048–4096</td><td class="wrap">Generate another with the exact Client ID</td></tr>
+<tr><td><code>schannel: Failed to import cert file</code></td><td class="wrap">Windows' <code>curl</code> cannot use the PEM certificate and key</td><td class="wrap">Use <code>./entity-check.sh call</code> in Git Bash</td></tr>
+<tr><td><b>403</b> <code>no_subscription</code></td><td class="wrap">The request is not <b>Active</b>, or the purpose is not one of the approved ones</td><td class="wrap">Check the request and the <code>X-DEN-Purpose</code> header</td></tr>
+<tr><td><b>403</b> <code>end_user_required</code></td><td class="wrap">The <code>X-DEN-End-User</code> header is missing</td><td class="wrap">Send who consults inside the entity</td></tr>
+</tbody></table></div>
+<p>More cases, mostly about the node and the instant APIs, in the <a href="walkthrough.html#when-something-fails">full walkthrough</a>.</p>
+</section>
+
+    <p class="footer">Generated from <code>user-manual.md</code> by <code>scripts/user-manual-html.mjs</code>; the screenshots come from the real portal through <code>pnpm docs:manual</code>.</p>
+  </main>
+</div>
+
+<dialog class="shot-dialog" aria-labelledby="shot-dialog-title">
+  <div class="shot-dialog-bar"><p id="shot-dialog-title"></p><button type="button" class="shot-dialog-close">Close</button></div>
+  <div class="shot-dialog-body"></div>
+</dialog>
+<script type="application/json" id="manual-strings">{"progress":"{done} of {total} steps done","noResults":"No step matches the search.","results":"{count} steps match","copied":"Link copied","total":10}</script>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var big = document.getElementById('bigtext');
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function setBig(on) { root.classList.toggle('big', on); big.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+  setBig(load('den-big') === '1');
+  big.addEventListener('click', function () { var on = !root.classList.contains('big'); setBig(on); store('den-big', on ? '1' : '0'); });
+
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var box = btn.closest('.code, .cmd');
+      var text = box.querySelector('pre, code').innerText.trim();
+      var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+      var fallback = function () { var r = document.createRange(); r.selectNodeContents(box.querySelector('pre, code')); var s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Selected'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+    });
+  });
+
+  document.querySelectorAll('#pre input').forEach(function (box) {
+    box.checked = load('den-' + box.id) === '1';
+    box.addEventListener('change', function () { store('den-' + box.id, box.checked ? '1' : '0'); });
+  });
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  if ('IntersectionObserver' in window) {
+    var seen = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { seen[e.target.id] = e.isIntersecting; });
+      var first = links.find(function (a) { return seen[a.getAttribute('href').slice(1)]; });
+      if (first) links.forEach(function (a) { a.classList.toggle('active', a === first); });
+    }, { rootMargin: '-80px 0px -55% 0px' });
+    links.forEach(function (a) { var s = document.getElementById(a.getAttribute('href').slice(1)); if (s) io.observe(s); });
+  }
+})();
+</script>
+
+<script>
+
+(function () {
+  var strings = JSON.parse(document.getElementById('manual-strings').textContent);
+  var KEY = 'den-manual:';
+  function load(k) { try { return window.localStorage.getItem(KEY + k); } catch (e) { return null; } }
+  function save(k, v) { try { window.localStorage.setItem(KEY + k, v); } catch (e) {} }
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var status = document.querySelector('.search-status');
+  function say(text) { if (status) status.textContent = text; }
+  function byHash(hash) { return document.getElementById(decodeURIComponent(hash.replace(/^#/, ''))); }
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.manual-section'));
+  var journey = Array.prototype.slice.call(document.querySelectorAll('.journey li'));
+  function rolesOf(el) { return (el.getAttribute('data-roles') || '').split(' ').filter(Boolean); }
+
+  // Who am I: the other roles' steps are dimmed, never hidden (it is one journey).
+  function applyRole(role) {
+    sections.concat(journey).forEach(function (el) {
+      var roles = rolesOf(el);
+      var mine = role === 'all' || !roles.length || roles.indexOf(role) >= 0 ||
+        (role === 'operator' && roles.indexOf('server') >= 0);
+      if (mine) el.removeAttribute('data-dimmed'); else el.setAttribute('data-dimmed', '');
+    });
+  }
+  var radios = Array.prototype.slice.call(document.querySelectorAll('input[name="manual-role"]'));
+  var savedRole = load('role') || 'all';
+  radios.forEach(function (r) {
+    if (r.value === savedRole) r.checked = true;
+    r.addEventListener('change', function () { if (r.checked) { applyRole(r.value); save('role', r.value); } });
+  });
+  applyRole(savedRole);
+
+  // Progress: a "Done" per step, counted in the contents rail.
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('[data-done]'));
+  var progress = document.querySelector('[data-progress]');
+  var done = [];
+  try { done = JSON.parse(load('done') || '[]'); } catch (e) { done = []; }
+  function count() {
+    var n = boxes.filter(function (b) { return b.checked; }).length;
+    if (progress) progress.textContent = strings.progress.replace('{done}', n).replace('{total}', strings.total);
+  }
+  function remember() {
+    save('done', JSON.stringify(boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.getAttribute('data-done'); })));
+  }
+  boxes.forEach(function (b) {
+    b.checked = done.indexOf(b.getAttribute('data-done')) >= 0;
+    b.addEventListener('change', function () { count(); remember(); });
+  });
+  var reset = document.querySelector('[data-reset-progress]');
+  if (reset) reset.addEventListener('click', function () { boxes.forEach(function (b) { b.checked = false; }); count(); remember(); });
+  count();
+
+  // Hotspots: a numbered box on a screenshot leads to its sub-step in the text.
+  function goTo(hash) {
+    var item = byHash(hash);
+    if (!item) return;
+    item.setAttribute('tabindex', '-1');
+    item.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+    item.focus({ preventScroll: true });
+    item.classList.add('flash');
+    setTimeout(function () { item.classList.remove('flash'); }, 2000);
+  }
+  var dialog = document.querySelector('.shot-dialog');
+  var opener = null;
+  var returnFocus = true;
+  document.addEventListener('click', function (event) {
+    var spot = event.target.closest && event.target.closest('.hotspot');
+    if (spot) {
+      event.preventDefault();
+      if (dialog && dialog.open) { returnFocus = false; dialog.close(); }
+      goTo(spot.getAttribute('data-target'));
+      return;
+    }
+    var open = event.target.closest && event.target.closest('.shot-open');
+    if (open && dialog && !dialog.contains(open)) {
+      var figure = open.closest('.shot');
+      var frame = figure.querySelector('.shot-frame').cloneNode(true);
+      var inner = frame.querySelector('.shot-open');
+      var img = inner.querySelector('img');
+      img.removeAttribute('loading');
+      inner.parentNode.replaceChild(img, inner);
+      var body = dialog.querySelector('.shot-dialog-body');
+      body.replaceChildren(frame);
+      var caption = figure.querySelector('figcaption');
+      dialog.querySelector('#shot-dialog-title').textContent = caption ? caption.textContent : img.alt;
+      opener = open;
+      returnFocus = true;
+      dialog.showModal();
+      return;
+    }
+    var link = event.target.closest && event.target.closest('[data-copy-link]');
+    if (link) {
+      var url = location.href.split('#')[0] + link.getAttribute('data-copy-link');
+      try { if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function () {}); } catch (e) {}
+      say(strings.copied);
+    }
+  });
+  if (dialog) {
+    dialog.querySelector('.shot-dialog-close').addEventListener('click', function () { dialog.close(); });
+    dialog.addEventListener('close', function () { if (returnFocus && opener) opener.focus(); });
+  }
+
+  // Tabs per operating system: arrow keys move, the chosen label applies to every group.
+  var groups = Array.prototype.slice.call(document.querySelectorAll('[data-tabs]'));
+  function select(group, index, focus) {
+    var tabs = Array.prototype.slice.call(group.querySelectorAll('[role="tab"]'));
+    tabs.forEach(function (tab, i) {
+      var on = i === index;
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+      var panel = document.getElementById(tab.getAttribute('aria-controls'));
+      if (panel) panel.hidden = !on;
+    });
+    if (focus) tabs[index].focus();
+  }
+  function selectLabel(label) {
+    groups.forEach(function (group) {
+      var tabs = Array.prototype.slice.call(group.querySelectorAll('[role="tab"]'));
+      var i = tabs.map(function (t) { return t.getAttribute('data-label'); }).indexOf(label);
+      if (i >= 0) select(group, i, false);
+    });
+  }
+  groups.forEach(function (group) {
+    var tabs = Array.prototype.slice.call(group.querySelectorAll('[role="tab"]'));
+    tabs.forEach(function (tab, i) {
+      var panel = document.getElementById(tab.getAttribute('aria-controls'));
+      if (panel) panel.setAttribute('data-print-label', tab.getAttribute('data-label'));
+      tab.addEventListener('click', function () { selectLabel(tab.getAttribute('data-label')); save('tab', tab.getAttribute('data-label')); });
+      tab.addEventListener('keydown', function (e) {
+        var next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+        if (next === undefined) return;
+        e.preventDefault();
+        next = (next + tabs.length) % tabs.length;
+        select(group, next, true);
+        selectLabel(tabs[next].getAttribute('data-label'));
+        save('tab', tabs[next].getAttribute('data-label'));
+      });
+    });
+  });
+  var savedTab = load('tab');
+  if (savedTab) selectLabel(savedTab);
+
+  // Search: keeps the sections (and table rows) that mention the words.
+  var search = document.getElementById('manual-search');
+  if (search) search.addEventListener('input', function () {
+    var q = search.value.trim().toLowerCase();
+    var shown = 0;
+    sections.forEach(function (s) {
+      var rows = Array.prototype.slice.call(s.querySelectorAll('tbody tr'));
+      rows.forEach(function (r) { r.hidden = false; });
+      if (!q) { s.hidden = false; return; }
+      var match = s.textContent.toLowerCase().indexOf(q) >= 0;
+      s.hidden = !match;
+      if (match) {
+        shown += 1;
+        var hits = rows.filter(function (r) { return r.textContent.toLowerCase().indexOf(q) >= 0; });
+        if (hits.length) rows.forEach(function (r) { r.hidden = hits.indexOf(r) < 0; });
+      }
+    });
+    say(!q ? '' : shown ? strings.results.replace('{count}', shown) : strings.noResults);
+  });
+})();
+
+</script>
